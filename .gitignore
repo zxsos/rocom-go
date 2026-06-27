@@ -1,0 +1,26 @@
+# Python (scripts venv)
+/.venv/
+
+# 抓包产物
+/pcap/
+*.pcap
+*.pcap[0-9]*
+
+# 运行时数据
+*.db
+*.db-journal
+*.log
+
+# 编译产物(二进制)
+/rocom
+/rocom-capture
+/dist/
+
+# 前端依赖(构建产物 internal/server/web 需提交以便 go build 开箱即用)
+/web/node_modules/
+
+# 编辑器 / 系统
+.DS_Store
+*.swp
+.idea/
+.vscode/
