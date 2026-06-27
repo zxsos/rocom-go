@@ -93,6 +93,9 @@ data = {
     "opcodes": {str(v): k for k, v in parse_enum("c2s_cmd.proto", "ZoneSvrCmd").items()},
 }
 
+# 实测补充: 不在 ZoneSvrCmd enum 但已逆向确认的 opcode
+data["opcodes"]["6531"] = "PET_CATCH_OUTSIDE_RSP"  # 0x1983 战斗外捕捉(赛季球/高级球)
+
 os.makedirs(OUT, exist_ok=True)
 with open(os.path.join(OUT, "names.json"), "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
