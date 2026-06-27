@@ -79,13 +79,17 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
-		// 孵蛋：服务器下行的孵蛋结果含新宠物
-		if m.Direction == gcp.S2C && m.Opcode == pet.OpCrackEggRsp {
+		// 孵蛋 / 战斗外捕捉：下行结果含新宠物(嵌在 goods_reward)
+		if m.Direction == gcp.S2C && (m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp) {
 			if pd := pet.FindNewPet(m.AppBody); pd != nil {
 				p := pet.ToPet(pd, db)
 				st.UpsertPet(p)
 				srv.Hub().Broadcast("pet", p)
-				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: "孵蛋", Gid: p.Gid, Pet: p}
+				sub := "孵蛋"
+				if m.Opcode == pet.OpPetCatchRsp {
+					sub = "捕捉"
+				}
+				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: sub, Gid: p.Gid, Pet: p}
 				if st.AddEvent(ev) == nil {
 					srv.Hub().Broadcast("event", ev)
 				}
