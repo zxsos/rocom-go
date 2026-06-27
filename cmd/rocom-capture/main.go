@@ -136,15 +136,13 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	}
 }
 
-// catchWayName 由 catch_way 推断获得方式(细分映射后续可补)。
+// catchWayName 由 catch_way 推断获得方式(实测：1=捕捉、3=孵蛋;其余未知归“获得”)。
 func catchWayName(pd *pb.PetData) string {
 	switch pd.GetCatchWay() {
 	case 1:
 		return "捕捉"
-	case 2:
-		return "孵蛋"
 	case 3:
-		return "赠送"
+		return "孵蛋"
 	default:
 		return "获得"
 	}
