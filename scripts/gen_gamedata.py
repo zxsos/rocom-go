@@ -60,6 +60,12 @@ species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get(
 data = {
     "species": species,
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
+    # 性格增减维度: positive/negative_effect 用 79-84 编码(79生命..84速度),减 78 得六维 1-6。
+    "nature_effect": {
+        k: {"pos": v["positive_effect"] - 78, "neg": v["negative_effect"] - 78}
+        for k, v in rows("NATURE_CONF.json").items()
+        if 79 <= (v.get("positive_effect") or 0) <= 84 and 79 <= (v.get("negative_effect") or 0) <= 84
+    },
     "skill_dam_type": enum_dim("SkillDamType"),
     "talent_rate": enum_dim("PetTalentRate"),
     "partner_mark": enum_dim("PetPartnerMarkType"),
