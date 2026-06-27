@@ -26,6 +26,13 @@ type DB struct {
 	speciality   map[string]string
 	medal        map[string]Medal
 	opcodes      map[uint16]string
+	natureEffect map[string]NatureEffect
+}
+
+// NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
+type NatureEffect struct {
+	Pos int32 `json:"pos"` // +10% 维度
+	Neg int32 `json:"neg"` // -10% 维度
 }
 
 // Load 加载 embed 的名称表。
@@ -37,8 +44,9 @@ func Load() (*DB, error) {
 		TalentRate   map[string]string `json:"talent_rate"`
 		PartnerMark  map[string]string `json:"partner_mark"`
 		Speciality   map[string]string `json:"speciality"`
-		Medal        map[string]Medal  `json:"medal"`
-		Opcodes      map[string]string `json:"opcodes"`
+		Medal        map[string]Medal        `json:"medal"`
+		Opcodes      map[string]string       `json:"opcodes"`
+		NatureEffect map[string]NatureEffect `json:"nature_effect"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
 		return nil, err
@@ -58,8 +66,12 @@ func Load() (*DB, error) {
 		speciality:   raw.Speciality,
 		medal:        raw.Medal,
 		opcodes:      opcodes,
+		natureEffect: raw.NatureEffect,
 	}, nil
 }
+
+// NatureEffect 返回性格的 +10%/-10% 维度(六维编号 1-6;0 表示无)。
+func (db *DB) NatureEffect(natureID uint32) NatureEffect { return db.natureEffect[key(natureID)] }
 
 // OpcodeNames 返回 opcode 整数到 ZoneSvrCmd 名称的映射。
 func (db *DB) OpcodeNames() map[uint16]string { return db.opcodes }

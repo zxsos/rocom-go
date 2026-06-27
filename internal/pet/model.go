@@ -7,9 +7,9 @@ import (
 
 // Stat 是一项六维属性。
 type Stat struct {
-	Value     int32 `json:"value"`     // 面板基础值
-	Talent    int32 `json:"talent"`    // 个体值(天赋)
-	NatureAdd int32 `json:"natureAdd"` // 性格修正(正升负降)
+	Value    int32 `json:"value"`    // 最终面板值
+	TalentLv int32 `json:"talentLv"` // 天分等级(1-10，0 表示该维度无天分)
+	Nature   int8  `json:"nature"`   // 性格影响：1=增益(+10%) -1=减益(-10%) 0=无
 }
 
 // Pet 是用于前端展示/存储的业务模型(已中文化)。
@@ -48,17 +48,6 @@ type Pet struct {
 	Speed     Stat `json:"speed"`
 
 	SkillIDs []uint32 `json:"skillIds"`
-}
-
-func toStat(a *pb.PetAttributeData) Stat {
-	if a == nil {
-		return Stat{}
-	}
-	return Stat{
-		Value:     int32(a.GetBaseValue()),
-		Talent:    int32(a.GetTalent()),
-		NatureAdd: a.GetTalentAddValue(),
-	}
 }
 
 // ToPet 把解码后的 PetData 结合名称库转成业务模型。
@@ -101,33 +90,51 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		out.MedalDesc = m.Desc
 	}
 
-	if attr := p.GetAttributeInfo(); attr != nil {
-		out.HP = toStat(attr.GetHp())
-		out.Attack = toStat(attr.GetAttack())
-		out.Defense = toStat(attr.GetDefense())
-		out.SpAttack = toStat(attr.GetSpecialAttack())
-		out.SpDefense = toStat(attr.GetSpecialDefense())
-		out.Speed = toStat(attr.GetSpeed())
+	// 六维按编号 1-6 顺序: 1生命 2物攻 3魔攻 4物防 5魔防 6速度。
+	stats := []*Stat{&out.HP, &out.Attack, &out.SpAttack, &out.Defense, &out.SpDefense, &out.Speed}
+
+	// 性格增减维度(道具修改过则以 changed_nature_* 为准，否则取性格默认)。
+	ne := db.NatureEffect(p.GetNature())
+	posAttr, negAttr := ne.Pos, ne.Neg
+	if t := int32(p.GetChangedNaturePosAttrType()); t != 0 {
+		posAttr = t
+	}
+	if t := int32(p.GetChangedNatureNegAttrType()); t != 0 {
+		negAttr = t
+	}
+	for i, s := range stats {
+		idx := int32(i + 1)
+		if idx == posAttr {
+			s.Nature = 1
+		} else if idx == negAttr {
+			s.Nature = -1
+		}
 	}
 
-	// attribute_new_info 直接给出最终面板值(已含等级/努力/奖牌加成)，
-	// 若存在则覆盖 base_value。type 为 AttributeType: 1生命 2物攻 3魔攻 4物防 5魔防 6速度。
+	if attr := p.GetAttributeInfo(); attr != nil {
+		src := []*pb.PetAttributeData{
+			attr.GetHp(), attr.GetAttack(), attr.GetSpecialAttack(),
+			attr.GetDefense(), attr.GetSpecialDefense(), attr.GetSpeed(),
+		}
+		for i, a := range src {
+			if a != nil {
+				stats[i].Value = int32(a.GetBaseValue())
+				stats[i].TalentLv = a.GetTalentAddValue() // 天分等级(1-10)
+			}
+		}
+	}
+
+	// attribute_new_info 直接给出最终面板值(已含等级/努力/奖牌加成)，覆盖 base_value。
 	if newAttr := p.GetAttributeNewInfo(); newAttr != nil {
 		finals := make(map[int32]int32)
 		for _, a := range newAttr.GetAddiAttrData() {
 			finals[a.GetType()] += a.GetAddiAttr()
 		}
-		setFinal := func(s *Stat, t int32) {
-			if v, ok := finals[t]; ok {
+		for i, s := range stats {
+			if v, ok := finals[int32(i+1)]; ok {
 				s.Value = v
 			}
 		}
-		setFinal(&out.HP, 1)
-		setFinal(&out.Attack, 2)
-		setFinal(&out.SpAttack, 3)
-		setFinal(&out.Defense, 4)
-		setFinal(&out.SpDefense, 5)
-		setFinal(&out.Speed, 6)
 	}
 
 	if sk := p.GetSkill(); sk != nil {
