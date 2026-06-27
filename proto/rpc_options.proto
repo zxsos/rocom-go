@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+
+import "google/protobuf/descriptor.proto";
+
+enum RealTypeOfInt {
+  RealTypeOfInt__PB3_ZERO = 0;
+  RT_UINT8 = 1;
+  RT_INT8 = 2;
+  RT_UINT16 = 3;
+  RT_INT16 = 4;
+}
+
+message NullRequest {
+}
+
+message NullResponse {
+}
