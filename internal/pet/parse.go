@@ -162,6 +162,86 @@ func FindNewPet(body []byte) *pb.PetData {
 	return nil
 }
 
+// PTTBigWorld 是 PlayerTeamType.PTT_BIG_WORLD(大世界队伍 team_type)。
+const PTTBigWorld = 1
+
+// TeamEntry 是一只宠物在大世界队伍中的位置(team_idx 第几队,pos 队内位置 0 起,每队 6 位)。
+type TeamEntry struct {
+	Gid     uint32
+	TeamIdx int32
+	Pos     int32
+}
+
+// collectTeamInfos 递归收集 body 里所有可解析的 PetTeamInfo 候选。
+func collectTeamInfos(body []byte, out *[]*pb.PetTeamInfo) {
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			var ti pb.PetTeamInfo
+			if proto.Unmarshal(v, &ti) == nil && len(ti.GetTeams()) > 0 {
+				*out = append(*out, &ti)
+			}
+			collectTeamInfos(v, out)
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+}
+
+// ParseTeams 在 body 里找大世界队伍(team_type==PTT_BIG_WORLD)的 PetTeamInfo,
+// 展开为 gid->(team_idx, pos) 列表。取含宠物数最多的大世界候选以排除误解析。
+func ParseTeams(body []byte) []TeamEntry {
+	var cands []*pb.PetTeamInfo
+	collectTeamInfos(body, &cands)
+
+	var best *pb.PetTeamInfo
+	bestN := 0
+	for _, ti := range cands {
+		if ti.GetTeamType() != PTTBigWorld {
+			continue
+		}
+		n := 0
+		for _, t := range ti.GetTeams() {
+			for _, pi := range t.GetPetInfos() {
+				if pi.GetPetGid() != 0 {
+					n++
+				}
+			}
+		}
+		if n > bestN {
+			bestN, best = n, ti
+		}
+	}
+	if best == nil {
+		return nil
+	}
+
+	// 队号取 teams[] 数组下标(实测 PetTeam.team_idx 恒 0、无队名,故以数组顺序为准)。
+	var out []TeamEntry
+	for ti, t := range best.GetTeams() {
+		for pos, pi := range t.GetPetInfos() {
+			if g := pi.GetPetGid(); g != 0 {
+				out = append(out, TeamEntry{Gid: g, TeamIdx: int32(ti), Pos: int32(pos)})
+			}
+		}
+	}
+	return out
+}
+
 // ParseFreeRsp 解析 ZonePetFreeRsp(放生)的 body，返回被放生的 gid 列表。
 // 消息结构: { RetInfo ret_info=1; repeated uint32 pet_gid=2; }
 func ParseFreeRsp(body []byte) []uint32 {

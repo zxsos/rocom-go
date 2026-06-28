@@ -18,16 +18,23 @@ import pbdesc
 
 PKG = "github.com/whoisnian/rocom-capture/internal/pb"
 OUT = "internal/pb"
-ROOT = "com_pet.proto"
+# 解析根:com_pet(PetData/背包) + com_pet_team(大世界队伍 PetTeamInfo)。闭包动态合并求取。
+ROOTS = ["com_pet.proto", "com_pet_team.proto"]
 ALL_PB = os.path.join(os.environ.get("NRC_PB_DIR", "nrc"), "all.pb")
 DESCRIPTORPB_GO = "google.golang.org/protobuf/types/descriptorpb"
 
 
 def main():
     fds = pbdesc.load(ALL_PB)
-    files = pbdesc.closure(fds, ROOT)
-    if not files:
-        sys.exit(f"无法从 {ALL_PB} 求取 {ROOT} 闭包")
+    files, seen = [], set()
+    for root in ROOTS:
+        c = pbdesc.closure(fds, root)
+        if not c:
+            sys.exit(f"无法从 {ALL_PB} 求取 {root} 闭包")
+        for f in c:
+            if f not in seen:
+                seen.add(f)
+                files.append(f)
     print(f"闭包({len(files)} 文件): {' '.join(files)}")
 
     # protoc-gen-go 在 GOPATH/bin

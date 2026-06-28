@@ -13,6 +13,12 @@ type PetBoxLoc struct {
 	Mark    string `json:"mark,omitempty"`    // 分类标记中文(首领/污染/奇异/炫彩/闪光)
 }
 
+// PetTeamLoc 是宠物在大世界队伍中的位置(teamIdx/pos 均从 0 起,最多 3 队、每队 6 位)。
+type PetTeamLoc struct {
+	TeamIdx int32 `json:"teamIdx"` // 第几队(0 起)
+	Pos     int32 `json:"pos"`     // 队内位置(0 起)
+}
+
 // Stat 是一项六维属性。
 type Stat struct {
 	Value    int32 `json:"value"`    // 最终面板值
@@ -51,7 +57,8 @@ type Pet struct {
 
 	Image gamedata.PetImage `json:"image"` // 各尺寸图片相对路径(由前端拼到 /img/ 下)
 
-	Box *PetBoxLoc `json:"box,omitempty"` // 仓库盒子位置(来自 PetBackpackInfo,读取时 JOIN 注入)
+	Box  *PetBoxLoc  `json:"box,omitempty"`  // 仓库盒子位置(来自 PetBackpackInfo,读取时 JOIN 注入)
+	Team *PetTeamLoc `json:"team,omitempty"` // 大世界队伍位置(在队宠物不在盒子里,二者互斥)
 
 	HP        Stat `json:"hp"`
 	Attack    Stat `json:"attack"`    // 物攻

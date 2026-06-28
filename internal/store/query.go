@@ -147,12 +147,12 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	if err = rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	s.attachBoxes(pets)
+	s.attachLocations(pets)
 	return pets, total, nil
 }
 
-// attachBoxes 给一页宠物批量注入盒子位置(单查询,按 gid 映射)。
-func (s *Store) attachBoxes(pets []*pet.Pet) {
+// attachLocations 给一页宠物批量注入盒子/队伍位置(各一次查询,按 gid 映射)。
+func (s *Store) attachLocations(pets []*pet.Pet) {
 	if len(pets) == 0 {
 		return
 	}
@@ -164,20 +164,32 @@ func (s *Store) attachBoxes(pets []*pet.Pet) {
 		ph[i] = "?"
 		args[i] = p.Gid
 	}
-	rows, err := s.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE gid IN (`+strings.Join(ph, ",")+`)`, args...)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var gid uint32
-		var boxID, slot, mark int32
-		var name string
-		if rows.Scan(&gid, &boxID, &slot, &name, &mark) == nil {
-			if p := byGid[gid]; p != nil {
-				p.Box = &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
+	in := "(" + strings.Join(ph, ",") + ")"
+
+	if rows, err := s.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE gid IN `+in, args...); err == nil {
+		for rows.Next() {
+			var gid uint32
+			var boxID, slot, mark int32
+			var name string
+			if rows.Scan(&gid, &boxID, &slot, &name, &mark) == nil {
+				if p := byGid[gid]; p != nil {
+					p.Box = &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
+				}
 			}
 		}
+		rows.Close()
+	}
+	if rows, err := s.db.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE gid IN `+in, args...); err == nil {
+		for rows.Next() {
+			var gid uint32
+			var teamIdx, pos int32
+			if rows.Scan(&gid, &teamIdx, &pos) == nil {
+				if p := byGid[gid]; p != nil {
+					p.Team = &pet.PetTeamLoc{TeamIdx: teamIdx, Pos: pos}
+				}
+			}
+		}
+		rows.Close()
 	}
 }
 

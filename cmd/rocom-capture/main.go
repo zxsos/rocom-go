@@ -82,10 +82,16 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		// 盒子布局：登录数据(0x0102)或盒子操作回包携带完整背包 PetBackpackInfo，
 		// 解出 gid->(盒子,格位) 全量快照存入 pet_box,读取宠物时 JOIN 注入位置。
 		if m.Direction == gcp.S2C && pet.CarriesBackpack(m.Opcode) {
+			updated := false
 			if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
-				if st.ReplacePetBoxes(entries) == nil {
-					srv.Hub().Broadcast("pet", map[string]any{"boxUpdate": len(entries)})
-				}
+				updated = st.ReplacePetBoxes(entries) == nil || updated
+			}
+			// 登录数据同时携带大世界队伍(在队宠物不在盒子里)
+			if teams := pet.ParseTeams(m.AppBody); len(teams) > 0 {
+				updated = st.ReplacePetTeams(teams) == nil || updated
+			}
+			if updated {
+				srv.Hub().Broadcast("pet", map[string]any{"locUpdate": true})
 			}
 		}
 
