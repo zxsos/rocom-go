@@ -23,9 +23,9 @@ const (
 
 type Position struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
-	Z             int32                  `protobuf:"varint,3,opt,name=z,proto3" json:"z,omitempty"`
+	X             *int32                 `protobuf:"varint,1,opt,name=x" json:"x,omitempty"`
+	Y             *int32                 `protobuf:"varint,2,opt,name=y" json:"y,omitempty"`
+	Z             *int32                 `protobuf:"varint,3,opt,name=z" json:"z,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,30 +61,30 @@ func (*Position) Descriptor() ([]byte, []int) {
 }
 
 func (x *Position) GetX() int32 {
-	if x != nil {
-		return x.X
+	if x != nil && x.X != nil {
+		return *x.X
 	}
 	return 0
 }
 
 func (x *Position) GetY() int32 {
-	if x != nil {
-		return x.Y
+	if x != nil && x.Y != nil {
+		return *x.Y
 	}
 	return 0
 }
 
 func (x *Position) GetZ() int32 {
-	if x != nil {
-		return x.Z
+	if x != nil && x.Z != nil {
+		return *x.Z
 	}
 	return 0
 }
 
 type Position2D struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	X             *int32                 `protobuf:"varint,1,opt,name=x" json:"x,omitempty"`
+	Y             *int32                 `protobuf:"varint,2,opt,name=y" json:"y,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -120,23 +120,23 @@ func (*Position2D) Descriptor() ([]byte, []int) {
 }
 
 func (x *Position2D) GetX() int32 {
-	if x != nil {
-		return x.X
+	if x != nil && x.X != nil {
+		return *x.X
 	}
 	return 0
 }
 
 func (x *Position2D) GetY() int32 {
-	if x != nil {
-		return x.Y
+	if x != nil && x.Y != nil {
+		return *x.Y
 	}
 	return 0
 }
 
 type Point struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pos           *Position              `protobuf:"bytes,1,opt,name=pos,proto3" json:"pos,omitempty"`
-	Dir           *Position              `protobuf:"bytes,2,opt,name=dir,proto3" json:"dir,omitempty"`
+	Pos           *Position              `protobuf:"bytes,1,opt,name=pos" json:"pos,omitempty"`
+	Dir           *Position              `protobuf:"bytes,2,opt,name=dir" json:"dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -187,8 +187,8 @@ func (x *Point) GetDir() *Position {
 
 type Rect struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Beg           *Position              `protobuf:"bytes,1,opt,name=beg,proto3" json:"beg,omitempty"`
-	Size          *Position              `protobuf:"bytes,2,opt,name=size,proto3" json:"size,omitempty"`
+	Beg           *Position              `protobuf:"bytes,1,opt,name=beg" json:"beg,omitempty"`
+	Size          *Position              `protobuf:"bytes,2,opt,name=size" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -239,8 +239,8 @@ func (x *Rect) GetSize() *Position {
 
 type Rect2D struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Beg           *Position2D            `protobuf:"bytes,1,opt,name=beg,proto3" json:"beg,omitempty"`
-	Size          *Position2D            `protobuf:"bytes,2,opt,name=size,proto3" json:"size,omitempty"`
+	Beg           *Position2D            `protobuf:"bytes,1,opt,name=beg" json:"beg,omitempty"`
+	Size          *Position2D            `protobuf:"bytes,2,opt,name=size" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -291,8 +291,8 @@ func (x *Rect2D) GetSize() *Position2D {
 
 type GlassInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	GlassType     GlassType              `protobuf:"varint,1,opt,name=glass_type,json=glassType,proto3,enum=dataconfig.GlassType" json:"glass_type,omitempty"`
-	GlassValue    int32                  `protobuf:"varint,2,opt,name=glass_value,json=glassValue,proto3" json:"glass_value,omitempty"`
+	GlassType     *GlassType             `protobuf:"varint,1,opt,name=glass_type,json=glassType,enum=dataconfig.GlassType" json:"glass_type,omitempty"`
+	GlassValue    *int32                 `protobuf:"varint,2,opt,name=glass_value,json=glassValue" json:"glass_value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -328,25 +328,25 @@ func (*GlassInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *GlassInfo) GetGlassType() GlassType {
-	if x != nil {
-		return x.GlassType
+	if x != nil && x.GlassType != nil {
+		return *x.GlassType
 	}
-	return GlassType_GlassType__PB3_ZERO
+	return GlassType_GT_NULL
 }
 
 func (x *GlassInfo) GetGlassValue() int32 {
-	if x != nil {
-		return x.GlassValue
+	if x != nil && x.GlassValue != nil {
+		return *x.GlassValue
 	}
 	return 0
 }
 
 type RecordItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cmd           string                 `protobuf:"bytes,1,opt,name=cmd,proto3" json:"cmd,omitempty"`
-	CmdVal        uint32                 `protobuf:"varint,2,opt,name=cmd_val,json=cmdVal,proto3" json:"cmd_val,omitempty"`
-	Content       []byte                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	WriteTime     []byte                 `protobuf:"bytes,4,opt,name=write_time,json=writeTime,proto3" json:"write_time,omitempty"`
+	Cmd           *string                `protobuf:"bytes,1,opt,name=cmd" json:"cmd,omitempty"`
+	CmdVal        *uint32                `protobuf:"varint,2,opt,name=cmd_val,json=cmdVal" json:"cmd_val,omitempty"`
+	Content       []byte                 `protobuf:"bytes,3,opt,name=content" json:"content,omitempty"`
+	WriteTime     []byte                 `protobuf:"bytes,4,opt,name=write_time,json=writeTime" json:"write_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -382,15 +382,15 @@ func (*RecordItem) Descriptor() ([]byte, []int) {
 }
 
 func (x *RecordItem) GetCmd() string {
-	if x != nil {
-		return x.Cmd
+	if x != nil && x.Cmd != nil {
+		return *x.Cmd
 	}
 	return ""
 }
 
 func (x *RecordItem) GetCmdVal() uint32 {
-	if x != nil {
-		return x.CmdVal
+	if x != nil && x.CmdVal != nil {
+		return *x.CmdVal
 	}
 	return 0
 }
@@ -411,7 +411,7 @@ func (x *RecordItem) GetWriteTime() []byte {
 
 type RecordItemList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ItemList      []*RecordItem          `protobuf:"bytes,1,rep,name=item_list,json=itemList,proto3" json:"item_list,omitempty"`
+	ItemList      []*RecordItem          `protobuf:"bytes,1,rep,name=item_list,json=itemList" json:"item_list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -455,9 +455,9 @@ func (x *RecordItemList) GetItemList() []*RecordItem {
 
 type RecordFileData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	BattleId      string                 `protobuf:"bytes,1,opt,name=battle_id,json=battleId,proto3" json:"battle_id,omitempty"`
-	Uin           string                 `protobuf:"bytes,2,opt,name=uin,proto3" json:"uin,omitempty"`
-	BattleData    *RecordItemList        `protobuf:"bytes,5,opt,name=battle_data,json=battleData,proto3" json:"battle_data,omitempty"`
+	BattleId      *string                `protobuf:"bytes,1,opt,name=battle_id,json=battleId" json:"battle_id,omitempty"`
+	Uin           *string                `protobuf:"bytes,2,opt,name=uin" json:"uin,omitempty"`
+	BattleData    *RecordItemList        `protobuf:"bytes,5,opt,name=battle_data,json=battleData" json:"battle_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -493,15 +493,15 @@ func (*RecordFileData) Descriptor() ([]byte, []int) {
 }
 
 func (x *RecordFileData) GetBattleId() string {
-	if x != nil {
-		return x.BattleId
+	if x != nil && x.BattleId != nil {
+		return *x.BattleId
 	}
 	return ""
 }
 
 func (x *RecordFileData) GetUin() string {
-	if x != nil {
-		return x.Uin
+	if x != nil && x.Uin != nil {
+		return *x.Uin
 	}
 	return ""
 }
@@ -515,15 +515,15 @@ func (x *RecordFileData) GetBattleData() *RecordItemList {
 
 type PlayerSceneInfo struct {
 	state                             protoimpl.MessageState `protogen:"open.v1"`
-	CellId                            uint64                 `protobuf:"varint,1,opt,name=cell_id,json=cellId,proto3" json:"cell_id,omitempty"`
-	Pt                                *Point                 `protobuf:"bytes,2,opt,name=pt,proto3" json:"pt,omitempty"`
-	BelongCamp                        uint32                 `protobuf:"varint,3,opt,name=belong_camp,json=belongCamp,proto3" json:"belong_camp,omitempty"`
-	EnteredCellInLastLoginProgress    bool                   `protobuf:"varint,4,opt,name=entered_cell_in_last_login_progress,json=enteredCellInLastLoginProgress,proto3" json:"entered_cell_in_last_login_progress,omitempty"`
-	KickoutTypeWhenScenesvrRecovering int32                  `protobuf:"varint,5,opt,name=kickout_type_when_scenesvr_recovering,json=kickoutTypeWhenScenesvrRecovering,proto3" json:"kickout_type_when_scenesvr_recovering,omitempty"`
-	DestroyFailedCellsvrBusppInstIds  []uint64               `protobuf:"varint,11,rep,packed,name=destroy_failed_cellsvr_buspp_inst_ids,json=destroyFailedCellsvrBusppInstIds,proto3" json:"destroy_failed_cellsvr_buspp_inst_ids,omitempty"`
-	TimeOfDay                         int32                  `protobuf:"varint,12,opt,name=time_of_day,json=timeOfDay,proto3" json:"time_of_day,omitempty"`
-	WeatherType                       int32                  `protobuf:"varint,13,opt,name=weather_type,json=weatherType,proto3" json:"weather_type,omitempty"`
-	CurrTime                          int64                  `protobuf:"varint,14,opt,name=curr_time,json=currTime,proto3" json:"curr_time,omitempty"`
+	CellId                            *uint64                `protobuf:"varint,1,opt,name=cell_id,json=cellId" json:"cell_id,omitempty"`
+	Pt                                *Point                 `protobuf:"bytes,2,opt,name=pt" json:"pt,omitempty"`
+	BelongCamp                        *uint32                `protobuf:"varint,3,opt,name=belong_camp,json=belongCamp" json:"belong_camp,omitempty"`
+	EnteredCellInLastLoginProgress    *bool                  `protobuf:"varint,4,opt,name=entered_cell_in_last_login_progress,json=enteredCellInLastLoginProgress" json:"entered_cell_in_last_login_progress,omitempty"`
+	KickoutTypeWhenScenesvrRecovering *int32                 `protobuf:"varint,5,opt,name=kickout_type_when_scenesvr_recovering,json=kickoutTypeWhenScenesvrRecovering" json:"kickout_type_when_scenesvr_recovering,omitempty"`
+	DestroyFailedCellsvrBusppInstIds  []uint64               `protobuf:"varint,11,rep,name=destroy_failed_cellsvr_buspp_inst_ids,json=destroyFailedCellsvrBusppInstIds" json:"destroy_failed_cellsvr_buspp_inst_ids,omitempty"`
+	TimeOfDay                         *int32                 `protobuf:"varint,12,opt,name=time_of_day,json=timeOfDay" json:"time_of_day,omitempty"`
+	WeatherType                       *int32                 `protobuf:"varint,13,opt,name=weather_type,json=weatherType" json:"weather_type,omitempty"`
+	CurrTime                          *int64                 `protobuf:"varint,14,opt,name=curr_time,json=currTime" json:"curr_time,omitempty"`
 	unknownFields                     protoimpl.UnknownFields
 	sizeCache                         protoimpl.SizeCache
 }
@@ -559,8 +559,8 @@ func (*PlayerSceneInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *PlayerSceneInfo) GetCellId() uint64 {
-	if x != nil {
-		return x.CellId
+	if x != nil && x.CellId != nil {
+		return *x.CellId
 	}
 	return 0
 }
@@ -573,22 +573,22 @@ func (x *PlayerSceneInfo) GetPt() *Point {
 }
 
 func (x *PlayerSceneInfo) GetBelongCamp() uint32 {
-	if x != nil {
-		return x.BelongCamp
+	if x != nil && x.BelongCamp != nil {
+		return *x.BelongCamp
 	}
 	return 0
 }
 
 func (x *PlayerSceneInfo) GetEnteredCellInLastLoginProgress() bool {
-	if x != nil {
-		return x.EnteredCellInLastLoginProgress
+	if x != nil && x.EnteredCellInLastLoginProgress != nil {
+		return *x.EnteredCellInLastLoginProgress
 	}
 	return false
 }
 
 func (x *PlayerSceneInfo) GetKickoutTypeWhenScenesvrRecovering() int32 {
-	if x != nil {
-		return x.KickoutTypeWhenScenesvrRecovering
+	if x != nil && x.KickoutTypeWhenScenesvrRecovering != nil {
+		return *x.KickoutTypeWhenScenesvrRecovering
 	}
 	return 0
 }
@@ -601,22 +601,22 @@ func (x *PlayerSceneInfo) GetDestroyFailedCellsvrBusppInstIds() []uint64 {
 }
 
 func (x *PlayerSceneInfo) GetTimeOfDay() int32 {
-	if x != nil {
-		return x.TimeOfDay
+	if x != nil && x.TimeOfDay != nil {
+		return *x.TimeOfDay
 	}
 	return 0
 }
 
 func (x *PlayerSceneInfo) GetWeatherType() int32 {
-	if x != nil {
-		return x.WeatherType
+	if x != nil && x.WeatherType != nil {
+		return *x.WeatherType
 	}
 	return 0
 }
 
 func (x *PlayerSceneInfo) GetCurrTime() int64 {
-	if x != nil {
-		return x.CurrTime
+	if x != nil && x.CurrTime != nil {
+		return *x.CurrTime
 	}
 	return 0
 }
@@ -672,7 +672,7 @@ const file_com_base_types_proto_rawDesc = "" +
 	"%destroy_failed_cellsvr_buspp_inst_ids\x18\v \x03(\x04R destroyFailedCellsvrBusppInstIds\x12\x1e\n" +
 	"\vtime_of_day\x18\f \x01(\x05R\ttimeOfDay\x12!\n" +
 	"\fweather_type\x18\r \x01(\x05R\vweatherType\x12\x1b\n" +
-	"\tcurr_time\x18\x0e \x01(\x03R\bcurrTimeb\x06proto3"
+	"\tcurr_time\x18\x0e \x01(\x03R\bcurrTime"
 
 var (
 	file_com_base_types_proto_rawDescOnce sync.Once

@@ -5,10 +5,12 @@
 
 - **pak-public-kit**(下称 *kit*)：当前 NRC 版本解包，`output/` 已提交、`git pull` 即跟新。
   提供**中文名称表与 opcode 表**(高频变动，正好随上游更新)。
-- **world-data**：提供 `internal/pb` 所需的 **protobuf 字段号**(`.proto`)。kit 不导出
-  protobuf 描述符(其网络协议字段号只在不被提交的二进制 `FileDescriptorSet` 里)，故此项
-  仍取自 world-data。好在字段号是**追加式**的(新版本只加不改号)，旧 `.proto` 解码始终有效，
-  几乎无需跟版本更新——这也是不强行把 `internal/pb` 也切到 kit 的原因。
+- **FModel 提取的 `all.pb`**：游戏自带的 protobuf 描述符(`FileDescriptorSet`)，提供
+  `internal/pb` 所需的 **protobuf 字段号/类型**。用 FModel 从 Windows 客户端
+  `Content/ScriptC/Data/PB/` 直接提取(即游戏运行时 `pb.loadufsfile` 加载的同一份)，
+  含字段号,可直接喂给 protoc 生成 Go，无需 .proto 文本。字段号是**追加式**的(新版本只加
+  不改号)，故此项几乎无需跟版本更新；要更新时重新 FModel 提取 `all.pb` 覆盖即可。
+  (历史上此项曾取自 world-data 的 `.proto`，现已被 `all.pb` 完全替代，且更新更全。)
 
 ## 1. 名称表数据来源(kit)
 
@@ -33,16 +35,16 @@ kit `output/` 下：
   `ZONE_SCENE_THROW_CATCH_FINISH_RSP`，无需再手工补丁)
 - `ProtoEnum.lua` 的 `SkillDamType / PetTalentRate / PetPartnerMarkType` — 枚举值名 → 整数
 
-## 2. proto → Go(`scripts/gen_proto.sh`，数据源:world-data)
+## 2. 描述符 → Go(`scripts/gen_proto.sh`，数据源:all.pb)
 
-游戏 `.proto` 有两个坑，脚本 `scripts/fix_proto.py` 自动修复：
+`all.pb` 已是合法的 `FileDescriptorSet`(含字段号/类型)，直接喂给
+`protoc --descriptor_set_in` 即可生成 Go，**无需 .proto 文本，也无需 fix_proto 修补
+syntax/enum**(那是旧 world-data `.proto` 才有的坑，已随数据源切换一并去除)。
 
-1. **缺 `syntax` 声明** → 补 `syntax = "proto3";`；
-2. **大量 enum 非 0 起始**(proto3 要求首值为 0)→ 为每个 enum 插入 0 占位值，
-   并对含重复/0 值的 enum 加 `option allow_alias`。
-
-只编译 `com_pet.proto` 的依赖闭包(6 个文件)，用 `--go_opt=M...` 映射到单一 Go 包
-`internal/pb`。产物为 `internal/pb/*.pb.go`(已提交)。
+只生成 `com_pet.proto` 的依赖闭包(8 个文件:com_pet/com_base_types/com_battle_enum/
+com_monster/com_pet_skill/com_season/rpc_options/xls_enum)，用 `--go_opt=M...` 映射到
+单一 Go 包 `internal/pb`。`all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options
+依赖)，脚本单独导出其描述符并拼接进描述符集。产物为 `internal/pb/*.pb.go`(已提交)。
 
 核心结构 `PetData`(`com_pet.proto`)字段对应展示项：
 
