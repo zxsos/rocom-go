@@ -44,6 +44,8 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 uv sync
 uv run python scripts/gen_proto.py     # nrc/all.pb → internal/pb
 uv run python scripts/gen_gamedata.py  # nrc/bin + all.pb → names.json
+# 宠物图片(可选):在 FModel 里把 Common/Icon 的 HeadIcon/BigHeadIcon256/Pet256 以 PNG 导出后
+uv run python scripts/gen_images.py    # FModel PNG → internal/gamedata/data/img 的 webp(embed)
 
 # 2. 构建前端到 embed 目录
 cd web && npm install && npm run build && cd ..

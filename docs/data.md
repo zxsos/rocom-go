@@ -16,7 +16,7 @@
 
 ## 1. 名称表数据来源(`nrc/bin/`)
 
-`nrc/bin/` 下(只收录需要的 6 张表):
+`nrc/bin/` 下(只收录需要的 8 张表):
 
 | 路径 | 内容 |
 | --- | --- |
@@ -35,6 +35,7 @@
 - `MEDAL_CONF` — 奖牌名(`ELocalizedString`)与描述
 - `PET_TALENT_CONF` — 特长名(`speciality_id → name`)
 - `PET_FILTER_CONF` — 系别/天分/标记的 `filter_enum_value → filter_desc`(中文)
+- `PETBASE_CONF` + `MODEL_CONF` — 宠物图片引用(`JL_res` 全身图、`model_conf→icon` 头像;见 3 节末)
 - opcode/系别/天分/标记的整数枚举取自 `nrc/all.pb`(`ZoneSvrCmd`/`SkillDamType` 等)
 
 ## 2. 描述符 → Go(`scripts/gen_proto.py`，数据源:all.pb)
@@ -76,13 +77,30 @@ com_season/rpc_options/xls_enum),用 `--go_opt=M...` 映射到单一 Go 包 `int
 
 ```
 species  nature  nature_effect  skill_dam_type  talent_rate
-partner_mark  speciality  medal  opcodes
+partner_mark  speciality  medal  images  image_base  opcodes
 ```
 
 名称表由 `decode_bin.py` 解 `nrc/bin/` 得到;系别/天分/标记的整数值通过解析 `nrc/all.pb`
 枚举(名→整数)再 join `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+
 PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `nrc/all.pb` 的 `ZoneSvrCmd` 全集
 (枚举/opcode 均经 `scripts/pbdesc.py` 读描述符,与 `internal/pb` 同源),性别为硬编码。
+
+### 宠物图片索引(`images` / `image_base`)
+
+链路:`PetData.conf_id` → `MONSTER_CONF`/`PET_CONF` 行的 **`base_id`** → `PETBASE_CONF.id`(基础形态)
+→ 全身图取 `PETBASE.JL_res`(`Pet1024/Pet256/JL_<拼音>`),头像经 `PETBASE.model_conf` →
+`MODEL_CONF.icon`/`big_icon`(`HeadIcon/BigHeadIcon256/<n>`)。**文件名不能用 id 拼**——728 个
+形态共用他人头像(如 3228 用 3012),全身图是拼音代号而非 id,故必须存表。
+
+`gen_gamedata.py` 输出两张:`images`(petbase_id → `{h,b,p,ps}` 文件名,1041 项)与
+`image_base`(conf_id → petbase_id,仅 base≠自身者,约 1.7 万项;base==自身者 Go 侧回退直查)。
+`gamedata.PetImage(confID)` 据此拼出相对路径(`HeadIcon/3001.webp` 等),挂到 `Pet.Image`,
+前端拼到 `/img/` 下。未上线宠(如占位的圣草帝魔)无美术资源,`PetImage` 返回空,前端给占位图。
+
+图片本体(webp)**embed 进二进制**:在 FModel 里把 `Common/Icon` 的 `HeadIcon`/`BigHeadIcon256`/
+`Pet256` 子目录以 **PNG** 导出,`uv run python scripts/gen_images.py <PNG源>` 转成 webp 落到
+`internal/gamedata/data/img/`(`//go:embed all:data/img`),`internal/server` 经 `/img/` 提供。
+35MB 的 `Pet1024` 全身大图暂不 embed(体积考量),需要时把 `Pet1024` 加进 `gen_images.py` 的 `DIRS`。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
