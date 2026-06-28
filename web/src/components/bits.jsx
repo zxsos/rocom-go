@@ -2,6 +2,15 @@ import React from 'react'
 
 const imgURL = (path) => '/img/' + path
 
+// boxLabel 把盒子位置渲染为 "13-性格1 第5排第2格"(每盒 5 排 × 6 格,slot 从 0 起)。
+export function boxLabel(box) {
+  if (!box) return '-'
+  const name = box.boxName || `盒${box.boxId}`
+  const row = Math.floor(box.slot / 6) + 1
+  const col = (box.slot % 6) + 1
+  return `${box.boxId}-${name} 第${row}排第${col}格`
+}
+
 // Avatar 渲染宠物小头像(列表/事件用);无图(未上线/缺源)或无 pet 回退 emoji。
 export function Avatar({ p, className = 'pet-avatar' }) {
   const [bad, setBad] = React.useState(false)

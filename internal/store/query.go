@@ -2,6 +2,8 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/whoisnian/rocom-capture/internal/pet"
@@ -20,6 +22,7 @@ type Filter struct {
 	PartnerMark   string
 	Shiny         string // "", "1", "0"
 	Colorful      string // "", "1", "0"
+	Box           string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
 	LevelMin      int
 	LevelMax      int
 	Sort          string
@@ -86,6 +89,16 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	for _, t := range f.Types { // types 存为 JSON 数组，用 LIKE 匹配带引号的元素
 		where = append(where, "types LIKE ?")
 		args = append(args, "%\""+t+"\"%")
+	}
+	if f.Box != "" { // 取前导整数为 box_id,关联 pet_box 表
+		idStr := f.Box
+		if i := strings.IndexByte(idStr, '-'); i >= 0 {
+			idStr = idStr[:i]
+		}
+		if id, err := strconv.Atoi(idStr); err == nil {
+			where = append(where, "gid IN (SELECT gid FROM pet_box WHERE box_id=?)")
+			args = append(args, id)
+		}
 	}
 
 	whereSQL := ""
@@ -190,6 +203,20 @@ func (s *Store) FilterOptions() map[string][]string {
 			var v string
 			if rows.Scan(&v) == nil {
 				out[key] = append(out[key], v)
+			}
+		}
+		rows.Close()
+	}
+	// 宠物盒:取 pet_box 里出现的盒子,形如 "13-性格1"(未命名 → "18-盒18")。
+	if rows, err := s.db.Query(`SELECT DISTINCT box_id, box_name FROM pet_box ORDER BY box_id`); err == nil {
+		for rows.Next() {
+			var id int
+			var name string
+			if rows.Scan(&id, &name) == nil {
+				if name == "" {
+					name = fmt.Sprintf("盒%d", id)
+				}
+				out["box"] = append(out["box"], fmt.Sprintf("%d-%s", id, name))
 			}
 		}
 		rows.Close()

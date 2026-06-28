@@ -86,6 +86,7 @@ func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
 		PartnerMark: q.Get("partnerMark"),
 		Shiny:       q.Get("shiny"),
 		Colorful:    q.Get("colorful"),
+		Box:         q.Get("box"),
 		LevelMin:    atoi("levelMin"),
 		LevelMax:    atoi("levelMax"),
 		Sort:        q.Get("sort"),
