@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, Marks, Avatar, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Avatar, boxLabel, fmtTime } from '../components/bits'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
@@ -83,7 +83,7 @@ export default function PetList() {
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
-  const boxTag = (b) => (b ? ` · 📦${b.boxId}-${b.boxName || '盒' + b.boxId}` : '')
+  const boxTag = (b) => (b ? ` · 📦${boxLabel(b)}` : '')
 
   return (
     <div className="list-layout">
