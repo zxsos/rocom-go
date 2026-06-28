@@ -79,11 +79,17 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
-		// 获得新宠物：孵蛋、战斗外捕捉、(普通)战斗内捕捉(经奖励通知)都把新宠物嵌在 goods_reward。
-		// 同一宠物可能经多个 opcode 下发，用 isNew 去重;获得方式由 catch_way 区分。
+		// 获得新宠物：孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)
+		// 都把新宠物嵌在子消息里。同一宠物可能经多个 opcode 下发，用 isNew 去重;获得方式由 catch_way 区分。
 		if m.Direction == gcp.S2C &&
-			(m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp || m.Opcode == pet.OpGoodsRewardNotify) {
+			(m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp ||
+				m.Opcode == pet.OpGoodsRewardNotify || m.Opcode == pet.OpPlayerSyncNotify) {
 			if pd := pet.FindNewPet(m.AppBody); pd != nil {
+				// PLAYER_SYNC_NOTIFY 是通用同步通道(理论上可能携带 PvP 对手/旧快照),
+				// 额外用 add_time 时近性(相对本包时间)守卫，仅认刚捕获的宠物。
+				if m.Opcode == pet.OpPlayerSyncNotify && int64(pd.GetAddTime()) < m.Time.Unix()-grace {
+					continue
+				}
 				p := pet.ToPet(pd, db)
 				isNew, _ := st.UpsertPet(p)
 				srv.Hub().Broadcast("pet", p)
@@ -139,8 +145,8 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 // catchWayName 由 catch_way 推断获得方式(实测：1=捕捉、3=孵蛋;其余未知归“获得”)。
 func catchWayName(pd *pb.PetData) string {
 	switch pd.GetCatchWay() {
-	case 1:
-		return "捕捉"
+	case 1, 4:
+		return "捕捉" // 1=普通/战斗外捕捉, 4=花种(稀兽)战斗内捕捉
 	case 3:
 		return "孵蛋"
 	default:
