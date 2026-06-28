@@ -24,19 +24,16 @@ const (
 type PetSkillInfo_COUNT_LIMIT int32
 
 const (
-	PetSkillInfo_COUNT_LIMIT__PB3_ZERO PetSkillInfo_COUNT_LIMIT = 0
-	PetSkillInfo_SKILL_DATA_COUNT      PetSkillInfo_COUNT_LIMIT = 200
+	PetSkillInfo_SKILL_DATA_COUNT PetSkillInfo_COUNT_LIMIT = 200
 )
 
 // Enum value maps for PetSkillInfo_COUNT_LIMIT.
 var (
 	PetSkillInfo_COUNT_LIMIT_name = map[int32]string{
-		0:   "COUNT_LIMIT__PB3_ZERO",
 		200: "SKILL_DATA_COUNT",
 	}
 	PetSkillInfo_COUNT_LIMIT_value = map[string]int32{
-		"COUNT_LIMIT__PB3_ZERO": 0,
-		"SKILL_DATA_COUNT":      200,
+		"SKILL_DATA_COUNT": 200,
 	}
 )
 
@@ -62,6 +59,16 @@ func (x PetSkillInfo_COUNT_LIMIT) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
+// Deprecated: Do not use.
+func (x *PetSkillInfo_COUNT_LIMIT) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = PetSkillInfo_COUNT_LIMIT(num)
+	return nil
+}
+
 // Deprecated: Use PetSkillInfo_COUNT_LIMIT.Descriptor instead.
 func (PetSkillInfo_COUNT_LIMIT) EnumDescriptor() ([]byte, []int) {
 	return file_com_pet_skill_proto_rawDescGZIP(), []int{4, 0}
@@ -69,9 +76,9 @@ func (PetSkillInfo_COUNT_LIMIT) EnumDescriptor() ([]byte, []int) {
 
 type PetCarryonInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	CarryonId     uint32                 `protobuf:"varint,1,opt,name=carryon_id,json=carryonId,proto3" json:"carryon_id,omitempty"`
-	CarryonIdx    uint32                 `protobuf:"varint,2,opt,name=carryon_idx,json=carryonIdx,proto3" json:"carryon_idx,omitempty"`
-	PetGid        uint32                 `protobuf:"varint,3,opt,name=pet_gid,json=petGid,proto3" json:"pet_gid,omitempty"`
+	CarryonId     *uint32                `protobuf:"varint,1,opt,name=carryon_id,json=carryonId" json:"carryon_id,omitempty"`
+	CarryonIdx    *uint32                `protobuf:"varint,2,opt,name=carryon_idx,json=carryonIdx" json:"carryon_idx,omitempty"`
+	PetGid        *uint32                `protobuf:"varint,3,opt,name=pet_gid,json=petGid" json:"pet_gid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -107,40 +114,41 @@ func (*PetCarryonInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *PetCarryonInfo) GetCarryonId() uint32 {
-	if x != nil {
-		return x.CarryonId
+	if x != nil && x.CarryonId != nil {
+		return *x.CarryonId
 	}
 	return 0
 }
 
 func (x *PetCarryonInfo) GetCarryonIdx() uint32 {
-	if x != nil {
-		return x.CarryonIdx
+	if x != nil && x.CarryonIdx != nil {
+		return *x.CarryonIdx
 	}
 	return 0
 }
 
 func (x *PetCarryonInfo) GetPetGid() uint32 {
-	if x != nil {
-		return x.PetGid
+	if x != nil && x.PetGid != nil {
+		return *x.PetGid
 	}
 	return 0
 }
 
 type PetSkillData struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type             uint32                 `protobuf:"varint,2,opt,name=type,proto3" json:"type,omitempty"`
-	IsLearned        bool                   `protobuf:"varint,3,opt,name=is_learned,json=isLearned,proto3" json:"is_learned,omitempty"`
-	IsEquipped       bool                   `protobuf:"varint,4,opt,name=is_equipped,json=isEquipped,proto3" json:"is_equipped,omitempty"`
-	Pos              uint32                 `protobuf:"varint,5,opt,name=pos,proto3" json:"pos,omitempty"`
-	UnlockNeedLv     uint32                 `protobuf:"varint,8,opt,name=unlock_need_lv,json=unlockNeedLv,proto3" json:"unlock_need_lv,omitempty"`
-	RawId            uint32                 `protobuf:"varint,11,opt,name=raw_id,json=rawId,proto3" json:"raw_id,omitempty"`
-	CarryonInfo      *PetCarryonInfo        `protobuf:"bytes,12,opt,name=carryon_info,json=carryonInfo,proto3" json:"carryon_info,omitempty"`
-	ConfIdx          uint32                 `protobuf:"varint,13,opt,name=conf_idx,json=confIdx,proto3" json:"conf_idx,omitempty"`
-	SkillSrc         uint32                 `protobuf:"varint,14,opt,name=skill_src,json=skillSrc,proto3" json:"skill_src,omitempty"`
-	UnlockNeedBaseId uint32                 `protobuf:"varint,15,opt,name=unlock_need_base_id,json=unlockNeedBaseId,proto3" json:"unlock_need_base_id,omitempty"`
-	UseTimes         int32                  `protobuf:"varint,16,opt,name=use_times,json=useTimes,proto3" json:"use_times,omitempty"`
+	Id               *uint32                `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
+	Type             *uint32                `protobuf:"varint,2,opt,name=type" json:"type,omitempty"`
+	IsLearned        *bool                  `protobuf:"varint,3,opt,name=is_learned,json=isLearned" json:"is_learned,omitempty"`
+	IsEquipped       *bool                  `protobuf:"varint,4,opt,name=is_equipped,json=isEquipped" json:"is_equipped,omitempty"`
+	Pos              *uint32                `protobuf:"varint,5,opt,name=pos" json:"pos,omitempty"`
+	SeasonId         *int32                 `protobuf:"varint,6,opt,name=season_id,json=seasonId" json:"season_id,omitempty"`
+	UnlockNeedLv     *uint32                `protobuf:"varint,8,opt,name=unlock_need_lv,json=unlockNeedLv" json:"unlock_need_lv,omitempty"`
+	RawId            *uint32                `protobuf:"varint,11,opt,name=raw_id,json=rawId" json:"raw_id,omitempty"`
+	CarryonInfo      *PetCarryonInfo        `protobuf:"bytes,12,opt,name=carryon_info,json=carryonInfo" json:"carryon_info,omitempty"`
+	ConfIdx          *uint32                `protobuf:"varint,13,opt,name=conf_idx,json=confIdx" json:"conf_idx,omitempty"`
+	SkillSrc         *uint32                `protobuf:"varint,14,opt,name=skill_src,json=skillSrc" json:"skill_src,omitempty"`
+	UnlockNeedBaseId *uint32                `protobuf:"varint,15,opt,name=unlock_need_base_id,json=unlockNeedBaseId" json:"unlock_need_base_id,omitempty"`
+	UseTimes         *int32                 `protobuf:"varint,16,opt,name=use_times,json=useTimes" json:"use_times,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -176,50 +184,57 @@ func (*PetSkillData) Descriptor() ([]byte, []int) {
 }
 
 func (x *PetSkillData) GetId() uint32 {
-	if x != nil {
-		return x.Id
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetType() uint32 {
-	if x != nil {
-		return x.Type
+	if x != nil && x.Type != nil {
+		return *x.Type
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetIsLearned() bool {
-	if x != nil {
-		return x.IsLearned
+	if x != nil && x.IsLearned != nil {
+		return *x.IsLearned
 	}
 	return false
 }
 
 func (x *PetSkillData) GetIsEquipped() bool {
-	if x != nil {
-		return x.IsEquipped
+	if x != nil && x.IsEquipped != nil {
+		return *x.IsEquipped
 	}
 	return false
 }
 
 func (x *PetSkillData) GetPos() uint32 {
-	if x != nil {
-		return x.Pos
+	if x != nil && x.Pos != nil {
+		return *x.Pos
+	}
+	return 0
+}
+
+func (x *PetSkillData) GetSeasonId() int32 {
+	if x != nil && x.SeasonId != nil {
+		return *x.SeasonId
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetUnlockNeedLv() uint32 {
-	if x != nil {
-		return x.UnlockNeedLv
+	if x != nil && x.UnlockNeedLv != nil {
+		return *x.UnlockNeedLv
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetRawId() uint32 {
-	if x != nil {
-		return x.RawId
+	if x != nil && x.RawId != nil {
+		return *x.RawId
 	}
 	return 0
 }
@@ -232,37 +247,37 @@ func (x *PetSkillData) GetCarryonInfo() *PetCarryonInfo {
 }
 
 func (x *PetSkillData) GetConfIdx() uint32 {
-	if x != nil {
-		return x.ConfIdx
+	if x != nil && x.ConfIdx != nil {
+		return *x.ConfIdx
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetSkillSrc() uint32 {
-	if x != nil {
-		return x.SkillSrc
+	if x != nil && x.SkillSrc != nil {
+		return *x.SkillSrc
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetUnlockNeedBaseId() uint32 {
-	if x != nil {
-		return x.UnlockNeedBaseId
+	if x != nil && x.UnlockNeedBaseId != nil {
+		return *x.UnlockNeedBaseId
 	}
 	return 0
 }
 
 func (x *PetSkillData) GetUseTimes() int32 {
-	if x != nil {
-		return x.UseTimes
+	if x != nil && x.UseTimes != nil {
+		return *x.UseTimes
 	}
 	return 0
 }
 
 type PetSkillRecord struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkillId       uint32                 `protobuf:"varint,1,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
-	UseTimes      int32                  `protobuf:"varint,2,opt,name=use_times,json=useTimes,proto3" json:"use_times,omitempty"`
+	SkillId       *uint32                `protobuf:"varint,1,opt,name=skill_id,json=skillId" json:"skill_id,omitempty"`
+	UseTimes      *int32                 `protobuf:"varint,2,opt,name=use_times,json=useTimes" json:"use_times,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -298,29 +313,29 @@ func (*PetSkillRecord) Descriptor() ([]byte, []int) {
 }
 
 func (x *PetSkillRecord) GetSkillId() uint32 {
-	if x != nil {
-		return x.SkillId
+	if x != nil && x.SkillId != nil {
+		return *x.SkillId
 	}
 	return 0
 }
 
 func (x *PetSkillRecord) GetUseTimes() int32 {
-	if x != nil {
-		return x.UseTimes
+	if x != nil && x.UseTimes != nil {
+		return *x.UseTimes
 	}
 	return 0
 }
 
 type SkillRecord struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Uin           uint32                 `protobuf:"varint,1,opt,name=uin,proto3" json:"uin,omitempty"`
-	SkillId       uint32                 `protobuf:"varint,2,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
-	Result0       uint32                 `protobuf:"varint,3,opt,name=result0,proto3" json:"result0,omitempty"`
-	Result1       uint32                 `protobuf:"varint,4,opt,name=result1,proto3" json:"result1,omitempty"`
-	Result2       uint32                 `protobuf:"varint,5,opt,name=result2,proto3" json:"result2,omitempty"`
-	RestraintCnt1 int32                  `protobuf:"varint,6,opt,name=restraint_cnt1,json=restraintCnt1,proto3" json:"restraint_cnt1,omitempty"`
-	RestraintCnt2 int32                  `protobuf:"varint,7,opt,name=restraint_cnt2,json=restraintCnt2,proto3" json:"restraint_cnt2,omitempty"`
-	RestraintCnt3 int32                  `protobuf:"varint,8,opt,name=restraint_cnt3,json=restraintCnt3,proto3" json:"restraint_cnt3,omitempty"`
+	Uin           *uint32                `protobuf:"varint,1,opt,name=uin" json:"uin,omitempty"`
+	SkillId       *uint32                `protobuf:"varint,2,opt,name=skill_id,json=skillId" json:"skill_id,omitempty"`
+	Result0       *uint32                `protobuf:"varint,3,opt,name=result0" json:"result0,omitempty"`
+	Result1       *uint32                `protobuf:"varint,4,opt,name=result1" json:"result1,omitempty"`
+	Result2       *uint32                `protobuf:"varint,5,opt,name=result2" json:"result2,omitempty"`
+	RestraintCnt1 *int32                 `protobuf:"varint,6,opt,name=restraint_cnt1,json=restraintCnt1" json:"restraint_cnt1,omitempty"`
+	RestraintCnt2 *int32                 `protobuf:"varint,7,opt,name=restraint_cnt2,json=restraintCnt2" json:"restraint_cnt2,omitempty"`
+	RestraintCnt3 *int32                 `protobuf:"varint,8,opt,name=restraint_cnt3,json=restraintCnt3" json:"restraint_cnt3,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -356,66 +371,66 @@ func (*SkillRecord) Descriptor() ([]byte, []int) {
 }
 
 func (x *SkillRecord) GetUin() uint32 {
-	if x != nil {
-		return x.Uin
+	if x != nil && x.Uin != nil {
+		return *x.Uin
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetSkillId() uint32 {
-	if x != nil {
-		return x.SkillId
+	if x != nil && x.SkillId != nil {
+		return *x.SkillId
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetResult0() uint32 {
-	if x != nil {
-		return x.Result0
+	if x != nil && x.Result0 != nil {
+		return *x.Result0
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetResult1() uint32 {
-	if x != nil {
-		return x.Result1
+	if x != nil && x.Result1 != nil {
+		return *x.Result1
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetResult2() uint32 {
-	if x != nil {
-		return x.Result2
+	if x != nil && x.Result2 != nil {
+		return *x.Result2
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetRestraintCnt1() int32 {
-	if x != nil {
-		return x.RestraintCnt1
+	if x != nil && x.RestraintCnt1 != nil {
+		return *x.RestraintCnt1
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetRestraintCnt2() int32 {
-	if x != nil {
-		return x.RestraintCnt2
+	if x != nil && x.RestraintCnt2 != nil {
+		return *x.RestraintCnt2
 	}
 	return 0
 }
 
 func (x *SkillRecord) GetRestraintCnt3() int32 {
-	if x != nil {
-		return x.RestraintCnt3
+	if x != nil && x.RestraintCnt3 != nil {
+		return *x.RestraintCnt3
 	}
 	return 0
 }
 
 type PetSkillInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkillData     []*PetSkillData        `protobuf:"bytes,1,rep,name=skill_data,json=skillData,proto3" json:"skill_data,omitempty"`
-	HappySkillIds []uint32               `protobuf:"varint,2,rep,packed,name=happy_skill_ids,json=happySkillIds,proto3" json:"happy_skill_ids,omitempty"`
-	AngrySkillIds []uint32               `protobuf:"varint,3,rep,packed,name=angry_skill_ids,json=angrySkillIds,proto3" json:"angry_skill_ids,omitempty"`
+	SkillData     []*PetSkillData        `protobuf:"bytes,1,rep,name=skill_data,json=skillData" json:"skill_data,omitempty"`
+	HappySkillIds []uint32               `protobuf:"varint,2,rep,name=happy_skill_ids,json=happySkillIds" json:"happy_skill_ids,omitempty"`
+	AngrySkillIds []uint32               `protobuf:"varint,3,rep,name=angry_skill_ids,json=angrySkillIds" json:"angry_skill_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -473,8 +488,8 @@ func (x *PetSkillInfo) GetAngrySkillIds() []uint32 {
 
 type PetPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PetId         uint32                 `protobuf:"varint,1,opt,name=pet_id,json=petId,proto3" json:"pet_id,omitempty"`
-	Pos           *Position              `protobuf:"bytes,2,opt,name=pos,proto3" json:"pos,omitempty"`
+	PetId         *uint32                `protobuf:"varint,1,opt,name=pet_id,json=petId" json:"pet_id,omitempty"`
+	Pos           *Position              `protobuf:"bytes,2,opt,name=pos" json:"pos,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -510,8 +525,8 @@ func (*PetPosition) Descriptor() ([]byte, []int) {
 }
 
 func (x *PetPosition) GetPetId() uint32 {
-	if x != nil {
-		return x.PetId
+	if x != nil && x.PetId != nil {
+		return *x.PetId
 	}
 	return 0
 }
@@ -525,11 +540,11 @@ func (x *PetPosition) GetPos() *Position {
 
 type CastInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkillId       uint32                 `protobuf:"varint,1,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
-	AuraConfId    uint32                 `protobuf:"varint,2,opt,name=aura_conf_id,json=auraConfId,proto3" json:"aura_conf_id,omitempty"`
-	GroupId       uint32                 `protobuf:"varint,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	CastMoment    uint32                 `protobuf:"varint,4,opt,name=cast_moment,json=castMoment,proto3" json:"cast_moment,omitempty"`
-	PetBaseId     uint32                 `protobuf:"varint,5,opt,name=pet_base_id,json=petBaseId,proto3" json:"pet_base_id,omitempty"`
+	SkillId       *uint32                `protobuf:"varint,1,opt,name=skill_id,json=skillId" json:"skill_id,omitempty"`
+	AuraConfId    *uint32                `protobuf:"varint,2,opt,name=aura_conf_id,json=auraConfId" json:"aura_conf_id,omitempty"`
+	GroupId       *uint32                `protobuf:"varint,3,opt,name=group_id,json=groupId" json:"group_id,omitempty"`
+	CastMoment    *uint32                `protobuf:"varint,4,opt,name=cast_moment,json=castMoment" json:"cast_moment,omitempty"`
+	PetBaseId     *uint32                `protobuf:"varint,5,opt,name=pet_base_id,json=petBaseId" json:"pet_base_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -565,44 +580,44 @@ func (*CastInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *CastInfo) GetSkillId() uint32 {
-	if x != nil {
-		return x.SkillId
+	if x != nil && x.SkillId != nil {
+		return *x.SkillId
 	}
 	return 0
 }
 
 func (x *CastInfo) GetAuraConfId() uint32 {
-	if x != nil {
-		return x.AuraConfId
+	if x != nil && x.AuraConfId != nil {
+		return *x.AuraConfId
 	}
 	return 0
 }
 
 func (x *CastInfo) GetGroupId() uint32 {
-	if x != nil {
-		return x.GroupId
+	if x != nil && x.GroupId != nil {
+		return *x.GroupId
 	}
 	return 0
 }
 
 func (x *CastInfo) GetCastMoment() uint32 {
-	if x != nil {
-		return x.CastMoment
+	if x != nil && x.CastMoment != nil {
+		return *x.CastMoment
 	}
 	return 0
 }
 
 func (x *CastInfo) GetPetBaseId() uint32 {
-	if x != nil {
-		return x.PetBaseId
+	if x != nil && x.PetBaseId != nil {
+		return *x.PetBaseId
 	}
 	return 0
 }
 
 type PetCastAura struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PetPosInfo    *PetPosition           `protobuf:"bytes,1,opt,name=pet_pos_info,json=petPosInfo,proto3" json:"pet_pos_info,omitempty"`
-	CastInfo      []*CastInfo            `protobuf:"bytes,2,rep,name=cast_info,json=castInfo,proto3" json:"cast_info,omitempty"`
+	PetPosInfo    *PetPosition           `protobuf:"bytes,1,opt,name=pet_pos_info,json=petPosInfo" json:"pet_pos_info,omitempty"`
+	CastInfo      []*CastInfo            `protobuf:"bytes,2,rep,name=cast_info,json=castInfo" json:"cast_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -653,8 +668,8 @@ func (x *PetCastAura) GetCastInfo() []*CastInfo {
 
 type BattleRemoveAuraInfo struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	RemoveAuraEffect []uint32               `protobuf:"varint,1,rep,packed,name=remove_aura_effect,json=removeAuraEffect,proto3" json:"remove_aura_effect,omitempty"`
-	PetBaseId        uint32                 `protobuf:"varint,2,opt,name=pet_base_id,json=petBaseId,proto3" json:"pet_base_id,omitempty"`
+	RemoveAuraEffect []uint32               `protobuf:"varint,1,rep,name=remove_aura_effect,json=removeAuraEffect" json:"remove_aura_effect,omitempty"`
+	PetBaseId        *uint32                `protobuf:"varint,2,opt,name=pet_base_id,json=petBaseId" json:"pet_base_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -697,16 +712,16 @@ func (x *BattleRemoveAuraInfo) GetRemoveAuraEffect() []uint32 {
 }
 
 func (x *BattleRemoveAuraInfo) GetPetBaseId() uint32 {
-	if x != nil {
-		return x.PetBaseId
+	if x != nil && x.PetBaseId != nil {
+		return *x.PetBaseId
 	}
 	return 0
 }
 
 type PetRemoveAura struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
-	PetPosInfo    *PetPosition            `protobuf:"bytes,1,opt,name=pet_pos_info,json=petPosInfo,proto3" json:"pet_pos_info,omitempty"`
-	RemoveInfo    []*BattleRemoveAuraInfo `protobuf:"bytes,2,rep,name=remove_info,json=removeInfo,proto3" json:"remove_info,omitempty"`
+	PetPosInfo    *PetPosition            `protobuf:"bytes,1,opt,name=pet_pos_info,json=petPosInfo" json:"pet_pos_info,omitempty"`
+	RemoveInfo    []*BattleRemoveAuraInfo `protobuf:"bytes,2,rep,name=remove_info,json=removeInfo" json:"remove_info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -765,7 +780,7 @@ const file_com_pet_skill_proto_rawDesc = "" +
 	"carryon_id\x18\x01 \x01(\rR\tcarryonId\x12\x1f\n" +
 	"\vcarryon_idx\x18\x02 \x01(\rR\n" +
 	"carryonIdx\x12\x17\n" +
-	"\apet_gid\x18\x03 \x01(\rR\x06petGid\"\xfe\x02\n" +
+	"\apet_gid\x18\x03 \x01(\rR\x06petGid\"\x9b\x03\n" +
 	"\fPetSkillData\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\rR\x04type\x12\x1d\n" +
@@ -773,7 +788,8 @@ const file_com_pet_skill_proto_rawDesc = "" +
 	"is_learned\x18\x03 \x01(\bR\tisLearned\x12\x1f\n" +
 	"\vis_equipped\x18\x04 \x01(\bR\n" +
 	"isEquipped\x12\x10\n" +
-	"\x03pos\x18\x05 \x01(\rR\x03pos\x12$\n" +
+	"\x03pos\x18\x05 \x01(\rR\x03pos\x12\x1b\n" +
+	"\tseason_id\x18\x06 \x01(\x05R\bseasonId\x12$\n" +
 	"\x0eunlock_need_lv\x18\b \x01(\rR\funlockNeedLv\x12\x15\n" +
 	"\x06raw_id\x18\v \x01(\rR\x05rawId\x127\n" +
 	"\fcarryon_info\x18\f \x01(\v2\x14.Next.PetCarryonInfoR\vcarryonInfo\x12\x19\n" +
@@ -792,14 +808,13 @@ const file_com_pet_skill_proto_rawDesc = "" +
 	"\aresult2\x18\x05 \x01(\rR\aresult2\x12%\n" +
 	"\x0erestraint_cnt1\x18\x06 \x01(\x05R\rrestraintCnt1\x12%\n" +
 	"\x0erestraint_cnt2\x18\a \x01(\x05R\rrestraintCnt2\x12%\n" +
-	"\x0erestraint_cnt3\x18\b \x01(\x05R\rrestraintCnt3\"\xd2\x01\n" +
+	"\x0erestraint_cnt3\x18\b \x01(\x05R\rrestraintCnt3\"\xb7\x01\n" +
 	"\fPetSkillInfo\x121\n" +
 	"\n" +
 	"skill_data\x18\x01 \x03(\v2\x12.Next.PetSkillDataR\tskillData\x12&\n" +
 	"\x0fhappy_skill_ids\x18\x02 \x03(\rR\rhappySkillIds\x12&\n" +
-	"\x0fangry_skill_ids\x18\x03 \x03(\rR\rangrySkillIds\"?\n" +
-	"\vCOUNT_LIMIT\x12\x19\n" +
-	"\x15COUNT_LIMIT__PB3_ZERO\x10\x00\x12\x15\n" +
+	"\x0fangry_skill_ids\x18\x03 \x03(\rR\rangrySkillIds\"$\n" +
+	"\vCOUNT_LIMIT\x12\x15\n" +
 	"\x10SKILL_DATA_COUNT\x10\xc8\x01\"F\n" +
 	"\vPetPosition\x12\x15\n" +
 	"\x06pet_id\x18\x01 \x01(\rR\x05petId\x12 \n" +
@@ -823,7 +838,7 @@ const file_com_pet_skill_proto_rawDesc = "" +
 	"\fpet_pos_info\x18\x01 \x01(\v2\x11.Next.PetPositionR\n" +
 	"petPosInfo\x12;\n" +
 	"\vremove_info\x18\x02 \x03(\v2\x1a.Next.BattleRemoveAuraInfoR\n" +
-	"removeInfob\x06proto3"
+	"removeInfo"
 
 var (
 	file_com_pet_skill_proto_rawDescOnce sync.Once

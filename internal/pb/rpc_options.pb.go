@@ -9,7 +9,7 @@ package pb
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/descriptorpb"
+	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -25,28 +25,25 @@ const (
 type RealTypeOfInt int32
 
 const (
-	RealTypeOfInt_RealTypeOfInt__PB3_ZERO RealTypeOfInt = 0
-	RealTypeOfInt_RT_UINT8                RealTypeOfInt = 1
-	RealTypeOfInt_RT_INT8                 RealTypeOfInt = 2
-	RealTypeOfInt_RT_UINT16               RealTypeOfInt = 3
-	RealTypeOfInt_RT_INT16                RealTypeOfInt = 4
+	RealTypeOfInt_RT_UINT8  RealTypeOfInt = 1
+	RealTypeOfInt_RT_INT8   RealTypeOfInt = 2
+	RealTypeOfInt_RT_UINT16 RealTypeOfInt = 3
+	RealTypeOfInt_RT_INT16  RealTypeOfInt = 4
 )
 
 // Enum value maps for RealTypeOfInt.
 var (
 	RealTypeOfInt_name = map[int32]string{
-		0: "RealTypeOfInt__PB3_ZERO",
 		1: "RT_UINT8",
 		2: "RT_INT8",
 		3: "RT_UINT16",
 		4: "RT_INT16",
 	}
 	RealTypeOfInt_value = map[string]int32{
-		"RealTypeOfInt__PB3_ZERO": 0,
-		"RT_UINT8":                1,
-		"RT_INT8":                 2,
-		"RT_UINT16":               3,
-		"RT_INT16":                4,
+		"RT_UINT8":  1,
+		"RT_INT8":   2,
+		"RT_UINT16": 3,
+		"RT_INT16":  4,
 	}
 )
 
@@ -70,6 +67,16 @@ func (RealTypeOfInt) Type() protoreflect.EnumType {
 
 func (x RealTypeOfInt) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Do not use.
+func (x *RealTypeOfInt) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = RealTypeOfInt(num)
+	return nil
 }
 
 // Deprecated: Use RealTypeOfInt.Descriptor instead.
@@ -149,19 +156,287 @@ func (*NullResponse) Descriptor() ([]byte, []int) {
 	return file_rpc_options_proto_rawDescGZIP(), []int{1}
 }
 
+var file_rpc_options_proto_extTypes = []protoimpl.ExtensionInfo{
+	{
+		ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2000,
+		Name:          "service_timeout",
+		Tag:           "varint,2000,opt,name=service_timeout",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.ServiceOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2001,
+		Name:          "private_service",
+		Tag:           "varint,2001,opt,name=private_service",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2000,
+		Name:          "method_cmd",
+		Tag:           "varint,2000,opt,name=method_cmd",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2001,
+		Name:          "method_timeout",
+		Tag:           "varint,2001,opt,name=method_timeout",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2002,
+		Name:          "private_method",
+		Tag:           "varint,2002,opt,name=private_method",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2004,
+		Name:          "risk_method",
+		Tag:           "varint,2004,opt,name=risk_method",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2005,
+		Name:          "lua_method",
+		Tag:           "varint,2005,opt,name=lua_method",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2006,
+		Name:          "req_cmd",
+		Tag:           "varint,2006,opt,name=req_cmd",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2007,
+		Name:          "rsp_cmd",
+		Tag:           "varint,2007,opt,name=rsp_cmd",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*bool)(nil),
+		Field:         2008,
+		Name:          "is_private",
+		Tag:           "varint,2008,opt,name=is_private",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2009,
+		Name:          "is_raw_protocol",
+		Tag:           "varint,2009,opt,name=is_raw_protocol",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
+		ExtensionType: (*bool)(nil),
+		Field:         2010,
+		Name:          "no_rsp_send",
+		Tag:           "varint,2010,opt,name=no_rsp_send",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2000,
+		Name:          "max_count",
+		Tag:           "varint,2000,opt,name=max_count",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2001,
+		Name:          "total_count",
+		Tag:           "varint,2001,opt,name=total_count",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*RealTypeOfInt)(nil),
+		Field:         2002,
+		Name:          "int_type",
+		Tag:           "varint,2002,opt,name=int_type,enum=RealTypeOfInt",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*uint32)(nil),
+		Field:         2003,
+		Name:          "str_len",
+		Tag:           "varint,2003,opt,name=str_len",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*string)(nil),
+		Field:         2004,
+		Name:          "fkey",
+		Tag:           "bytes,2004,opt,name=fkey",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*string)(nil),
+		Field:         2005,
+		Name:          "custom_type",
+		Tag:           "bytes,2005,opt,name=custom_type",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*string)(nil),
+		Field:         2006,
+		Name:          "excel_name",
+		Tag:           "bytes,2006,opt,name=excel_name",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
+		ExtensionType: (*string)(nil),
+		Field:         2007,
+		Name:          "index_type",
+		Tag:           "bytes,2007,opt,name=index_type",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2000,
+		Name:          "gen_pod",
+		Tag:           "varint,2000,opt,name=gen_pod",
+		Filename:      "rpc_options.proto",
+	},
+	{
+		ExtendedType:  (*descriptorpb.MessageOptions)(nil),
+		ExtensionType: (*int32)(nil),
+		Field:         2001,
+		Name:          "gen_lua_export",
+		Tag:           "varint,2001,opt,name=gen_lua_export",
+		Filename:      "rpc_options.proto",
+	},
+}
+
+// Extension fields to descriptorpb.ServiceOptions.
+var (
+	// optional int32 service_timeout = 2000;
+	E_ServiceTimeout = &file_rpc_options_proto_extTypes[0]
+	// optional int32 private_service = 2001;
+	E_PrivateService = &file_rpc_options_proto_extTypes[1]
+)
+
+// Extension fields to descriptorpb.MethodOptions.
+var (
+	// optional int32 method_cmd = 2000;
+	E_MethodCmd = &file_rpc_options_proto_extTypes[2]
+	// optional int32 method_timeout = 2001;
+	E_MethodTimeout = &file_rpc_options_proto_extTypes[3]
+	// optional int32 private_method = 2002;
+	E_PrivateMethod = &file_rpc_options_proto_extTypes[4]
+	// optional int32 risk_method = 2004;
+	E_RiskMethod = &file_rpc_options_proto_extTypes[5]
+	// optional int32 lua_method = 2005;
+	E_LuaMethod = &file_rpc_options_proto_extTypes[6]
+	// optional uint32 req_cmd = 2006;
+	E_ReqCmd = &file_rpc_options_proto_extTypes[7]
+	// optional uint32 rsp_cmd = 2007;
+	E_RspCmd = &file_rpc_options_proto_extTypes[8]
+	// optional bool is_private = 2008;
+	E_IsPrivate = &file_rpc_options_proto_extTypes[9]
+	// optional uint32 is_raw_protocol = 2009;
+	E_IsRawProtocol = &file_rpc_options_proto_extTypes[10]
+	// optional bool no_rsp_send = 2010;
+	E_NoRspSend = &file_rpc_options_proto_extTypes[11]
+)
+
+// Extension fields to descriptorpb.FieldOptions.
+var (
+	// optional uint32 max_count = 2000;
+	E_MaxCount = &file_rpc_options_proto_extTypes[12]
+	// optional uint32 total_count = 2001;
+	E_TotalCount = &file_rpc_options_proto_extTypes[13]
+	// optional RealTypeOfInt int_type = 2002;
+	E_IntType = &file_rpc_options_proto_extTypes[14]
+	// optional uint32 str_len = 2003;
+	E_StrLen = &file_rpc_options_proto_extTypes[15]
+	// optional string fkey = 2004;
+	E_Fkey = &file_rpc_options_proto_extTypes[16]
+	// optional string custom_type = 2005;
+	E_CustomType = &file_rpc_options_proto_extTypes[17]
+	// optional string excel_name = 2006;
+	E_ExcelName = &file_rpc_options_proto_extTypes[18]
+	// optional string index_type = 2007;
+	E_IndexType = &file_rpc_options_proto_extTypes[19]
+)
+
+// Extension fields to descriptorpb.MessageOptions.
+var (
+	// optional int32 gen_pod = 2000;
+	E_GenPod = &file_rpc_options_proto_extTypes[20]
+	// optional int32 gen_lua_export = 2001;
+	E_GenLuaExport = &file_rpc_options_proto_extTypes[21]
+)
+
 var File_rpc_options_proto protoreflect.FileDescriptor
 
 const file_rpc_options_proto_rawDesc = "" +
 	"\n" +
 	"\x11rpc_options.proto\x1a google/protobuf/descriptor.proto\"\r\n" +
 	"\vNullRequest\"\x0e\n" +
-	"\fNullResponse*d\n" +
-	"\rRealTypeOfInt\x12\x1b\n" +
-	"\x17RealTypeOfInt__PB3_ZERO\x10\x00\x12\f\n" +
+	"\fNullResponse*G\n" +
+	"\rRealTypeOfInt\x12\f\n" +
 	"\bRT_UINT8\x10\x01\x12\v\n" +
 	"\aRT_INT8\x10\x02\x12\r\n" +
 	"\tRT_UINT16\x10\x03\x12\f\n" +
-	"\bRT_INT16\x10\x04b\x06proto3"
+	"\bRT_INT16\x10\x04:I\n" +
+	"\x0fservice_timeout\x12\x1f.google.protobuf.ServiceOptions\x18\xd0\x0f \x01(\x05R\x0eserviceTimeout:I\n" +
+	"\x0fprivate_service\x12\x1f.google.protobuf.ServiceOptions\x18\xd1\x0f \x01(\x05R\x0eprivateService:>\n" +
+	"\n" +
+	"method_cmd\x12\x1e.google.protobuf.MethodOptions\x18\xd0\x0f \x01(\x05R\tmethodCmd:F\n" +
+	"\x0emethod_timeout\x12\x1e.google.protobuf.MethodOptions\x18\xd1\x0f \x01(\x05R\rmethodTimeout:F\n" +
+	"\x0eprivate_method\x12\x1e.google.protobuf.MethodOptions\x18\xd2\x0f \x01(\x05R\rprivateMethod:@\n" +
+	"\vrisk_method\x12\x1e.google.protobuf.MethodOptions\x18\xd4\x0f \x01(\x05R\n" +
+	"riskMethod:>\n" +
+	"\n" +
+	"lua_method\x12\x1e.google.protobuf.MethodOptions\x18\xd5\x0f \x01(\x05R\tluaMethod:8\n" +
+	"\areq_cmd\x12\x1e.google.protobuf.MethodOptions\x18\xd6\x0f \x01(\rR\x06reqCmd:8\n" +
+	"\arsp_cmd\x12\x1e.google.protobuf.MethodOptions\x18\xd7\x0f \x01(\rR\x06rspCmd:>\n" +
+	"\n" +
+	"is_private\x12\x1e.google.protobuf.MethodOptions\x18\xd8\x0f \x01(\bR\tisPrivate:G\n" +
+	"\x0fis_raw_protocol\x12\x1e.google.protobuf.MethodOptions\x18\xd9\x0f \x01(\rR\risRawProtocol:?\n" +
+	"\vno_rsp_send\x12\x1e.google.protobuf.MethodOptions\x18\xda\x0f \x01(\bR\tnoRspSend:;\n" +
+	"\tmax_count\x12\x1d.google.protobuf.FieldOptions\x18\xd0\x0f \x01(\rR\bmaxCount:?\n" +
+	"\vtotal_count\x12\x1d.google.protobuf.FieldOptions\x18\xd1\x0f \x01(\rR\n" +
+	"totalCount:I\n" +
+	"\bint_type\x12\x1d.google.protobuf.FieldOptions\x18\xd2\x0f \x01(\x0e2\x0e.RealTypeOfIntR\aintType:7\n" +
+	"\astr_len\x12\x1d.google.protobuf.FieldOptions\x18\xd3\x0f \x01(\rR\x06strLen:2\n" +
+	"\x04fkey\x12\x1d.google.protobuf.FieldOptions\x18\xd4\x0f \x01(\tR\x04fkey:?\n" +
+	"\vcustom_type\x12\x1d.google.protobuf.FieldOptions\x18\xd5\x0f \x01(\tR\n" +
+	"customType:=\n" +
+	"\n" +
+	"excel_name\x12\x1d.google.protobuf.FieldOptions\x18\xd6\x0f \x01(\tR\texcelName:=\n" +
+	"\n" +
+	"index_type\x12\x1d.google.protobuf.FieldOptions\x18\xd7\x0f \x01(\tR\tindexType:9\n" +
+	"\agen_pod\x12\x1f.google.protobuf.MessageOptions\x18\xd0\x0f \x01(\x05R\x06genPod:F\n" +
+	"\x0egen_lua_export\x12\x1f.google.protobuf.MessageOptions\x18\xd1\x0f \x01(\x05R\fgenLuaExport"
 
 var (
 	file_rpc_options_proto_rawDescOnce sync.Once
@@ -178,16 +453,43 @@ func file_rpc_options_proto_rawDescGZIP() []byte {
 var file_rpc_options_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_rpc_options_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_rpc_options_proto_goTypes = []any{
-	(RealTypeOfInt)(0),   // 0: RealTypeOfInt
-	(*NullRequest)(nil),  // 1: NullRequest
-	(*NullResponse)(nil), // 2: NullResponse
+	(RealTypeOfInt)(0),                  // 0: RealTypeOfInt
+	(*NullRequest)(nil),                 // 1: NullRequest
+	(*NullResponse)(nil),                // 2: NullResponse
+	(*descriptorpb.ServiceOptions)(nil), // 3: google.protobuf.ServiceOptions
+	(*descriptorpb.MethodOptions)(nil),  // 4: google.protobuf.MethodOptions
+	(*descriptorpb.FieldOptions)(nil),   // 5: google.protobuf.FieldOptions
+	(*descriptorpb.MessageOptions)(nil), // 6: google.protobuf.MessageOptions
 }
 var file_rpc_options_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	3,  // 0: service_timeout:extendee -> google.protobuf.ServiceOptions
+	3,  // 1: private_service:extendee -> google.protobuf.ServiceOptions
+	4,  // 2: method_cmd:extendee -> google.protobuf.MethodOptions
+	4,  // 3: method_timeout:extendee -> google.protobuf.MethodOptions
+	4,  // 4: private_method:extendee -> google.protobuf.MethodOptions
+	4,  // 5: risk_method:extendee -> google.protobuf.MethodOptions
+	4,  // 6: lua_method:extendee -> google.protobuf.MethodOptions
+	4,  // 7: req_cmd:extendee -> google.protobuf.MethodOptions
+	4,  // 8: rsp_cmd:extendee -> google.protobuf.MethodOptions
+	4,  // 9: is_private:extendee -> google.protobuf.MethodOptions
+	4,  // 10: is_raw_protocol:extendee -> google.protobuf.MethodOptions
+	4,  // 11: no_rsp_send:extendee -> google.protobuf.MethodOptions
+	5,  // 12: max_count:extendee -> google.protobuf.FieldOptions
+	5,  // 13: total_count:extendee -> google.protobuf.FieldOptions
+	5,  // 14: int_type:extendee -> google.protobuf.FieldOptions
+	5,  // 15: str_len:extendee -> google.protobuf.FieldOptions
+	5,  // 16: fkey:extendee -> google.protobuf.FieldOptions
+	5,  // 17: custom_type:extendee -> google.protobuf.FieldOptions
+	5,  // 18: excel_name:extendee -> google.protobuf.FieldOptions
+	5,  // 19: index_type:extendee -> google.protobuf.FieldOptions
+	6,  // 20: gen_pod:extendee -> google.protobuf.MessageOptions
+	6,  // 21: gen_lua_export:extendee -> google.protobuf.MessageOptions
+	0,  // 22: int_type:type_name -> RealTypeOfInt
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	22, // [22:23] is the sub-list for extension type_name
+	0,  // [0:22] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_rpc_options_proto_init() }
@@ -202,13 +504,14 @@ func file_rpc_options_proto_init() {
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rpc_options_proto_rawDesc), len(file_rpc_options_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   2,
-			NumExtensions: 0,
+			NumExtensions: 22,
 			NumServices:   0,
 		},
 		GoTypes:           file_rpc_options_proto_goTypes,
 		DependencyIndexes: file_rpc_options_proto_depIdxs,
 		EnumInfos:         file_rpc_options_proto_enumTypes,
 		MessageInfos:      file_rpc_options_proto_msgTypes,
+		ExtensionInfos:    file_rpc_options_proto_extTypes,
 	}.Build()
 	File_rpc_options_proto = out.File
 	file_rpc_options_proto_goTypes = nil

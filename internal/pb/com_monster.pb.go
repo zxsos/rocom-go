@@ -24,28 +24,25 @@ const (
 type MonsterSettleStatus int32
 
 const (
-	MonsterSettleStatus_MonsterSettleStatus__PB3_ZERO MonsterSettleStatus = 0
-	MonsterSettleStatus_MONSTER_SETTLE_NONE           MonsterSettleStatus = 0
-	MonsterSettleStatus_BATTLE_DEFEAT                 MonsterSettleStatus = 1
-	MonsterSettleStatus_BATTLE_CAPTURE                MonsterSettleStatus = 2
-	MonsterSettleStatus_SCENE_CAPTURE                 MonsterSettleStatus = 3
+	MonsterSettleStatus_MONSTER_SETTLE_NONE MonsterSettleStatus = 0
+	MonsterSettleStatus_BATTLE_DEFEAT       MonsterSettleStatus = 1
+	MonsterSettleStatus_BATTLE_CAPTURE      MonsterSettleStatus = 2
+	MonsterSettleStatus_SCENE_CAPTURE       MonsterSettleStatus = 3
 )
 
 // Enum value maps for MonsterSettleStatus.
 var (
 	MonsterSettleStatus_name = map[int32]string{
-		0: "MonsterSettleStatus__PB3_ZERO",
-		// Duplicate value: 0: "MONSTER_SETTLE_NONE",
+		0: "MONSTER_SETTLE_NONE",
 		1: "BATTLE_DEFEAT",
 		2: "BATTLE_CAPTURE",
 		3: "SCENE_CAPTURE",
 	}
 	MonsterSettleStatus_value = map[string]int32{
-		"MonsterSettleStatus__PB3_ZERO": 0,
-		"MONSTER_SETTLE_NONE":           0,
-		"BATTLE_DEFEAT":                 1,
-		"BATTLE_CAPTURE":                2,
-		"SCENE_CAPTURE":                 3,
+		"MONSTER_SETTLE_NONE": 0,
+		"BATTLE_DEFEAT":       1,
+		"BATTLE_CAPTURE":      2,
+		"SCENE_CAPTURE":       3,
 	}
 )
 
@@ -71,6 +68,16 @@ func (x MonsterSettleStatus) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
+// Deprecated: Do not use.
+func (x *MonsterSettleStatus) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = MonsterSettleStatus(num)
+	return nil
+}
+
 // Deprecated: Use MonsterSettleStatus.Descriptor instead.
 func (MonsterSettleStatus) EnumDescriptor() ([]byte, []int) {
 	return file_com_monster_proto_rawDescGZIP(), []int{0}
@@ -78,14 +85,14 @@ func (MonsterSettleStatus) EnumDescriptor() ([]byte, []int) {
 
 type MonsterDiffInfo struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	Height               int32                  `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
-	Weight               int32                  `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
-	Nature               int32                  `protobuf:"varint,3,opt,name=nature,proto3" json:"nature,omitempty"`
-	MutationType         int32                  `protobuf:"varint,4,opt,name=mutation_type,json=mutationType,proto3" json:"mutation_type,omitempty"`
-	BloodMixSkillDamType uint32                 `protobuf:"varint,5,opt,name=blood_mix_skill_dam_type,json=bloodMixSkillDamType,proto3" json:"blood_mix_skill_dam_type,omitempty"`
-	GlassInfo            *GlassInfo             `protobuf:"bytes,7,opt,name=glass_info,json=glassInfo,proto3" json:"glass_info,omitempty"`
-	Voice                int32                  `protobuf:"varint,8,opt,name=voice,proto3" json:"voice,omitempty"`
-	Gender               int32                  `protobuf:"varint,9,opt,name=gender,proto3" json:"gender,omitempty"`
+	Height               *int32                 `protobuf:"varint,1,opt,name=height" json:"height,omitempty"`
+	Weight               *int32                 `protobuf:"varint,2,opt,name=weight" json:"weight,omitempty"`
+	Nature               *int32                 `protobuf:"varint,3,opt,name=nature" json:"nature,omitempty"`
+	MutationType         *int32                 `protobuf:"varint,4,opt,name=mutation_type,json=mutationType" json:"mutation_type,omitempty"`
+	BloodMixSkillDamType *uint32                `protobuf:"varint,5,opt,name=blood_mix_skill_dam_type,json=bloodMixSkillDamType" json:"blood_mix_skill_dam_type,omitempty"`
+	GlassInfo            *GlassInfo             `protobuf:"bytes,7,opt,name=glass_info,json=glassInfo" json:"glass_info,omitempty"`
+	Voice                *int32                 `protobuf:"varint,8,opt,name=voice" json:"voice,omitempty"`
+	Gender               *int32                 `protobuf:"varint,9,opt,name=gender" json:"gender,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -121,36 +128,36 @@ func (*MonsterDiffInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *MonsterDiffInfo) GetHeight() int32 {
-	if x != nil {
-		return x.Height
+	if x != nil && x.Height != nil {
+		return *x.Height
 	}
 	return 0
 }
 
 func (x *MonsterDiffInfo) GetWeight() int32 {
-	if x != nil {
-		return x.Weight
+	if x != nil && x.Weight != nil {
+		return *x.Weight
 	}
 	return 0
 }
 
 func (x *MonsterDiffInfo) GetNature() int32 {
-	if x != nil {
-		return x.Nature
+	if x != nil && x.Nature != nil {
+		return *x.Nature
 	}
 	return 0
 }
 
 func (x *MonsterDiffInfo) GetMutationType() int32 {
-	if x != nil {
-		return x.MutationType
+	if x != nil && x.MutationType != nil {
+		return *x.MutationType
 	}
 	return 0
 }
 
 func (x *MonsterDiffInfo) GetBloodMixSkillDamType() uint32 {
-	if x != nil {
-		return x.BloodMixSkillDamType
+	if x != nil && x.BloodMixSkillDamType != nil {
+		return *x.BloodMixSkillDamType
 	}
 	return 0
 }
@@ -163,30 +170,30 @@ func (x *MonsterDiffInfo) GetGlassInfo() *GlassInfo {
 }
 
 func (x *MonsterDiffInfo) GetVoice() int32 {
-	if x != nil {
-		return x.Voice
+	if x != nil && x.Voice != nil {
+		return *x.Voice
 	}
 	return 0
 }
 
 func (x *MonsterDiffInfo) GetGender() int32 {
-	if x != nil {
-		return x.Gender
+	if x != nil && x.Gender != nil {
+		return *x.Gender
 	}
 	return 0
 }
 
 type CheerMonsterInitInfo struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	ConfId          uint32                 `protobuf:"varint,1,opt,name=conf_id,json=confId,proto3" json:"conf_id,omitempty"`
-	Sid             uint64                 `protobuf:"varint,2,opt,name=sid,proto3" json:"sid,omitempty"`
-	Tag             uint32                 `protobuf:"varint,3,opt,name=tag,proto3" json:"tag,omitempty"`
-	EnterIndex      uint32                 `protobuf:"varint,4,opt,name=enter_index,json=enterIndex,proto3" json:"enter_index,omitempty"`
-	Level           uint32                 `protobuf:"varint,5,opt,name=level,proto3" json:"level,omitempty"`
-	AiStatus        uint64                 `protobuf:"varint,6,opt,name=ai_status,json=aiStatus,proto3" json:"ai_status,omitempty"`
-	PreActTag       int32                  `protobuf:"varint,7,opt,name=pre_act_tag,json=preActTag,proto3" json:"pre_act_tag,omitempty"`
-	PreActParam     int32                  `protobuf:"varint,8,opt,name=pre_act_param,json=preActParam,proto3" json:"pre_act_param,omitempty"`
-	MonsterDiffInfo *MonsterDiffInfo       `protobuf:"bytes,9,opt,name=monster_diff_info,json=monsterDiffInfo,proto3" json:"monster_diff_info,omitempty"`
+	ConfId          *uint32                `protobuf:"varint,1,opt,name=conf_id,json=confId" json:"conf_id,omitempty"`
+	Sid             *uint64                `protobuf:"varint,2,opt,name=sid" json:"sid,omitempty"`
+	Tag             *uint32                `protobuf:"varint,3,opt,name=tag" json:"tag,omitempty"`
+	EnterIndex      *uint32                `protobuf:"varint,4,opt,name=enter_index,json=enterIndex" json:"enter_index,omitempty"`
+	Level           *uint32                `protobuf:"varint,5,opt,name=level" json:"level,omitempty"`
+	AiStatus        *uint64                `protobuf:"varint,6,opt,name=ai_status,json=aiStatus" json:"ai_status,omitempty"`
+	PreActTag       *int32                 `protobuf:"varint,7,opt,name=pre_act_tag,json=preActTag" json:"pre_act_tag,omitempty"`
+	PreActParam     *int32                 `protobuf:"varint,8,opt,name=pre_act_param,json=preActParam" json:"pre_act_param,omitempty"`
+	MonsterDiffInfo *MonsterDiffInfo       `protobuf:"bytes,9,opt,name=monster_diff_info,json=monsterDiffInfo" json:"monster_diff_info,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -222,57 +229,57 @@ func (*CheerMonsterInitInfo) Descriptor() ([]byte, []int) {
 }
 
 func (x *CheerMonsterInitInfo) GetConfId() uint32 {
-	if x != nil {
-		return x.ConfId
+	if x != nil && x.ConfId != nil {
+		return *x.ConfId
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetSid() uint64 {
-	if x != nil {
-		return x.Sid
+	if x != nil && x.Sid != nil {
+		return *x.Sid
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetTag() uint32 {
-	if x != nil {
-		return x.Tag
+	if x != nil && x.Tag != nil {
+		return *x.Tag
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetEnterIndex() uint32 {
-	if x != nil {
-		return x.EnterIndex
+	if x != nil && x.EnterIndex != nil {
+		return *x.EnterIndex
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetLevel() uint32 {
-	if x != nil {
-		return x.Level
+	if x != nil && x.Level != nil {
+		return *x.Level
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetAiStatus() uint64 {
-	if x != nil {
-		return x.AiStatus
+	if x != nil && x.AiStatus != nil {
+		return *x.AiStatus
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetPreActTag() int32 {
-	if x != nil {
-		return x.PreActTag
+	if x != nil && x.PreActTag != nil {
+		return *x.PreActTag
 	}
 	return 0
 }
 
 func (x *CheerMonsterInitInfo) GetPreActParam() int32 {
-	if x != nil {
-		return x.PreActParam
+	if x != nil && x.PreActParam != nil {
+		return *x.PreActParam
 	}
 	return 0
 }
@@ -309,13 +316,12 @@ const file_com_monster_proto_rawDesc = "" +
 	"\tai_status\x18\x06 \x01(\x04R\baiStatus\x12\x1e\n" +
 	"\vpre_act_tag\x18\a \x01(\x05R\tpreActTag\x12\"\n" +
 	"\rpre_act_param\x18\b \x01(\x05R\vpreActParam\x12A\n" +
-	"\x11monster_diff_info\x18\t \x01(\v2\x15.Next.MonsterDiffInfoR\x0fmonsterDiffInfo*\x8f\x01\n" +
-	"\x13MonsterSettleStatus\x12!\n" +
-	"\x1dMonsterSettleStatus__PB3_ZERO\x10\x00\x12\x17\n" +
+	"\x11monster_diff_info\x18\t \x01(\v2\x15.Next.MonsterDiffInfoR\x0fmonsterDiffInfo*h\n" +
+	"\x13MonsterSettleStatus\x12\x17\n" +
 	"\x13MONSTER_SETTLE_NONE\x10\x00\x12\x11\n" +
 	"\rBATTLE_DEFEAT\x10\x01\x12\x12\n" +
 	"\x0eBATTLE_CAPTURE\x10\x02\x12\x11\n" +
-	"\rSCENE_CAPTURE\x10\x03\x1a\x02\x10\x01b\x06proto3"
+	"\rSCENE_CAPTURE\x10\x03"
 
 var (
 	file_com_monster_proto_rawDescOnce sync.Once
