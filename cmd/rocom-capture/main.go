@@ -79,19 +79,19 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
-		// 孵蛋 / 战斗外捕捉：下行结果含新宠物(嵌在 goods_reward)
-		if m.Direction == gcp.S2C && (m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp) {
+		// 获得新宠物：孵蛋、战斗外捕捉、(普通)战斗内捕捉(经奖励通知)都把新宠物嵌在 goods_reward。
+		// 同一宠物可能经多个 opcode 下发，用 isNew 去重;获得方式由 catch_way 区分。
+		if m.Direction == gcp.S2C &&
+			(m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp || m.Opcode == pet.OpGoodsRewardNotify) {
 			if pd := pet.FindNewPet(m.AppBody); pd != nil {
 				p := pet.ToPet(pd, db)
-				st.UpsertPet(p)
+				isNew, _ := st.UpsertPet(p)
 				srv.Hub().Broadcast("pet", p)
-				sub := "孵蛋"
-				if m.Opcode == pet.OpPetCatchRsp {
-					sub = "捕捉"
-				}
-				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: sub, Gid: p.Gid, Pet: p}
-				if st.AddEvent(ev) == nil {
-					srv.Hub().Broadcast("event", ev)
+				if isNew {
+					ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: catchWayName(pd), Gid: p.Gid, Pet: p}
+					if st.AddEvent(ev) == nil {
+						srv.Hub().Broadcast("event", ev)
+					}
 				}
 			}
 			continue
