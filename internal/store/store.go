@@ -69,8 +69,46 @@ CREATE TABLE IF NOT EXISTS events (
   data TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_time ON events(time);
+CREATE TABLE IF NOT EXISTS pet_box (
+  gid INTEGER PRIMARY KEY,
+  box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER
+);
 `)
 	return err
+}
+
+// ReplacePetBoxes 用一份完整背包快照替换所有宠物盒子位置(整体 DELETE + 批量插入)。
+func (s *Store) ReplacePetBoxes(entries []pet.BoxEntry) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM pet_box`); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_box(gid,box_id,slot,box_name,mark) VALUES(?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, e := range entries {
+		if _, err = stmt.Exec(e.Gid, e.BoxID, e.Slot, e.BoxName, e.Mark); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// boxLocFor 读取单只宠物的盒子位置(无则 nil),供 GetPet 注入。
+func (s *Store) boxLocFor(gid uint32) *pet.PetBoxLoc {
+	var boxID, slot, mark int32
+	var name string
+	err := s.db.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE gid=?`, gid).Scan(&boxID, &slot, &name, &mark)
+	if err != nil {
+		return nil
+	}
+	return &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
 }
 
 // UpsertPet 插入或更新一只宠物，返回是否为新增(库中此前无该 gid)。
@@ -130,6 +168,7 @@ func (s *Store) GetPet(gid uint32) (*pet.Pet, error) {
 	if err := json.Unmarshal([]byte(data), &p); err != nil {
 		return nil, err
 	}
+	p.Box = s.boxLocFor(gid)
 	return &p, nil
 }
 

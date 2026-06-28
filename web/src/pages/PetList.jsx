@@ -153,7 +153,7 @@ export default function PetList() {
                       <Avatar p={p} />
                       <div>
                         <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                        <div className="pet-sub">{p.species} · Lv.{p.level}</div>
+                        <div className="pet-sub">{p.species} · Lv.{p.level}{p.box ? ` · 📦${p.box.boxName || '盒' + p.box.boxId}` : ''}</div>
                       </div>
                     </div>
                   </td>
@@ -180,7 +180,7 @@ export default function PetList() {
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
                   <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                  <div className="pet-sub">{p.species} · Lv.{p.level}</div>
+                  <div className="pet-sub">{p.species} · Lv.{p.level}{p.box ? ` · 📦${p.box.boxName || '盒' + p.box.boxId}` : ''}</div>
                 </div>
                 <Types types={p.types} />
               </div>

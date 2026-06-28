@@ -16,7 +16,104 @@ const (
 	OpPetCatchRsp         = 0x1983 // ZONE_SCENE_THROW_CATCH_FINISH_RSP(6531), 战斗外捕捉(赛季球/高级球)
 	OpGoodsRewardNotify   = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
 	OpPlayerSyncNotify    = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
+	OpLoginRsp            = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
 )
+
+// 盒子操作 opcode 区间(ZoneSvrCmd 十进制 6272-6292,如 TIDY_RSP/SETTING_UP_RSP 携带全量盒子)。
+const boxOpcodeLo, boxOpcodeHi = 6272, 6292
+
+// CarriesBackpack 判断该 opcode 是否可能携带盒子布局(登录数据或盒子操作回包)。
+func CarriesBackpack(opcode uint16) bool {
+	return opcode == OpLoginRsp || (opcode >= boxOpcodeLo && opcode <= boxOpcodeHi)
+}
+
+// warehouseMark 是 WarehouseMarkType(盒子分类标记)枚举值 -> 中文。
+var warehouseMark = map[int32]string{1: "首领", 2: "污染", 4: "奇异", 8: "炫彩", 16: "闪光"}
+
+// MarkName 返回盒子分类标记中文(0/未知返回空)。
+func MarkName(v int32) string { return warehouseMark[v] }
+
+// BoxEntry 是一只宠物的盒子位置(供 store 落库)。
+type BoxEntry struct {
+	Gid     uint32
+	BoxID   int32
+	Slot    int32
+	BoxName string
+	Mark    int32
+}
+
+// collectBackpacks 递归收集 body 里所有 boxes 非空的 PetBackpackInfo 候选。
+func collectBackpacks(body []byte, out *[]*pb.PetBackpackInfo) {
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			var bp pb.PetBackpackInfo
+			if proto.Unmarshal(v, &bp) == nil && len(bp.GetBoxes()) > 0 {
+				*out = append(*out, &bp)
+			}
+			collectBackpacks(v, out)
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+}
+
+// ParseBackpack 在 body 里找最完整的 PetBackpackInfo,展开为盒子位置列表。
+// 位置 = 宠物 gid 在 PetBox.pet_gid[] 中的下标(空格为 0,跳过)。取非零 gid 数最多的
+// 候选以排除误解析;少于 5 只视为非真实背包,返回 nil。
+func ParseBackpack(body []byte) []BoxEntry {
+	var cands []*pb.PetBackpackInfo
+	collectBackpacks(body, &cands)
+
+	var best *pb.PetBackpackInfo
+	bestN := 0
+	for _, bp := range cands {
+		n := 0
+		for _, bx := range bp.GetBoxes() {
+			if bx.GetVacancyNum() < 0 || bx.GetVacancyNum() > 200 || bx.GetBoxId() < 0 || bx.GetBoxId() > 1000 {
+				n = -1 // 数值不合理,整体判为误解析
+				break
+			}
+			for _, g := range bx.GetPetGid() {
+				if g != 0 {
+					n++
+				}
+			}
+		}
+		if n > bestN {
+			bestN, best = n, bp
+		}
+	}
+	if best == nil || bestN < 5 {
+		return nil
+	}
+
+	var out []BoxEntry
+	for _, bx := range best.GetBoxes() {
+		name := string(bx.GetBoxName())
+		mark := int32(bx.GetMarkType())
+		for slot, g := range bx.GetPetGid() {
+			if g != 0 {
+				out = append(out, BoxEntry{Gid: g, BoxID: bx.GetBoxId(), Slot: int32(slot), BoxName: name, Mark: mark})
+			}
+		}
+	}
+	return out
+}
 
 // hasCJK 判断字节串是否含中日韩统一表意文字(宠物名为中文)。
 func hasCJK(b []byte) bool {

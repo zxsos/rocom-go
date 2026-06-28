@@ -87,6 +87,7 @@ export default function PetDetail() {
             <Item k="体重" v={pet.weightKg.toFixed(2) + ' kg'} />
             <Item k="声音" v={pet.voice} />
             <Item k="标记" v={pet.partnerMark || '无'} />
+            <Item k="盒子位置" v={pet.box ? `${pet.box.boxName || '盒' + pet.box.boxId} · 第${pet.box.slot + 1}格` : '-'} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} />
             <Item k="异色" v={pet.shiny ? '是' : '否'} />
             <Item k="炫彩" v={pet.colorful ? '是' : '否'} />

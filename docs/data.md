@@ -164,8 +164,16 @@ s2c 0x1346 DATA 明文 body
   `isNew` 去重(同宠物可能多 opcode 下发);
 - **异色/炫彩**：`mutation_type` 为位标志,bit0=异色、bit3=炫彩(9 样本实测验证);
   炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
+- **盒子位置**：`PetData` 无位置字段,位置由仓库布局 `PetBackpackInfo` 表达——
+  `ZONE_LOGIN_RSP(0x0102)` 登录数据(或盒子操作回包 6272-6292)携带 `boxes[]`,每个 `PetBox` 有
+  `box_id`(盒号)、`mark_type`(WarehouseMarkType:1首领/2污染/4奇异/8炫彩/16闪光)、`box_name`
+  (玩家命名)、`pet_gid[]`(**有序数组,每盒 30 格,空格=0**)。**位置 =(box_id, pet_gid[] 下标)**。
+  `ParseBackpack` 取非零 gid 数最多的候选(排除误解析),展开为 gid→位置存入 `pet_box` 表,
+  读取宠物时 JOIN 注入 `Pet.Box`;实测 0x0102 解出 ~525 只(27 盒),`/api/pets/21`→污染1 第11格。
 
 待校准(多数需含相应事件/宠物的新样本)：
 - **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入;
-- **咕噜球/蛋组/技能名**本地化尚未梳理；**盒子位置**字段待定位；
+- **盒子位置增量**：现仅按 `0x0102` 全量快照刷新;盒内移动(`ZONE_PET_BOX_CHANGE_PET 6280`
+  的 `PetBoxPetChange`:`id`=盒、`pos`=格位)与 `GoodsChangeItem.box_pet_change` 增量更新待接入;
+- **咕噜球/蛋组/技能名**本地化尚未梳理;
 - **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。

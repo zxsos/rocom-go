@@ -131,7 +131,41 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 			pets = append(pets, &p)
 		}
 	}
-	return pets, total, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	s.attachBoxes(pets)
+	return pets, total, nil
+}
+
+// attachBoxes 给一页宠物批量注入盒子位置(单查询,按 gid 映射)。
+func (s *Store) attachBoxes(pets []*pet.Pet) {
+	if len(pets) == 0 {
+		return
+	}
+	byGid := make(map[uint32]*pet.Pet, len(pets))
+	ph := make([]string, len(pets))
+	args := make([]any, len(pets))
+	for i, p := range pets {
+		byGid[p.Gid] = p
+		ph[i] = "?"
+		args[i] = p.Gid
+	}
+	rows, err := s.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var gid uint32
+		var boxID, slot, mark int32
+		var name string
+		if rows.Scan(&gid, &boxID, &slot, &name, &mark) == nil {
+			if p := byGid[gid]; p != nil {
+				p.Box = &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
+			}
+		}
+	}
 }
 
 // CountPets 返回库中宠物总数。
