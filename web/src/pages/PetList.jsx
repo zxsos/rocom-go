@@ -25,17 +25,40 @@ const SORTS = [
   { key: 'catchTime', label: '捕捉时间' },
 ]
 
+// 列表状态(筛选/排序/分页/滚动)用 sessionStorage 持久化,从详情返回时还原。
+const DEFAULT_FILTER = { page: 1, pageSize: 10, sort: 'gid', order: 'asc' }
+function loadFilter() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem('petListFilter'))
+    if (s && typeof s === 'object') return s
+  } catch { /* ignore */ }
+  return DEFAULT_FILTER
+}
+
 export default function PetList() {
   const nav = useNavigate()
-  const [filter, setFilter] = useState({ page: 1, pageSize: 12, sort: 'gid', order: 'asc' })
+  const [filter, setFilter] = useState(loadFilter)
   const [data, setData] = useState({ total: 0, pets: [] })
   const [options, setOptions] = useState({})
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
   const reloadRef = useRef(null)
+  const restoredRef = useRef(false)
 
   const load = useCallback(() => { getPets(filter).then(setData).catch(() => {}) }, [filter])
   useEffect(() => { load() }, [load])
   useEffect(() => { getFilterOptions().then(setOptions).catch(() => {}) }, [])
+
+  // 持久化筛选状态与筛选栏折叠态
+  useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
+  useEffect(() => { sessionStorage.setItem('petListCollapsed', collapsed ? '1' : '0') }, [collapsed])
+
+  // 首次数据到达后还原滚动位置(从详情返回)
+  useEffect(() => {
+    if (restoredRef.current || data.pets.length === 0) return
+    const y = parseInt(sessionStorage.getItem('petListScroll') || '0', 10)
+    if (y > 0) window.scrollTo(0, y)
+    restoredRef.current = true
+  }, [data])
 
   // 实时：收到宠物更新时防抖重载当前页
   useEffect(() => {
@@ -55,9 +78,12 @@ export default function PetList() {
     })
   const sortBy = (key) =>
     setFilter((f) => ({ ...f, sort: key, order: f.sort === key && f.order === 'asc' ? 'desc' : 'asc', page: 1 }))
+  // 进详情前记录滚动位置
+  const goDetail = (gid) => { sessionStorage.setItem('petListScroll', String(window.scrollY)); nav('/pets/' + gid) }
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
+  const boxTag = (b) => (b ? ` · 📦${b.boxId}-${b.boxName || '盒' + b.boxId}` : '')
 
   return (
     <div className="list-layout">
@@ -73,9 +99,9 @@ export default function PetList() {
         <div className="filter-group">
           <label>等级</label>
           <div className="range">
-            <input className="input" type="number" placeholder="最小" onChange={(e) => set({ levelMin: e.target.value })} />
+            <input className="input" type="number" placeholder="最小" value={filter.levelMin || ''} onChange={(e) => set({ levelMin: e.target.value })} />
             <span className="muted">~</span>
-            <input className="input" type="number" placeholder="最大" onChange={(e) => set({ levelMax: e.target.value })} />
+            <input className="input" type="number" placeholder="最大" value={filter.levelMax || ''} onChange={(e) => set({ levelMax: e.target.value })} />
           </div>
         </div>
         <div className="filter-group">
@@ -96,24 +122,25 @@ export default function PetList() {
             <option value="__other__">其他</option>
           </select>
         </div>
-        <Select label="天分" opts={options.talentRank} onChange={(v) => set({ talentRank: v })} />
-        <Select label="特长" opts={options.speciality} onChange={(v) => set({ speciality: v })} />
-        <Select label="奖牌" opts={options.medal} onChange={(v) => set({ medal: v })} />
+        <Select label="天分" opts={options.talentRank} value={filter.talentRank} onChange={(v) => set({ talentRank: v })} />
+        <Select label="特长" opts={options.speciality} value={filter.speciality} onChange={(v) => set({ speciality: v })} />
+        <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
+        <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
           <label>性别</label>
-          <select className="select" onChange={(e) => set({ gender: e.target.value })}>
+          <select className="select" value={filter.gender || ''} onChange={(e) => set({ gender: e.target.value })}>
             <option value="">全部</option><option value="♂">♂</option><option value="♀">♀</option>
           </select>
         </div>
         <div className="filter-group">
           <label>异色</label>
-          <select className="select" onChange={(e) => set({ shiny: e.target.value })}>
+          <select className="select" value={filter.shiny || ''} onChange={(e) => set({ shiny: e.target.value })}>
             <option value="">全部</option><option value="1">仅异色</option><option value="0">非异色</option>
           </select>
         </div>
         <div className="filter-group">
           <label>炫彩</label>
-          <select className="select" onChange={(e) => set({ colorful: e.target.value })}>
+          <select className="select" value={filter.colorful || ''} onChange={(e) => set({ colorful: e.target.value })}>
             <option value="">全部</option><option value="1">仅炫彩</option><option value="0">非炫彩</option>
           </select>
         </div>
@@ -122,7 +149,7 @@ export default function PetList() {
       <section>
         <div className="toolbar">
           <button className="btn filter-toggle" onClick={() => setCollapsed((c) => !c)}>筛选</button>
-          <input className="input" placeholder="搜索昵称 / 种类" onChange={(e) => set({ search: e.target.value })} />
+          <input className="input" placeholder="搜索昵称 / 种类" value={filter.search || ''} onChange={(e) => set({ search: e.target.value })} />
           <select className="select" style={{ maxWidth: 130 }} value={filter.sort} onChange={(e) => set({ sort: e.target.value })}>
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
@@ -147,13 +174,13 @@ export default function PetList() {
             </thead>
             <tbody>
               {data.pets.map((p) => (
-                <tr key={p.gid} onClick={() => nav('/pets/' + p.gid)}>
+                <tr key={p.gid} onClick={() => goDetail(p.gid)}>
                   <td>
                     <div className="pet-cell">
                       <Avatar p={p} />
                       <div>
                         <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                        <div className="pet-sub">{p.species} · Lv.{p.level}{p.box ? ` · 📦${p.box.boxName || '盒' + p.box.boxId}` : ''}</div>
+                        <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p.box)}</div>
                       </div>
                     </div>
                   </td>
@@ -175,12 +202,12 @@ export default function PetList() {
         {/* 移动卡片 */}
         <div className="cards">
           {data.pets.map((p) => (
-            <div className="card" key={p.gid} onClick={() => nav('/pets/' + p.gid)}>
+            <div className="card" key={p.gid} onClick={() => goDetail(p.gid)}>
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
                   <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                  <div className="pet-sub">{p.species} · Lv.{p.level}{p.box ? ` · 📦${p.box.boxName || '盒' + p.box.boxId}` : ''}</div>
+                  <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p.box)}</div>
                 </div>
                 <Types types={p.types} />
               </div>
@@ -204,7 +231,7 @@ export default function PetList() {
           <span className="muted">{filter.page} / {pages}</span>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: filter.page + 1 })}>下一页</button>
           <select className="select" style={{ width: 110 }} value={filter.pageSize} onChange={(e) => set({ pageSize: +e.target.value })}>
-            {[12, 24, 48, 96].map((n) => <option key={n} value={n}>{n} 条/页</option>)}
+            {[10, 20, 30, 60, 100].map((n) => <option key={n} value={n}>{n} 条/页</option>)}
           </select>
         </div>
       </section>
@@ -212,11 +239,11 @@ export default function PetList() {
   )
 }
 
-function Select({ label, opts, onChange }) {
+function Select({ label, opts, value, onChange }) {
   return (
     <div className="filter-group">
       <label>{label}</label>
-      <select className="select" onChange={(e) => onChange(e.target.value)}>
+      <select className="select" value={value || ''} onChange={(e) => onChange(e.target.value)}>
         <option value="">全部</option>
         {(opts || []).map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
