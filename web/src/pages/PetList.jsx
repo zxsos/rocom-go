@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
-import { Types, Six, Marks, Avatar, boxLabel, fmtTime } from '../components/bits'
+import { Types, Six, Marks, Avatar, boxLabel, teamLabel, fmtTime } from '../components/bits'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
 const HOT_NATURES = [
@@ -85,7 +85,7 @@ export default function PetList() {
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
-  const boxTag = (b) => (b ? ` · 📦${boxLabel(b)}` : '')
+  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界${teamLabel(p.team)}` : '')
 
   return (
     <div className="list-layout">
@@ -185,7 +185,7 @@ export default function PetList() {
                       <Avatar p={p} />
                       <div>
                         <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                        <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p.box)}</div>
+                        <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p)}</div>
                       </div>
                     </div>
                   </td>
@@ -212,7 +212,7 @@ export default function PetList() {
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
                   <div className="pet-name">{p.name || p.species} {p.gender} <Marks p={p} /></div>
-                  <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p.box)}</div>
+                  <div className="pet-sub">{p.species} · Lv.{p.level}{boxTag(p)}</div>
                 </div>
                 <Types types={p.types} />
               </div>

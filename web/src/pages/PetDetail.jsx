@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet } from '../api'
-import { Types, Marks, Portrait, boxLabel, fmtTime } from '../components/bits'
+import { Types, Marks, Portrait, locText, fmtTime } from '../components/bits'
 
 const SIX = [
   ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
@@ -87,7 +87,7 @@ export default function PetDetail() {
             <Item k="体重" v={pet.weightKg + ' kg'} />
             <Item k="声音" v={pet.voice} />
             <Item k="标记" v={pet.partnerMark || '无'} />
-            <Item k="盒子位置" v={boxLabel(pet.box)} />
+            <Item k="位置" v={locText(pet)} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} />
             <Item k="异色" v={pet.shiny ? '是' : '否'} />
             <Item k="炫彩" v={pet.colorful ? '是' : '否'} />

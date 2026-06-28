@@ -44,9 +44,10 @@
 `protoc --descriptor_set_in` 即可生成 Go，**无需 .proto 文本，也无需 fix_proto 修补
 syntax/enum**(那是旧 world-data `.proto` 才有的坑，已随数据源切换一并去除)。
 
-只生成 `com_pet.proto` 的**依赖闭包**(由脚本从描述符**动态求取**,随 all.pb 版本而变,
-当前约 8 个文件:com_pet/com_base_types/com_battle_enum/com_monster/com_pet_skill/
-com_season/rpc_options/xls_enum),用 `--go_opt=M...` 映射到单一 Go 包 `internal/pb`。
+只生成 `com_pet.proto` + `com_pet_team.proto`(大世界队伍)两个根的**依赖闭包**(由脚本从描述符
+**动态求取并合并**,随 all.pb 版本而变,当前约 9 个文件:com_pet/com_base_types/com_battle_enum/
+com_monster/com_pet_skill/com_season/rpc_options/xls_enum/com_pet_team),
+用 `--go_opt=M...` 映射到单一 Go 包 `internal/pb`。
 `all.pb` 不含 well-known 的 `descriptor.proto`(被 rpc_options 依赖),脚本用 protobuf 运行时
 自带的描述符在内存里补进描述符集(见 `scripts/pbdesc.py`)。产物为 `internal/pb/*.pb.go`(已提交)。
 
@@ -170,6 +171,11 @@ s2c 0x1346 DATA 明文 body
   (玩家命名)、`pet_gid[]`(**有序数组,每盒 30 格,空格=0**)。**位置 =(box_id, pet_gid[] 下标)**。
   `ParseBackpack` 取非零 gid 数最多的候选(排除误解析),展开为 gid→位置存入 `pet_box` 表,
   读取宠物时 JOIN 注入 `Pet.Box`;实测 0x0102 解出 ~525 只(27 盒),`/api/pets/21`→污染1 第11格。
+- **队伍位置**：在队宠物**不在盒子里**,位置由 `PlayerPetInfo.team_infos`(同在 0x0102 登录数据)
+  里 `team_type==PTT_BIG_WORLD(1)` 的 `PetTeamInfo` 表达——`teams[]`(最多 3 队,**队号取数组下标**,
+  实测 `PetTeam.team_idx` 恒 0),每队 `pet_infos[]`(6 位)的 `pet_gid`。`ParseTeams`(取宠物数最多的
+  大世界候选)→ gid→(队,位)存 `pet_team` 表,JOIN 注入 `Pet.Team`(与 `Box` 互斥);实测 3 队 18 只全命中。
+  为此 `gen_proto.py` 把 `com_pet_team.proto` 加为第二根(闭包 +1 文件)。
 
 待校准(多数需含相应事件/宠物的新样本)：
 - **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入;

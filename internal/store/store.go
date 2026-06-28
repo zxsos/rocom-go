@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS pet_box (
   gid INTEGER PRIMARY KEY,
   box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER
 );
+CREATE TABLE IF NOT EXISTS pet_team (
+  gid INTEGER PRIMARY KEY,
+  team_idx INTEGER, pos INTEGER
+);
 `)
 	return err
 }
@@ -109,6 +113,38 @@ func (s *Store) boxLocFor(gid uint32) *pet.PetBoxLoc {
 		return nil
 	}
 	return &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
+}
+
+// ReplacePetTeams 用一份大世界队伍快照替换所有宠物队伍位置。
+func (s *Store) ReplacePetTeams(entries []pet.TeamEntry) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM pet_team`); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_team(gid,team_idx,pos) VALUES(?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, e := range entries {
+		if _, err = stmt.Exec(e.Gid, e.TeamIdx, e.Pos); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// teamLocFor 读取单只宠物的队伍位置(无则 nil),供 GetPet 注入。
+func (s *Store) teamLocFor(gid uint32) *pet.PetTeamLoc {
+	var teamIdx, pos int32
+	if s.db.QueryRow(`SELECT team_idx,pos FROM pet_team WHERE gid=?`, gid).Scan(&teamIdx, &pos) != nil {
+		return nil
+	}
+	return &pet.PetTeamLoc{TeamIdx: teamIdx, Pos: pos}
 }
 
 // UpsertPet 插入或更新一只宠物，返回是否为新增(库中此前无该 gid)。
@@ -169,6 +205,7 @@ func (s *Store) GetPet(gid uint32) (*pet.Pet, error) {
 		return nil, err
 	}
 	p.Box = s.boxLocFor(gid)
+	p.Team = s.teamLocFor(gid)
 	return &p, nil
 }
 

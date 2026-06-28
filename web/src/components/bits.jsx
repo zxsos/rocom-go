@@ -11,6 +11,19 @@ export function boxLabel(box) {
   return `${box.boxId}-${name} 第${row}排第${col}格`
 }
 
+// teamLabel 把队伍位置渲染为 "第3队第2位"(teamIdx/pos 从 0 起)。
+export function teamLabel(team) {
+  if (!team) return '-'
+  return `第${team.teamIdx + 1}队第${team.pos + 1}位`
+}
+
+// locText 返回宠物的位置文本:在盒显示盒位,在大世界队伍显示队位,否则 '-'。
+export function locText(pet) {
+  if (pet.box) return boxLabel(pet.box)
+  if (pet.team) return '大世界 ' + teamLabel(pet.team)
+  return '-'
+}
+
 // Avatar 渲染宠物小头像(列表/事件用);无图(未上线/缺源)或无 pet 回退 emoji。
 export function Avatar({ p, className = 'pet-avatar' }) {
   const [bad, setBad] = React.useState(false)
