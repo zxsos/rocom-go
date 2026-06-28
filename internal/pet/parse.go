@@ -14,7 +14,18 @@ const (
 	OpPetFreeRsp          = 0x01c5 // ZONE_PET_FREE_RSP(453), 放生(下行含 pet_gid 列表)
 	OpCrackEggRsp         = 0x030c // ZONE_CRACK_EGG_RSP(780), 孵蛋(新宠物嵌在 goods_reward)
 	OpPetCatchRsp         = 0x1983 // 战斗外捕捉(赛季球/高级球)新宠物下发(实测;不在 ZoneSvrCmd enum)
+	OpGoodsRewardNotify   = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(战斗内捕捉等新宠物)
 )
+
+// hasCJK 判断字节串是否含中日韩统一表意文字(宠物名为中文)。
+func hasCJK(b []byte) bool {
+	for _, r := range string(b) {
+		if r >= 0x4E00 && r <= 0x9FFF {
+			return true
+		}
+	}
+	return false
+}
 
 // FindNewPet 在响应 body 中递归查找新宠物 PetData。
 // 孵蛋/捕捉获得的宠物作为奖励嵌套在 ret_info.goods_reward.rewards[].pet 里，
@@ -35,7 +46,7 @@ func FindNewPet(body []byte) *pb.PetData {
 			}
 			var pd pb.PetData
 			if proto.Unmarshal(v, &pd) == nil &&
-				pd.GetGid() > 0 && pd.GetConfId() > 0 && len(pd.GetName()) > 0 {
+				pd.GetGid() > 0 && pd.GetConfId() > 1000 && hasCJK(pd.GetName()) {
 				return &pd
 			}
 			if r := FindNewPet(v); r != nil {

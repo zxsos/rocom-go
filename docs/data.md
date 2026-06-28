@@ -114,12 +114,15 @@ s2c 0x1346 DATA 明文 body
   (`ret_info.goods_reward.rewards[].pet`)中的新宠物 → 入库 + obtain(孵蛋)事件;
 - **战斗外捕捉**：`0x1983`(赛季球/高级球，大 body 含新宠物)同样用 FindNewPet
   → 入库 + obtain(捕捉);与放生形成完整链(实测 #2 捕5放5、#3 捕3放3 全为菊花梨);
+- **(普通)战斗内捕捉**：经 `ZONE_GOODS_REWARD_NOTIFY(0x0243)` 下发新宠物;统一三个
+  获得 opcode(孵蛋/战斗外/普通战斗内),`FindNewPet` 加严格判据(conf_id>1000 且名称含
+  中文)防误报,按 `catch_way` 区分子类型,`isNew` 去重(同宠物可能多 opcode 下发);
 - **异色/炫彩**：`mutation_type` 为位标志,bit0=异色、bit3=炫彩(9 样本实测验证);
   炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
 
 待校准(多数需含相应事件/宠物的新样本)：
-- **战斗内捕捉**：#4/#5 战斗内捕捉不走 `0x1983`,需在 `ZONE_BATTLE_CATCH_CONFIRM(4924)`
-  等战斗结算流程里定位新宠物下发;
+- **花种战斗捕捉**：不走 `GOODS_REWARD`,新宠物经 `ZONE_PLAYER_SYNC_NOTIFY(0x0160)` 下发
+  (实测 20497);该 opcode 通用(玩家数据同步),直接 FindNewPet 有误报/库污染风险,待更精确定位;
 - **删除/赠送减少事件**：`DELETE_REQ(397)`/赠送相关 opcode 待接入;
 - **咕噜球/蛋组/技能名**本地化尚未梳理；**盒子位置**字段待定位；
 - **性格** `nature_id` 用 `AUDIO_NATURE_CONF`，个别可能与游戏显示略有偏差。
