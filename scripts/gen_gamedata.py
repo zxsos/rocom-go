@@ -15,6 +15,7 @@ opcode/枚举与字段号(internal/pb)同出 nrc/all.pb(见 gen_proto.py),与 in
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -62,6 +63,51 @@ def enum_dim(enum_name):
 species = {k: v["name"] for k, v in rows("MONSTER_CONF.json").items() if v.get("name")}
 species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get("name")})
 
+
+# ---- 宠物图片索引 ----
+# 链路: conf_id(MONSTER/PET 行) --base_id--> PETBASE 基础形态 --> 头像/全身图文件名。
+#   头像取自 MODEL_CONF(经 PETBASE.model_conf 关联)的 icon/big_icon;全身图取自 PETBASE.JL_res。
+#   文件名【不能用 id 拼】(728 个形态共用他人头像,如 3228 用 3012),故存表;
+#   Go 侧按固定目录(HeadIcon/BigHeadIcon256/Pet1024/Pet256)拼出 .webp 路径。
+def texkey(ref):
+    """从 UE 贴图引用 Texture2D'/Game/.../Dir/NAME.NAME' 抠出文件名 NAME。"""
+    if not isinstance(ref, str):
+        return None
+    m = re.search(r"/Game/.*/([^/.']+)\.", ref)
+    return m.group(1) if m else None
+
+
+_petbase = rows("PETBASE_CONF.json")
+_model = rows("MODEL_CONF.json")
+
+# images: petbase_id -> {h:小头像 b:大头像 p:全身图 ps:全身缩略}(全身图去掉 JL_ 前缀省字节)。
+images = {}
+for pid, p in _petbase.items():
+    m = _model.get(str(p.get("model_conf"))) or {}
+    entry = {}
+    head = texkey(m.get("icon") or m.get("small_icon") or m.get("ui_icon"))
+    big = texkey(m.get("big_icon"))
+    portrait = texkey(p.get("JL_res"))
+    portrait_s = texkey(p.get("JL_small_res"))
+    if head:
+        entry["h"] = head
+    if big:
+        entry["b"] = big
+    if portrait:
+        entry["p"] = portrait[3:] if portrait.startswith("JL_") else portrait
+    if portrait_s:
+        entry["ps"] = portrait_s[3:] if portrait_s.startswith("JL_") else portrait_s
+    if entry:
+        images[pid] = entry
+
+# image_base: conf_id -> base_id(petbase),仅当与自身不同;base==自身者 Go 侧回退直查 images。
+image_base = {}
+for src in ("MONSTER_CONF.json", "PET_CONF.json"):
+    for cid, r in rows(src).items():
+        b = r.get("base_id")
+        if b is not None and str(b) != cid:
+            image_base.setdefault(cid, b)
+
 # 性格增减维度(权威表，按性格名匹配；维度编号 1生命 2物攻 3魔攻 4物防 5魔防 6速度)。
 # NATURE_CONF 推导对个别性格(如平和)的 id 错位，故以名为准。
 NATURE_TABLE = {
@@ -94,6 +140,9 @@ data = {
     },
     "medal": {k: {"name": v.get("name", ""), "desc": v.get("desc", "")}
               for k, v in rows("MEDAL_CONF.json").items() if v.get("name")},
+    # 图片索引:petbase 形态 -> 文件名;conf_id -> petbase(经 base_id,与自身相同者省略)。
+    "images": images,
+    "image_base": image_base,
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
     # 与 internal/pb 同源同版本,无需手工补充。

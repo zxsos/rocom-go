@@ -3,8 +3,9 @@ name = "rocom-capture-scripts"
 version = "0"
 description = "代码生成脚本(解析 nrc/all.pb 描述符、解码 nrc/bin 配置 → internal/pb 与 names.json)"
 requires-python = ">=3.9"
-# 仅生成脚本需要;decode_bin.py 为纯标准库,不在此列。
-dependencies = ["protobuf>=5,<7"]
+# protobuf: gen_proto/gen_gamedata 读 all.pb 描述符;pillow: gen_images 把 FModel PNG 转 webp。
+# decode_bin.py 为纯标准库,不在此列。
+dependencies = ["protobuf>=5,<7", "pillow>=10"]
 
 [tool.uv]
 package = false

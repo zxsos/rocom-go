@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -53,7 +54,18 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
+	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
+	imgFS := http.FileServerFS(gamedata.ImageFS())
+	s.mux.Handle("GET /img/", http.StripPrefix("/img/", cacheControl(imgFS, "public, max-age=86400")))
 	s.mux.HandleFunc("/", s.handleStatic)
+}
+
+// cacheControl 给静态资源加 Cache-Control 头。
+func cacheControl(h http.Handler, v string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", v)
+		h.ServeHTTP(w, r)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

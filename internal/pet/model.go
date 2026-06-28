@@ -41,6 +41,8 @@ type Pet struct {
 	Shiny     bool  `json:"shiny"`     // 异色(mutation_type bit0)
 	Colorful  bool  `json:"colorful"`  // 炫彩(mutation_type bit3)
 
+	Image gamedata.PetImage `json:"image"` // 各尺寸图片相对路径(由前端拼到 /img/ 下)
+
 	HP        Stat `json:"hp"`
 	Attack    Stat `json:"attack"`    // 物攻
 	Defense   Stat `json:"defense"`   // 物防
@@ -84,6 +86,8 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		// mutation_type 为位标志: bit0=异色, bit3=炫彩(实测样本验证)。
 		Shiny:    p.GetMutationType()&1 != 0,
 		Colorful: p.GetMutationType()&8 != 0,
+
+		Image: db.PetImage(p.GetConfId()),
 	}
 
 	if m, ok := db.Medal(p.GetWearMedalConfId()); ok {

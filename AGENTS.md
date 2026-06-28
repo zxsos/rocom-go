@@ -12,12 +12,15 @@
 ## 约定
 
 - Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(→ internal/pb)、
-  `uv run python scripts/gen_gamedata.py`(→ names.json);抓包脚本 `scripts/capture.sh`(bash)。
+  `uv run python scripts/gen_gamedata.py`(→ names.json)、`uv run python scripts/gen_images.py`
+  (FModel PNG → internal/gamedata/data/img 的 webp,需先在 FModel 里 PNG 导出 Icon 目录);
+  抓包脚本 `scripts/capture.sh`(bash)。
 - 数据来源**全部随仓库提交、均为 FModel 自行提取**,不依赖外部仓库:中文名称表来自
   `nrc/bin/`(游戏二进制配置,用 vendored 的 `scripts/decode_bin.py` 解码);`internal/pb`
   结构、opcode、枚举同出游戏描述符 `nrc/all.pb`(前者经 protoc `--descriptor_set_in` 生成 Go,
-  后者经 `scripts/pbdesc.py` 读描述符)。更新游戏版本:FModel 重新提取覆盖
-  `nrc/bin/` 与 `nrc/all.pb` 再跑两个生成脚本(详见 docs/data.md)。
+  后者经 `scripts/pbdesc.py` 读描述符);宠物图片索引(conf_id→头像/全身图)取自 `nrc/bin/`
+  的 `PETBASE_CONF`/`MODEL_CONF`,图片本体(webp)经 FModel PNG 导出 + `gen_images.py` 转码后
+  embed。更新游戏版本:FModel 重新提取覆盖 `nrc/bin/` 与 `nrc/all.pb` 再跑生成脚本(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
 - `internal/pb/*.pb.go` 与 `internal/gamedata/data/names.json` 为生成物，改动应改生成脚本而非手改。
