@@ -79,6 +79,16 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			"name":   srv.OpcodeName(m.Opcode),
 		})
 
+		// 盒子布局：登录数据(0x0102)或盒子操作回包携带完整背包 PetBackpackInfo，
+		// 解出 gid->(盒子,格位) 全量快照存入 pet_box,读取宠物时 JOIN 注入位置。
+		if m.Direction == gcp.S2C && pet.CarriesBackpack(m.Opcode) {
+			if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
+				if st.ReplacePetBoxes(entries) == nil {
+					srv.Hub().Broadcast("pet", map[string]any{"boxUpdate": len(entries)})
+				}
+			}
+		}
+
 		// 获得新宠物：孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)
 		// 都把新宠物嵌在子消息里。同一宠物可能经多个 opcode 下发，用 isNew 去重;获得方式由 catch_way 区分。
 		if m.Direction == gcp.S2C &&

@@ -5,6 +5,14 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/pb"
 )
 
+// PetBoxLoc 是宠物在仓库盒子里的位置(box_id 从 1 起,slot 盒内格位从 0 起)。
+type PetBoxLoc struct {
+	BoxID   int32  `json:"boxId"`             // 盒子编号
+	Slot    int32  `json:"slot"`              // 盒内格位(0 起)
+	BoxName string `json:"boxName,omitempty"` // 盒子名(玩家命名,可空)
+	Mark    string `json:"mark,omitempty"`    // 分类标记中文(首领/污染/奇异/炫彩/闪光)
+}
+
 // Stat 是一项六维属性。
 type Stat struct {
 	Value    int32 `json:"value"`    // 最终面板值
@@ -42,6 +50,8 @@ type Pet struct {
 	Colorful  bool  `json:"colorful"`  // 炫彩(mutation_type bit3)
 
 	Image gamedata.PetImage `json:"image"` // 各尺寸图片相对路径(由前端拼到 /img/ 下)
+
+	Box *PetBoxLoc `json:"box,omitempty"` // 仓库盒子位置(来自 PetBackpackInfo,读取时 JOIN 注入)
 
 	HP        Stat `json:"hp"`
 	Attack    Stat `json:"attack"`    // 物攻
