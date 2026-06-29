@@ -33,6 +33,11 @@ export async function getStats() {
   return r.json()
 }
 
+export async function getMedals() {
+  const r = await fetch('/api/medals')
+  return r.json()
+}
+
 // subscribe 订阅 SSE，onMsg 收到 {type, data}。返回取消函数。
 export function subscribe(onMsg) {
   const es = new EventSource('/api/stream')

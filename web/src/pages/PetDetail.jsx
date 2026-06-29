@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
-import { getPet } from '../api'
+import { getPet, getMedals } from '../api'
 import { Types, Marks, Portrait, locText, fmtTime } from '../components/bits'
 
 const SIX = [
@@ -14,11 +14,13 @@ export default function PetDetail() {
   const nav = useNavigate()
   const [pet, setPet] = useState(null)
   const [err, setErr] = useState(false)
+  const [medals, setMedals] = useState([])
   const cardRef = useRef(null)
 
   useEffect(() => {
     getPet(gid).then(setPet).catch(() => setErr(true))
   }, [gid])
+  useEffect(() => { getMedals().then(setMedals).catch(() => {}) }, [])
 
   const exportImg = () => {
     if (!cardRef.current) return
@@ -93,14 +95,22 @@ export default function PetDetail() {
             <Item k="炫彩" v={pet.colorful ? '是' : '否'} />
           </div>
 
-          {pet.medal && (
-            <div>
-              <div className="muted" style={{ marginBottom: 6 }}>奖牌墙</div>
-              <div className="medals">
-                <div className="medal">🏅 {pet.medal}{pet.medalDesc ? ` · ${pet.medalDesc}` : ''}</div>
+          {(() => {
+            const owned = medals.filter((m) => (pet.medalIds || []).includes(m.id))
+            if (owned.length === 0) return null
+            return (
+              <div>
+                <div className="muted" style={{ marginBottom: 6 }}>奖牌墙</div>
+                <div className="medals">
+                  {owned.map((m) => (
+                    <div key={m.id} className="medal owned medal-tip" data-tip={m.desc || m.name}>
+                      🏅 {m.name}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {pet.skillIds?.length > 0 && (
             <div>

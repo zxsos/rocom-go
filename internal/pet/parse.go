@@ -18,6 +18,7 @@ const (
 	OpPlayerSyncNotify    = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
 	OpLoginRsp            = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
 	OpPetBoxChangePetRsp  = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
+	OpPetMedalCommonRsp   = 0x141e // ZONE_PET_MEDAL_COMMON_RSP(5150), 换牌等回包(含更新后 PetData)
 )
 
 // 盒子操作 opcode 区间(ZoneSvrCmd 十进制 6272-6292,如 TIDY_RSP/SETTING_UP_RSP 携带全量盒子)。
@@ -173,6 +174,122 @@ func FindNewPet(body []byte) *pb.PetData {
 
 // PTTBigWorld 是 PlayerTeamType.PTT_BIG_WORLD(大世界队伍 team_type)。
 const PTTBigWorld = 1
+
+// MedalOwn 是一只宠物拥有的一枚奖牌(来自登录数据的 PetMedalInfo)。
+type MedalOwn struct {
+	Gid     uint32
+	MedalID uint32
+}
+
+// ParsePetMedals 从登录数据(PlayerSvrDataInfo.pet_medal_info)递归解析每只宠物拥有的奖牌。
+// PetMedalInfo:#1 medal_conf_id / #2 medal_type / #3 owner 组[],组内 #2 记录里宠物 gid = #8??#6??#2。
+// 注:线上 wire 格式与 all.pb 的 PetMedalOwnerInfo 定义不一致(版本偏移),故纯按 wire 经验解码。
+func ParsePetMedals(body []byte) []MedalOwn {
+	var out []MedalOwn
+	collectPetMedals(body, &out)
+	return out
+}
+
+func collectPetMedals(body []byte, out *[]MedalOwn) {
+	// 形似 PetMedalInfo(#1 在奖牌区间 + 有 medal_type + 有 owner 组)则提取,不再深入。
+	if mc, ok := wireVarint(body, 1); ok && mc >= 1000 && mc < 2000 {
+		if _, hasType := wireVarint(body, 2); hasType {
+			if groups := wireSubs(body, 3); len(groups) > 0 {
+				for _, g := range groups {
+					for _, rec := range wireSubs(g, 2) {
+						if gid := recPetGid(rec); gid != 0 {
+							*out = append(*out, MedalOwn{Gid: gid, MedalID: uint32(mc)})
+						}
+					}
+				}
+				return
+			}
+		}
+	}
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			return
+		}
+		b = b[n:]
+		if typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				return
+			}
+			collectPetMedals(v, out)
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				return
+			}
+			b = b[m:]
+		}
+	}
+}
+
+// recPetGid 从奖牌记录里取宠物 gid(优先 obtain_pet_gid #8,退 #6,再退 #2)。
+func recPetGid(rec []byte) uint32 {
+	for _, f := range []uint32{8, 6, 2} {
+		if v, ok := wireVarint(rec, f); ok {
+			return uint32(v)
+		}
+	}
+	return 0
+}
+
+// wireVarint 取消息里指定字段号的 varint 值(无/类型不符则 false)。
+func wireVarint(b []byte, want uint32) (uint64, bool) {
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			return 0, false
+		}
+		b = b[n:]
+		if uint32(num) == want && typ == protowire.VarintType {
+			v, m := protowire.ConsumeVarint(b)
+			if m < 0 {
+				return 0, false
+			}
+			return v, true
+		}
+		m := protowire.ConsumeFieldValue(num, typ, b)
+		if m < 0 {
+			return 0, false
+		}
+		b = b[m:]
+	}
+	return 0, false
+}
+
+// wireSubs 取消息里指定字段号的所有 length-delimited 子消息。
+func wireSubs(b []byte, want uint32) [][]byte {
+	var out [][]byte
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if uint32(num) == want && typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			out = append(out, v)
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+	return out
+}
 
 // ParseBoxMoves 从盒子操作回包(GoodsChangeItem.box_pet_change)抽取盒位增量变更。
 // 每个 PetBoxPetChange = {pet_gid, is_in_team, id=box_id, pos(1 起)};只取非在队、gid 非 0、

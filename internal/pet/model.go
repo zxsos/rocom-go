@@ -43,13 +43,14 @@ type Pet struct {
 	WeightKg float64 `json:"weightKg"` // 体重(千克)
 	Voice    int32   `json:"voice"`    // 声音值
 
-	TalentRank      string `json:"talentRank"` // 天分评价
-	Medal           string `json:"medal"`      // 佩戴奖牌名
-	MedalDesc       string `json:"medalDesc"`
-	WearMedalConfID uint32 `json:"wearMedalConfId"`
-	PartnerMark     string `json:"partnerMark"` // 标记
-	Speciality      string `json:"speciality"`  // 特长
-	SpecialityID    uint32 `json:"specialityId"`
+	TalentRank      string   `json:"talentRank"` // 天分评价
+	Medal           string   `json:"medal"`      // 佩戴奖牌名
+	MedalDesc       string   `json:"medalDesc"`
+	WearMedalConfID uint32   `json:"wearMedalConfId"`
+	MedalIDs        []uint32 `json:"medalIds"`    // 该宠物已拥有的奖牌 id(佩戴+custom+free,去重)
+	PartnerMark     string   `json:"partnerMark"` // 标记
+	Speciality      string   `json:"speciality"`  // 特长
+	SpecialityID    uint32   `json:"specialityId"`
 
 	CatchTime int64 `json:"catchTime"` // 捕捉时间(unix 秒)
 	Shiny     bool  `json:"shiny"`     // 异色(mutation_type bit0)
@@ -110,6 +111,14 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 	if m, ok := db.Medal(p.GetWearMedalConfId()); ok {
 		out.Medal = m.Name
 		out.MedalDesc = m.Desc
+	}
+	// 该宠物已拥有的奖牌(佩戴 + custom + free,去重),供奖牌墙高亮。
+	seen := map[uint32]bool{}
+	for _, id := range append([]uint32{p.GetWearMedalConfId()}, append(p.GetCustomMedalConfId(), p.GetFreeMedalConfIds()...)...) {
+		if id != 0 && !seen[id] {
+			seen[id] = true
+			out.MedalIDs = append(out.MedalIDs, id)
+		}
 	}
 
 	// 六维按编号 1-6 顺序: 1生命 2物攻 3魔攻 4物防 5魔防 6速度。
