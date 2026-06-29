@@ -140,7 +140,7 @@ img.pet-avatar { object-fit: cover; }
 .detail-wrap { max-width: 460px; margin: 0 auto; }
 .detail-card {
   background: linear-gradient(180deg, #2b3346, #161b22); border: 1px solid var(--line);
-  border-radius: 18px; overflow: hidden; box-shadow: var(--shadow);
+  border-radius: 18px; box-shadow: var(--shadow); /* 不裁剪子元素,让奖牌 tooltip 可溢出卡片 */
 }
 .detail-head { padding: 16px; display: flex; justify-content: space-between; align-items: baseline; }
 .detail-no { color: var(--fg-dim); }
@@ -160,6 +160,21 @@ img.pet-avatar { object-fit: cover; }
 .stat .l { font-size: 12px; color: var(--fg-dim); }
 .medals { display: flex; flex-wrap: wrap; gap: 8px; }
 .medal { background: var(--bg-3); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+/* 奖牌墙:宠物拥有的奖牌(金色高亮) */
+.medal.owned { background: var(--gold); color: #222; font-weight: 600; }
+/* hover tooltip 显示奖牌描述 */
+.medal-tip { position: relative; cursor: default; }
+.medal-tip::after {
+  content: attr(data-tip);
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+  margin-bottom: 6px; padding: 6px 10px; border-radius: 8px;
+  background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
+  font-size: 12px; font-weight: 400; line-height: 1.4;
+  width: max-content; max-width: 220px; white-space: normal; text-align: left;
+  opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 50; box-shadow: var(--shadow);
+}
+.medal-tip:hover::after { opacity: 1; }
+.medal-tip:hover { z-index: 51; }
 
 /* ---- debug ---- */
 .debug-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }

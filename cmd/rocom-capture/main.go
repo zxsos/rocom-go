@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("打开数据库失败: %v", err)
 	}
 	hub := server.NewHub()
-	srv := server.New(st, hub, db.OpcodeNames())
+	srv := server.New(st, hub, db.OpcodeNames(), db.AllMedals())
 	eng := capture.NewEngine(*port)
 
 	go consume(eng, st, db, srv)
@@ -99,9 +99,32 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 					updated = st.ApplyBoxMoves(moves) == nil || updated
 				}
 			}
+			// 宠物拥有的奖牌(仅登录数据携带 pet_medal_info),过滤掉非真实奖牌 id
+			if m.Opcode == pet.OpLoginRsp {
+				owns := pet.ParsePetMedals(m.AppBody)
+				valid := owns[:0]
+				for _, o := range owns {
+					if _, ok := db.Medal(o.MedalID); ok {
+						valid = append(valid, o)
+					}
+				}
+				if len(valid) > 0 {
+					updated = st.ReplacePetMedals(valid) == nil || updated
+				}
+			}
 			if updated {
 				srv.Hub().Broadcast("pet", map[string]any{"locUpdate": true})
 			}
+		}
+
+		// 换牌等回包携带更新后的完整 PetData(如佩戴奖牌已变),更新但不产生获得事件。
+		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetMedalCommonRsp {
+			if pd := pet.FindNewPet(m.AppBody); pd != nil {
+				p := pet.ToPet(pd, db)
+				st.UpsertPet(p)
+				srv.Hub().Broadcast("pet", p)
+			}
+			continue
 		}
 
 		// 获得新宠物：孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)

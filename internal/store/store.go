@@ -77,8 +77,52 @@ CREATE TABLE IF NOT EXISTS pet_team (
   gid INTEGER PRIMARY KEY,
   team_idx INTEGER, pos INTEGER
 );
+CREATE TABLE IF NOT EXISTS pet_medal (
+  gid INTEGER, medal_id INTEGER,
+  PRIMARY KEY(gid, medal_id)
+);
 `)
 	return err
+}
+
+// ReplacePetMedals 用一份登录快照替换所有宠物拥有的奖牌(gid↔medal 多对多)。
+func (s *Store) ReplacePetMedals(owns []pet.MedalOwn) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM pet_medal`); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO pet_medal(gid,medal_id) VALUES(?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, o := range owns {
+		if _, err = stmt.Exec(o.Gid, o.MedalID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// medalsFor 读取单只宠物拥有的奖牌 id 列表(升序),供 GetPet 注入。
+func (s *Store) medalsFor(gid uint32) []uint32 {
+	rows, err := s.db.Query(`SELECT medal_id FROM pet_medal WHERE gid=? ORDER BY medal_id`, gid)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []uint32
+	for rows.Next() {
+		var id uint32
+		if rows.Scan(&id) == nil {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // ReplacePetBoxes 用一份完整背包快照替换所有宠物盒子位置(整体 DELETE + 批量插入)。
@@ -234,6 +278,9 @@ func (s *Store) GetPet(gid uint32) (*pet.Pet, error) {
 	}
 	p.Box = s.boxLocFor(gid)
 	p.Team = s.teamLocFor(gid)
+	if ms := s.medalsFor(gid); ms != nil {
+		p.MedalIDs = ms
+	}
 	return &p, nil
 }
 

@@ -24,11 +24,12 @@ type Server struct {
 	hub         *Hub
 	mux         *http.ServeMux
 	opcodeNames map[uint16]string
+	medals      []gamedata.MedalEntry
 }
 
 // New 创建 HTTP 服务。
-func New(st *store.Store, hub *Hub, opcodeNames map[uint16]string) *Server {
-	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), opcodeNames: opcodeNames}
+func New(st *store.Store, hub *Hub, opcodeNames map[uint16]string, medals []gamedata.MedalEntry) *Server {
+	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), opcodeNames: opcodeNames, medals: medals}
 	s.routes()
 	return s
 }
@@ -53,6 +54,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
+	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
 	imgFS := http.FileServerFS(gamedata.ImageFS())
@@ -66,6 +68,11 @@ func cacheControl(h http.Handler, v string) http.Handler {
 		w.Header().Set("Cache-Control", v)
 		h.ServeHTTP(w, r)
 	})
+}
+
+// handleMedals 返回全部奖牌(id/name/desc),供宠物详情奖牌墙展示。
+func (s *Server) handleMedals(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.medals)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

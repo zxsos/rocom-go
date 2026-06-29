@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"sort"
 	"strconv"
 )
 
@@ -165,6 +166,24 @@ func (db *DB) Speciality(id uint32) string { return db.speciality[key(id)] }
 
 // Medal 返回奖牌名称与描述(wear_medal_conf_id)。
 func (db *DB) Medal(id uint32) (Medal, bool) { m, ok := db.medal[key(id)]; return m, ok }
+
+// MedalEntry 是带 id 的奖牌(用于全量奖牌墙)。
+type MedalEntry struct {
+	ID   uint32 `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+}
+
+// AllMedals 返回全部奖牌,按 id 升序(供前端奖牌墙展示全部奖牌)。
+func (db *DB) AllMedals() []MedalEntry {
+	out := make([]MedalEntry, 0, len(db.medal))
+	for k, v := range db.medal {
+		id, _ := strconv.ParseUint(k, 10, 32)
+		out = append(out, MedalEntry{ID: uint32(id), Name: v.Name, Desc: v.Desc})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
 
 // GenderName 返回性别符号。
 func GenderName(g uint32) string {

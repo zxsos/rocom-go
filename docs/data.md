@@ -184,6 +184,13 @@ s2c 0x1346 DATA 明文 body
   - **队位**:队伍变更/盒子操作回包(`CarriesTeam`:登录/6272-6292/524-527)常一并刷新完整队伍快照,
     复用 `ParseTeams` 整体 `ReplacePetTeams`。
   - 实测 pcap(交换队首两位 + 盒内 1→30 移位 + 盒内 2/3 互换):三处变更均正确落库。
+- **宠物奖牌墙**(每只宠物拥有的全部奖牌):数据在 **登录 `0x0102`** 的 `PlayerSvrDataInfo.pet_medal_info`
+  → `PlayerPetMedalInfo.medal_infos[]`(`PetMedalInfo`:#1 medal_conf_id / #2 medal_type / #3 owner 组[]),
+  组内 #2 记录里宠物 gid = `#8(obtain_pet_gid) ?? #6 ?? #2`。**注:该消息线上 wire 格式与 all.pb 的
+  `PetMedalOwnerInfo` 定义不一致(版本偏移),故 `pet.ParsePetMedals` 纯按 wire 经验解码**,不走 pb。
+  解出 gid↔medal 存 `pet_medal` 表,读取时注入 `Pet.MedalIDs`(覆盖 `ToPet` 里仅佩戴的那枚);
+  前端 `/api/medals` 全量奖牌 + `medalIds` 过滤出该宠物拥有的渲染奖牌墙。实测火神(gid=1)解出
+  命定勇者/结伴同行/燃了鸭/同心相伴 4 枚。奖牌数据**仅完整登录携带**(普通/快速登录可能不含)。
 - **删除/赠送减少事件**:`DELETE_REQ(397)`/赠送相关 opcode 待接入。
 
 待校准(多数需含相应事件/宠物的新样本)：

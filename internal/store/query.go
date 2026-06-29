@@ -191,6 +191,23 @@ func (s *Store) attachLocations(pets []*pet.Pet) {
 		}
 		rows.Close()
 	}
+	// 拥有的奖牌(覆盖 ToPet 里仅佩戴的那枚);先清空有 pet_medal 记录的宠物再填,避免回退。
+	if rows, err := s.db.Query(`SELECT gid,medal_id FROM pet_medal WHERE gid IN `+in+` ORDER BY medal_id`, args...); err == nil {
+		seen := map[uint32]bool{}
+		for rows.Next() {
+			var gid, mid uint32
+			if rows.Scan(&gid, &mid) == nil {
+				if p := byGid[gid]; p != nil {
+					if !seen[gid] {
+						p.MedalIDs = nil
+						seen[gid] = true
+					}
+					p.MedalIDs = append(p.MedalIDs, mid)
+				}
+			}
+		}
+		rows.Close()
+	}
 }
 
 // CountPets 返回库中宠物总数。
