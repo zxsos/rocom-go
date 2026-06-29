@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/medals", s.handleMedals)
+	s.mux.HandleFunc("GET /api/boxes", s.handleBoxes)
+	s.mux.HandleFunc("GET /api/teams", s.handleTeams)
+	s.mux.HandleFunc("GET /api/pet-page", s.handlePetPage)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
 	imgFS := http.FileServerFS(gamedata.ImageFS())
@@ -75,13 +79,18 @@ func (s *Server) handleMedals(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.medals)
 }
 
+// handleBoxes 返回各盒子的槽位布局,供宠物列表左侧盒子示意图。
+func (s *Server) handleBoxes(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.store.BoxLayouts())
+}
+
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(v)
 }
 
-func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
+// parseFilter 从查询参数构造 store.Filter(handlePets/handlePetPage 共用)。
+func parseFilter(q url.Values) store.Filter {
 	atoi := func(k string) int { n, _ := strconv.Atoi(q.Get(k)); return n }
 	f := store.Filter{
 		Search:      q.Get("search"),
@@ -107,6 +116,23 @@ func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
 	if ne := q.Get("natureExclude"); ne != "" {
 		f.NatureExclude = strings.Split(ne, ",")
 	}
+	return f
+}
+
+// handleTeams 返回大世界三队的 18 格布局,供盒子示意图。
+func (s *Server) handleTeams(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.store.TeamLayouts())
+}
+
+// handlePetPage 返回某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页。
+func (s *Server) handlePetPage(w http.ResponseWriter, r *http.Request) {
+	gid, _ := strconv.ParseUint(r.URL.Query().Get("gid"), 10, 32)
+	page := s.store.PetPage(uint32(gid), parseFilter(r.URL.Query()))
+	writeJSON(w, map[string]int{"page": page})
+}
+
+func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
+	f := parseFilter(r.URL.Query())
 	pets, total, err := s.store.ListPets(f)
 	if err != nil {
 		http.Error(w, err.Error(), 500)

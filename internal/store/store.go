@@ -4,6 +4,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"sort"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -106,6 +107,75 @@ func (s *Store) ReplacePetMedals(owns []pet.MedalOwn) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// BoxLayout 是一个盒子的槽位布局(30 格,gid=0 表示空)。
+type BoxLayout struct {
+	ID    int32    `json:"id"`
+	Name  string   `json:"name"`
+	Slots []uint32 `json:"slots"` // 长 30,下标=格位(0 起),值=宠物 gid(0 空)
+}
+
+// BoxLayouts 返回所有有宠物的盒子的槽位布局(按 box_id 升序),供前端盒子示意图。
+func (s *Store) BoxLayouts() []BoxLayout {
+	rows, err := s.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box ORDER BY box_id, slot`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	m := map[int32]*BoxLayout{}
+	var order []int32
+	for rows.Next() {
+		var boxID, slot int32
+		var gid uint32
+		var name string
+		if rows.Scan(&boxID, &slot, &gid, &name) != nil {
+			continue
+		}
+		bl := m[boxID]
+		if bl == nil {
+			bl = &BoxLayout{ID: boxID, Slots: make([]uint32, 30)}
+			m[boxID] = bl
+			order = append(order, boxID)
+		}
+		if name != "" && bl.Name == "" {
+			bl.Name = name
+		}
+		if slot >= 0 && slot < 30 {
+			bl.Slots[slot] = gid
+		}
+	}
+	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
+	out := make([]BoxLayout, 0, len(order))
+	for _, id := range order {
+		out = append(out, *m[id])
+	}
+	return out
+}
+
+// TeamLayout 是大世界三支队伍的位置布局(18 格 = 3 队 × 6 位,下标=team_idx*6+pos)。
+type TeamLayout struct {
+	Slots []uint32 `json:"slots"`
+}
+
+// TeamLayouts 返回大世界队伍的 18 格布局(gid=0 表示空位)。
+func (s *Store) TeamLayouts() TeamLayout {
+	tl := TeamLayout{Slots: make([]uint32, 18)}
+	rows, err := s.db.Query(`SELECT team_idx, pos, gid FROM pet_team`)
+	if err != nil {
+		return tl
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ti, pos int32
+		var gid uint32
+		if rows.Scan(&ti, &pos, &gid) == nil {
+			if idx := ti*6 + pos; idx >= 0 && idx < 18 {
+				tl.Slots[idx] = gid
+			}
+		}
+	}
+	return tl
 }
 
 // medalsFor 读取单只宠物拥有的奖牌 id 列表(升序),供 GetPet 注入。

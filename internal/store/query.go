@@ -39,11 +39,10 @@ var sortColumns = map[string]string{
 	"name": "name", "species": "species",
 }
 
-// ListPets 按筛选条件返回宠物列表与命中总数。
-func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
+// buildWhere 由筛选条件构造 WHERE 子句与参数(列名均属 pets 表)。
+func buildWhere(f Filter) (string, []any) {
 	var where []string
 	var args []any
-
 	if f.Search != "" {
 		where = append(where, "(name LIKE ? OR species LIKE ?)")
 		args = append(args, "%"+f.Search+"%", "%"+f.Search+"%")
@@ -100,34 +99,76 @@ func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 			args = append(args, id)
 		}
 	}
-
-	whereSQL := ""
-	if len(where) > 0 {
-		whereSQL = " WHERE " + strings.Join(where, " AND ")
+	if len(where) == 0 {
+		return "", args
 	}
+	return " WHERE " + strings.Join(where, " AND "), args
+}
+
+// 位置排序键:大世界队伍在前(team_idx*6+pos),其后按盒子(1000+box_id*100+slot),其余末尾。
+const boxPosExpr = `COALESCE(` +
+	`(SELECT team_idx*6+pos FROM pet_team WHERE pet_team.gid=pets.gid),` +
+	`(SELECT 1000+box_id*100+slot FROM pet_box WHERE pet_box.gid=pets.gid),999999)`
+
+// buildOrder 构造 ORDER BY 表达式(含 gid 兜底,保证稳定顺序)。
+func buildOrder(f Filter) string {
+	dir := "ASC"
+	if strings.EqualFold(f.Order, "desc") {
+		dir = "DESC"
+	}
+	if f.Sort == "boxpos" {
+		return boxPosExpr + " " + dir + ", gid"
+	}
+	col := sortColumns[f.Sort]
+	if col == "" {
+		col = "gid"
+	}
+	return col + " " + dir + ", gid"
+}
+
+func clampPageSize(n int) int {
+	if n <= 0 || n > 200 {
+		return 12
+	}
+	return n
+}
+
+// PetPage 返回 gid 在当前筛选+排序下所处的页码(1 起,未命中返回 1)。
+func (s *Store) PetPage(gid uint32, f Filter) int {
+	whereSQL, args := buildWhere(f)
+	rows, err := s.db.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
+	if err != nil {
+		return 1
+	}
+	defer rows.Close()
+	idx := 0
+	for rows.Next() {
+		var g uint32
+		if rows.Scan(&g) == nil {
+			if g == gid {
+				return idx/clampPageSize(f.PageSize) + 1
+			}
+			idx++
+		}
+	}
+	return 1
+}
+
+// ListPets 按筛选条件返回宠物列表与命中总数。
+func (s *Store) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
+	whereSQL, args := buildWhere(f)
 
 	if err = s.db.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	sortCol := sortColumns[f.Sort]
-	if sortCol == "" {
-		sortCol = "gid"
-	}
-	order := "ASC"
-	if strings.EqualFold(f.Order, "desc") {
-		order = "DESC"
-	}
-	pageSize := f.PageSize
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = 12
-	}
+	pageSize := clampPageSize(f.PageSize)
 	page := f.Page
 	if page < 1 {
 		page = 1
 	}
 
-	q := "SELECT data FROM pets" + whereSQL + " ORDER BY " + sortCol + " " + order + " LIMIT ? OFFSET ?"
+	q := "SELECT data FROM pets" + whereSQL + " ORDER BY " + buildOrder(f) + " LIMIT ? OFFSET ?"
 	args = append(args, pageSize, (page-1)*pageSize)
 	rows, err := s.db.Query(q, args...)
 	if err != nil {
