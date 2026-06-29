@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getPets, getFilterOptions, subscribe, ALL_TYPES } from '../api'
+import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
 import { Types, Six, Marks, Avatar, boxLabel, teamLabel, fmtTime } from '../components/bits'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -18,6 +18,7 @@ const HOT_NAMES = HOT_NATURES.map((n) => n[0])
 
 const SORTS = [
   { key: 'gid', label: '编号' },
+  { key: 'boxpos', label: '盒子位置' },
   { key: 'level', label: '等级' },
   { key: 'weight', label: '体重' },
   { key: 'height', label: '身高' },
@@ -43,6 +44,9 @@ export default function PetList() {
   const [collapsed, setCollapsed] = useState(() => sessionStorage.getItem('petListCollapsed') !== '0')
   const [selected, setSelected] = useState(null) // 单击选中的 gid
   const [menu, setMenu] = useState(null)          // 右键/长按菜单 {gid,x,y}
+  const [boxes, setBoxes] = useState([])          // 各盒子槽位布局
+  const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
+  const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
   const reloadRef = useRef(null)
   const restoredRef = useRef(false)
   const lpRef = useRef(null)        // 长按定时器
@@ -50,8 +54,30 @@ export default function PetList() {
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
 
   const load = useCallback(() => { getPets(filter).then(setData).catch(() => {}) }, [filter])
+  const loadBoxes = useCallback(() => {
+    getBoxes().then(setBoxes).catch(() => {})
+    getTeams().then(setTeams).catch(() => {})
+  }, [])
   useEffect(() => { load() }, [load])
   useEffect(() => { getFilterOptions().then(setOptions).catch(() => {}) }, [])
+  useEffect(() => { loadBoxes() }, [loadBoxes])
+
+  // 示意图容器:大世界队伍(6 排 × 3 队,竖向)排在所有盒子前,其后各盒子(5 排 × 6 格)
+  const containers = useMemo(() => {
+    // 原始 18 格为队序(team*6+pos);转置为「行=位置、列=队伍」的显示序(pos*3+team)
+    const raw = teams.slots && teams.slots.length ? teams.slots : new Array(18).fill(0)
+    const teamDisplay = []
+    for (let pos = 0; pos < 6; pos++) for (let t = 0; t < 3; t++) teamDisplay.push(raw[t * 6 + pos])
+    const list = [{ type: 'team', name: '大世界队伍', cols: 3, slots: teamDisplay }]
+    for (const b of boxes) list.push({ type: 'box', id: b.id, name: b.name || ('盒' + b.id), cols: 6, slots: b.slots })
+    return list
+  }, [teams, boxes])
+  const boxIdxById = (id) => containers.findIndex((c) => c.type === 'box' && c.id === id)
+  // 宠物盒筛选变化时,示意图跟随展示该盒
+  useEffect(() => {
+    const id = parseInt((filter.box || '').split('-')[0], 10)
+    if (id) { const i = boxIdxById(id); if (i >= 0) setActiveIdx(i) }
+  }, [filter.box, containers])
 
   // 持久化筛选状态与筛选栏折叠态
   useEffect(() => { sessionStorage.setItem('petListFilter', JSON.stringify(filter)) }, [filter])
@@ -70,9 +96,9 @@ export default function PetList() {
     return subscribe((m) => {
       if (m.type !== 'pet') return
       clearTimeout(reloadRef.current)
-      reloadRef.current = setTimeout(() => reloadRef.current && load(), 600)
+      reloadRef.current = setTimeout(() => { if (reloadRef.current) { load(); loadBoxes() } }, 600)
     })
-  }, [load])
+  }, [load, loadBoxes])
 
   const set = (patch) => setFilter((f) => ({ ...f, ...patch, page: patch.page || 1 }))
   const toggleType = (t) =>
@@ -113,18 +139,38 @@ export default function PetList() {
     }
   }, [menu])
 
+  // 选中宠物:高亮 + 示意图跟随展示其盒子/队伍
+  const selectPet = (p) => {
+    setSelected(p.gid)
+    if (p.team) setActiveIdx(0)
+    else if (p.box) { const i = boxIdxById(p.box.boxId); if (i >= 0) setActiveIdx(i) }
+  }
+  // 点击示意图格子:选中该宠物,并跳到列表里它所在页(超过一页时切页)
+  const onCell = (gid, container) => {
+    setSelected(gid)
+    // 盒子格 → 把列表筛选到该盒;队伍格 → 清盒筛选(队伍宠物不在盒里)
+    const base = container.type === 'box'
+      ? { ...filter, box: `${container.id}-${container.name}` }
+      : { ...filter, box: '' }
+    getPetPage(gid, base)
+      .then((r) => setFilter({ ...base, page: (r && r.page) || 1 }))
+      .catch(() => setFilter({ ...base, page: 1 }))
+  }
+
   // 列表项交互:单击选中、右键(桌面)/长按(移动)弹菜单
-  const itemProps = (gid) => ({
-    onClick: () => { if (lpFiredRef.current) { lpFiredRef.current = false; return } setSelected(gid) },
-    onContextMenu: (e) => { e.preventDefault(); openMenu(gid, e.clientX, e.clientY) },
+  const itemProps = (p) => ({
+    onClick: () => { if (lpFiredRef.current) { lpFiredRef.current = false; return } selectPet(p) },
+    onContextMenu: (e) => { e.preventDefault(); openMenu(p.gid, e.clientX, e.clientY) },
     onTouchStart: (e) => {
       lpFiredRef.current = false
       const t = e.touches[0]
-      lpRef.current = setTimeout(() => { lpFiredRef.current = true; openMenu(gid, t.clientX, t.clientY) }, 450)
+      lpRef.current = setTimeout(() => { lpFiredRef.current = true; openMenu(p.gid, t.clientX, t.clientY) }, 450)
     },
     onTouchMove: () => clearTimeout(lpRef.current),
     onTouchEnd: () => clearTimeout(lpRef.current),
   })
+
+  const active = containers[Math.min(activeIdx, containers.length - 1)]
 
   const pages = Math.max(1, Math.ceil(data.total / filter.pageSize))
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
@@ -133,6 +179,11 @@ export default function PetList() {
   return (
     <div className="list-layout">
       <aside className={'filters' + (collapsed ? ' collapsed' : '')}>
+        <BoxMap
+          container={active} selected={selected} onCell={onCell}
+          onPrev={() => setActiveIdx((i) => (i - 1 + containers.length) % containers.length)}
+          onNext={() => setActiveIdx((i) => (i + 1) % containers.length)}
+        />
         <div className="filter-group">
           <button className="btn" onClick={reset}>重置筛选</button>
         </div>
@@ -222,7 +273,7 @@ export default function PetList() {
             </thead>
             <tbody>
               {data.pets.map((p) => (
-                <tr key={p.gid} className={p.gid === selected ? 'selected' : ''} {...itemProps(p.gid)}>
+                <tr key={p.gid} className={p.gid === selected ? 'selected' : ''} {...itemProps(p)}>
                   <td>
                     <div className="pet-cell">
                       <Avatar p={p} />
@@ -250,7 +301,7 @@ export default function PetList() {
         {/* 移动卡片 */}
         <div className="cards">
           {data.pets.map((p) => (
-            <div className={'card' + (p.gid === selected ? ' selected' : '')} key={p.gid} {...itemProps(p.gid)}>
+            <div className={'card' + (p.gid === selected ? ' selected' : '')} key={p.gid} {...itemProps(p)}>
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
@@ -289,6 +340,40 @@ export default function PetList() {
           <div className="ctx-item" onClick={() => { goDetail(menu.gid); setMenu(null) }}>查看详情</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// BoxMap 位置示意图(每行 6 格;盒子 5 排、队伍 3 队;白=有宠物,灰=空,选中高亮)。
+// 标题右侧上一个/下一个按钮在容器间切换(大世界队伍排在所有盒子最前)。
+function BoxMap({ container, selected, onCell, onPrev, onNext }) {
+  const slots = (container && container.slots) || []
+  const cols = (container && container.cols) || 6
+  const cellTitle = (i) => {
+    if (!container) return ''
+    // 队伍:列=队、行=位(cols=3);盒子:行=排、列=格(cols=6)
+    if (container.type === 'team') return `第${(i % cols) + 1}队第${Math.floor(i / cols) + 1}位`
+    return `第${Math.floor(i / cols) + 1}排第${(i % cols) + 1}格`
+  }
+  return (
+    <div className="boxmap">
+      <div className="boxmap-head">
+        <span className="boxmap-name">{container ? container.name : '盒子位置'}</span>
+        <span className="boxmap-nav">
+          <button className="boxmap-btn" title="上一个" onClick={onPrev}>‹</button>
+          <button className="boxmap-btn" title="下一个" onClick={onNext}>›</button>
+        </span>
+      </div>
+      <div className="boxmap-grid" style={{ gridTemplateColumns: `repeat(${cols}, 30px)` }}>
+        {slots.map((gid, i) => (
+          <div
+            key={i}
+            className={'boxmap-cell' + (gid ? ' filled' : '') + (gid && gid === selected ? ' on' : '')}
+            title={gid ? cellTitle(i) : '空'}
+            onClick={() => gid && onCell(gid, container)}
+          />
+        ))}
+      </div>
     </div>
   )
 }

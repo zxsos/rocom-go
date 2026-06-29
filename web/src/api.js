@@ -38,6 +38,29 @@ export async function getMedals() {
   return r.json()
 }
 
+export async function getBoxes() {
+  const r = await fetch('/api/boxes')
+  return r.json()
+}
+
+export async function getTeams() {
+  const r = await fetch('/api/teams')
+  return r.json()
+}
+
+// getPetPage 查询某宠物在指定筛选/排序下所处页码。
+export async function getPetPage(gid, params) {
+  const q = new URLSearchParams()
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+      q.set(k, Array.isArray(v) ? v.join(',') : v)
+    }
+  })
+  q.set('gid', gid)
+  const r = await fetch('/api/pet-page?' + q.toString())
+  return r.json()
+}
+
 // subscribe 订阅 SSE，onMsg 收到 {type, data}。返回取消函数。
 export function subscribe(onMsg) {
   const es = new EventSource('/api/stream')
