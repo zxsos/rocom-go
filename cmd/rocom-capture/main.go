@@ -99,7 +99,9 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				if moves := pet.ParseBoxMoves(m.AppBody); len(moves) > 0 {
 					if st.ApplyBoxMoves(moves) == nil {
 						updated = true
-						focusGid = moves[0].Gid // 首项为被拖动的宠物(实测 RSP 顺序)
+						// 末项为被拖动(开始选中)的宠物:交换时回包按「先被挤走者、
+						// 后拖动者落到目标位」排列,移到空位时也仅末项是被移动的宠物。
+						focusGid = moves[len(moves)-1].Gid
 					}
 				}
 			}
