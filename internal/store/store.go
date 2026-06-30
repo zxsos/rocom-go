@@ -379,6 +379,10 @@ func (s *Store) RemovePet(gid uint32) (*pet.Pet, error) {
 		return nil, err
 	}
 	_, err = s.db.Exec(`DELETE FROM pets WHERE gid=?`, gid)
+	// 一并清掉盒位/队位/奖牌关联,否则示意图仍把该格当作占用(灰底可点、却无头像)。
+	s.db.Exec(`DELETE FROM pet_box WHERE gid=?`, gid)
+	s.db.Exec(`DELETE FROM pet_team WHERE gid=?`, gid)
+	s.db.Exec(`DELETE FROM pet_medal WHERE gid=?`, gid)
 	return p, err
 }
 
