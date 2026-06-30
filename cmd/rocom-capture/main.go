@@ -161,12 +161,18 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 
 		// 放生：服务器下行确认被放生的 gid 列表(库中无快照时仍记录 gid)
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetFreeRsp {
+			freed := false
 			for _, gid := range pet.ParseFreeRsp(m.AppBody) {
 				old, _ := st.RemovePet(gid)
+				freed = true
 				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "放生", Gid: gid, Pet: old}
 				if st.AddEvent(ev) == nil {
 					srv.Hub().Broadcast("event", ev)
 				}
+			}
+			// 通知前端刷新列表与盒子/队伍示意图(放生已清掉盒位/队位)
+			if freed {
+				srv.Hub().Broadcast("pet", map[string]any{"locUpdate": true})
 			}
 			continue
 		}
