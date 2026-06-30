@@ -68,8 +68,8 @@ export default function PetList() {
     const raw = teams.slots && teams.slots.length ? teams.slots : new Array(18).fill(0)
     const teamDisplay = []
     for (let pos = 0; pos < 6; pos++) for (let t = 0; t < 3; t++) teamDisplay.push(raw[t * 6 + pos])
-    const list = [{ type: 'team', name: '大世界队伍', cols: 3, slots: teamDisplay }]
-    for (const b of boxes) list.push({ type: 'box', id: b.id, name: b.name || ('盒' + b.id), cols: 6, slots: b.slots })
+    const list = [{ type: 'team', name: '大世界队伍', cols: 3, slots: teamDisplay, heads: teams.heads || {} }]
+    for (const b of boxes) list.push({ type: 'box', id: b.id, name: b.name || ('盒' + b.id), cols: 6, slots: b.slots, heads: b.heads || {} })
     return list
   }, [teams, boxes])
   const boxIdxById = (id) => containers.findIndex((c) => c.type === 'box' && c.id === id)
@@ -344,10 +344,11 @@ export default function PetList() {
   )
 }
 
-// BoxMap 位置示意图(每行 6 格;盒子 5 排、队伍 3 队;白=有宠物,灰=空,选中高亮)。
+// BoxMap 位置示意图(每行 6 格;盒子 5 排、队伍 3 队;有宠物格显示头像,灰=空,选中高亮)。
 // 标题右侧上一个/下一个按钮在容器间切换(大世界队伍排在所有盒子最前)。
 function BoxMap({ container, selected, onCell, onPrev, onNext }) {
   const slots = (container && container.slots) || []
+  const heads = (container && container.heads) || {}
   const cols = (container && container.cols) || 6
   const cellTitle = (i) => {
     if (!container) return ''
@@ -364,14 +365,16 @@ function BoxMap({ container, selected, onCell, onPrev, onNext }) {
           <button className="boxmap-btn" title="下一个" onClick={onNext}>›</button>
         </span>
       </div>
-      <div className="boxmap-grid" style={{ gridTemplateColumns: `repeat(${cols}, 30px)` }}>
+      <div className="boxmap-grid" style={{ gridTemplateColumns: `repeat(${cols}, 40px)` }}>
         {slots.map((gid, i) => (
           <div
             key={i}
             className={'boxmap-cell' + (gid ? ' filled' : '') + (gid && gid === selected ? ' on' : '')}
             title={gid ? cellTitle(i) : '空'}
             onClick={() => gid && onCell(gid, container)}
-          />
+          >
+            {gid && heads[gid] ? <img src={'/img/' + heads[gid]} alt="" loading="lazy" /> : null}
+          </div>
         ))}
       </div>
     </div>

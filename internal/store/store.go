@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -111,9 +113,41 @@ func (s *Store) ReplacePetMedals(owns []pet.MedalOwn) error {
 
 // BoxLayout 是一个盒子的槽位布局(30 格,gid=0 表示空)。
 type BoxLayout struct {
-	ID    int32    `json:"id"`
-	Name  string   `json:"name"`
-	Slots []uint32 `json:"slots"` // 长 30,下标=格位(0 起),值=宠物 gid(0 空)
+	ID    int32             `json:"id"`
+	Name  string            `json:"name"`
+	Slots []uint32          `json:"slots"`           // 长 30,下标=格位(0 起),值=宠物 gid(0 空)
+	Heads map[string]string `json:"heads,omitempty"` // gid(字符串)→小头像路径,供示意图渲染头像
+}
+
+// petHeads 批量读取一组 gid 的小头像路径(image.head);空集或无图忽略。
+func (s *Store) petHeads(gids []uint32) map[string]string {
+	if len(gids) == 0 {
+		return nil
+	}
+	ph := make([]string, len(gids))
+	args := make([]any, len(gids))
+	for i, g := range gids {
+		ph[i] = "?"
+		args[i] = g
+	}
+	rows, err := s.db.Query(`SELECT gid,data FROM pets WHERE gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var gid uint32
+		var data string
+		if rows.Scan(&gid, &data) != nil {
+			continue
+		}
+		var p pet.Pet
+		if json.Unmarshal([]byte(data), &p) == nil && p.Image.Head != "" {
+			out[strconv.FormatUint(uint64(gid), 10)] = p.Image.Head
+		}
+	}
+	return out
 }
 
 // BoxLayouts 返回所有有宠物的盒子的槽位布局(按 box_id 升序),供前端盒子示意图。
@@ -148,14 +182,23 @@ func (s *Store) BoxLayouts() []BoxLayout {
 	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
 	out := make([]BoxLayout, 0, len(order))
 	for _, id := range order {
-		out = append(out, *m[id])
+		bl := m[id]
+		var gids []uint32
+		for _, g := range bl.Slots {
+			if g != 0 {
+				gids = append(gids, g)
+			}
+		}
+		bl.Heads = s.petHeads(gids)
+		out = append(out, *bl)
 	}
 	return out
 }
 
 // TeamLayout 是大世界三支队伍的位置布局(18 格 = 3 队 × 6 位,下标=team_idx*6+pos)。
 type TeamLayout struct {
-	Slots []uint32 `json:"slots"`
+	Slots []uint32          `json:"slots"`
+	Heads map[string]string `json:"heads,omitempty"` // gid(字符串)→小头像路径
 }
 
 // TeamLayouts 返回大世界队伍的 18 格布局(gid=0 表示空位)。
@@ -175,6 +218,13 @@ func (s *Store) TeamLayouts() TeamLayout {
 			}
 		}
 	}
+	var gids []uint32
+	for _, g := range tl.Slots {
+		if g != 0 {
+			gids = append(gids, g)
+		}
+	}
+	tl.Heads = s.petHeads(gids)
 	return tl
 }
 
