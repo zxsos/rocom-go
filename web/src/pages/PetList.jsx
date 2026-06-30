@@ -97,8 +97,12 @@ export default function PetList() {
         setSelected(focus)
         loadBoxes()
       }
+      // 防抖重载用 filterRef 读取最新筛选(含 focus 切过去的新页),
+      // 避免捕获旧 load 闭包,在 600ms 后把列表拉回切换前的页。
       clearTimeout(reloadRef.current)
-      reloadRef.current = setTimeout(() => { if (reloadRef.current) { load(); loadBoxes() } }, 600)
+      reloadRef.current = setTimeout(() => {
+        if (reloadRef.current) { getPets(filterRef.current).then(setData).catch(() => {}); loadBoxes() }
+      }, 600)
     })
   }, [load, loadBoxes])
 
@@ -153,13 +157,15 @@ export default function PetList() {
     if (p.team) setActiveIdx(0)
     else if (p.box) { const i = boxIdxById(p.box.boxId); if (i >= 0) setActiveIdx(i) }
   }
-  // 点击示意图格子:选中该宠物,并跳到列表里它所在页(超过一页时切页)
+  // 点击示意图格子:选中该宠物,并跳到列表里它所在页(超过一页时切页)。
+  // 清掉其它筛选条件(仅保留排序/每页档位),确保目标宠物一定在列表中,
+  // 否则原有筛选可能把它排除导致跳转落空。盒子格→筛到该盒;队伍格→不限盒。
   const onCell = (gid, container) => {
     setSelected(gid)
-    // 盒子格 → 把列表筛选到该盒;队伍格 → 清盒筛选(队伍宠物不在盒里)
+    const cleared = { pageSize: filter.pageSize, sort: filter.sort, order: filter.order }
     const base = container.type === 'box'
-      ? { ...filter, box: `${container.id}-${container.name}` }
-      : { ...filter, box: '' }
+      ? { ...cleared, box: `${container.id}-${container.name}` }
+      : { ...cleared }
     getPetPage(gid, base)
       .then((r) => setFilter({ ...base, page: (r && r.page) || 1 }))
       .catch(() => setFilter({ ...base, page: 1 }))
