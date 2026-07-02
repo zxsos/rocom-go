@@ -19,6 +19,9 @@ const (
 	OpPlayerSyncNotify     = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
 	OpLoginRsp             = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
 	OpPetBoxChangePetRsp   = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
+	OpPetBoxSettingUpRsp   = 0x1891 // ZONE_PET_BOX_SETTING_UP_RSP(6289), 整理/编辑排列回包(改名/换位,全量 repeated PetBox)
+	OpPetBoxUnlockRsp      = 0x1883 // ZONE_PET_BOX_UNLOCK_RSP(6275), 解锁新盒回包(field2=新 PetBox 增量)
+	OpPetBoxSetMarkTypeRsp = 0x1893 // ZONE_PET_BOX_SET_MARK_TYPE_RSP(6291), 设标记/改名回包(单盒元数据增量)
 	OpPetMedalCommonRsp    = 0x141e // ZONE_PET_MEDAL_COMMON_RSP(5150), 换牌等回包(含更新后 PetData)
 	OpPetEvoluteRsp        = 0x01ae // ZONE_PET_EVOLUTE_RSP(430), 进化回包(含进化后完整 PetData,base_conf_id 已换形态)
 )
@@ -54,6 +57,34 @@ type BoxEntry struct {
 	Mark    int32
 }
 
+// BoxMeta 是一个盒子的元数据(名称/标记/是否锁定),与是否有宠物无关——空盒子也在内。
+// 盒号 box_id 即展示位置(1 起),改名/换位/解锁都会更新这份全量元数据。
+type BoxMeta struct {
+	BoxID int32
+	Name  string
+	Mark  int32
+	Lock  bool
+}
+
+// boxesToLayout 把一组 PetBox 展开为「占用项(有宠物的格)」+「全量盒子元数据(含空盒)」。
+// 任一盒子的 vacancy/box_id 越界即判为误解析,返回 (nil,nil,false)。
+func boxesToLayout(boxes []*pb.PetBox) (entries []BoxEntry, metas []BoxMeta, ok bool) {
+	for _, bx := range boxes {
+		if bx.GetVacancyNum() < 0 || bx.GetVacancyNum() > 200 || bx.GetBoxId() < 0 || bx.GetBoxId() > 1000 {
+			return nil, nil, false
+		}
+		name := string(bx.GetBoxName())
+		mark := int32(bx.GetMarkType())
+		metas = append(metas, BoxMeta{BoxID: bx.GetBoxId(), Name: name, Mark: mark, Lock: bx.GetLock()})
+		for slot, g := range bx.GetPetGid() {
+			if g != 0 {
+				entries = append(entries, BoxEntry{Gid: g, BoxID: bx.GetBoxId(), Slot: int32(slot), BoxName: name, Mark: mark})
+			}
+		}
+	}
+	return entries, metas, true
+}
+
 // collectBackpacks 递归收集 body 里所有 boxes 非空的 PetBackpackInfo 候选。
 func collectBackpacks(body []byte, out *[]*pb.PetBackpackInfo) {
 	b := body
@@ -84,10 +115,10 @@ func collectBackpacks(body []byte, out *[]*pb.PetBackpackInfo) {
 	}
 }
 
-// ParseBackpack 在 body 里找最完整的 PetBackpackInfo,展开为盒子位置列表。
-// 位置 = 宠物 gid 在 PetBox.pet_gid[] 中的下标(空格为 0,跳过)。取非零 gid 数最多的
-// 候选以排除误解析;少于 5 只视为非真实背包,返回 nil。
-func ParseBackpack(body []byte) []BoxEntry {
+// ParseBackpack 在 body 里找最完整的 PetBackpackInfo(登录/整理回包),展开为盒子占用项 +
+// 全量盒子元数据。位置 = 宠物 gid 在 PetBox.pet_gid[] 中的下标(空格为 0,跳过)。取非零 gid 数
+// 最多的候选以排除误解析;少于 5 只视为非真实背包,返回 (nil,nil)。
+func ParseBackpack(body []byte) ([]BoxEntry, []BoxMeta) {
 	var cands []*pb.PetBackpackInfo
 	collectBackpacks(body, &cands)
 
@@ -111,20 +142,141 @@ func ParseBackpack(body []byte) []BoxEntry {
 		}
 	}
 	if best == nil || bestN < 5 {
-		return nil
+		return nil, nil
 	}
+	entries, metas, _ := boxesToLayout(best.GetBoxes())
+	return entries, metas
+}
 
-	var out []BoxEntry
-	for _, bx := range best.GetBoxes() {
-		name := string(bx.GetBoxName())
-		mark := int32(bx.GetMarkType())
-		for slot, g := range bx.GetPetGid() {
-			if g != 0 {
-				out = append(out, BoxEntry{Gid: g, BoxID: bx.GetBoxId(), Slot: int32(slot), BoxName: name, Mark: mark})
+// ParseBoxSettingUp 解析 ZonePetBoxSettingUpRsp(整理/编辑排列,含改名/换位)的 body。
+// 该回包不是 PetBackpackInfo,而是 { RetInfo ret_info=1; repeated PetBox boxes=2; }——盒子直接
+// 挂在顶层 field2。逐个把 field2 反序列化为 PetBox,展开为占用项 + 全量元数据;盒子数 <5 或数值
+// 越界视为误解析返回 (nil,nil)。box_id 即新的展示位置,故整体替换即让盒内宠物随盒换位。
+func ParseBoxSettingUp(body []byte) ([]BoxEntry, []BoxMeta) {
+	var boxes []*pb.PetBox
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if num == 2 && typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
 			}
+			var bx pb.PetBox
+			if proto.Unmarshal(v, &bx) == nil && bx.BoxId != nil {
+				boxes = append(boxes, &bx)
+			}
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
 		}
 	}
-	return out
+	if len(boxes) < 5 {
+		return nil, nil
+	}
+	entries, metas, ok := boxesToLayout(boxes)
+	if !ok {
+		return nil, nil
+	}
+	return entries, metas
+}
+
+// ParseBoxUnlock 解析 ZonePetBoxUnlockRsp(解锁新盒)的 body,返回新盒的元数据(增量,单盒)。
+// 结构: { RetInfo ret_info=1(含玩家数据); PetBox new_box=2 }——新盒挂在顶层 field2。
+// box_id 越界或未找到返回 nil。
+func ParseBoxUnlock(body []byte) *BoxMeta {
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		if num == 2 && typ == protowire.BytesType {
+			v, m := protowire.ConsumeBytes(b)
+			if m < 0 {
+				break
+			}
+			var bx pb.PetBox
+			if proto.Unmarshal(v, &bx) == nil && bx.BoxId != nil &&
+				bx.GetBoxId() > 0 && bx.GetBoxId() <= 1000 {
+				return &BoxMeta{BoxID: bx.GetBoxId(), Name: string(bx.GetBoxName()), Mark: int32(bx.GetMarkType()), Lock: bx.GetLock()}
+			}
+			b = b[m:]
+		} else {
+			m := protowire.ConsumeFieldValue(num, typ, b)
+			if m < 0 {
+				break
+			}
+			b = b[m:]
+		}
+	}
+	return nil
+}
+
+// ParseBoxSetMark 解析 ZonePetBoxSetMarkTypeRsp(设标记/改名)的 body,返回该盒更新后的元数据。
+// 结构(非 PetBox): { RetInfo ret_info=1; uint32 box_id=2; WarehouseMarkType mark=3; bytes name=4;
+// bool lock=5 }。仅 ret_info.result==0 且 box_id 合法才返回,否则 nil。
+func ParseBoxSetMark(body []byte) *BoxMeta {
+	var result int64 = -1
+	var boxID, mark int32
+	var name string
+	var lock bool
+	b := body
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			break
+		}
+		b = b[n:]
+		var m int
+		switch {
+		case num == 1 && typ == protowire.BytesType: // ret_info: 取 field1 作 result
+			var v []byte
+			v, m = protowire.ConsumeBytes(b)
+			if m >= 0 {
+				if rn, rt, rk := protowire.ConsumeTag(v); rk >= 0 && rn == 1 && rt == protowire.VarintType {
+					if rv, rm := protowire.ConsumeVarint(v[rk:]); rm >= 0 {
+						result = int64(rv)
+					}
+				}
+			}
+		case num == 2 && typ == protowire.VarintType:
+			var v uint64
+			v, m = protowire.ConsumeVarint(b)
+			boxID = int32(v)
+		case num == 3 && typ == protowire.VarintType:
+			var v uint64
+			v, m = protowire.ConsumeVarint(b)
+			mark = int32(v)
+		case num == 4 && typ == protowire.BytesType:
+			var v []byte
+			v, m = protowire.ConsumeBytes(b)
+			name = string(v)
+		case num == 5 && typ == protowire.VarintType:
+			var v uint64
+			v, m = protowire.ConsumeVarint(b)
+			lock = v != 0
+		default:
+			m = protowire.ConsumeFieldValue(num, typ, b)
+		}
+		if m < 0 {
+			break
+		}
+		b = b[m:]
+	}
+	if result != 0 || boxID <= 0 || boxID > 1000 {
+		return nil
+	}
+	return &BoxMeta{BoxID: boxID, Name: name, Mark: mark, Lock: lock}
 }
 
 // hasCJK 判断字节串是否含中日韩统一表意文字(宠物名为中文)。

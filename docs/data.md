@@ -191,10 +191,24 @@ s2c 0x1346 DATA 明文 body
   炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
 - **盒子位置**：`PetData` 无位置字段,位置由仓库布局 `PetBackpackInfo` 表达——
   `ZONE_LOGIN_RSP(0x0102)` 登录数据(或盒子操作回包 6272-6292)携带 `boxes[]`,每个 `PetBox` 有
-  `box_id`(盒号)、`mark_type`(WarehouseMarkType:1首领/2污染/4奇异/8炫彩/16闪光)、`box_name`
-  (玩家命名)、`pet_gid[]`(**有序数组,每盒 30 格,空格=0**)。**位置 =(box_id, pet_gid[] 下标)**。
-  `ParseBackpack` 取非零 gid 数最多的候选(排除误解析),展开为 gid→位置存入 `pet_box` 表,
-  读取宠物时 JOIN 注入 `Pet.Box`;实测 0x0102 解出 ~525 只(27 盒),`/api/pets/21`→污染1 第11格。
+  `box_id`(**盒号即展示位置,1 起**)、`mark_type`(WarehouseMarkType:1首领/2污染/4奇异/8炫彩/16闪光)、
+  `box_name`(玩家命名)、`lock`、`pet_gid[]`(**有序数组,每盒 30 格,空格=0**)。**位置 =(box_id, pet_gid[] 下标)**。
+  `ParseBackpack` 取非零 gid 数最多的候选(排除误解析),展开为 gid→位置存入 `pet_box`(占用),
+  同时把**全量盒子元数据**(含空盒:box_id/name/mark/lock)存入 `pet_boxes` 表;读取宠物时 JOIN 注入
+  `Pet.Box`(盒名/标记以 `pet_boxes` 为权威,移入空的命名盒也拿得到盒名)。实测 0x0102 解出 ~525 只
+  (27 盒),`/api/pets/21`→污染1 第11格。
+- **盒子元数据(数量/名称/位置)**:盒子的存在性/盒名/标记/`box_id`(位置)独立于是否有宠物,存
+  `pet_boxes` 表(与占用表 `pet_box` 解耦),故**空盒也可见**、盒数/盒名/换位都能表达。`BoxLayouts`
+  从 `pet_boxes` 枚举全部盒子(含空盒)、占用格从 `pet_box` 填入。三条来源:
+  - **全量**:登录/整理(`PetBackpackInfo`,`ParseBackpack`)与**整理排列**(改名/换位)的
+    `ZONE_PET_BOX_SETTING_UP_RSP(0x1891)` 整体 `ReplacePetBoxMetas`+`ReplacePetBoxes`。后者不是
+    `PetBackpackInfo` 而是裸的 `repeated PetBox`(挂顶层 field2),故 `ParseBackpack` 解不出时按
+    `ParseBoxSettingUp` 再试。换位即 `box_id` 重排,整体替换让**盒内宠物随盒换位**。
+  - **增量(单盒)**:解锁 `ZONE_PET_BOX_UNLOCK_RSP(0x1883)`(新盒挂 field2,盒数+1)、
+    设标记/改名 `ZONE_PET_BOX_SET_MARK_TYPE_RSP(0x1893)`(自定义结构 `{ret=1,box_id=2,mark=3,name=4,lock=5}`),
+    各自 `UpsertPetBoxMeta` 只动单盒——单独解锁/改名不必等下次全量/重登即时生效。
+  - 实测两 pcap:①解锁盒29→改名 newbox→移到第20位(盒数28→29、box20=newbox);②重登后把
+    18号盒`孵蛋`里的 20644 移入20号盒`newbox`(移入空命名盒仍正确显示盒名)——均正确落库。
 - **队伍位置**：在队宠物**不在盒子里**,位置由 `PlayerPetInfo.team_infos`(同在 0x0102 登录数据)
   里 `team_type==PTT_BIG_WORLD(1)` 的 `PetTeamInfo` 表达——`teams[]`(最多 3 队,**队号取数组下标**,
   实测 `PetTeam.team_idx` 恒 0),每队 `pet_infos[]`(6 位)的 `pet_gid`。`ParseTeams`(取宠物数最多的
@@ -203,8 +217,9 @@ s2c 0x1346 DATA 明文 body
 - **位置移动增量**(运行期实时刷新):
   - **盒位**:`ZONE_PET_BOX_CHANGE_PET_RSP(0x1888)` 携带 `GoodsChangeItem.box_pet_change`
     (`PetBoxPetChange`:`pet_gid`/`is_in_team`/`id`=盒/`pos`=格,**pos 1 起**)。`ParseBoxMoves` 抽出
-    非在队、gid 非 0 的落位项(`slot=pos-1`),`ApplyBoxMoves` 增量 upsert `pet_box`(盒名/标记沿用该盒)
-    并清其队位。**仅在 0x1888 解析**(其他 opcode 的子消息易误判为 PetBoxPetChange)。
+    非在队、gid 非 0 的落位项(`slot=pos-1`),`ApplyBoxMoves` 增量 upsert `pet_box`(盒名/标记取自
+    `pet_boxes` 元数据,移入空盒也拿得到;元数据缺失才回退取该盒既有宠物行)并清其队位。
+    **仅在 0x1888 解析**(其他 opcode 的子消息易误判为 PetBoxPetChange)。
   - **队位**:队伍变更/盒子操作回包(`CarriesTeam`:登录/6272-6292/524-527)常一并刷新完整队伍快照,
     复用 `ParseTeams` 整体 `ReplacePetTeams`。
   - 实测 pcap(交换队首两位 + 盒内 1→30 移位 + 盒内 2/3 互换):三处变更均正确落库。

@@ -92,6 +92,11 @@ CREATE TABLE IF NOT EXISTS pet_box (
   box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER,
   PRIMARY KEY(account, gid)
 );
+CREATE TABLE IF NOT EXISTS pet_boxes (
+  account TEXT NOT NULL, box_id INTEGER,
+  name TEXT, mark INTEGER, lock INTEGER,
+  PRIMARY KEY(account, box_id)
+);
 CREATE TABLE IF NOT EXISTS pet_team (
   account TEXT NOT NULL, gid INTEGER,
   team_idx INTEGER, pos INTEGER,
@@ -209,34 +214,52 @@ func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 	return out
 }
 
-// BoxLayouts 返回本账号所有有宠物的盒子的槽位布局(按 box_id 升序),供前端盒子示意图。
+// BoxLayouts 返回本账号全部盒子的槽位布局(按 box_id/展示位置升序),供前端盒子示意图。
+// 盒子全集与盒名取自 pet_boxes 元数据(含空盒),占用格从 pet_box 填入;两表都缺时返回空。
+// 无 pet_boxes 元数据(旧库尚未刷新)时回退按 pet_box 里出现过的盒号构造(仅有宠物的盒)。
 func (sc *Scoped) BoxLayouts() []BoxLayout {
-	rows, err := sc.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box WHERE account=? ORDER BY box_id, slot`, sc.account)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
 	m := map[int32]*BoxLayout{}
-	var order []int32
-	for rows.Next() {
-		var boxID, slot int32
-		var gid uint32
-		var name string
-		if rows.Scan(&boxID, &slot, &gid, &name) != nil {
-			continue
-		}
-		bl := m[boxID]
+	ensure := func(id int32) *BoxLayout {
+		bl := m[id]
 		if bl == nil {
-			bl = &BoxLayout{ID: boxID, Slots: make([]uint32, 30)}
-			m[boxID] = bl
-			order = append(order, boxID)
+			bl = &BoxLayout{ID: id, Slots: make([]uint32, 30)}
+			m[id] = bl
 		}
-		if name != "" && bl.Name == "" {
-			bl.Name = name
+		return bl
+	}
+	// 盒子全集 + 盒名(含空盒)
+	if rows, err := sc.db.Query(`SELECT box_id, name FROM pet_boxes WHERE account=?`, sc.account); err == nil {
+		for rows.Next() {
+			var id int32
+			var name string
+			if rows.Scan(&id, &name) == nil {
+				ensure(id).Name = name
+			}
 		}
-		if slot >= 0 && slot < 30 {
-			bl.Slots[slot] = gid
+		rows.Close()
+	}
+	// 占用格(旧库无元数据时,盒名回退用 pet_box.box_name)
+	if rows, err := sc.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box WHERE account=?`, sc.account); err == nil {
+		for rows.Next() {
+			var boxID, slot int32
+			var gid uint32
+			var name string
+			if rows.Scan(&boxID, &slot, &gid, &name) != nil {
+				continue
+			}
+			bl := ensure(boxID)
+			if bl.Name == "" && name != "" {
+				bl.Name = name
+			}
+			if slot >= 0 && slot < 30 {
+				bl.Slots[slot] = gid
+			}
 		}
+		rows.Close()
+	}
+	order := make([]int32, 0, len(m))
+	for id := range m {
+		order = append(order, id)
 	}
 	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
 	out := make([]BoxLayout, 0, len(order))
@@ -327,8 +350,40 @@ func (sc *Scoped) ReplacePetBoxes(entries []pet.BoxEntry) error {
 	return tx.Commit()
 }
 
+// ReplacePetBoxMetas 用一份完整盒子元数据快照替换本账号所有盒子(整体 DELETE + 批量插入)。
+// 元数据含空盒,是盒名/数量/位置(box_id)的权威来源;登录/整理回包携带全量盒列表时刷新。
+func (sc *Scoped) ReplacePetBoxMetas(metas []pet.BoxMeta) error {
+	tx, err := sc.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM pet_boxes WHERE account=?`, sc.account); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO pet_boxes(account,box_id,name,mark,lock) VALUES(?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, mt := range metas {
+		if _, err = stmt.Exec(sc.account, mt.BoxID, mt.Name, mt.Mark, mt.Lock); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// UpsertPetBoxMeta 增量更新单个盒子的元数据(解锁新盒 / 设标记 / 改名),不动其他盒子。
+func (sc *Scoped) UpsertPetBoxMeta(meta pet.BoxMeta) error {
+	_, err := sc.db.Exec(`INSERT OR REPLACE INTO pet_boxes(account,box_id,name,mark,lock) VALUES(?,?,?,?,?)`,
+		sc.account, meta.BoxID, meta.Name, meta.Mark, meta.Lock)
+	return err
+}
+
 // ApplyBoxMoves 增量应用盒位变更(box_pet_change):把每只宠物移到新(盒,格);
-// 盒名/标记沿用该盒既有行(随盒不随宠);宠物入盒即不在队伍,清除其队伍位置。
+// 盒名/标记随盒不随宠,取自 pet_boxes 元数据(增量包不携带,移入空盒也能拿到盒名),
+// 元数据缺失(旧库)才回退取该盒任一既有宠物行;宠物入盒即不在队伍,清除其队伍位置。
 func (sc *Scoped) ApplyBoxMoves(entries []pet.BoxEntry) error {
 	tx, err := sc.db.Begin()
 	if err != nil {
@@ -343,8 +398,9 @@ func (sc *Scoped) ApplyBoxMoves(entries []pet.BoxEntry) error {
 	for _, e := range entries {
 		var name string
 		var mark int32
-		// 盒名/标记是盒的属性,取该盒任一既有行(增量包不携带)。
-		tx.QueryRow(`SELECT box_name,mark FROM pet_box WHERE account=? AND box_id=? AND gid<>? LIMIT 1`, sc.account, e.BoxID, e.Gid).Scan(&name, &mark)
+		if tx.QueryRow(`SELECT name,mark FROM pet_boxes WHERE account=? AND box_id=?`, sc.account, e.BoxID).Scan(&name, &mark) != nil {
+			tx.QueryRow(`SELECT box_name,mark FROM pet_box WHERE account=? AND box_id=? AND gid<>? LIMIT 1`, sc.account, e.BoxID, e.Gid).Scan(&name, &mark)
+		}
 		if _, err = up.Exec(sc.account, e.Gid, e.BoxID, e.Slot, name, mark); err != nil {
 			return err
 		}
@@ -356,12 +412,18 @@ func (sc *Scoped) ApplyBoxMoves(entries []pet.BoxEntry) error {
 }
 
 // boxLocFor 读取本账号单只宠物的盒子位置(无则 nil),供 GetPet 注入。
+// 盒号/格位取自 pet_box;盒名/标记优先取 pet_boxes 权威元数据(移入空盒也准),缺失才回退 pet_box。
 func (sc *Scoped) boxLocFor(gid uint32) *pet.PetBoxLoc {
 	var boxID, slot, mark int32
 	var name string
 	err := sc.db.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid=?`, sc.account, gid).Scan(&boxID, &slot, &name, &mark)
 	if err != nil {
 		return nil
+	}
+	var mName string
+	var mMark int32
+	if sc.db.QueryRow(`SELECT name,mark FROM pet_boxes WHERE account=? AND box_id=?`, sc.account, boxID).Scan(&mName, &mMark) == nil {
+		name, mark = mName, mMark
 	}
 	return &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
 }

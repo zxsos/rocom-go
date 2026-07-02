@@ -125,10 +125,30 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			updated := false
 			var focusGid uint32 // 客户端刚调整位置的宠物,推给前端自动切页选中
 			var focusBox int32  // 该宠物移动后所在盒子,供前端切换盒子示意图
-			// 全量背包快照(登录/整理/设置回包):整体替换盒位
+			// 全量背包快照:整体替换盒位(占用)+ 盒子元数据(名称/数量/位置,含空盒)。
+			// 登录/整理走 PetBackpackInfo;整理排列(改名/换位)的 SETTING_UP 回包是裸的
+			// repeated PetBox(非 PetBackpackInfo),前者解不出时按后者再试。
 			if pet.CarriesBackpack(m.Opcode) {
-				if entries := pet.ParseBackpack(m.AppBody); len(entries) > 0 {
+				entries, metas := pet.ParseBackpack(m.AppBody)
+				if len(metas) == 0 && m.Opcode == pet.OpPetBoxSettingUpRsp {
+					entries, metas = pet.ParseBoxSettingUp(m.AppBody)
+				}
+				if len(metas) > 0 {
+					updated = sc.ReplacePetBoxMetas(metas) == nil || updated
+				}
+				if len(entries) > 0 {
 					updated = sc.ReplacePetBoxes(entries) == nil || updated
+				}
+				// 单盒元数据增量:解锁(新增空盒→盒数+1)/设标记·改名(更新单盒名称/标记)
+				var meta *pet.BoxMeta
+				switch m.Opcode {
+				case pet.OpPetBoxUnlockRsp:
+					meta = pet.ParseBoxUnlock(m.AppBody)
+				case pet.OpPetBoxSetMarkTypeRsp:
+					meta = pet.ParseBoxSetMark(m.AppBody)
+				}
+				if meta != nil {
+					updated = sc.UpsertPetBoxMeta(*meta) == nil || updated
 				}
 			}
 			// 大世界队伍快照(登录/队伍变更/盒子操作回包常一并刷新):整体替换队位
