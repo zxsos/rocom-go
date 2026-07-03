@@ -100,8 +100,70 @@ CREATE TABLE IF NOT EXISTS pet_medal (
 CREATE TABLE IF NOT EXISTS accounts (
   account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS sessions (
+  conn_id TEXT PRIMARY KEY, key BLOB, account TEXT, updated_at INTEGER
+);
 `)
 	return err
+}
+
+// SessionTTL 是持久化会话(密钥/账号归属)的有效期:超过此时长的连接不再复用,
+// 兜底防止四元组被新连接复用时套用陈旧密钥(主校验仍是 gcp.ValidPlain 的明文自检)。
+const SessionTTL = 24 * time.Hour
+
+// SaveSessionKey 持久化某 GCP 连接(conn_id)的会话 AES 密钥,
+// 供抓包服务异常重启后继续解密同一条仍存活的连接。account 列保持不变。
+func (s *Store) SaveSessionKey(connID string, key []byte) error {
+	_, err := s.db.Exec(`
+INSERT INTO sessions(conn_id,key,updated_at) VALUES(?,?,?)
+ON CONFLICT(conn_id) DO UPDATE SET key=excluded.key, updated_at=excluded.updated_at`,
+		connID, key, time.Now().Unix())
+	return err
+}
+
+// LoadKey 读取某连接近 SessionTTL 内更新过的会话密钥;无/过期/为空均返回 false。
+// 实现 capture.KeyStore,供 Engine 在连接首次出现时预热密钥。
+func (s *Store) LoadKey(connID string) ([]byte, bool) {
+	var key []byte
+	err := s.db.QueryRow(`SELECT key FROM sessions WHERE conn_id=? AND updated_at>=?`,
+		connID, time.Now().Add(-SessionTTL).Unix()).Scan(&key)
+	if err != nil || len(key) == 0 {
+		return nil, false
+	}
+	return key, true
+}
+
+// SaveKey 实现 capture.KeyStore(SaveSessionKey 的忽略错误封装)。
+func (s *Store) SaveKey(connID string, key []byte) { s.SaveSessionKey(connID, key) }
+
+// SaveSessionAccount 持久化某连接的账号归属("UID:<user_id>"),
+// 使重启后无需再次等到登录回包即可归属该连接解密出的消息。key 列保持不变。
+func (s *Store) SaveSessionAccount(connID, account string) error {
+	_, err := s.db.Exec(`
+INSERT INTO sessions(conn_id,account,updated_at) VALUES(?,?,?)
+ON CONFLICT(conn_id) DO UPDATE SET account=excluded.account, updated_at=excluded.updated_at`,
+		connID, account, time.Now().Unix())
+	return err
+}
+
+// LoadSessionAccounts 读取近 SessionTTL 内的 conn_id→account 映射(重启预热用),
+// 并顺带清理过期会话行,避免长期累积。仅返回 account 非空的连接。
+func (s *Store) LoadSessionAccounts() (map[string]string, error) {
+	cutoff := time.Now().Add(-SessionTTL).Unix()
+	s.db.Exec(`DELETE FROM sessions WHERE updated_at<?`, cutoff)
+	rows, err := s.db.Query(`SELECT conn_id,account FROM sessions WHERE account IS NOT NULL AND account<>''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var connID, account string
+		if rows.Scan(&connID, &account) == nil {
+			out[connID] = account
+		}
+	}
+	return out, rows.Err()
 }
 
 // AccountInfo 是一个账号的概要(供前端账号下拉)。

@@ -32,7 +32,22 @@ const (
 	s2cBodyOffset   = 10
 	s2cOpcodeOffset = 2
 	c2sOpcodeOffset = 6
+	s2cMarkerOffset = 4 // s2c 明文固定标记 0x55aa 的偏移
 )
+
+// s2cMarker 是 s2c 明文 internal header [4:6] 的固定标记,用于校验解密密钥是否正确。
+var s2cMarker = []byte{0x55, 0xaa}
+
+// ValidPlain 判断解密明文结构是否正确(即所用会话密钥是否匹配)。
+// s2c 明文 [4:6] 恒为 0x55aa,密钥错误时解出的是乱码,该标记不符即可判定;
+// c2s 无此固定标记,恒返回 true(下游只据 s2c 归属/解析,c2s 仅供调试)。
+func ValidPlain(dir Direction, plain []byte) bool {
+	if dir != S2C {
+		return true
+	}
+	return len(plain) >= s2cMarkerOffset+2 &&
+		plain[s2cMarkerOffset] == s2cMarker[0] && plain[s2cMarkerOffset+1] == s2cMarker[1]
+}
 
 var Magic = []byte{0x33, 0x66}
 
