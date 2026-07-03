@@ -62,6 +62,9 @@ func main() {
 		if d := eng.NoKeyDropped(); d > 0 {
 			log.Printf("提示: %d 个数据包因尚无会话密钥被丢弃(抓包晚于密钥协商时属正常)", d)
 		}
+		if d := eng.BadKeyDropped(); d > 0 {
+			log.Printf("提示: %d 个数据包因密钥错误(明文校验失败)被丢弃(缓存密钥失效时会出现)", d)
+		}
 		select {}
 	} else if *iface != "" {
 		log.Printf("实时抓包: 网卡=%s 端口=%d", *iface, *port)

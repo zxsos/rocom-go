@@ -47,6 +47,12 @@
 
 - **方向判定**：`reassembly` 每个 TCP 连接只创建一个 `Stream`，双向数据经同一
   `ReassembledSG`，用 `sg.Info()` 的方向 + 触发包端口映射为 c2s/s2c。
+- **flush 用抓包时钟(实时中段接入必需)**：`reassembly` 在中段接入(未见 SYN)时会把起始
+  数据当作"等待更早分段"缓冲,须 flush 才下推。`process()` 每 `flushEvery` 包调一次
+  `FlushWithOptions{T: lastTS-flushLag, TC: lastTS-closeIdle}`,阈值取**最新包时间戳**
+  `lastTS` 而非墙钟——实时流里墙钟-2min 永远追不上活跃连接的数据时间,起始 backlog 会一直
+  卡住直到 EOF 的 `FlushAll`(而 `Ctrl-C` 会跳过它),表现为"重启后能恢复密钥却收不到任何
+  消息"。`T` 促使跨间隙滞留数据近实时下推,`TC` 只关闭真正空闲的连接、不误关活跃连接。
 - **会话密钥共享**：c2s/s2c 两个半连接归一化为同一 `session`，ACK(下行)提取的密钥
   供同会话的 DATA 解密。
 - **会话密钥持久化(重启续解)**：密钥仅在连接建立时的 `0x1002 ACK` 明文下发一次;抓包
