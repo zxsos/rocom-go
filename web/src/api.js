@@ -1,6 +1,6 @@
 // REST 封装与 SSE 订阅。
 
-// 当前选中账号(玩家 user_id 派生的 key,如 "role:10001")。持久化到 localStorage,
+// 当前选中账号(玩家 user_id 派生的 key,如 "UID:10001")。持久化到 localStorage,
 // 所有 REST 请求自动带上 ?account=;为空则由后端回退到最近活跃账号。
 let currentAccount = localStorage.getItem('account') || ''
 export function getCurrentAccount() { return currentAccount }
@@ -40,6 +40,12 @@ export async function getEvents(params) {
 
 export async function clearEvents() {
   await fetch('/api/events?' + buildQuery(), { method: 'DELETE' })
+}
+
+// getEventCount 返回事件总数({count}),即自上次清空以来获得的宠物数(失去事件不入库)。
+export async function getEventCount(params) {
+  const r = await fetch('/api/events/count?' + buildQuery(params))
+  return r.json()
 }
 
 export async function getFilterOptions() {

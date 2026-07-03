@@ -79,7 +79,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	const grace = 120
 	startTS := time.Now().Unix() - grace
 
-	// connAccount: GCP 连接(connID)→账号("role:"+user_id)。同一客户端 IP 可能同时跑多个
+	// connAccount: GCP 连接(connID)→账号("UID:"+user_id)。同一客户端 IP 可能同时跑多个
 	// 账号(不同设备经 NAT 同 IP、或不同游戏服),故按 user_id 而非 IP 归属:抓到某连接的
 	// LOGIN_RSP 时解析 user_id 建映射。登录回包自身也带背包/队伍/奖牌快照,须先登记再归属。
 	connAccount := map[string]string{}
@@ -88,13 +88,13 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面 resolve acc 之前)。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp {
 			if id, name, ok := pet.ParseLoginAccount(m.AppBody); ok {
-				acc := "role:" + strconv.FormatUint(id, 10)
+				acc := "UID:" + strconv.FormatUint(id, 10)
 				nick := name
 				if nick == "" {
 					nick = "?"
 				}
 				if connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志
-					log.Printf("用户 %d(%s) 登录成功 [%s]", id, nick, m.Session)
+					log.Printf("用户 %s (UID:%d) 登录成功 [%s]", nick, id, m.Session)
 				}
 				connAccount[m.Session] = acc
 				if name == "" {
@@ -216,7 +216,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				isNew, _ := sc.UpsertPet(p)
 				srv.Hub().Broadcast("pet", acc, p)
 				if isNew {
-					ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventObtain, SubKind: catchWayName(pd, acc), Gid: p.Gid, Pet: p}
+					ev := &store.Event{Time: m.Time.Unix(), SubKind: catchWayName(pd, acc), Gid: p.Gid, Pet: p}
 					if sc.AddEvent(ev) == nil {
 						logEvent(acc, ev)
 						srv.Hub().Broadcast("event", acc, ev)
@@ -226,17 +226,12 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue
 		}
 
-		// 放生：服务器下行确认被放生的 gid 列表(库中无快照时仍记录 gid)
+		// 放生：服务器下行确认被放生的 gid 列表。宠物减少不计入事件,仅从库中移除并刷新前端。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpPetFreeRsp {
 			freed := false
 			for _, gid := range pet.ParseFreeRsp(m.AppBody) {
-				old, _ := sc.RemovePet(gid)
+				sc.RemovePet(gid)
 				freed = true
-				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "放生", Gid: gid, Pet: old}
-				if sc.AddEvent(ev) == nil {
-					logEvent(acc, ev)
-					srv.Hub().Broadcast("event", acc, ev)
-				}
 			}
 			// 通知前端刷新列表与盒子/队伍示意图(放生已清掉盒位/队位)
 			if freed {
@@ -245,16 +240,11 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue
 		}
 
-		// 赠送:玩家开盒子手动把共同捕捉的宠物赠送给好友(与先前捕捉是相互独立的事件),
-		// 执行回包携带被送出的 gid;据此从自己库中移除并记一条「赠送」失去事件。
+		// 赠送:玩家开盒子手动把共同捕捉的宠物赠送给好友。宠物减少不计入事件,
+		// 仅据执行回包携带的 gid 从自己库中移除并刷新前端。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpTogetherCatchGiftRsp {
 			if gid := pet.ParseTogetherCatchGiftRsp(m.AppBody); gid != 0 {
-				old, _ := sc.RemovePet(gid)
-				ev := &store.Event{Time: m.Time.Unix(), Kind: store.EventLose, SubKind: "赠送", Gid: gid, Pet: old}
-				if sc.AddEvent(ev) == nil {
-					logEvent(acc, ev)
-					srv.Hub().Broadcast("event", acc, ev)
-				}
+				sc.RemovePet(gid)
 				// 刷新列表与盒子/队伍示意图(赠送已清掉盒位/队位)
 				srv.Hub().Broadcast("pet", acc, map[string]any{"locUpdate": true})
 			}
@@ -275,7 +265,6 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			if isNew && int64(pd.GetAddTime()) >= startTS {
 				ev := &store.Event{
 					Time:    int64(pd.GetAddTime()),
-					Kind:    store.EventObtain,
 					SubKind: catchWayName(pd, acc),
 					Gid:     p.Gid,
 					Pet:     p,
@@ -289,17 +278,13 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	}
 }
 
-// logEvent 打印一条宠物增减事件日志(获得/失去)。
+// logEvent 打印一条获得宠物事件日志。
 func logEvent(acc string, ev *store.Event) {
-	verb := "获得"
-	if ev.Kind == store.EventLose {
-		verb = "失去"
-	}
 	sp := "?"
 	if ev.Pet != nil && ev.Pet.Species != "" {
 		sp = ev.Pet.Species
 	}
-	log.Printf("用户 %s %s宠物 %s(gid=%d) [%s]", acc, verb, sp, ev.Gid, ev.SubKind)
+	log.Printf("用户 %s 获得宠物 %s(gid=%d) [%s]", acc, sp, ev.Gid, ev.SubKind)
 }
 
 // catchWayName 由 catch_way 推断获得方式(实测：1=捕捉、3=孵蛋;其余未知归“获得”)。
@@ -322,9 +307,9 @@ func catchWayName(pd *pb.PetData, acc string) string {
 	}
 }
 
-// uidFromAcc 从账号标识("role:<user_id>")取回 user_id。
+// uidFromAcc 从账号标识("UID:<user_id>")取回 user_id。
 func uidFromAcc(acc string) (uint32, bool) {
-	s, ok := strings.CutPrefix(acc, "role:")
+	s, ok := strings.CutPrefix(acc, "UID:")
 	if !ok {
 		return 0, false
 	}

@@ -11,8 +11,8 @@ const NAV = [
 // AccountContext 提供当前选中账号(玩家 user_id key),供各页对 SSE 按账号过滤。
 export const AccountContext = createContext('')
 
-// uidOf 从账号键 "role:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
-const uidOf = (acc) => (acc || '').replace(/^role:/, '')
+// uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
+const uidOf = (acc) => (acc || '').replace(/^UID:/, '')
 
 export default function App() {
   const [accounts, setAccounts] = useState([])
@@ -63,7 +63,7 @@ export default function App() {
               title="切换账号(玩家)"
             >
               {accounts.map((a) => (
-                <option key={a.account} value={a.account}>{a.name} ({uidOf(a.account)})</option>
+                <option key={a.account} value={a.account}>{a.name} (UID:{uidOf(a.account)})</option>
               ))}
             </select>
           )}

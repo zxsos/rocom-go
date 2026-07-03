@@ -42,7 +42,7 @@ button, input, select { font: inherit; color: inherit; }
 .navlink.active { background: var(--bg-3); color: var(--fg); }
 .navlink:hover { color: var(--fg); }
 .count { margin-left: auto; color: var(--fg-dim); font-size: 13px; }
-.account-select { margin-left: auto; max-width: 200px; }
+.account-select { margin-left: auto; max-width: 220px; }
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }
@@ -170,10 +170,10 @@ img.evo-avatar { object-fit: cover; }
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
   border-radius: 10px; background: var(--bg-1);
 }
+.event .event-seq { min-width: 40px; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
 .event.hl { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2a2410; }
 .event .badge { padding: 2px 8px; border-radius: 6px; font-size: 12px; background: var(--bg-3); }
 .event .badge.obtain { background: #133a1e; color: var(--green); }
-.event .badge.lose { background: #3a1313; color: var(--red); }
 .rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-width: 720px; }
 .rule-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 

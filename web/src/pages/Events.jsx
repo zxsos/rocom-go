@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react'
-import { getEvents, clearEvents, subscribe } from '../api'
+import { getEvents, getEventCount, clearEvents, subscribe } from '../api'
 import { Types, Avatar, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 import { AccountContext } from '../App'
@@ -32,16 +32,22 @@ function isHighlight(pet, rules) {
 export default function Events() {
   const account = useContext(AccountContext)
   const [events, setEvents] = useState([])
+  // total=自上次清空以来累计获得的宠物数(即列表最新一条的序号);列表可能因上限被截断,
+  // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
+  const [total, setTotal] = useState(0)
   const [rules, setRules] = useState(loadRules)
   const [draft, setDraft] = useState({ field: 'nature', value: '' })
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
 
   useEffect(() => {
+    // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
+    getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
     return subscribe((m) => {
       if (m.type !== 'event') return
       if (m.account && m.account !== account) return // 只认当前账号的事件
       setEvents((prev) => [m.data, ...prev].slice(0, 300))
+      setTotal((n) => n + 1)
     })
   }, [account])
 
@@ -55,10 +61,10 @@ export default function Events() {
     setDraft({ field, value: '' })
   }
   const delRule = (i) => setRules((r) => r.filter((_, idx) => idx !== i))
-  // 清空事件历史(后端删除 + 前端清列表)
+  // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
   const clearAll = () => {
-    if (!window.confirm('确定清空所有事件历史?')) return
-    clearEvents().then(() => setEvents([])).catch(() => {})
+    if (!window.confirm('确定清空所有事件历史?计数将从头开始。')) return
+    clearEvents().then(() => { setEvents([]); setTotal(0) }).catch(() => {})
   }
 
   return (
@@ -87,15 +93,16 @@ export default function Events() {
       </div>
 
       <div className="event-head">
-        <h3>实时事件</h3>
+        <h3>实时事件 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>累计获得 {total} 只</span></h3>
         <div className="spacer" />
         <button className="btn" disabled={events.length === 0} onClick={clearAll}>清空</button>
       </div>
       <div className="event-list">
-        {events.map((ev) => (
+        {events.map((ev, i) => (
           <div key={ev.id || ev.gid + '-' + ev.time} className={'event' + (isHighlight(ev.pet, rules) ? ' hl' : '')}
             onClick={() => ev.gid && setDetailGid(ev.gid)}>
-            <span className={'badge ' + ev.kind}>{ev.subKind || (ev.kind === 'obtain' ? '获得' : '失去')}</span>
+            <span className="event-seq muted">#{total - i}</span>
+            <span className="badge obtain">{ev.subKind || '获得'}</span>
             <Avatar p={ev.pet} />
             <div style={{ flex: 1 }}>
               <div className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} /></div>

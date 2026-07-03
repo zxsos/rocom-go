@@ -62,7 +62,7 @@
 局域网内多台设备(手机/平板/PC)可同时在线,各账号数据在**同一 SQLite 库**内隔离
 (单库加 `account` 列,而非分库)。
 
-- **身份 = 玩家 `user_id`**(账号键 `"role:"+user_id`),取自 `ZONE_LOGIN_RSP(0x0102)`:
+- **身份 = 玩家 `user_id`**(账号键 `"UID:"+user_id`),取自 `ZONE_LOGIN_RSP(0x0102)`:
   wire 三层下钻 `AppBody → #2(LoginData) → #1(base) → {#1=user_id(varint), #3=nickname}`
   (`pet.ParseLoginAccount`)。**不用客户端 IP**——多台设备常经 NAT 共用同一 IP(实测两设备
   同为 `10.0.3.201`,仅连不同游戏服),会把不同用户合并;`user_id` 全局唯一、跨设备/跨服/
@@ -84,7 +84,9 @@
 | --- | --- |
 | `GET /api/pets` | 宠物列表(筛选/排序/分页)，参数：`account,search,types,nature,gender,talentRank,medal,speciality,partnerMark,shiny,levelMin,levelMax,sort,order,page,pageSize` |
 | `GET /api/pets/{gid}` | 单只宠物详情(`?account=`) |
-| `GET /api/events` | 事件历史(`account,limit,beforeId`) |
+| `GET /api/events` | 事件历史(`account,limit,beforeId`);仅获得宠物事件,减少不入库 |
+| `GET /api/events/count` | 事件总数 `{count}`(`?account=`),即自上次清空以来获得的宠物数 |
+| `DELETE /api/events` | 清空本账号事件历史(计数随之归零) |
 | `GET /api/accounts` | 已知账号列表(`account,name,petCount`),供账号切换下拉 |
 | `GET /api/filter-options` | 各筛选维度的可选值(`?account=`) |
 | `GET /api/stats` | 统计(当前账号宠物总数,`?account=`) |

@@ -159,7 +159,8 @@ s2c 0x1346 DATA 明文 body
 - **特长**：取 PET_TALENT_CONF 中 `filter_enum_value=PTFN_TALENT_*` 的 11 种固定特长
   (无/奇袭/亲密/灵巧/疾行/同乘/无畏/爱分享/家里蹲/热心教/慈悲为怀),id=502 按游戏
   显示为"无畏"(表内 name 为"勇敢"),覆盖率 100%；
-- **放生事件**：接入 `ZONE_PET_FREE_RSP(453)`，解析 `pet_gid`(field2)→ 移除并推 lose 事件;
+- **放生**：接入 `ZONE_PET_FREE_RSP(453)`，解析 `pet_gid`(field2)→ 从库中移除并刷新前端;
+  宠物减少不计入实时事件(事件页只统计获得),故不记录也不推送事件;
 - **孵蛋事件**：`ZONE_CRACK_EGG_RSP(780)` 用 `FindNewPet` 递归提取奖励
   (`ret_info.goods_reward.rewards[].pet`)中的新宠物 → 入库 + obtain(孵蛋)事件;
 - **战斗外捕捉**：`0x1983`(赛季球/高级球，大 body 含新宠物)同样用 FindNewPet
@@ -178,9 +179,9 @@ s2c 0x1346 DATA 明文 body
   (另有 `transfer_deadline` 等)。**捕捉与赠送是相互独立的事件**,两端分别处理:
   - **送出方**:先由捕捉回包 `0x1983` 照常记「捕捉」入库;之后开盒子手动赠送,经
     `ZONE_TOGETHER_CATCH_PET_FOR_GIFTING_RSP(0x1808)` 确认 → `ParseTogetherCatchGiftRsp`
-    取 `pet_gid`(顶层 field3)移除并记 lose「赠送」。该 opcode 有两种回包且都在顶层带 gid:
+    取 `pet_gid`(顶层 field3)从库中移除(减少不计入事件,不记录)。该 opcode 有两种回包且都在顶层带 gid:
     内嵌完整 PetData 的宠物详情(赠送前预览/同步)与紧凑 ack(仅 `ret_info`+gid);**只认后者**
-    (内嵌 PetData 的返回 0),避免预览误删 + 两种回包重复记;
+    (内嵌 PetData 的返回 0),避免预览误删 + 两种回包重复处理;
   - **接收方**:受赠宠物经 `ZONE_GOODS_REWARD_NOTIFY(0x0243)` 下发(走 `FindNewPet` 入库),
     其 `catch_way` 仍为 1,故靠 `together_catch_info` 区分:`related_uin`==本账号 且 `catched_uin`≠本账号
     → 记 obtain「赠送获得」而非「捕捉」;
@@ -230,7 +231,7 @@ s2c 0x1346 DATA 明文 body
   解出 gid↔medal 存 `pet_medal` 表,读取时注入 `Pet.MedalIDs`(覆盖 `ToPet` 里仅佩戴的那枚);
   前端 `/api/medals` 全量奖牌 + `medalIds` 过滤出该宠物拥有的渲染奖牌墙。实测火神(gid=1)解出
   命定勇者/结伴同行/燃了鸭/同心相伴 4 枚。奖牌数据**仅完整登录携带**(普通/快速登录可能不含)。
-- **多账号身份**:`ZONE_LOGIN_RSP(0x0102)` 取玩家 `user_id` 作账号键(`"role:"+id`)——wire 三层
+- **多账号身份**:`ZONE_LOGIN_RSP(0x0102)` 取玩家 `user_id` 作账号键(`"UID:"+id`)——wire 三层
   下钻 `body → #2(LoginData) → #1(base) → {#1=user_id(varint), #3=nickname(bytes)}`
   (`pet.ParseLoginAccount`,实测两用户 10001/100000004)。按 user_id 而非客户端 IP 归属
   (多台设备常经 NAT 共用同一 IP,无法区分);各账号数据在同库内按 `account` 列隔离,
