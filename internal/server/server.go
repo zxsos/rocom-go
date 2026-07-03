@@ -54,6 +54,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/pets", s.handlePets)
 	s.mux.HandleFunc("GET /api/pets/{gid}", s.handlePet)
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
+	s.mux.HandleFunc("GET /api/events/count", s.handleEventCount)
 	s.mux.HandleFunc("DELETE /api/events", s.handleClearEvents)
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
@@ -212,6 +213,16 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		events = []*store.Event{}
 	}
 	writeJSON(w, events)
+}
+
+// handleEventCount 返回事件总数,供前端展示「累计获得宠物数」(失去事件不入库)。
+func (s *Server) handleEventCount(w http.ResponseWriter, r *http.Request) {
+	n, err := s.store.For(s.acct(r)).CountEvents()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"count": n})
 }
 
 // handleClearEvents 清空事件历史。
