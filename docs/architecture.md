@@ -33,12 +33,12 @@
 
 | 包 | 职责 |
 | --- | --- |
-| `gcp` | GCP 分帧(`Deframe`)、密钥提取(`ExtractKey`)、AES 解密(`DecryptData`)、opcode 提取 |
-| `capture` | 数据源(`afpacket` 实时 / `pcapgo` 离线)+ `reassembly` TCP 重组 + 会话密钥管理，输出 `Message` |
+| `gcp` | GCP 分帧(`Deframe`)、密钥提取(`ExtractKey`)、AES 解密(`DecryptData`)、明文自检(`ValidPlain`)、opcode 提取 |
+| `capture` | 数据源(`afpacket` 实时 / `pcapgo` 离线)+ `reassembly` TCP 重组 + 会话密钥管理(可选 `KeyStore` 持久化，见 §3)，输出 `Message` |
 | `pb` | 游戏描述符 `nrc/all.pb` 生成的宠物消息结构(生成物) |
 | `pet` | `ParsePetListRsp` 解析宠物列表；`ToPet` 转中文化业务模型；`ParseLoginAccount` 取登录 user_id/昵称 |
 | `gamedata` | embed 的 id→中文名 查找库 |
-| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件 + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图 |
+| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件 + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源 |
 
 `cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
@@ -49,6 +49,14 @@
   `ReassembledSG`，用 `sg.Info()` 的方向 + 触发包端口映射为 c2s/s2c。
 - **会话密钥共享**：c2s/s2c 两个半连接归一化为同一 `session`，ACK(下行)提取的密钥
   供同会话的 DATA 解密。
+- **会话密钥持久化(重启续解)**：密钥仅在连接建立时的 `0x1002 ACK` 明文下发一次;抓包
+  服务若在密钥协商之后才启动/重启,拿不到密钥则整条连接的 DATA 全被当无密钥丢弃。
+  为此 `Engine.Keys`(可选 `KeyStore`,由 `store` 实现)把 `connID→密钥` 落库:连接首次
+  出现时预热密钥、收到 ACK 时落盘;`consume` 同步持久化 `connID→account` 归属并在启动时
+  预热。因 AES-CBC 每个 DATA 包自带 IV(或固定零 IV)、解密无跨包状态,只要密钥在手,重启后
+  从流中段接上的 DATA 即可独立解密并归属。**防误用**:四元组被新连接复用时可能套到陈旧
+  缓存密钥,故解密后用 `gcp.ValidPlain` 校验 s2c 明文固定标记 `0x55aa`,不符即丢弃(新连接
+  的 ACK 会重下发正确密钥覆盖);缓存另设 `store.SessionTTL`(24h)兜底过期。
 - **实时 vs 离线**：二者共用 `process()`；`afpacket` 无需 libpcap(纯 AF_PACKET)。
 
 ## 4. 事件判定
@@ -76,7 +84,10 @@
   `account=?`——漏传即编译错误。复合主键使同一 `gid` 可在不同账号并存,互不覆盖。
 - **实时/接口**:SSE 每条广播带 `account` 字段(调试消息为空);前端各页按当前账号过滤
   (调试页不过滤,并显示来源账号)。REST 用 `?account=` 选账号(缺省回退最近活跃)。
-- **已知限制**:必须抓到某连接的 `LOGIN_RSP` 才能归属它(中途接入抓包会漏到该连接下次登录)。
+- **归属持久化**:`connID→account` 映射随 `sessions` 表落库(见 §3),抓包服务重启后预热恢复,
+  配合缓存的会话密钥即可对仍存活的连接续解并正确归属,无需再等下次登录。
+- **已知限制**:首次仍必须抓到某连接的 `LOGIN_RSP` 才能建立归属(从未见过登录、且无缓存的
+  连接,其消息直接丢弃,不回退 IP)。
 
 ## 6. HTTP 接口
 

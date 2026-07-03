@@ -37,6 +37,7 @@ func main() {
 	hub := server.NewHub()
 	srv := server.New(st, hub, db)
 	eng := capture.NewEngine(*port)
+	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 
 	go consume(eng, st, db, srv)
 
@@ -82,7 +83,11 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	// connAccount: GCP 连接(connID)→账号("UID:"+user_id)。同一客户端 IP 可能同时跑多个
 	// 账号(不同设备经 NAT 同 IP、或不同游戏服),故按 user_id 而非 IP 归属:抓到某连接的
 	// LOGIN_RSP 时解析 user_id 建映射。登录回包自身也带背包/队伍/奖牌快照,须先登记再归属。
+	// 从库中预热已知映射:配合会话密钥缓存,抓包服务重启后无需再等登录回包即可归属消息。
 	connAccount := map[string]string{}
+	if saved, err := st.LoadSessionAccounts(); err == nil {
+		connAccount = saved
+	}
 
 	for m := range eng.Out {
 		// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面 resolve acc 之前)。
@@ -93,8 +98,9 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				if nick == "" {
 					nick = "?"
 				}
-				if connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志
+				if connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志并落盘映射
 					log.Printf("用户 %s (UID:%d) 登录成功 [%s]", nick, id, m.Session)
+					st.SaveSessionAccount(m.Session, acc)
 				}
 				connAccount[m.Session] = acc
 				if name == "" {

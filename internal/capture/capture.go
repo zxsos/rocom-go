@@ -35,10 +35,18 @@ type session struct {
 func (s *session) setKey(k []byte) { s.mu.Lock(); s.key = k; s.mu.Unlock() }
 func (s *session) getKey() []byte  { s.mu.Lock(); defer s.mu.Unlock(); return s.key }
 
+// KeyStore 持久化连接会话密钥,供抓包服务重启后继续解密仍存活的连接。
+// 由 store.Store 实现;Engine.Keys 为 nil 时退化为纯内存(重启即丢密钥)。
+type KeyStore interface {
+	LoadKey(connID string) ([]byte, bool) // 连接首次出现时预热;无/过期返回 false
+	SaveKey(connID string, key []byte)    // 收到 ACK 提取到密钥时落盘
+}
+
 // Engine 是抓包解析引擎。
 type Engine struct {
 	Port int
 	Out  chan Message
+	Keys KeyStore // 可选:会话密钥持久化(见 KeyStore)
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -65,6 +73,12 @@ func (e *Engine) getSession(id string) *session {
 	s := e.sessions[id]
 	if s == nil {
 		s = &session{}
+		if e.Keys != nil {
+			if k, ok := e.Keys.LoadKey(id); ok {
+				s.key = k
+				log.Printf("从缓存恢复会话密钥 [%s]", id)
+			}
+		}
 		e.sessions[id] = s
 	}
 	return s
@@ -181,6 +195,9 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 					log.Printf("会话密钥就绪 [%s]", s.connID)
 				}
 				s.sess.setKey(k)
+				if s.e.Keys != nil {
+					s.e.Keys.SaveKey(s.connID, k)
+				}
 			}
 		case gcp.CmdData:
 			key := s.sess.getKey()
@@ -190,6 +207,11 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 			}
 			plain, err := gcp.DecryptData(key, p.Body)
 			if err != nil {
+				continue
+			}
+			// 校验明文结构:密钥错误(如四元组被新连接复用套用了陈旧缓存密钥)时
+			// 解出乱码,丢弃不上抛;正确的密钥会随该新连接的 ACK 重新下发并覆盖。
+			if !gcp.ValidPlain(dir, plain) {
 				continue
 			}
 			op, ok := gcp.AppOpcode(dir, plain)
