@@ -194,3 +194,20 @@ tooltip 样式为 `99.67% (xx.x-xx.x)`，身高体重本身不需要特殊样式
 编号 9542 的机幕方舟在游戏内的进化链为 钨丝贝贝(348) -> 辉光幕机(349) -> 机幕方舟(350)
 编号 18481 的凡鹰在游戏内的进化链为 凡雀(351) -> 紫翎鹰(352) -> 凡鹰(353)
 ```
+
+### 2026-07-03-cache-keys-for-session-reconnect
+```md
+实时事件页面仅关注获得宠物的事件，且每次清空后从 1 开始计数，方便统计一共抓了多少个宠物
+不需要保留失去事件，直接清理相关代码
+connAccount 记录方式从 `"role:"+user_id"` 改为 `"UID:"+user_id"`
+
+能否按 tcp 连接缓存会话密钥，使得游戏持续进行，抓包服务异常重启后能继续解析
+复用现有 sqlite 进行实现
+更新会话密钥缓存逻辑到相关文档；go mod tidy 整理相关依赖；修复 npm install 报的 vulnerabilities
+日志中提示了从缓存恢复会话密钥，但在游戏内捕捉宠物未能在服务日志中看到
+`ssh gateway "tcpdump -i eth0 -s0 -U -w - 'tcp port 8195 and host not 10.0.3.254'" | ./rocom-capture -pcap /dev/stdin` 调整命令，既留存一份 pcap 文件用于后续验证，又实时验证新的 rocom-capture
+
+两段抓包分别得到：
+./pcap/rocom-20260704-032326.pcap，正常登录游戏，查看宠物盒子
+./pcap/rocom-20260704-032449.pcap，手动 Ctrl+C 断开 tcpdump 后重新启动，在游戏内成功捕捉两个宠物
+```
