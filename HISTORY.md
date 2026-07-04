@@ -226,3 +226,44 @@ connAccount 记录方式从 `"role:"+user_id"` 改为 `"UID:"+user_id"`
 调试页面支持忽略事件，默认忽略高频的 ZONE_SCENE_SET_NPC_POS_REQ ZONE_SCENE_SET_NPC_POS_RSP 和 ZONE_SCENE_PLAY_ACTS_NOTIFY
 当前打开网页后，无论是否打开调试页面都会持续通过 /api/stream 接口拉取数据，且暂停按钮只是前端暂停。修改为打开调试页面后才拉取数据，且仅拉取当前账号相关数据
 ```
+
+### 2026-07-04-update-unpack-data-and-icons
+```md
+近期游戏更新了小版本，新的解包数据已下载至 ~/Downloads/NRC，检查并更新仓库内相关文件
+从 ~/Downloads/NRC/Content/ScriptC/Data/Bin/BinDataCompressed/PET_FILTER_CONF.bytes 中能否解出部分图标路径，并在解包数据中找到对应图标，将相关的图标加入当前仓库
+Frames 目录下是一堆 uasset，FModel 的 Save Texture 选项置灰，只能 Export Raw Data (.uasset) 或者 Save Properties (.json)
+已从 FModel 导出 json 到 .uasset 相同目录
+
+同理，从 ~/Downloads/NRC/Content/ScriptC/Data/Bin/BinDataCompressed/PET_BLOOD_CONF.bytes 中解出相关图标路径，并找到对应图标加入当前仓库
+仅关注 Common/Icon/XueMai/ 下的血脉主图标即可，已从 FModel 导出 json 到 .uasset 相同目录
+
+将 Common/CommonStatic/Frames 下所有图片解到一个临时目录，我来检查有没有其他会用到的图标一同保存
+img_collect_png.png 搭档标记外框
+img_emeng_png.png 污染图标
+img_yisetubian_png.png 异色图标
+img_bolitubian_png.png 炫彩图标
+img_yisexuancai_png.png 异色炫彩图标
+
+清理尚未保存的 ./internal/gamedata/data 和 ./nrc，从头整理一遍解包数据需求，总结出需要的目录和导出格式
+我会使用 FModel 导出一份干净的数据源从头进行处理，最终数据加入到当前仓库时保持原始解包数据文件名称
+整理合并尚未提交的生成脚本，顺便补充从 ~/Downloads/NRC/Content/ScriptC/Data/Bin/BinDataCompressed/MEDAL_CONF.bytes 中解析出的奖牌 BagItem 小图路径
+已删除并重新导出解包数据到 ~/Downloads/NRC，修改脚本，切换到保持原始解包文件名，生成结果分目录存储
+./scripts/gen_icons.py 中不需要保留历史说明，以下解包目录及导出格式整理到 README.md
+
+Export Raw Data:
+Content/ScriptC/Data/Bin/
+Content/ScriptC/Data/PB/
+
+Save Texture:
+Content/NewRoco/Modules/System/Common/Icon/BagItem/
+Content/NewRoco/Modules/System/Common/Icon/HeadIcon/
+Content/NewRoco/Modules/System/Common/Icon/BigHeadIcon256/
+Content/NewRoco/Modules/System/Common/Icon/Pet256/
+Content/NewRoco/Modules/System/Common/Icon/Pet1024/
+
+Export Raw Data + Save Texture + Save Properties:
+Content/NewRoco/Modules/System/Common/CommonStatic/
+Content/NewRoco/Modules/System/Common/Icon/Species/
+Content/NewRoco/Modules/System/Common/Icon/XueMai/
+Content/NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI/
+```
