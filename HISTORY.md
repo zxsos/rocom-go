@@ -211,3 +211,18 @@ connAccount 记录方式从 `"role:"+user_id"` 改为 `"UID:"+user_id"`
 ./pcap/rocom-20260704-032326.pcap，正常登录游戏，查看宠物盒子
 ./pcap/rocom-20260704-032449.pcap，手动 Ctrl+C 断开 tcpdump 后重新启动，在游戏内成功捕捉两个宠物
 ```
+
+### 2026-07-04-optimize-events-and-debug-page
+```md
+移动端浏览器由于屏幕宽度限制，部分信息在展示时自动换行，导致查看体验不佳，实际效果可参考以下截屏。
+对应的手机屏幕像素约 408x884，参照这个标准来调整展示布局，或隐藏部分信息，进一步优化展示效果：
+~/Downloads/Screenshot_20260704-142226.png 宠物列表
+~/Downloads/Screenshot_20260704-142532.png 实时事件
+
+实时事件页面能否通过浏览器 API 阻挡设备睡眠或熄屏
+增加屏幕常量开关，后端增加自签 TLS 证书选项
+抓包得到 ./pcap/rocom-20260704-212350.pcap00，用户登录游戏后，成功捕捉到一只护主犬 20960，可以在宠物列表末尾看到该宠物，但盒子位置示意无法显示
+
+调试页面支持忽略事件，默认忽略高频的 ZONE_SCENE_SET_NPC_POS_REQ ZONE_SCENE_SET_NPC_POS_RSP 和 ZONE_SCENE_PLAY_ACTS_NOTIFY
+当前打开网页后，无论是否打开调试页面都会持续通过 /api/stream 接口拉取数据，且暂停按钮只是前端暂停。修改为打开调试页面后才拉取数据，且仅拉取当前账号相关数据
+```
