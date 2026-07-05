@@ -1,38 +1,72 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { IconsContext } from '../App'
 
 const imgURL = (path) => '/img/' + path
 
-// boxLabel 把盒子位置渲染为 "13-性格1 第5排第2格"(每盒 5 排 × 6 格,slot 从 0 起)。
+// InlineIcon 渲染文字前的小图标(系别/六维/血脉等);无路径或加载失败则不占位(留文字)。
+export function InlineIcon({ src, className = 'inline-ic', alt = '' }) {
+  const [bad, setBad] = React.useState(false)
+  React.useEffect(() => setBad(false), [src])
+  if (!src || bad) return null
+  return <img className={className} src={imgURL(src)} alt={alt} loading="lazy" onError={() => setBad(true)} />
+}
+
+// StatIcon 按六维键(hp/attack/…)从 IconsContext 取对应属性小图。
+export function StatIcon({ statKey, className = 'stat-ic' }) {
+  const icons = React.useContext(IconsContext)
+  return <InlineIcon src={icons.stat && icons.stat[statKey]} className={className} alt="" />
+}
+
+// boxLabel 把盒子位置渲染为 "13-性格1 5-2"(排-格,每盒 5 排 × 6 格,slot 从 0 起)。
 export function boxLabel(box) {
   if (!box) return '-'
   const name = box.boxName || `盒${box.boxId}`
   const row = Math.floor(box.slot / 6) + 1
   const col = (box.slot % 6) + 1
-  return `${box.boxId}-${name} 第${row}排第${col}格`
+  return `${box.boxId}-${name} ${row}-${col}`
 }
 
-// teamLabel 把队伍位置渲染为 "第3队第2位"(teamIdx/pos 从 0 起)。
+// teamLabel 把队伍位置渲染为 "3-2"(队-位,teamIdx/pos 从 0 起)。
 export function teamLabel(team) {
   if (!team) return '-'
-  return `第${team.teamIdx + 1}队第${team.pos + 1}位`
+  return `${team.teamIdx + 1}-${team.pos + 1}`
 }
 
-// locText 返回宠物的位置文本:在盒显示盒位,在大世界队伍显示队位,否则 '-'。
+// locText 返回宠物位置的【完整描述】(详情页用,保留「第X排第Y格 / 第X队第Y位」);
+// 列表用短式见 boxLabel/teamLabel。
 export function locText(pet) {
-  if (pet.box) return boxLabel(pet.box)
-  if (pet.team) return '大世界 ' + teamLabel(pet.team)
+  if (pet.box) {
+    const b = pet.box
+    const name = b.boxName || `盒${b.boxId}`
+    return `${b.boxId}-${name} 第${Math.floor(b.slot / 6) + 1}排第${b.slot % 6 + 1}格`
+  }
+  if (pet.team) return `大世界 第${pet.team.teamIdx + 1}队第${pet.team.pos + 1}位`
   return '-'
 }
 
-// Avatar 渲染宠物小头像(列表/事件用);无图(未上线/缺源)或无 pet 回退 emoji。
+// PetMark 渲染搭档标记徽章(橙色外框底 img_collect + 白色标记符号),叠在头像左上角;
+// 无标记(值 0=无)或缺符号图时不渲染。
+export function PetMark({ p }) {
+  const icons = React.useContext(IconsContext)
+  if (!p || !p.partnerMarkIcon || p.partnerMark === '无') return null
+  return (
+    <span className="pet-mark" title={p.partnerMark}>
+      {icons.partnerFrame && <img className="pet-mark-frame" src={imgURL(icons.partnerFrame)} alt="" />}
+      <img className="pet-mark-ic" src={imgURL(p.partnerMarkIcon)} alt={p.partnerMark} />
+    </span>
+  )
+}
+
+// Avatar 渲染宠物小头像(列表/事件用);无图(未上线/缺源)或无 pet 回退 emoji;
+// 有搭档标记时在左上角叠加徽章。
 export function Avatar({ p, className = 'pet-avatar' }) {
   const [bad, setBad] = React.useState(false)
   const src = p && p.image && p.image.head
-  if (src && !bad) {
-    return <img className={className} src={imgURL(src)} alt={p.species} loading="lazy" onError={() => setBad(true)} />
-  }
-  return <div className={className}>{p && p.shiny ? '✨' : '🐾'}</div>
+  const inner = (src && !bad)
+    ? <img className={className} src={imgURL(src)} alt={p.species} loading="lazy" onError={() => setBad(true)} />
+    : <div className={className}>{p && p.shiny ? '✨' : '🐾'}</div>
+  return <span className="avatar-wrap">{inner}<PetMark p={p} /></span>
 }
 
 // Portrait 渲染宠物全身图(详情用,优先 Pet256 全身缩略,退大头像);无图回退 emoji。
@@ -49,15 +83,36 @@ export function Portrait({ p }) {
   )
 }
 
-// Types 渲染系别色块。
-export function Types({ types }) {
+// Types 渲染系别(icons 与 types 一一对应,前置属性小图);plain=去掉色块背景,仅图标+文字。
+export function Types({ types, icons, plain }) {
+  const list = types || []
+  const cls = plain ? 'type type-plain' : 'type'
   return (
     <>
-      {(types || []).map((t, i) => (
-        <span key={i} className="type" data-t={t}>{t}</span>
+      {list.map((t, i) => (
+        <span key={i} className={cls} data-t={t}>
+          <InlineIcon src={icons && icons[i]} className="type-ic" alt="" />{t}
+        </span>
       ))}
-      {(!types || types.length === 0) && <span className="muted">-</span>}
+      {list.length === 0 && <span className="muted">-</span>}
     </>
+  )
+}
+
+// MedalTag 渲染奖牌图标(仅图标,名称落到 hover title);无奖牌显示 '-',缺图退回名称文字。
+export function MedalTag({ icon, name }) {
+  if (!name) return <span className="muted">-</span>
+  if (!icon) return <span title={name}>{name}</span>
+  return <span className="medal-inline" title={name}><InlineIcon src={icon} className="medal-ic" alt={name} /></span>
+}
+
+// Blood 渲染血脉(主图标 + 中文短名);iconOnly=仅图标(列表用,名称落到 title)。
+export function Blood({ p, iconOnly }) {
+  if (!p || !p.blood) return null
+  return (
+    <span className="blood" title={'血脉 ' + p.blood}>
+      <InlineIcon src={p.bloodIcon} className="blood-ic" alt={p.blood} />{!iconOnly && p.blood}
+    </span>
   )
 }
 
@@ -70,7 +125,7 @@ const SIX = [
   ['魔防', 'spDefense'],
 ]
 
-// Six 渲染六维(性格 ±10% 升降箭头 + 天分等级 +N)。
+// Six 渲染六维(纯文字:标签 + 面板值 + 性格 ±10% 升降箭头 + 天分 +N)。列表用。
 export function Six({ p }) {
   return (
     <div className="six">
@@ -81,7 +136,62 @@ export function Six({ p }) {
             {label} <b>{s.value ?? 0}</b>
             {s.nature === 1 && <span className="up" title="性格 +10%"> ↑</span>}
             {s.nature === -1 && <span className="down" title="性格 -10%"> ↓</span>}
-            {s.talentLv > 0 && <span className="talent" title="天分等级">+{s.talentLv}</span>}
+            {s.talentLv > 0 && <span className="talent" title="天分">+{s.talentLv}</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// 雷达图六轴顺序(顺时针自顶点):生命→魔攻→魔防→速度→物防→物攻,与游戏内六维雷达一致。
+const RADAR_AXES = ['hp', 'spAttack', 'spDefense', 'speed', 'defense', 'attack']
+// 绝对刻度:外环对应的面板值上限(与游戏一致,按截图比例定标 219≈44%);超出者夹到外环。
+const RADAR_MAX = 500
+
+// NatBadge 右上角性格增减角标:SVG 实心粗箭头(箭头 + 矩形柄,同游戏内,无圆底),
+// 绿=增益向上、红=减益向下。
+function NatBadge({ dir }) {
+  const up = dir === 1
+  return (
+    <span className={'radar-nat ' + (up ? 'up' : 'down')} title={up ? '性格 +10%' : '性格 -10%'}>
+      <svg viewBox="0 0 12 14" aria-hidden="true">
+        <path d={up ? 'M6 0L12 6H8.5V14H3.5V6H0Z' : 'M6 14L12 8H8.5V0H3.5V8H0Z'} />
+      </svg>
+    </span>
+  )
+}
+
+// StatRadar 以六边形雷达图展示六维(仅图标,不显示中文标签):各顶点=属性图标 + 面板值
+// (含性格 ±10% 箭头 / 天分 +N);橙色多边形按绝对刻度(RADAR_MAX)定标,越强多边形越大。详情页用。
+export function StatRadar({ p }) {
+  const icons = React.useContext(IconsContext)
+  const stats = RADAR_AXES.map((k) => p[k] || {})
+  const vals = stats.map((s) => s.value ?? 0)
+  const size = 280, c = size / 2, R = 84, labelR = 108
+  const pt = (i, r) => {
+    const a = (-90 + i * 60) * Math.PI / 180
+    return [c + r * Math.cos(a), c + r * Math.sin(a)]
+  }
+  const poly = (r) => RADAR_AXES.map((_, i) => pt(i, r).join(',')).join(' ')
+  const dataPoly = vals.map((v, i) => pt(i, R * Math.min(1, v / RADAR_MAX)).join(',')).join(' ')
+  return (
+    <div className="radar">
+      <svg className="radar-svg" viewBox={`0 0 ${size} ${size}`}>
+        {[0.25, 0.5, 0.75, 1].map((rr, i) => <polygon key={i} className="radar-ring" points={poly(R * rr)} />)}
+        {RADAR_AXES.map((_, i) => { const [x, y] = pt(i, R); return <line key={i} className="radar-spoke" x1={c} y1={c} x2={x} y2={y} /> })}
+        <polygon className="radar-area" points={dataPoly} />
+      </svg>
+      {RADAR_AXES.map((key, i) => {
+        const s = stats[i]
+        const [x, y] = pt(i, labelR)
+        const talented = s.talentLv > 0
+        return (
+          <div key={key} className="radar-label" style={{ left: (x / size * 100) + '%', top: (y / size * 100) + '%' }}>
+            <InlineIcon src={icons.stat && icons.stat[key]} className="radar-ic" alt="" />
+            <b className={talented ? 'has-talent' : undefined} title={talented ? `天分 +${s.talentLv}` : undefined}>{s.value ?? 0}</b>
+            {s.nature === 1 && <NatBadge dir={1} />}
+            {s.nature === -1 && <NatBadge dir={-1} />}
           </div>
         )
       })}
@@ -156,13 +266,27 @@ export function ImgAvatar({ src, alt = '', className = 'pet-avatar' }) {
   return <div className={className}>🐾</div>
 }
 
-// Marks 渲染异色/炫彩标记。
+// MarkIcon 渲染单个异色/炫彩标记图;无图或加载失败退化为原文字徽标(异/彩)。
+function MarkIcon({ src, title, fallback, cls }) {
+  const [bad, setBad] = React.useState(false)
+  React.useEffect(() => setBad(false), [src])
+  if (src && !bad) {
+    return <img className="mark-img" src={imgURL(src)} alt={title} title={title} onError={() => setBad(true)} />
+  }
+  return <span className={'mark ' + cls} title={title}>{fallback}</span>
+}
+
+// Marks 渲染异色/炫彩标记(优先游戏图标;两者兼具用合成的异色炫彩图)。
 export function Marks({ p }) {
+  const icons = React.useContext(IconsContext)
   if (!p) return null
+  if (p.shiny && p.colorful && icons.shinyColorful) {
+    return <MarkIcon src={icons.shinyColorful} title="异色炫彩" fallback="异彩" cls="mark-colorful" />
+  }
   return (
     <>
-      {p.shiny && <span className="mark mark-shiny" title="异色">异</span>}
-      {p.colorful && <span className="mark mark-colorful" title="炫彩">彩</span>}
+      {p.shiny && <MarkIcon src={icons.shiny} title="异色" fallback="异" cls="mark-shiny" />}
+      {p.colorful && <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />}
     </>
   )
 }

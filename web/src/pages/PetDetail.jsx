@@ -2,12 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals, getEvolution } from '../api'
-import { Types, Marks, Gender, Form, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
-
-const SIX = [
-  ['生命', 'hp'], ['物攻', 'attack'], ['魔攻', 'spAttack'],
-  ['物防', 'defense'], ['魔防', 'spDefense'], ['速度', 'speed'],
-]
+import { Types, Marks, Gender, Form, Blood, StatRadar, InlineIcon, Portrait, ImgAvatar, StatRange, locText, fmtTime } from '../components/bits'
 
 // 路由页:直接访问 /pets/:gid 或从其他页跳转时,以弹窗形式呈现,关闭即返回上一页。
 export default function PetDetail() {
@@ -98,27 +93,11 @@ export function PetDetailModal({ gid, onClose }) {
         <div className="detail-body">
           <div className="rule-row">
             {pet.talentRank && <span className="pill">{pet.talentRank}</span>}
-            <Types types={pet.types} />
+            <Types types={pet.types} icons={pet.typeIcons} plain />
+            <Blood p={pet} />
           </div>
 
-          <div className="stats">
-            {SIX.map(([label, key]) => {
-              const s = pet[key] || {}
-              return (
-                <div className="stat" key={key}>
-                  <div className="n">
-                    {s.value ?? 0}
-                    {s.nature === 1 && <span className="up"> ↑</span>}
-                    {s.nature === -1 && <span className="down"> ↓</span>}
-                  </div>
-                  <div className="l">
-                    {label}
-                    {s.talentLv > 0 && <span className="talent"> +{s.talentLv}</span>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <StatRadar p={pet} />
 
           <div className="kv">
             <Item k="性格" v={pet.nature} />
@@ -126,7 +105,9 @@ export function PetDetailModal({ gid, onClose }) {
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
             <Item k="体重" v={<StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" />} />
             <Item k="声音" v={pet.voice} />
-            <Item k="标记" v={pet.partnerMark || '无'} />
+            <Item k="标记" v={pet.partnerMark && pet.partnerMark !== '无' && pet.partnerMarkIcon
+              ? <span title={pet.partnerMark}><InlineIcon src={pet.partnerMarkIcon} className="mark-detail-ic" alt={pet.partnerMark} /></span>
+              : '-'} />
             <Item k="位置" v={locText(pet)} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} />
             <Item k="异色" v={pet.shiny ? '是' : '否'} />
@@ -163,8 +144,8 @@ export function PetDetailModal({ gid, onClose }) {
                 <div className="muted" style={{ marginBottom: 6 }}>奖牌墙</div>
                 <div className="medals">
                   {owned.map((m) => (
-                    <div key={m.id} className="medal medal-tip" data-tip={m.desc || m.name}>
-                      🏅 {m.name}
+                    <div key={m.id} className="medal medal-tip" data-tip={m.name + (m.desc ? '：' + m.desc : '')}>
+                      {m.icon ? <InlineIcon src={m.icon} className="medal-ic" alt={m.name} /> : '🏅'}
                     </div>
                   ))}
                 </div>
@@ -173,12 +154,12 @@ export function PetDetailModal({ gid, onClose }) {
           })()}
 
           {pet.skillIds?.length > 0 && (
-            <div>
-              <div className="muted" style={{ marginBottom: 6 }}>技能</div>
+            <details className="skills">
+              <summary className="muted">技能（{pet.skillIds.length}）</summary>
               <div className="medals">
                 {pet.skillIds.map((id, i) => <div className="medal" key={i}>技能 #{id}</div>)}
               </div>
-            </div>
+            </details>
           )}
         </div>
       </div>

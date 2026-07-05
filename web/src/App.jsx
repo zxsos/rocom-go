@@ -1,6 +1,6 @@
 import React, { useEffect, useState, createContext } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { getAccounts, getCurrentAccount, setCurrentAccount } from './api'
+import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 
 const NAV = [
   { to: '/pets', label: '宠物列表', icon: '🐾' },
@@ -11,12 +11,19 @@ const NAV = [
 // AccountContext 提供当前选中账号(玩家 user_id key),供各页对 SSE 按账号过滤。
 export const AccountContext = createContext('')
 
+// IconsContext 提供全局固定图标(六维属性小图 + 异色/炫彩/污染标记图);App 启动拉一次。
+export const IconsContext = createContext({ stat: {} })
+
 // uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
 const uidOf = (acc) => (acc || '').replace(/^UID:/, '')
 
 export default function App() {
   const [accounts, setAccounts] = useState([])
   const [account, setAccount] = useState(getCurrentAccount())
+  const [icons, setIcons] = useState({ stat: {} })
+
+  // 全局固定图标只随游戏版本变,拉一次即可。
+  useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
 
   // 拉账号列表;当前无选中(或选中的已不存在)时默认选最近活跃的第一个。
   useEffect(() => {
@@ -45,6 +52,7 @@ export default function App() {
 
   return (
     <AccountContext.Provider value={account}>
+      <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar">
           <div className="brand">洛克助手 <span className="brand-sub">宠物统计</span></div>
@@ -82,6 +90,7 @@ export default function App() {
           ))}
         </nav>
       </div>
+      </IconsContext.Provider>
     </AccountContext.Provider>
   )
 }

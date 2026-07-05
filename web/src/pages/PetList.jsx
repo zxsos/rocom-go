@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe, ALL_TYPES } from '../api'
-import { AccountContext } from '../App'
-import { Types, Six, Marks, Gender, Form, Avatar, StatRange, boxLabel, teamLabel, fmtTime } from '../components/bits'
+import { AccountContext, IconsContext } from '../App'
+import { Types, Six, Marks, Gender, Form, Blood, MedalTag, Avatar, StatRange, InlineIcon, boxLabel, teamLabel, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 
 // 热门性格(筛选用)及其影响。其余归入"其他"。
@@ -27,6 +27,35 @@ const SORTS = [
   { key: 'catchTime', label: '捕捉时间' },
 ]
 
+// 极值高亮阈值:声音 |v|>=96(接近 ±100 极值);体重百分位 <=2% 或 >=98%(接近该形态上下限)。
+const voiceHot = (v) => Math.abs(v) >= 96
+const pctHot = (pct) => pct != null && (pct <= 2 || pct >= 98)
+
+// 捕捉时间区间选项(键存入 filter,查询时按本地时间实时算出 catch_time 下限,避免持久化的时间戳过期)。
+const CATCH_RANGES = [
+  ['', '全部'], ['h1', '最近一小时'], ['h6', '最近六小时'],
+  ['today', '今日'], ['week', '本周'], ['month', '本月'],
+]
+// catchAfterTs 把区间键转为 unix 秒下限(0=不限);今日/本周/本月按本地日历边界(周一为一周起点)。
+function catchAfterTs(range) {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const startOfDay = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return Math.floor(d.getTime() / 1000) }
+  switch (range) {
+    case 'h1': return nowSec - 3600
+    case 'h6': return nowSec - 6 * 3600
+    case 'today': return startOfDay()
+    case 'week': { const d = new Date(); const back = (d.getDay() + 6) % 7; d.setDate(d.getDate() - back); d.setHours(0, 0, 0, 0); return Math.floor(d.getTime() / 1000) }
+    case 'month': { const d = new Date(); const m = new Date(d.getFullYear(), d.getMonth(), 1); return Math.floor(m.getTime() / 1000) }
+    default: return 0
+  }
+}
+// withCatch 把 filter.catchRange 转成后端 catchAfter 时间戳(并从查询参数里去掉 catchRange)。
+function withCatch(f) {
+  const { catchRange, ...rest } = f
+  const ts = catchAfterTs(catchRange)
+  return ts > 0 ? { ...rest, catchAfter: ts } : rest
+}
+
 // 列表状态(筛选/排序/分页/滚动)用 sessionStorage 持久化,从详情返回时还原。
 const DEFAULT_FILTER = { page: 1, pageSize: 20, sort: 'boxpos', order: 'asc' }
 function loadFilter() {
@@ -39,6 +68,7 @@ function loadFilter() {
 
 export default function PetList() {
   const account = useContext(AccountContext)
+  const icons = useContext(IconsContext)
   const [filter, setFilter] = useState(loadFilter)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   const [data, setData] = useState({ total: 0, pets: [] })
@@ -56,7 +86,7 @@ export default function PetList() {
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
 
-  const load = useCallback(() => { getPets(filter).then(setData).catch(() => {}) }, [filter])
+  const load = useCallback(() => { getPets(withCatch(filter)).then(setData).catch(() => {}) }, [filter])
   const loadBoxes = useCallback(() => {
     getBoxes().then(setBoxes).catch(() => {})
     getTeams().then(setTeams).catch(() => {})
@@ -115,7 +145,7 @@ export default function PetList() {
       // 避免捕获旧 load 闭包,在 600ms 后把列表拉回切换前的页。
       clearTimeout(reloadRef.current)
       reloadRef.current = setTimeout(() => {
-        if (reloadRef.current) { getPets(filterRef.current).then(setData).catch(() => {}); loadBoxes() }
+        if (reloadRef.current) { getPets(withCatch(filterRef.current)).then(setData).catch(() => {}); loadBoxes() }
       }, 600)
     })
   }, [load, loadBoxes, account])
@@ -205,9 +235,9 @@ export default function PetList() {
   const arrow = (k) => (filter.sort === k ? (filter.order === 'asc' ? ' ▲' : ' ▼') : '')
   // 盒位/队位均缺失:多为刚捕捉、登录快照之后新增的宠物。游戏「打开盒子」不重传布局,
   // 位置要等下次登录 / 挪格 / 整理才会经流量落库,故此处标「位置待同步」而非留空。
-  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界${teamLabel(p.team)}` : ' · ⏳位置待同步')
-  // 移动卡片用的紧凑位置标签(队伍去掉「大世界/第」以免窄屏折行;盒子含空格可自然折行)
-  const boxTagShort = (p) => (p.box ? `📦${boxLabel(p.box)}` : p.team ? `🌍${p.team.teamIdx + 1}队${p.team.pos + 1}位` : '⏳位置待同步')
+  const boxTag = (p) => (p.box ? ` · 📦${boxLabel(p.box)}` : p.team ? ` · 🌍大世界 ${teamLabel(p.team)}` : ' · ⏳位置待同步')
+  // 移动卡片用的紧凑位置标签(队伍去掉「大世界」以免窄屏折行;盒子含空格可自然折行)
+  const boxTagShort = (p) => (p.box ? `📦${boxLabel(p.box)}` : p.team ? `🌍${teamLabel(p.team)}` : '⏳位置待同步')
 
   return (
     <div className="list-layout">
@@ -224,7 +254,9 @@ export default function PetList() {
           <label>系别</label>
           <div className="chips">
             {ALL_TYPES.map((t) => (
-              <span key={t} className={'chip' + ((filter.types || []).includes(t) ? ' on' : '')} onClick={() => toggleType(t)}>{t}</span>
+              <span key={t} className={'chip' + ((filter.types || []).includes(t) ? ' on' : '')} onClick={() => toggleType(t)}>
+                <InlineIcon src={icons.type && icons.type[t]} className="chip-ic" alt="" />{t}
+              </span>
             ))}
           </div>
         </div>
@@ -257,25 +289,34 @@ export default function PetList() {
         <Select label="天分" opts={options.talentRank} value={filter.talentRank} onChange={(v) => set({ talentRank: v })} />
         <Select label="特长" opts={options.speciality} value={filter.speciality} onChange={(v) => set({ speciality: v })} />
         <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
-        <Select label="形态" opts={options.form} value={filter.form} onChange={(v) => set({ form: v })} />
         <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
+          <label>捕捉时间</label>
+          <select className="select" value={filter.catchRange || ''} onChange={(e) => set({ catchRange: e.target.value })}>
+            {CATCH_RANGES.map(([v, lbl]) => <option key={v || 'all'} value={v}>{lbl}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
           <label>性别</label>
-          <select className="select" value={filter.gender || ''} onChange={(e) => set({ gender: e.target.value })}>
-            <option value="">全部</option><option value="♂">♂ 雄</option><option value="♀">♀ 雌</option>
-          </select>
+          <div className="radios">
+            {['', '♂', '♀'].map((v) => (
+              <label key={v || 'all'} className="radio">
+                <input type="radio" name="gender" checked={(filter.gender || '') === v} onChange={() => set({ gender: v })} />
+                {v ? <Gender g={v} /> : '全部'}
+              </label>
+            ))}
+          </div>
         </div>
         <div className="filter-group">
-          <label>异色</label>
-          <select className="select" value={filter.shiny || ''} onChange={(e) => set({ shiny: e.target.value })}>
-            <option value="">全部</option><option value="1">仅异色</option><option value="0">非异色</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>炫彩</label>
-          <select className="select" value={filter.colorful || ''} onChange={(e) => set({ colorful: e.target.value })}>
-            <option value="">全部</option><option value="1">仅炫彩</option><option value="0">非炫彩</option>
-          </select>
+          <label>变异</label>
+          <div className="checks">
+            <label className="check">
+              <input type="checkbox" checked={filter.shiny === '1'} onChange={(e) => set({ shiny: e.target.checked ? '1' : '' })} />异色
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={filter.colorful === '1'} onChange={(e) => set({ colorful: e.target.checked ? '1' : '' })} />炫彩
+            </label>
+          </div>
         </div>
       </aside>
 
@@ -297,7 +338,7 @@ export default function PetList() {
             <thead>
               <tr>
                 <th onClick={() => sortBy('gid')}>宠物{arrow('gid')}</th>
-                <th>系别</th><th>性格</th><th>特长</th><th>佩戴奖牌</th>
+                <th>系别</th><th>性格</th><th>特长</th><th className="medal-col">佩戴奖牌</th>
                 <th onClick={() => sortBy('voice')}>声音{arrow('voice')}</th>
                 <th onClick={() => sortBy('weight')}>体重{arrow('weight')}</th>
                 <th onClick={() => sortBy('height')}>身高{arrow('height')}</th>
@@ -312,17 +353,17 @@ export default function PetList() {
                     <div className="pet-cell">
                       <Avatar p={p} />
                       <div>
-                        <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Form form={p.form} /></div>
-                        <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · No.${p.book}` : ""}{boxTag(p)}</div>
+                        <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Blood p={p} iconOnly /> <Form form={p.form} /></div>
+                        <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · #${p.book}` : ""}{boxTag(p)}</div>
                       </div>
                     </div>
                   </td>
-                  <td><Types types={p.types} /></td>
+                  <td><Types types={p.types} icons={p.typeIcons} plain /></td>
                   <td>{p.nature || '-'}</td>
                   <td>{p.speciality || '无'}</td>
-                  <td>{p.medal || '-'}</td>
-                  <td>{p.voice}</td>
-                  <td><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
+                  <td className="medal-col"><MedalTag icon={p.medalIcon} name={p.medal} /></td>
+                  <td className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</td>
+                  <td className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
                   <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></td>
                   <td><Six p={p} /></td>
                   <td className="muted">{fmtTime(p.catchTime)}</td>
@@ -339,21 +380,21 @@ export default function PetList() {
               <div className="card-head">
                 <Avatar p={p} />
                 <div style={{ flex: 1 }}>
-                  <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Form form={p.form} /></div>
+                  <div className="pet-name">{p.name || p.species} <Gender g={p.gender} /> <Marks p={p} /> <Blood p={p} iconOnly /> <Form form={p.form} /></div>
                   <div className="pet-sub">
                     {p.species} · Lv.{p.level}
                     {boxTagShort(p) && <> · <span className="loc">{boxTagShort(p)}</span></>}
                   </div>
                 </div>
-                <Types types={p.types} />
+                <Types types={p.types} icons={p.typeIcons} plain />
               </div>
               <div className="card-grid">
                 <div>性格：{p.nature || '-'}</div>
                 <div>特长：{p.speciality || '无'}</div>
-                <div>奖牌：{p.medal || '-'}</div>
-                <div>体重：<StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></div>
+                <div className="medal-cell">奖牌：<MedalTag icon={p.medalIcon} name={p.medal} /></div>
+                <div>体重：<span className={pctHot(p.weightPct) ? 'val-hot' : undefined}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
                 <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
-                <div>声音：{p.voice}</div>
+                <div>声音：<span className={voiceHot(p.voice) ? 'val-hot' : undefined}>{p.voice}</span></div>
               </div>
               <Six p={p} />
             </div>
