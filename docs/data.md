@@ -178,7 +178,7 @@ s2c 0x1346 DATA 明文 body
 每项六维(`Stat`)含三部分：
 
 - **最终面板值**(`value`)：取自 `attribute_new_info`(已含等级/努力/奖牌加成)。
-- **天分等级**(`talentLv`)：取自 `attribute_info.*.talent_add_value`，即该维度的个体值 1–10
+- **天分**(`talentLv`)：取自 `attribute_info.*.talent_add_value`，即该维度的个体值 1–10
   (无天分则为 0)。宠物在 1–3 个维度上有天分。
 - **性格影响**(`nature`)：性格使一维 +10%、一维 −10%。增减维度由权威性格表(30 种，
   按性格名匹配，见 `gen_gamedata.py` 的 `NATURE_TABLE`)生成 `nature_effect`;若用道具
@@ -197,7 +197,7 @@ s2c 0x1346 DATA 明文 body
   本地化对彩蛋宠(PET_CONF)整体偏移一位(3011001 误为"恶魔叮",应为"恶魔狼"),
   累计 4787 个彩蛋宠名错误;经 FModel + 两个独立 world-data 源三方比对确认后改用自有解码;
 - **六维**：改用 `attribute_new_info` 最终面板值，火神 410/277/163/229/119/139 与截图完全一致；
-- **天分/性格**：`talent_add_value` 修正为天分等级(1–10)而非性格修正；性格 ±10% 维度
+- **天分/性格**：`talent_add_value` 修正为天分(1–10)而非性格修正；性格 ±10% 维度
   改由 `NATURE_CONF` 推导(火神固执=+物攻−魔攻),天分评级逻辑实测吻合；
 - **特长**：取 PET_TALENT_CONF 中 `filter_enum_value=PTFN_TALENT_*` 的 11 种固定特长
   (无/奇袭/亲密/灵巧/疾行/同乘/无畏/爱分享/家里蹲/热心教/慈悲为怀),id=502 按游戏

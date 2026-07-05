@@ -92,6 +92,27 @@ def id_icons(table, id_field, icon_field):
     return out
 
 
+def id_names(table, id_field, name_field):
+    """CONF 行 -> {str(id): 中文名}(与 id_icons 同键,供图标旁配名)。"""
+    out = {}
+    for r in rows(table).values():
+        i, n = r.get(id_field), r.get(name_field)
+        if i is not None and n:
+            out[str(int(i))] = n
+    return out
+
+
+# static 组图标:人工挑选的杂项精灵(与 gen_icons.py 的 STATIC 同一批文件),语义键 -> 原始文件名。
+# 非 CONF 派生,故就地登记;webp 保持原名(见 gen_icons.py),Go 侧拼 static/<原名>.webp。
+STATIC_ICONS = {
+    "shiny":          "img_yisetubian_png",   # 异色
+    "colorful":       "img_bolitubian_png",   # 炫彩
+    "shiny_colorful": "img_yisexuancai_png",  # 异色炫彩(两者兼具)
+    "pollution":      "img_emeng_png",        # 污染
+    "partner_frame":  "img_collect_png",      # 伙伴标记外框
+}
+
+
 # 种类名：常规宠物在 MONSTER_CONF，彩蛋/特殊宠物在 PET_CONF，两表 id 不重叠，合并取用。
 species = {k: v["name"] for k, v in rows("MONSTER_CONF.json").items() if v.get("name")}
 species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get("name")})
@@ -255,7 +276,10 @@ data = {
         "partner_mark": enum_icon("PetPartnerMarkType"),
     },
     "blood_icons": id_icons("PET_BLOOD_CONF.json", "blood", "icon"),
+    "blood_names": id_names("PET_BLOOD_CONF.json", "blood", "blood_name"),
     "medal_icons": id_icons("MEDAL_CONF.json", "id", "icon"),
+    # 杂项静态图标(异色/炫彩/污染/伙伴外框):语义键 -> 原名,Go 侧拼 static/<原名>.webp。
+    "static_icons": STATIC_ICONS,
     # 特长：仅取 PET_TALENT_CONF 里 filter_enum_value=PTFN_TALENT_* 的固定特长，
     # 避免误用非特长条目;id=502 的 name 为"勇敢"，游戏内显示为"无畏"。
     "speciality": {
