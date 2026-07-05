@@ -244,6 +244,18 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				}
 				p := pet.ToPet(pd, db)
 				isNew, _ := sc.UpsertPet(p)
+				// 获得新宠物的回包(战斗外捕捉/孵蛋等)常同时携带该宠物的盒位放置(box_pet_change);
+				// 据此落库盒位,否则新宠物在盒子示意图上缺位(仅列表末尾可见,位置标「待同步」)。
+				// 严格按本次新宠 gid 过滤:回包体内只有该宠物一条落位,借此排除 PetData 子结构被误解析。
+				var placed []pet.BoxEntry
+				for _, mv := range pet.ParseBoxMoves(m.AppBody) {
+					if mv.Gid == p.Gid {
+						placed = append(placed, mv)
+					}
+				}
+				if len(placed) > 0 {
+					sc.ApplyBoxMoves(placed)
+				}
 				srv.Hub().Broadcast("pet", acc, p)
 				if isNew {
 					ev := &store.Event{Time: m.Time.Unix(), SubKind: catchWayName(pd, acc), Gid: p.Gid, Pet: p}
