@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { getEvents, getEventCount, clearEvents, subscribe } from '../api'
-import { Types, Avatar, fmtTime } from '../components/bits'
+import { Types, Blood, MedalTag, Avatar, fmtTime } from '../components/bits'
 import { PetDetailModal } from './PetDetail'
 import { AccountContext } from '../App'
 
@@ -130,10 +130,10 @@ export default function Events() {
               <div className="event-row">
                 <span className="event-seq muted">#{total - i}</span>
                 <span className="badge obtain">{ev.subKind || '获得'}</span>
-                <span className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} /></span>
+                <span className="pet-name">{ev.pet?.name || ev.pet?.species} <Types types={ev.pet?.types} icons={ev.pet?.typeIcons} plain /> <Blood p={ev.pet} iconOnly /></span>
                 <span className="event-time muted">{fmtTime(ev.time)}</span>
               </div>
-              <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal || '无奖牌'}</div>
+              <div className="pet-sub">{ev.pet?.species} · Lv.{ev.pet?.level} · {ev.pet?.nature} · {ev.pet?.medal ? <MedalTag icon={ev.pet.medalIcon} name={ev.pet.medal} /> : '无奖牌'}</div>
             </div>
           </div>
         ))}

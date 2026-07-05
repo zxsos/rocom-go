@@ -68,13 +68,22 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim);
 }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pill { padding: 2px 8px; border-radius: 6px; background: var(--bg-3); font-size: 12px; }
+.pill { padding: 2px 8px; border-radius: 6px; background: #6c6c6c; font-size: 12px; }
 .muted { color: var(--fg-dim); }
+/* 极值高亮(声音 |v|>=96 / 体重百分位 <=2% 或 >=98%) */
+.val-hot { color: var(--gold); font-weight: 700; }
 
 /* ---- 系别色 ---- */
 .type {
-  display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 12px; color: #fff; margin: 0 2px 2px 0;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px 1px 4px; border-radius: 6px; font-size: 12px; color: #fff; margin: 0 2px 2px 0;
 }
+/* plain:列表/详情用,去掉色块背景,仅图标 + 文字(选择器带 [data-t] 压过 data-t 配色规则) */
+.type.type-plain, .type.type-plain[data-t] {
+  background: none; color: var(--fg); padding: 1px 2px 1px 0; border-radius: 0;
+}
+/* 系别属性小图 */
+.type-ic { width: 14px; height: 14px; object-fit: contain; }
 .type[data-t="火"]{background:#e2563b}.type[data-t="水"]{background:#3b8fe2}.type[data-t="草"]{background:#46b35a}
 .type[data-t="光"]{background:#e0c33a;color:#222}.type[data-t="地"]{background:#a9763e}.type[data-t="冰"]{background:#54bcd6}
 .type[data-t="龙"]{background:#6b58d6}.type[data-t="电"]{background:#d6b53a;color:#222}.type[data-t="毒"]{background:#9b4fc4}
@@ -111,6 +120,12 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .boxmap-hint { font-size: 12px; margin-top: 6px; }
 .filter-group > label { font-size: 12px; color: var(--fg-dim); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 系别筛选按钮内的属性小图 */
+.chip-ic { width: 15px; height: 15px; object-fit: contain; }
+/* 性别 radio 一行 / 变异 checkbox 一行 */
+.radios, .checks { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.radio, .check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 13px; }
+.radio input, .check input { cursor: pointer; margin: 0; }
 .range { display: flex; align-items: center; gap: 6px; }
 .range input { width: 64px; }
 
@@ -130,6 +145,13 @@ table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent);
 .pet-cell { display: flex; align-items: center; gap: 8px; }
 .pet-avatar { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-size: 16px; }
 img.pet-avatar { object-fit: cover; }
+/* 头像 + 左上角搭档标记徽章 */
+.avatar-wrap { position: relative; display: inline-flex; line-height: 0; flex: none; }
+.pet-mark { position: absolute; top: -5px; left: -6px; width: 20px; height: 20px; pointer-events: none; z-index: 1; }
+.pet-mark img { position: absolute; object-fit: contain; }
+.pet-mark-frame { top: 0; left: 0; width: 100%; height: 100%; }
+/* 白色标记符号居中叠在橙色外框上 */
+.pet-mark-ic { top: 50%; left: 50%; width: 58%; height: 58%; transform: translate(-50%, -50%); }
 .pet-name { font-weight: 600; }
 .gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
 .gender.male { color: #4ea3ff; }
@@ -141,9 +163,28 @@ img.pet-avatar { object-fit: cover; }
    改为定宽让「生命/物攻/物防」三列在所有行间对齐(84px 可容纳「生命 118 ↑+10」级最宽内容)。 */
 .six { display: grid; grid-template-columns: repeat(3, 84px); gap: 1px 10px; font-size: 12px; }
 .six b { color: var(--gold); }
+.six > div { display: flex; align-items: center; }
+/* 六维属性小图(六维栏、详情属性卡、系别外的通用行内图标) */
+.six-ic { width: 14px; height: 14px; object-fit: contain; margin-right: 2px; vertical-align: -2px; }
+.inline-ic { width: 15px; height: 15px; object-fit: contain; margin-right: 3px; vertical-align: -3px; }
+.stat-ic { width: 14px; height: 14px; object-fit: contain; margin-right: 2px; vertical-align: -2px; }
+/* 血脉(主图标 + 短名;无背景色) */
+.blood { display: inline-flex; align-items: center; gap: 2px; font-size: 11px;
+  margin-left: 4px; font-weight: 600; color: var(--fg); vertical-align: middle; }
+/* 血脉图标与异色/炫彩标记图统一大小(见 .mark-img) */
+.blood-ic { width: 18px; height: 18px; object-fit: contain; }
+/* 奖牌图标(列表/卡片/事件/详情奖牌墙:仅图标,适当增大) */
+.medal-inline { display: inline-flex; align-items: center; }
+/* 列表「佩戴奖牌」列表头与单元格居中 */
+.pets .medal-col { text-align: center; }
+.medal-ic { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
+.icon-text { display: inline-flex; align-items: center; }
 .up { color: var(--green); } .down { color: var(--red); }
 .talent { color: var(--gold); font-size: 11px; margin-left: 3px; font-weight: 600; }
-.mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; }
+/* 文字徽标(异/彩回退、形态):vertical-align middle 让形态徽标与左侧图标/文字高度对齐 */
+.mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; vertical-align: middle; }
+/* 异色/炫彩标记图(取代文字徽标;缺图时组件自动退回 .mark 文字),与血脉图标同大小 */
+.mark-img { width: 18px; height: 18px; object-fit: contain; margin-left: 4px; vertical-align: middle; }
 .mark-shiny { background: #3a2f6b; color: #c9b6ff; }
 .mark-colorful { background: #6b2f50; color: #ffb6e0; }
 .mark-form { background: #2f4a3a; color: #a8e6c0; font-weight: 500; }
@@ -226,6 +267,32 @@ img.evo-avatar { object-fit: cover; }
 .stat { background: var(--bg-2); border-radius: 10px; padding: 8px; text-align: center; }
 .stat .n { font-size: 18px; font-weight: 700; }
 .stat .l { font-size: 12px; color: var(--fg-dim); }
+/* 六维雷达图(详情):六边形栅格 + 橙色数据多边形,各顶点为属性图标 + 面板值胶囊 */
+.radar { position: relative; width: 100%; max-width: 280px; margin: 6px auto 2px; aspect-ratio: 1; }
+.radar-svg { width: 100%; height: 100%; overflow: visible; }
+.radar-ring { fill: none; stroke: var(--line); stroke-width: 1; }
+.radar-spoke { stroke: var(--line); stroke-width: 1; }
+.radar-area { fill: rgba(245, 185, 66, .3); stroke: var(--gold); stroke-width: 2; stroke-linejoin: round; }
+/* 定宽胶囊,六个顶点边缘对齐;性格箭头做右上角角标(绝对定位,不占宽度) */
+.radar-label {
+  position: absolute; transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;
+  width: 62px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 6px; font-size: 12px; line-height: 1;
+}
+.radar-label b { color: var(--fg); font-weight: 700; }
+/* 有天分加成的面板值高亮(具体天分见 title) */
+.radar-label b.has-talent { color: var(--gold); text-shadow: 0 0 6px rgba(245, 185, 66, .6); }
+.radar-nat {
+  position: absolute; top: -9px; right: -3px;
+  width: 11px; height: 13px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .55));
+}
+.radar-nat svg { width: 100%; height: 100%; display: block; }
+.radar-nat.up svg path { fill: var(--green); }
+.radar-nat.down svg path { fill: var(--red); }
+.radar-ic { width: 16px; height: 16px; object-fit: contain; }
 .medals { display: flex; flex-wrap: wrap; gap: 8px; }
 .medal { background: var(--bg-3); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
 /* hover tooltip 显示奖牌描述 */
@@ -241,6 +308,13 @@ img.evo-avatar { object-fit: cover; }
 }
 .medal-tip:hover::after { opacity: 1; }
 .medal-tip:hover { z-index: 51; }
+/* 详情奖牌墙内的奖牌图标适当增大(仅 .medals 容器内,不影响列表/事件的行内奖牌) */
+.medals .medal-ic { width: 40px; height: 40px; }
+/* 详情「标记」项:仅图标 */
+.mark-detail-ic { width: 20px; height: 20px; object-fit: contain; vertical-align: middle; }
+/* 技能列表默认折叠(<details>);summary 可点击展开 */
+.skills > summary { cursor: pointer; user-select: none; }
+.skills > .medals { margin-top: 6px; }
 
 /* 身高/体重范围 tooltip:由 StatRange 经 portal 渲染到 body、fixed 定位(避开 .table-wrap
    的 overflow 裁剪与常驻滚动条问题);值本身不加特殊样式,定位由 JS 计算(默认上方/自动翻转)。 */
