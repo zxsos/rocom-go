@@ -84,7 +84,9 @@ type DB struct {
 	// UI 图标索引: 语义键 -> 图标原始文件名(webp 保持原名),Go 侧拼 <组>/<原名>.webp。
 	filterIcons map[string]map[string]string // 组名 -> {枚举整数值: 原名}(filter/)
 	bloodIcons  map[string]string            // 血脉id -> 原名(blood/)
+	bloodNames  map[string]string            // 血脉id -> 中文短名(普通/草/火…)
 	medalIcons  map[string]string            // 奖牌id -> 原名(medal/)
+	staticIcons map[string]string            // 语义键 -> 原名(static/:异色/炫彩/污染等)
 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
@@ -107,7 +109,9 @@ func Load() (*DB, error) {
 		NatureEffect map[string]NatureEffect      `json:"nature_effect"`
 		FilterIcons  map[string]map[string]string `json:"filter_icons"`
 		BloodIcons   map[string]string            `json:"blood_icons"`
+		BloodNames   map[string]string            `json:"blood_names"`
 		MedalIcons   map[string]string            `json:"medal_icons"`
+		StaticIcons  map[string]string            `json:"static_icons"`
 		Images       map[string]imageEntry        `json:"images"`
 		ImageBase    map[string]uint32            `json:"image_base"`
 		Petbase      map[string]struct {
@@ -170,7 +174,9 @@ func Load() (*DB, error) {
 		natureEffect: raw.NatureEffect,
 		filterIcons:  raw.FilterIcons,
 		bloodIcons:   raw.BloodIcons,
+		bloodNames:   raw.BloodNames,
 		medalIcons:   raw.MedalIcons,
+		staticIcons:  raw.StaticIcons,
 		images:       raw.Images,
 		imageBase:    imageBase,
 		petbase:      petbase,
@@ -305,6 +311,19 @@ func (db *DB) filterIcon(group string, v int32) string {
 // SkillDamTypeIcon 返回系别(属性)图标路径(SkillDamType enum 整数值)。
 func (db *DB) SkillDamTypeIcon(v int32) string { return db.filterIcon("skill_dam_type", v) }
 
+// SkillDamTypeIcons 返回系别中文名 -> 图标路径(供前端系别筛选按钮显示图标)。
+func (db *DB) SkillDamTypeIcons() map[string]string {
+	out := make(map[string]string, len(db.skillDamType))
+	for k, name := range db.skillDamType {
+		if v, err := strconv.ParseInt(k, 10, 32); err == nil {
+			if p := db.SkillDamTypeIcon(int32(v)); p != "" {
+				out[name] = p
+			}
+		}
+	}
+	return out
+}
+
 // AttributeTypeIcon 返回六维属性图标路径(AttributeType enum 整数值;1-6 即六维编号,
 // 79-84 为对应增益类)。
 func (db *DB) AttributeTypeIcon(v int32) string { return db.filterIcon("attribute_type", v) }
@@ -316,6 +335,13 @@ func (db *DB) PartnerMarkIcon(v int32) string { return db.filterIcon("partner_ma
 func (db *DB) BloodIcon(bloodID uint32) string {
 	return db.iconPath("blood", db.bloodIcons[key(bloodID)])
 }
+
+// BloodName 返回血脉中文短名(普通/草/火…;PET_BLOOD_CONF.blood_name)。
+func (db *DB) BloodName(bloodID uint32) string { return db.bloodNames[key(bloodID)] }
+
+// StaticIcon 返回杂项静态图标路径 static/<原名>.webp(语义键:shiny/colorful/shiny_colorful/
+// pollution/partner_frame);未知键或未 embed 时空串。
+func (db *DB) StaticIcon(sem string) string { return db.iconPath("static", db.staticIcons[sem]) }
 
 // MedalIcon 返回奖牌小图路径 medal/<原名>.webp(MEDAL_CONF.id → icon(BagItem));无图或未 embed 时空串。
 func (db *DB) MedalIcon(medalID uint32) string {
@@ -339,6 +365,7 @@ type MedalEntry struct {
 	ID   uint32 `json:"id"`
 	Name string `json:"name"`
 	Desc string `json:"desc"`
+	Icon string `json:"icon,omitempty"` // medal/<原名>.webp(无图或未 embed 时空)
 }
 
 // AllMedals 返回全部奖牌,按 id 升序(供前端奖牌墙展示全部奖牌)。
@@ -346,7 +373,7 @@ func (db *DB) AllMedals() []MedalEntry {
 	out := make([]MedalEntry, 0, len(db.medal))
 	for k, v := range db.medal {
 		id, _ := strconv.ParseUint(k, 10, 32)
-		out = append(out, MedalEntry{ID: uint32(id), Name: v.Name, Desc: v.Desc})
+		out = append(out, MedalEntry{ID: uint32(id), Name: v.Name, Desc: v.Desc, Icon: db.MedalIcon(uint32(id))})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
