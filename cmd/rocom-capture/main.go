@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 func main() {
 	pcapPath := flag.String("pcap", "", "离线 pcap 文件路径(回放模式)")
 	iface := flag.String("iface", "", "实时抓包网卡名")
+	ignoreIPs := flag.String("ignore-ip", "", "额外忽略的 IP(逗号分隔;两端命中即丢包)。实时抓包已自动忽略网卡自身 IP,此项用于离线回放或多网关等场景")
 	port := flag.Int("port", 8195, "游戏服务器端口")
 	addr := flag.String("addr", ":4939", "Web 服务监听地址")
 	dbPath := flag.String("db", "rocom.db", "SQLite 数据库路径")
@@ -42,6 +44,16 @@ func main() {
 	srv := server.New(st, hub, db)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
+	for s := range strings.SplitSeq(*ignoreIPs, ",") {
+		if s = strings.TrimSpace(s); s == "" {
+			continue
+		}
+		ip, err := netip.ParseAddr(s)
+		if err != nil {
+			log.Fatalf("-ignore-ip 无效地址 %q: %v", s, err)
+		}
+		eng.AddSkipIP(ip)
+	}
 
 	go consume(eng, st, db, srv)
 

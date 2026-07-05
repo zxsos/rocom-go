@@ -4,6 +4,7 @@ package capture
 
 import (
 	"log"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -81,6 +82,11 @@ type Engine struct {
 	sessions map[string]*session
 	noKey    int
 	badKey   int
+
+	// skipIPs:凡 src 或 dst 命中即整包丢弃。用于单臂网关去重——网关对转发流量做
+	// SNAT 后从同一网卡再发一次,该副本的客户端侧地址是网关本机 IP;忽略本机 IP 即只
+	// 保留 NAT 前的真实客户端会话,避免同一游戏流被解析两次(见 RunLive 自动填充)。
+	skipIPs map[netip.Addr]bool
 }
 
 // NewEngine 创建引擎，port 为游戏服务器端口(8195)。
@@ -89,8 +95,12 @@ func NewEngine(port int) *Engine {
 		Port:     port,
 		Out:      make(chan Message, 4096),
 		sessions: make(map[string]*session),
+		skipIPs:  make(map[netip.Addr]bool),
 	}
 }
+
+// AddSkipIP 登记一个需忽略的 IP(见 skipIPs)。非并发安全,须在 Run* 前调用。
+func (e *Engine) AddSkipIP(ip netip.Addr) { e.skipIPs[ip.Unmap()] = true }
 
 // NoKeyDropped 返回因尚无会话密钥而丢弃的 DATA 包数。
 func (e *Engine) NoKeyDropped() int { e.mu.Lock(); defer e.mu.Unlock(); return e.noKey }
@@ -161,6 +171,15 @@ func (e *Engine) process(src *gopacket.PacketSource) {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		if int(tcp.SrcPort) != e.Port && int(tcp.DstPort) != e.Port {
 			continue
+		}
+		if len(e.skipIPs) > 0 {
+			nf := netLayer.NetworkFlow()
+			if ip, ok := netip.AddrFromSlice(nf.Src().Raw()); ok && e.skipIPs[ip.Unmap()] {
+				continue // SNAT 后的重复副本(源为本机/网关 IP)
+			}
+			if ip, ok := netip.AddrFromSlice(nf.Dst().Raw()); ok && e.skipIPs[ip.Unmap()] {
+				continue
+			}
 		}
 		ci := pkt.Metadata().CaptureInfo
 		if ci.Timestamp.After(lastTS) {
