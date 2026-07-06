@@ -244,15 +244,18 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue
 		}
 
-		// 获得新宠物：孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)
-		// 都把新宠物嵌在子消息里。同一宠物可能经多个 opcode 下发，用 isNew 去重;获得方式由 catch_way 区分。
+		// 获得新宠物：孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)、
+		// 传说精灵战后捕捉(catch_way=5,仅经战斗结束通知下发)都把新宠物嵌在子消息里。同一宠物可能
+		// 经多个 opcode 下发(普通捕捉的 BATTLE_FINISH 与 GOODS_REWARD 重复),用 isNew 去重;获得方式由 catch_way 区分。
 		if m.Direction == gcp.S2C &&
 			(m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp ||
-				m.Opcode == pet.OpGoodsRewardNotify || m.Opcode == pet.OpPlayerSyncNotify) {
+				m.Opcode == pet.OpGoodsRewardNotify || m.Opcode == pet.OpPlayerSyncNotify ||
+				m.Opcode == pet.OpBattleFinishNotify) {
 			if pd := pet.FindNewPet(m.AppBody); pd != nil {
-				// PLAYER_SYNC_NOTIFY 是通用同步通道(理论上可能携带 PvP 对手/旧快照),
+				// PLAYER_SYNC_NOTIFY/BATTLE_FINISH_NOTIFY 是通用通知通道(理论上可能携带对手/旧快照),
 				// 额外用 add_time 时近性(相对本包时间)守卫，仅认刚捕获的宠物。
-				if m.Opcode == pet.OpPlayerSyncNotify && int64(pd.GetAddTime()) < m.Time.Unix()-grace {
+				if (m.Opcode == pet.OpPlayerSyncNotify || m.Opcode == pet.OpBattleFinishNotify) &&
+					int64(pd.GetAddTime()) < m.Time.Unix()-grace {
 					continue
 				}
 				p := pet.ToPet(pd, db)
@@ -353,8 +356,8 @@ func catchWayName(pd *pb.PetData, acc string) string {
 		}
 	}
 	switch pd.GetCatchWay() {
-	case 1, 4:
-		return "捕捉" // 1=普通/战斗外捕捉, 4=花种(稀兽)战斗内捕捉
+	case 1, 4, 5:
+		return "捕捉" // 1=普通/战斗外捕捉, 4=花种(稀兽)战斗内捕捉, 5=传说精灵战后(耗体力)捕捉
 	case 3:
 		return "孵蛋"
 	default:

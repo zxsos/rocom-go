@@ -17,6 +17,7 @@ const (
 	OpPetCatchRsp            = 0x1983 // ZONE_SCENE_THROW_CATCH_FINISH_RSP(6531), 战斗外捕捉(赛季球/高级球)
 	OpGoodsRewardNotify      = 0x0243 // ZONE_GOODS_REWARD_NOTIFY, 奖励通知(普通战斗内捕捉等新宠物)
 	OpPlayerSyncNotify       = 0x0160 // ZONE_PLAYER_SYNC_NOTIFY, 玩家数据同步(花种战斗内捕捉走此通道)
+	OpBattleFinishNotify     = 0x132c // ZONE_BATTLE_FINISH_NOTIFY(4908), 战斗结束通知(传说精灵战后捕捉,catch_way=5,唯一下发通道)
 	OpLoginRsp               = 0x0102 // ZONE_LOGIN_RSP(258), 登录数据(含完整背包 PetBackpackInfo)
 	OpPetBoxChangePetRsp     = 0x1888 // ZONE_PET_BOX_CHANGE_PET_RSP(6280), 盒位移动回包(box_pet_change 增量)
 	OpPetBoxSettingUpRsp     = 0x1891 // ZONE_PET_BOX_SETTING_UP_RSP(6289), 整理/编辑排列回包(改名/换位,全量 repeated PetBox)
