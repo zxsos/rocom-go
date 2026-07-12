@@ -280,10 +280,84 @@ for k, v in rows("PET_LIKE_ELEMENT_CONF.json").items():
     desc = raw.split("：", 1)[1] if "：" in raw else raw  # 「名称:描述」取描述半
     egg_group[str(gid)] = {"name": EGG_GROUP_NAMES[gid], "desc": desc}
 
+# ---- 场景与大地图(实时地图页) ----
+# 协议 ZoneEnterSceneRsp / ZoneSceneTeleportNotify 同时给 scene_cfg_id 与 scene_res_cfg_id:
+#   scenes:    scene_cfg_id     -> 场景名(SCENE_CONF)
+#   scene_res: scene_res_cfg_id -> {n:名称, s:所属 scene_cfg_id}(SCENE_RES_CONF)
+#   maps:      有大地图底图的 scene_res_cfg_id -> 投影参数(WORLD_MAP_BLOCK_CONF)
+# 只有 4 个场景配了大地图(卡洛西亚大陆/魔法学院/家园室内/家园种植园),其余场景(副本、洞穴、
+# 室内小场景)无底图,实时地图页只能显示场景名 + 原始坐标。
+scenes = {k: v["scene_name"] for k, v in rows("SCENE_CONF.json").items() if v.get("scene_name")}
+scene_res = {}
+for k, v in rows("SCENE_RES_CONF.json").items():
+    e = {"n": v.get("scene_res_name") or v.get("editor_name") or ""}
+    if v.get("scene_id"):
+        e["s"] = int(v["scene_id"])
+    scene_res[k] = e
+
+# 家园室内(30001)的底图按房屋等级分层(美术资源 Maps/30001/RoomLevel{1..5}),
+# 选层用 ZoneEnterSceneRsp.home_room_level;其余场景一张整图。
+HOME_INDOOR_RES, HOME_ROOM_LEVELS = 30001, 5
+
+maps = {}
+for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
+    res, center, side = v.get("scene_res_id"), v.get("map_center_position_xyz"), v.get("side_length")
+    if not (res and center and side):  # id=999 是无场景的兜底行(只有雷达半径)
+        continue
+    # 投影(复刻客户端 BigMapUtils.ScenePosToImagePosF):底图左上角 = 中心 - 边长/2,
+    # 世界坐标(厘米)→底图归一化坐标 u=(x-ox)/side, v=(y-oy)/side,与底图输出分辨率无关。
+    cx, cy = (float(t) for t in center.split(";")[:2])
+    side = int(side)
+    maps[str(int(res))] = {
+        "n": v.get("list_name", ""),
+        "ox": int(cx - side / 2),
+        "oy": int(cy - side / 2),
+        "side": side,
+        "world": bool(v.get("is_world_map")),  # 大世界(底图出 4096²);家园场景小,出 2048²
+        **({"rooms": HOME_ROOM_LEVELS} if int(res) == HOME_INDOOR_RES else {}),
+    }
+
+# 分层地图(洞穴/室内层):LAYERED_WORLD_MAP_CONF。玩家进入洞穴/地下层时,地图显示切换为该层的
+# 独立切片(LayerMap 单张图),投影用该层自己的 camera_center + Ortho_width(而非底图的
+# map_center/side_length)——因为层图是局部放大视图。同一坐标系(scene_res_id),坐标不变,只换图。
+#
+# 选层机制(见 docs/data.md 3.2):客户端按位置对 AREA_CONF 多边形做点在区域内判定
+# (GetPointAreaId)→ area_func → 层。协议侧 ZoneSceneClientCaveStateReq(0x1838,c2s)下发
+# cave_name(如 "Cave_A2_02_01"),它是层 map_resource 去掉 "_CaveTunnel..." 后缀的前缀
+# (实测:"Cave_A2_02_01" 对应 信仰者村落一层/二层),可作粗粒度定位(定洞穴组,楼层仍需多边形)。
+# 只收录有 map_resource(即有切片图)的层;地表条目(无图,用底图)跳过。
+layers = {}
+for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
+    img = v.get("map_resource")
+    cc, ow = v.get("camera_center"), v.get("Ortho_width")
+    if not (img and cc and ow):
+        continue
+    ow = int(ow)
+    # cave_name 前缀:洞穴层 map_resource 形如 "Cave_A2_02_01_CaveTunnel_...",取 "_CaveTunnel" 前一段
+    # 即协议 cave_name;下水管道口/家园层无此结构,cave 前缀留空(其进层检测机制不同,待验证)。
+    cave = img.split("_CaveTunnel")[0] if "_CaveTunnel" in img else ""
+    layers[str(int(v["id"]))] = {
+        "n": v.get("display_name", ""),
+        "grp": v.get("map_layer_group"),     # 同组共享地表底图;组内 sort=1 地表、2+ 楼层
+        "res": int(v.get("scene_res_id") or 0),  # 所属 scene_res(家园层为 0)
+        "img": img,                          # 层切片 webp 文件名(保持原名,见 gen_bigmap.py)
+        "cave": cave,                        # 协议 cave_name 前缀(空=非洞穴层,暂不支持按 cave_name 定位)
+        "ox": cc[0] - ow // 2,               # 层投影:同底图公式,参数换成 camera_center/Ortho_width
+        "oy": cc[1] - ow // 2,
+        "side": ow,
+    }
+
 data = {
     "species": species,
     # 蛋组: id -> {name:社区流行名, desc:官方描述}。petbase[].eg 引用这些 id。
     "egg_group": egg_group,
+    # 场景名与大地图投影参数(见上)。底图 webp 由 gen_bigmap.py 生成,文件名即 scene_res_cfg_id
+    # (家园室内为 30001_<房屋等级>),Go 侧拼 bigmap/<名>.webp。
+    "scenes": scenes,
+    "scene_res": scene_res,
+    "maps": maps,
+    # 分层地图(洞穴/地下层):层id -> {名称,组,scene_res,层图,cave前缀,投影 ox/oy/side}。见上。
+    "layers": layers,
     "nature": {k: v.get("name", "") for k, v in rows("AUDIO_NATURE_CONF.json").items() if v.get("name")},
     "nature_effect": nature_effect,
     "skill_dam_type": enum_dim("SkillDamType"),

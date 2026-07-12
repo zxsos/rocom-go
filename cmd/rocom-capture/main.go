@@ -16,6 +16,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gcp"
 	"github.com/whoisnian/rocom-capture/internal/pb"
 	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -138,6 +139,13 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	// sweeps: 账号 → 正在累积的分页宠物列表快照(见 petSweep)。末页到达即对账清除别处放生/赠送的残留。
 	sweeps := map[string]*petSweep{}
 
+	// 实时地图(仅自己):按连接维护当前 scene_res_cfg_id(s2c 进入/传送更新),
+	// c2s 移动包结合当前场景投影成地图坐标推给前端。移动包高频(~100-200ms/次,客户端
+	// Roco.Move.ReqInterval),故按账号节流,stop_move(停下)必推。
+	sceneByConn := map[string]int32{}     // connID -> 当前 scene_res_cfg_id
+	lastPosSent := map[string]time.Time{} // 账号 -> 上次位置推送时刻(节流)
+	const posThrottle = 150 * time.Millisecond
+
 	for m := range eng.Out {
 		// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面 resolve acc 之前)。
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp {
@@ -174,6 +182,47 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			continue // 尚未见到该连接的登录(无法归属 user_id),丢弃
 		}
 		sc := st.For(acc)
+
+		// 实时地图(仅自己):s2c 进入/传送更新当前场景 res;c2s 移动包按当前场景投影后推送。
+		switch {
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpEnterSceneRsp:
+			if _, res, ok := scene.ParseEnterScene(m.AppBody); ok {
+				sceneByConn[m.Session] = res
+			}
+			continue
+		case m.Direction == gcp.S2C && m.Opcode == scene.OpTeleportNotify:
+			if _, res, ok := scene.ParseTeleport(m.AppBody); ok {
+				sceneByConn[m.Session] = res
+			}
+			continue
+		case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
+			mr, ok := scene.ParseMoveReq(m.AppBody)
+			if !ok {
+				continue
+			}
+			// 节流:非停止包且距上次推送不足阈值则跳过(移动包高频)。
+			if !mr.StopMove && m.Time.Sub(lastPosSent[acc]) < posThrottle {
+				continue
+			}
+			lastPosSent[acc] = m.Time
+			res := sceneByConn[m.Session]
+			pos := map[string]any{
+				"account":    acc,
+				"sceneResId": res,
+				"sceneCfgId": mr.SceneCfgID,
+				"sceneName":  sceneDisplayName(db, res, mr.SceneCfgID),
+				"x":          mr.Pos.X,
+				"y":          mr.Pos.Y,
+				"z":          mr.Pos.Z,
+				"stop":       mr.StopMove,
+				"ts":         m.Time.Unix(),
+			}
+			if u, v, ok := db.Project(uint32(res), mr.Pos.X, mr.Pos.Y); ok {
+				pos["u"], pos["v"] = u, v
+			}
+			srv.Hub().Broadcast("position", acc, pos)
+			continue
+		}
 
 		// 盒子布局：登录数据(0x0102)或盒子操作回包携带完整背包 PetBackpackInfo，
 		// 解出 gid->(盒子,格位) 全量快照存入 pet_box,读取宠物时 JOIN 注入位置。
@@ -377,6 +426,17 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 }
 
 // logEvent 打印一条获得宠物事件日志。
+// sceneDisplayName 取当前场景显示名:优先 scene_res(区分同一 cfg 下的子场景,如卡洛西亚
+// 大陆 vs 魔法学院),缺失时(未见进入/传送通知)回退移动包自带的 scene_cfg_id。
+func sceneDisplayName(db *gamedata.DB, resID, cfgID int32) string {
+	if resID != 0 {
+		if n := db.SceneResName(resID); n != "" {
+			return n
+		}
+	}
+	return db.SceneName(cfgID)
+}
+
 func logEvent(acc string, ev *store.Event) {
 	sp := "?"
 	if ev.Pet != nil && ev.Pet.Species != "" {
