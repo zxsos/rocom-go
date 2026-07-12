@@ -96,6 +96,43 @@ type DB struct {
 	bloodNames  map[string]string            // 血脉id -> 中文短名(普通/草/火…)
 	medalIcons  map[string]string            // 奖牌id -> 原名(medal/)
 	staticIcons map[string]string            // 语义键 -> 原名(static/:异色/炫彩/污染等)
+	// 场景与大地图(实时地图页):见 docs/data.md 3.1、3.2。
+	scenes   map[string]string   // scene_cfg_id -> 场景名(SCENE_CONF)
+	sceneRes map[string]sceneRes // scene_res_cfg_id -> {名称, 所属 scene_cfg_id}
+	maps     map[uint32]MapInfo  // 有大地图底图的 scene_res_cfg_id -> 投影参数
+	layers   []LayerInfo         // 分层地图(洞穴/地下层),按 cave_name 前缀/位置定位
+}
+
+// sceneRes 是一个场景资源(scene_res_cfg_id)的名称与所属场景(scene_cfg_id)。
+type sceneRes struct {
+	N string `json:"n"`
+	S int32  `json:"s"`
+}
+
+// MapInfo 是一张大地图底图的投影参数(SCENE_RES 世界坐标 → 底图归一化坐标)。
+// 底图 webp 路径为 bigmap/<scene_res_cfg_id>.webp(家园室内 30001 为 30001_<房屋等级>)。
+type MapInfo struct {
+	Name  string `json:"name"`  // 地图名(卡洛西亚大陆…)
+	OX    int32  `json:"ox"`    // 底图左上角世界坐标 X(= 地块中心X - 边长/2)
+	OY    int32  `json:"oy"`    // 底图左上角世界坐标 Y
+	Side  int32  `json:"side"`  // 地块世界边长(厘米);u=(x-ox)/side, v=(y-oy)/side
+	World bool   `json:"world"` // 大世界(底图 4096²)否则家园场景(2048²)
+	Rooms int    `json:"rooms"` // >0 表示按房屋等级分层(家园室内 30001,底图 30001_<lv>)
+}
+
+// LayerInfo 是一个分层地图(洞穴/地下层)的切片图与投影(见 docs/data.md 3.2)。
+// 与所属场景同坐标系,进入该层时地图改用此层切片图 + 此投影(camera_center/Ortho_width)。
+// 切片 webp 路径为 bigmap/layer/<Img>.webp。
+type LayerInfo struct {
+	ID    uint32 // 层 id(LAYERED_WORLD_MAP_CONF.id)
+	Name  string // 层名(信仰者村落一层…)
+	Group int32  // 层组;同组共享地表底图,组内多个楼层
+	Res   int32  // 所属 scene_res_cfg_id(家园层为 0)
+	Img   string // 切片图文件名(bigmap/layer/<Img>.webp)
+	Cave  string // 协议 cave_name 前缀(空=非洞穴层,不支持按 cave_name 定位)
+	OX    int32  // 层投影左上角世界坐标 X(= camera_center.x - Ortho_width/2)
+	OY    int32  // 层投影左上角世界坐标 Y
+	Side  int32  // 层投影世界边长(= Ortho_width);u=(x-ox)/side, v=(y-oy)/side
 }
 
 // NatureEffect 是性格对六维的增减维度(六维编号 1-6:1生命2物攻3魔攻4物防5魔防6速度)。
@@ -136,6 +173,26 @@ func Load() (*DB, error) {
 			WL uint32   `json:"wl"`
 			WH uint32   `json:"wh"`
 		} `json:"petbase"`
+		Scenes   map[string]string   `json:"scenes"`
+		SceneRes map[string]sceneRes `json:"scene_res"`
+		Maps     map[string]struct {
+			N     string `json:"n"`
+			OX    int32  `json:"ox"`
+			OY    int32  `json:"oy"`
+			Side  int32  `json:"side"`
+			World bool   `json:"world"`
+			Rooms int    `json:"rooms"`
+		} `json:"maps"`
+		Layers map[string]struct {
+			N    string `json:"n"`
+			Grp  int32  `json:"grp"`
+			Res  int32  `json:"res"`
+			Img  string `json:"img"`
+			Cave string `json:"cave"`
+			OX   int32  `json:"ox"`
+			OY   int32  `json:"oy"`
+			Side int32  `json:"side"`
+		} `json:"layers"`
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
 		return nil, err
@@ -179,7 +236,27 @@ func Load() (*DB, error) {
 		}
 		return nil
 	})
+	maps := make(map[uint32]MapInfo, len(raw.Maps))
+	for k, v := range raw.Maps {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			maps[uint32(id)] = MapInfo{Name: v.N, OX: v.OX, OY: v.OY, Side: v.Side, World: v.World, Rooms: v.Rooms}
+		}
+	}
+	layers := make([]LayerInfo, 0, len(raw.Layers))
+	for k, v := range raw.Layers {
+		id, err := strconv.ParseUint(k, 10, 32)
+		if err != nil {
+			continue
+		}
+		layers = append(layers, LayerInfo{ID: uint32(id), Name: v.N, Group: v.Grp, Res: v.Res,
+			Img: v.Img, Cave: v.Cave, OX: v.OX, OY: v.OY, Side: v.Side})
+	}
+	sort.Slice(layers, func(i, j int) bool { return layers[i].ID < layers[j].ID })
 	return &DB{
+		scenes:       raw.Scenes,
+		sceneRes:     raw.SceneRes,
+		maps:         maps,
+		layers:       layers,
 		species:      raw.Species,
 		nature:       raw.Nature,
 		skillDamType: raw.SkillDamType,
@@ -312,6 +389,52 @@ func (db *DB) NatureEffect(natureID uint32) NatureEffect { return db.natureEffec
 
 // OpcodeNames 返回 opcode 整数到 ZoneSvrCmd 名称的映射。
 func (db *DB) OpcodeNames() map[uint16]string { return db.opcodes }
+
+// SceneName 返回场景名(scene_cfg_id → SCENE_CONF.scene_name)。
+func (db *DB) SceneName(cfgID int32) string {
+	return db.scenes[strconv.FormatInt(int64(cfgID), 10)]
+}
+
+// SceneResName 返回场景资源名(scene_res_cfg_id → SCENE_RES_CONF)。
+func (db *DB) SceneResName(resID int32) string {
+	return db.sceneRes[strconv.FormatInt(int64(resID), 10)].N
+}
+
+// MapInfo 返回某 scene_res_cfg_id 的大地图投影参数;第二返回值表示该场景是否有底图。
+func (db *DB) MapInfo(resID uint32) (MapInfo, bool) { m, ok := db.maps[resID]; return m, ok }
+
+// Project 把场景世界坐标(厘米)投影为底图归一化坐标 u,v∈[0,1](复刻客户端
+// BigMapUtils.ScenePosToImagePosF)。该 scene_res 无底图时 ok=false。u,v 可能越界
+// [0,1](角色在底图覆盖范围外,如迷雾区),调用方自行决定是否裁剪。
+func (db *DB) Project(resID uint32, x, y int32) (u, v float64, ok bool) {
+	m, ok := db.maps[resID]
+	if !ok || m.Side == 0 {
+		return 0, 0, false
+	}
+	return float64(x-m.OX) / float64(m.Side), float64(y-m.OY) / float64(m.Side), true
+}
+
+// LayersByCave 返回 cave_name(ZoneSceneClientCaveStateReq 下发)对应的候选分层。cave_name 是层
+// map_resource 的前缀(如 "Cave_A2_02_01" 命中信仰者村落一层/二层),故一个 cave_name 可能返回同组
+// 多个楼层——精确楼层需再对位置做区域判定(见 docs/data.md 3.2,尚未实现)。空/无匹配返回 nil。
+func (db *DB) LayersByCave(caveName string) []LayerInfo {
+	if caveName == "" {
+		return nil
+	}
+	var out []LayerInfo
+	for _, l := range db.layers {
+		if l.Cave == caveName {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// ProjectLayer 把世界坐标投影为某分层切片图的归一化坐标 u,v∈[0,1](公式同底图,参数用层的
+// camera_center/Ortho_width)。切片图路径为 bigmap/layer/<LayerInfo.Img>.webp。
+func (l LayerInfo) ProjectLayer(x, y int32) (u, v float64) {
+	return float64(x-l.OX) / float64(l.Side), float64(y-l.OY) / float64(l.Side)
+}
 
 func key(id uint32) string { return strconv.FormatUint(uint64(id), 10) }
 

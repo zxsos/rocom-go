@@ -71,6 +71,13 @@ s2c(下行)：  [0:2]?  [2:4] opcode(BE u16)  [4:6]=0x55aa  [6:10] seq  [10:] pr
 
 实测命中率：c2s opcode@6 ≈ 99%，s2c opcode@2 = 100%。
 
+**c2s protobuf body 与 trailer**(实测 `ZONE_SCENE_MOVE_REQ` 0x0133,`internal/scene` 依此解析)：
+opcode 之后还有 **6 字节子头**(前 2 字节随包变化、余 4 字节为 0),故 protobuf 从偏移 `8+6=14`
+起(`gcp.AppBody` 只剥到 8,子头留在 AppBody 头 6 字节)。protobuf **之后、`tsf4g` 尾之前**还有
+一段**变长 trailer**(路由/校验),长度不定。因此解析 c2s body 不能要求「消费到 tsf4g」,应
+**贪婪解析已知字段、遇到不属于该消息的字段即停**(trailer 起始处 wire type/字段号必然不符)。
+注:c2s 字段**不保证按字段号升序**(实测 move 包顺序为 1,4,7,2,15,3,6,8,5,17)。
+
 ## 5. 宠物列表消息
 
 - 客户端打开宠物仓库时发 `ZONE_GET_PET_INFO_BY_PAGE_REQ(0x1345)`；
@@ -80,3 +87,24 @@ s2c(下行)：  [0:2]?  [2:4] opcode(BE u16)  [4:6]=0x55aa  [6:10] seq  [10:] pr
 
 本项目只手动取 field 4 再 `proto.Unmarshal` 成 `PetDataInfoList`，无需编译庞大的 zonesvr 消息。
 解析细节见 [data.md](data.md)。
+
+## 6. 实时位置与场景消息(`internal/scene`,实时地图页)
+
+只跟踪**登录账号自己**的位置(不解析其他玩家/AOI)。字段语义经当前版客户端 Scene luac 坐实、
+真实 pcap 验证(见 [data.md](data.md) 3.1/3.2)。
+
+| opcode | 方向 | 消息 | 用途 |
+| --- | --- | --- | --- |
+| `0x0133` | c2s | `ZONE_SCENE_MOVE_REQ` | 自己移动:`to_pos`(field 2,Position 子消息)+ `scene_cfg_id`(17) |
+| `0x0152` | s2c | `ZONE_ENTER_SCENE_RSP` | 进入场景:`scene_cfg_id`(2)、`scene_res_cfg_id`(3) |
+| `0x015c` | s2c | `ZONE_SCENE_TELEPORT_NOTIFY` | 传送:`to_scene_cfg_id`(11)、`to_scene_res_cfg_id`(12) |
+| `0x1838` | c2s | `ZONE_SCENE_CLIENT_CAVE_STATE_REQ` | 洞穴层:`cave_name`(1,string)+ `pos`(2) |
+| `0x1505` | s2c | `ZONE_SCENE_CLIENT_CAVE_STATE_NOTIFY` | 同上(服务器侧下发) |
+
+- **坐标**:`Position{x,y,z}` = UE 世界坐标,1 单位 = 1 厘米,取整。玩家 `to_pos.z` 是**脚底**高度
+  (角色中心 +85);`to_rot`/`Point.dir` **不是坐标是旋转**(`FRotator×10`=0.1 度,x=Roll/y=Pitch/z=Yaw)。
+- **当前场景 res 必须从 0x0152/0x015c 跟踪**,不能只看移动包的 `scene_cfg_id`——一个 scene_cfg_id
+  可对应多个 scene_res(103 → 10003 卡洛西亚 或 10018 魔法学院)。
+- 状态机:收 0x0152/0x015c 更新当前 scene_res;收 0x0133 取 `to_pos` 配当前 scene_res 投影;
+  收 0x1838 取 `cave_name` 定洞穴层(见 data.md 3.2)。cave_name 解析同 move 包:需扫子头起点、
+  容忍尾部 trailer。

@@ -18,7 +18,9 @@
   `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,medal}:属性/六维/
   搭档标记、血脉主图标、手挑杂项、奖牌小图;图集精灵从 FModel PaperSprite JSON + 图集 PNG 裁切,
   奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
-  docs/data.md);抓包脚本 `scripts/capture.sh`(bash)。
+  docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
+  行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
+  抓包脚本 `scripts/capture.sh`(bash)。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
@@ -37,8 +39,8 @@
 ## reference
 | source                                                       | directory                                   | description                                                           |
 | ------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------- |
-| FModel 自行提取数据                                          | `./nrc/all.pb` + `./nrc/bin/`           | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
-| https://github.com/MIXUULS/Roco-Kingdom-World-Data           | `./scripts/decode_bin.py`                   | 解 `nrc/bin/` 的 `.bytes`                                           |
+| FModel 自行提取数据                                          | `~/Downloads/NRC` 挑选得到 `./nrc`          | **当前唯一数据源**:描述符(字段号/opcode/枚举)+ 二进制配置(中文名称表) |
+| https://github.com/MIXUULS/Roco-Kingdom-World-Data           | `./scripts/decode_bin.py`                   | 解 `nrc/bin/` 的 `.bytes`                                             |
 | https://github.com/phainia/pak-public-kit                    | ~/Git/gh/pak-public-kit                     | 已弃用(曾为名称表源,其 PET_CONF 本地化错位;仅留作对照)                |
 | https://github.com/kikozz/Roco-Kingdom-World-Data-2026-05-21 | ~/Git/gh/Roco-Kingdom-World-Data-2026-05-21 | 已弃用(曾为 `.proto` 源;其 Bin JSON 可作名称表三方对照)               |
 | https://github.com/h3110w0r1d-y/rocom-helper                 | ~/Git/gh/rocom-helper                       | 闭源洛克王国世界助手，本项目受其启发                                  |
