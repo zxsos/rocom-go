@@ -214,20 +214,19 @@ type poiKind struct {
 }
 
 // poiPoint 是一个 POI 标记:底图归一化坐标(与玩家位置同一投影)+ 名称。
-// 眠枭之星另带刷新点 id、所属区域与收集状态(见 docs/data.md 3.4)。
+// 眠枭之星另带刷新点 id 与收集状态(见 docs/data.md 3.4)。
 type poiPoint struct {
 	K  string  `json:"k"`
 	U  float64 `json:"u"`
 	V  float64 `json:"v"`
 	N  string  `json:"n"`
 	R  int32   `json:"r,omitempty"`  // 刷新点 id(星星:前端据此接收状态增量)
-	Z  int32   `json:"z,omitempty"`  // 所属区域(营地 id);0=不属任何区域,不做整片隐藏
 	St int     `json:"st,omitempty"` // 收集状态:0 未确认 / 1 未收集 / 2 已收集
 }
 
-// zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的独立星/光点/石像)。
+// zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的独立星/光点/石像),仅作数字展示。
 type zoneProgress struct {
-	Camp int32  `json:"camp"` // 区域键(营地 id),与 poiPoint.Z 对应
+	Camp int32  `json:"camp"` // 区域键(营地 id)
 	Name string `json:"name"` // 区域名(商店街周边…)
 	Got  int32  `json:"got"`
 	Tot  int32  `json:"tot"`
@@ -254,7 +253,7 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 		}
 		pt := poiPoint{K: p.K, U: u, V: v, N: p.N}
 		if strings.HasPrefix(p.K, "star") {
-			pt.R, pt.Z, pt.St = p.R, p.Z, states[p.R]
+			pt.R, pt.St = p.R, states[p.R]
 		}
 		pts = append(pts, pt)
 		num[p.K]++
@@ -263,7 +262,7 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 	for _, k := range s.db.POIKinds() {
 		kinds = append(kinds, poiKind{K: k.K, N: k.N, Icon: s.db.POIIcon(k), On: k.On, Num: num[k.K]})
 	}
-	// 按区域的收集进度(服务器口径):某区域 got==tot ⇒ 该区域的星星全已收集,可整片隐藏。
+	// 按区域的收集进度(服务器口径),仅作数字展示。
 	agg := map[int32]*zoneProgress{}
 	for _, z := range s.store.StarZones(acc) {
 		e := agg[z.Camp]

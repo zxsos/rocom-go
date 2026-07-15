@@ -569,7 +569,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 					seen: map[int32]bool{}, actor: map[uint64]int32{}, res: res,
 				}
 			}
-			// 按区域的收集进度(服务器口径):区域收满 ⇒ 该区域的星星整片可隐藏,无需逐点走到。
+			// 按区域的收集进度(服务器口径),仅作数字展示。
 			if zp := scene.ParseZoneProgress(m.AppBody); len(zp) > 0 {
 				rows := make([]store.ZoneProgressRow, 0, len(zp))
 				for _, p := range zp {

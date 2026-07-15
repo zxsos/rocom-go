@@ -123,7 +123,6 @@ type POI struct {
 	X int32  `json:"x"` // 世界坐标 X(厘米)
 	Y int32  `json:"y"` // 世界坐标 Y
 	N string `json:"n"` // 名称(悬停显示)
-	Z int32  `json:"z"` // 所属区域(营地 id;仅眠枭之星有,0=不属任何区域)
 }
 
 // sceneRes 是一个场景资源(scene_res_cfg_id)的名称与所属场景(scene_cfg_id)。
