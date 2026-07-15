@@ -20,7 +20,9 @@
   奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
   docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
-  抓包脚本 `scripts/capture.sh`(bash)。
+  抓包脚本 `scripts/capture.sh`(bash)。查数据用 `uv run python scripts/dump_bin.py`:
+  把 `~/Downloads/NRC/.../Bin` 下全部 823 张表批量解码为 `<Bin>/Json/*.json`(增量,秒级),
+  之后直接 grep/jq,免每张表临时调 decode_bin。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
   `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
