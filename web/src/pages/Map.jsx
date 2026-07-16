@@ -43,8 +43,11 @@ const loadPoiPrefs = () => {
 
 // —— 眠枭之星「收集模式」——
 // 开启后隐藏已收集的星星,只留还没拿的。判定全部来自实测流量(见 docs/data.md 3.4),不做猜测:
-// 逐点确认——玩家走到某点 80m 内而服务器没下发该点的实体 ⇒ 已收集(已收集的星星不刷)→ 隐藏
-// (石像走挂件状态,见后端)。没确认过的点一律**照常显示**——宁可多显示,不能藏掉没拿的。
+//   1) 候选区域全部收满(服务器按区域给「已收集/总数」;点在管辖区重叠带上会有多个候选,
+//      p.z 列表里的区域全部 got>=tot 才算)→ 隐藏,不必逐个走到;
+//   2) 逐点确认:玩家走到某点 80m 内而服务器没下发该点的实体 ⇒ 已收集(已收集的星星不刷)
+//      → 隐藏(石像走挂件状态,见后端)。
+// 两条都没命中的点一律**照常显示**——宁可多显示,不能藏掉没拿的。
 const STAR_MODE_LS_KEY = 'map.starMode'
 const ST_UNCOLLECTED = 1 // 收到过实体 ⇒ 还在,未收集
 const ST_COLLECTED = 2   // 走近了却没实体 ⇒ 已收集
@@ -239,7 +242,7 @@ export default function MapPage() {
   }, [res, poiVer])
 
   // 收集状态增量:玩家一边走,后端一边判定(走近却没实体 ⇒ 已收集),即时推过来。
-  // 区域进度数据只在进场景时更新,那时重取一次点位即可。
+  // 区域进度只在进场景时更新(区域隐藏用),那时重取一次点位即可。
   useEffect(() => subscribe((m) => {
     if (m.type === 'stars') setStarSt((prev) => ({ ...prev, ...m.data }))
     if (m.type === 'starzones') setPoiVer((v) => v + 1)
@@ -267,8 +270,10 @@ export default function MapPage() {
   const poiKinds = poi.kinds.filter((k) => k.num > 0)
   const poiIcon = Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon]))
   const hasStars = poiKinds.some((k) => k.k.startsWith('star'))
-  // 收集模式下隐藏「已收集」的星星:只认逐点确认过的,其余一律显示。
-  const collected = (p) => starSt[p.r] === ST_COLLECTED
+  // 已收满的区域(服务器口径 got>=tot)。
+  const doneZones = new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp))
+  // 收集模式下隐藏「已收集」的星星:逐点确认过的,或候选区域(p.z 列表)全部收满的。其余一律显示。
+  const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.z?.length > 0 && p.z.every((c) => doneZones.has(c)))
   const marks = poi.pois.filter((p) => {
     if (!poiOn.has(p.k)) return false
     if (!starMode || !p.r) return true

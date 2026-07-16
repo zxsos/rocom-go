@@ -336,6 +336,21 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 	areasByConn := map[string]map[uint32]map[uint32]bool{}
 	layerByConn := map[string]*layerState{} // connID -> 分层地图去抖状态(见 layerDebounce)
 	starByConn := map[string]*starTracker{} // connID -> 眠枭之星收集判定(见 starTracker)
+	// acc -> camp -> 该区已收集数合计(服务器口径,各形态相加)。用作 starSweep 的守卫:
+	// 某区 got=0 ⇒ 该区**任何点都不可能已收集**,「走近无实体」只能是没刷出(2026-07-17 实测:
+	// 新区紫星配置/计数就位但实体未开放刷出,无此守卫会把玩家路过的点全误判成已收集)。
+	zoneGotByAcc := map[string]map[int32]int32{}
+	zoneGot := func(acc string) map[int32]int32 {
+		if g, ok := zoneGotByAcc[acc]; ok {
+			return g
+		}
+		g := map[int32]int32{} // 抓包服务重启后从库预热
+		for _, r := range st.StarZones(acc) {
+			g[r.Camp] += r.Got
+		}
+		zoneGotByAcc[acc] = g
+		return g
+	}
 	starKnown := map[string]map[int32]int{} // account -> 已确认的星星状态(库内快照,只写增量)
 	pendantByConn := map[string]int32{}     // connID -> 最近一次挂件交互(0x0272)的刷新行 id,等回包确认
 	if saved, err := st.LoadSessionScenes(); err == nil {
@@ -443,6 +458,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			return
 		}
 		states := map[int32]int{}
+		got := zoneGot(acc)
 		for _, p := range db.POIs(uint32(res)) {
 			if !strings.HasPrefix(p.K, "star") {
 				continue
@@ -452,7 +468,18 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			}
 			if ts.seen[p.R] {
 				states[p.R] = store.StarUncollected
-			} else {
+				continue
+			}
+			// 守卫:候选区域(见 POI.Z)只要有一个 got=0,「已收集」就不可能成立
+			//(真实归属区必在候选之中),多半是该点还没开放刷出——不判,保持显示。
+			ok := true
+			for _, c := range p.Z {
+				if got[c] == 0 {
+					ok = false
+					break
+				}
+			}
+			if ok {
 				states[p.R] = store.StarCollected
 			}
 		}
@@ -569,12 +596,15 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 					seen: map[int32]bool{}, actor: map[uint64]int32{}, res: res,
 				}
 			}
-			// 按区域的收集进度(服务器口径),仅作数字展示。
+			// 按区域的收集进度(服务器口径):前端按候选区域整片隐藏,starSweep 按 got=0 挡误判。
 			if zp := scene.ParseZoneProgress(m.AppBody); len(zp) > 0 {
 				rows := make([]store.ZoneProgressRow, 0, len(zp))
+				g := map[int32]int32{}
 				for _, p := range zp {
 					rows = append(rows, store.ZoneProgressRow{Camp: p.Camp, NpcID: p.NpcID, Got: p.Got, Total: p.Total})
+					g[p.Camp] += p.Got
 				}
+				zoneGotByAcc[acc] = g
 				st.SetStarZones(acc, rows)
 				srv.Hub().Broadcast("starzones", acc, rows)
 			}
