@@ -31,8 +31,15 @@
 > (增量),`--list` 预览、`--filter` 按前缀选导、`--force` 覆盖。**默认排除**纯客户端运行时
 > 资源(ArtRes 三维美术、Movies 视频、WwiseAudio 音频、AI 行为树、PVS/着色器/PSO 缓存、Engine;
 > 约占全量 74G/80G,下游脚本零引用,清单见 `--help`),`--exclude <前缀>` 追加排除、
-> `--no-exclude` 恢复真·全量。`.luac` 解出为标准 Lua 5.4 字节码(源码已编译,非明文);
-> RenderTarget/视频纹理无像素数据,只出属性 json 不出 png(降级为记录、json 照写)。
+> `--no-exclude` 恢复真·全量。RenderTarget/视频纹理无像素数据,只出属性 json 不出 png
+> (降级为记录、json 照写)。
+>
+> 导出后自动跑两个**后置步骤**(增量,`--no-post` 跳过;`--list`/`--help`/导出致命错时不跑):
+> ①`.bytes` → `Json/*.json`(`scripts/dump_bin.py`,需 uv);②`.luac` → `.lua` 反编译
+> (`scripts/decompile_luac.sh`,需 unluac)。`.luac` 本是标准 Lua 5.4 字节码(编译产物),
+> unluac 反编译回可读源码,6341 个里 6339 成功;单文件 `timeout`(默认 60s,`LUAC_TIMEOUT`
+> 覆盖)兜住 unluac 对个别字节码的死循环,真失败(1 报错 + 1 死循环)打 `.lua.nodecomp`
+> 标记,增量重跑跳过不再白耗。空模块(源仅注释/空)合法解出空 `.lua`。
 > C# 实现在 `scripts/unpack/`,基于 CUE4Parse 内置的 `GAME_RocoKingdomWorld` 支持(自定义
 > AES 字节置换变体、Bin/luac 专属处理,无需 usmap)。**CUE4Parse 的 NRCLua 只解无头 luac,
 > 漏了带 `{0xFA,0xE5,0xC0}+len` 头的那批(约占 9 成,其 AES 对整段解密 padding 失败),
