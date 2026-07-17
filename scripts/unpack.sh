@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# unpack.sh — 在 Linux 上从游戏 pak 批量解包(复刻 FModel 手动导出流程,见 docs/data.md)
+# unpack.sh — 在 Linux 上从游戏 pak 全量解包(见 docs/data.md)
 #
-# 封装 scripts/unpack/(C#,基于 ~/Git/gh/CUE4Parse 的 GAME_RocoKingdomWorld 支持):
-# 输出布局与 FModel 完全一致(默认 ~/Downloads/NRC/Content/...),gen_gamedata/gen_images/
-# gen_icons/gen_bigmap/dump_bin 等下游脚本零改动。并行解码,默认跳过已存在文件(增量)。
+# 封装 scripts/unpack/(C#,基于 CUE4Parse 的 GAME_RocoKingdomWorld 支持):
+# 从 ~/Downloads/rocom/Paks/(游戏目录原样复制的 pak)全量导出到 ~/Downloads/rocom/parsed/,
+# 按虚拟路径镜像:uasset/umap → json(纹理另出 png),其余(.bytes/.non/.pb/.lua 等)原样字节。
+# 生成脚本(gen_proto/gen_gamedata/gen_images/gen_icons/gen_bigmap/dump_bin)直接读 parsed/。
+# 并行解码,默认跳过已存在文件(增量);默认排除纯客户端运行时资源(三维美术/视频/音频/着色器等,
+# 约占全量 74G/80G,清单见 --help),--exclude 追加、--no-exclude 恢复真·全量。
 #
 # 用法:
-#   ./scripts/unpack.sh --paks <游戏Paks目录|.apk> --aes <64位hex|@密钥文件>
-#   ./scripts/unpack.sh --paks ... --aes ... --list          # 只列清单不导出
-#   ./scripts/unpack.sh --paks ... --aes ... --only bin,pb   # 只导名称表与描述符
-#   其余参数(--out/-j/--pet1024/--raw/--force/...)见 --help,原样透传给 C# 工具。
+#   ./scripts/unpack.sh                          # 默认 Paks → parsed 增量导出(含默认排除)
+#   ./scripts/unpack.sh --list [substr]          # 只列清单不导出
+#   ./scripts/unpack.sh --filter NRC/Content/ScriptC   # 只导指定前缀
+#   其余参数(--paks/--out/--aes/-j/--exclude/--force/...)见 --help,原样透传给 C# 工具。
 #
 # AES 主密钥默认用下方 DEFAULT_AES(与 Windows FModel AppSettings.json → AesKeys 同一把,
 # 换密钥的版本传 --aes 覆盖)。
