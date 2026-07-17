@@ -419,6 +419,47 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 		st.SetStarStates(acc, diff)
 		srv.Hub().Broadcast("stars", acc, diff)
 	}
+	// starZoneBump 把一次**新收集**计入本地分区进度并广播。服务器只在进场景包(0x0152)里给
+	// 全量进度、收集当下不推增量(全部 pcap 核实:0x01DC/0x01DF worldmap 通知从未出现,收集时刻
+	// 只有 AOI + 奖励通知)——不自己记,刚收完某区最后一颗时,该区其他星(抓包前收掉、没走近过的)
+	// 要等下次传送/重登才整片隐藏。只在两条「刚收走」路径上调用(实体离开+在旁、挂件交互成功),
+	// 且须在 starSave 写入该点状态**之前**——按「库内尚未是已收集」防重(光点交互存在光点离开→
+	// 星出现→星离开的同 rid 两次 leave 路径,只能计一次);starSweep 补判的历史收集**不算**
+	// (服务器 got 早已计入,再加会重复)。候选区域唯一才能归因,双候选点(全图 16 个)与检测
+	// 错漏等下次 0x0152 全量校准。前端按 camp 聚合求和判收满,加在该区哪一行(npc 形态)无所谓,
+	// 取首行(个别行会 got>tot,聚合和不受影响)。
+	starZoneBump := func(acc string, res int32, rid int32) {
+		known := starKnown[acc]
+		if known == nil {
+			known = st.StarStates(acc)
+			starKnown[acc] = known
+		}
+		if known[rid] == store.StarCollected {
+			return // 本次会话或历史上已计过:不重复
+		}
+		var zs []int32
+		for _, p := range db.POIs(uint32(res)) {
+			if p.R == rid && strings.HasPrefix(p.K, "star") {
+				zs = p.Z
+				break
+			}
+		}
+		if len(zs) != 1 {
+			return
+		}
+		rows := st.StarZones(acc)
+		for i := range rows {
+			if rows[i].Camp == zs[0] {
+				rows[i].Got++
+				st.SetStarZones(acc, rows)
+				if g := zoneGotByAcc[acc]; g != nil {
+					g[zs[0]]++
+				}
+				srv.Hub().Broadcast("starzones", acc, rows)
+				return
+			}
+		}
+	}
 	// starSee 收录一个星星系实体:星/光点按「出现 ⇒ 未收集」;石像按挂件状态定收集与否
 	// (本体常驻,出现不代表未收集),且不进 ts.actor——「实体离开 = 被收走」对石像不成立。
 	starSee := func(ts *starTracker, a scene.NpcActor, states map[int32]int) {
@@ -459,6 +500,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 			if px, py, ok := posXY(pos); ok && near(px, py, starPos(db, ts.res, rid), starCollectRadius) {
 				delete(ts.seen, rid)
 				states[rid] = store.StarCollected
+				starZoneBump(acc, ts.res, rid) // 刚收走:分区进度本地 +1(凑满即触发前端整区隐藏)
 			}
 		}
 		starSave(acc, states)
@@ -693,6 +735,7 @@ func consume(eng *capture.Engine, st *store.Store, db *gamedata.DB, srv *server.
 				continue
 			}
 			delete(ts.seen, rid)
+			starZoneBump(acc, ts.res, rid) // 石像的星刚收走:计入分区进度(须在写状态前,防重闸看库内旧值)
 			starSave(acc, map[int32]int{rid: store.StarCollected})
 			continue
 		case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
