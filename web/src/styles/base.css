@@ -1,0 +1,76 @@
+/* 基础:主题变量、重置、通用控件(按钮/输入/胶囊)、系别配色。 */
+
+:root {
+  --bg: #0e1116;
+  --bg-1: #161b22;
+  --bg-2: #1c2230;
+  --bg-3: #232b3a;
+  --line: #2a3240;
+  --fg: #e6edf3;
+  --fg-dim: #9aa7b4;
+  --accent: #4c8dff;
+  --gold: #f5b942;
+  --green: #3fb950;
+  --red: #f85149;
+  --shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+
+.btn {
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 12px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 单图标按钮:桌面/移动统一,方形观感,含义见 title */
+.btn-icon { font-size: 15px; line-height: 1; padding: 7px 11px; }
+.input, .select {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%;
+}
+/* 屏蔽 number 输入的原生上下箭头 */
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim);
+}
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pill { padding: 2px 8px; border-radius: 6px; background: #6c6c6c; font-size: 12px; }
+/* 最高档天分「了不起的天分」用金色高亮 */
+.pill-gold { background: var(--gold); color: #1a1400; font-weight: 700; }
+.muted { color: var(--fg-dim); }
+/* 极值高亮(声音 |v|>=96 / 体重百分位 <=2% 或 >=98%):按边界方向分色,上=金、下=蓝 */
+.val-hot-hi { color: var(--gold); font-weight: 700; }
+.val-hot-lo { color: var(--accent); font-weight: 700; }
+
+.empty { color: var(--fg-dim); text-align: center; padding: 40px; }
+
+/* ---- 系别色 ---- */
+.type {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px 1px 4px; border-radius: 6px; font-size: 12px; color: #fff; margin: 0 2px 2px 0;
+}
+/* plain:列表/详情用,去掉色块背景,仅图标 + 文字(选择器带 [data-t] 压过 data-t 配色规则) */
+.type.type-plain, .type.type-plain[data-t] {
+  background: none; color: var(--fg); padding: 1px 2px 1px 0; border-radius: 0;
+}
+/* 系别属性小图 */
+.type-ic { width: 14px; height: 14px; object-fit: contain; }
+.type[data-t="火"]{background:#e2563b}.type[data-t="水"]{background:#3b8fe2}.type[data-t="草"]{background:#46b35a}
+.type[data-t="光"]{background:#e0c33a;color:#222}.type[data-t="地"]{background:#a9763e}.type[data-t="冰"]{background:#54bcd6}
+.type[data-t="龙"]{background:#6b58d6}.type[data-t="电"]{background:#d6b53a;color:#222}.type[data-t="毒"]{background:#9b4fc4}
+.type[data-t="虫"]{background:#86a832}.type[data-t="武"]{background:#c2452f}.type[data-t="翼"]{background:#5bc0c9}
+.type[data-t="萌"]{background:#e58fb8;color:#222}.type[data-t="幽"]{background:#5a4a7a}.type[data-t="恶"]{background:#3a3f4a}
+.type[data-t="机械"]{background:#7a8794}.type[data-t="幻"]{background:#b46fd6}.type[data-t="普"]{background:#6b7280}

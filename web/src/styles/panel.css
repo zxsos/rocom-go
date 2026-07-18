@@ -1,0 +1,75 @@
+/* 侧栏面板与页面工具条:宠物列表筛选/事件规则/地图图层共用同一套
+   「桌面常驻左列 + 移动端侧滑抽屉」结构(.list-layout / .filters / .filter-group)。 */
+
+.list-layout { display: grid; grid-template-columns: 312px 1fr; gap: 16px; align-items: start; }
+.filters {
+  position: sticky; top: 64px; background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
+}
+.filter-group { display: flex; flex-direction: column; gap: 7px; }
+.filter-group > label { font-size: 12px; color: var(--fg-dim); }
+/* 筛选抽屉的标题栏/底部条/遮罩:仅移动端显示,桌面隐藏 */
+.filters-bar, .filters-foot, .filters-backdrop { display: none; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 系别筛选按钮内的属性小图 */
+.chip-ic { width: 15px; height: 15px; object-fit: contain; }
+/* 性别 radio 一行 / 变异 checkbox 一行 */
+.radios, .checks { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.radio, .check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 13px; }
+.radio input, .check input { cursor: pointer; margin: 0; }
+.range { display: flex; align-items: center; gap: 6px; }
+.range input { width: 64px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.toolbar .input { max-width: 280px; }
+.sort-select { max-width: 130px; }
+.spacer { flex: 1; }
+
+@media (max-width: 760px) {
+  .list-layout { grid-template-columns: 1fr; }
+  /* 工具栏:窄屏去掉弹性占位、收紧间距并缩窄排序下拉,让「共 N 只」并回按钮行而非独占一行
+     (用专属 .list-toolbar 类,避免波及嵌在列表内的详情弹窗 .toolbar) */
+  .list-toolbar { gap: 8px; }
+  .list-toolbar .spacer { display: none; }
+  .list-toolbar .btn { padding: 7px 10px; }
+  .sort-select { max-width: 104px; }
+  /* 侧栏改为左侧抽屉:盖在内容上而非把列表推下去,关闭入口始终在顶部 */
+  .filters {
+    position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
+    max-height: none; margin: 0; z-index: 40; border-radius: 0;
+    border: none; border-right: 1px solid var(--line); box-shadow: var(--shadow);
+    overflow-y: auto; padding: 0 14px 14px;
+    transform: translateX(-100%); transition: transform .25s ease;
+  }
+  .filters:not(.collapsed) { transform: none; }
+  /* 标题栏吸顶、底部条吸底,长面板滚动时始终可见 */
+  .filters-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  }
+  .filters-title { font-weight: 700; font-size: 15px; }
+  .icon-btn {
+    width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px;
+    background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; color: var(--fg);
+  }
+  .filters-foot {
+    display: flex; gap: 10px; position: sticky; bottom: 0; background: var(--bg-1);
+    padding: 10px 0 2px; margin-top: 4px; border-top: 1px solid var(--line);
+  }
+  .filters-foot .btn { flex: 1; }
+  /* 底部条已有重置,隐藏面板内那颗独立「重置筛选」 */
+  .filter-reset { display: none; }
+  .filters-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45);
+    opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
+  }
+  .filters-backdrop.show { opacity: 1; visibility: visible; }
+}
+
+/* 工具条上的「筛选/规则」抽屉入口:仅移动端显示 */
+.filter-toggle { display: none; }
+@media (max-width: 760px) {
+  .filter-toggle { display: inline-flex; }
+}

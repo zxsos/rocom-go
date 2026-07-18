@@ -1,0 +1,46 @@
+/* 捕获事件页:事件流列表 + 高亮规则侧栏。 */
+
+/* 顶部工具条复用 .toolbar/.list-toolbar,仅补最大宽度;不用 h3,避免标题行过高、内容下移 */
+.event-head { max-width: 720px; }
+.event-title { font-weight: 700; font-size: 15px; }
+.event-list { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
+.event {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg-1);
+}
+.event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* 序号/名称/时间同一行,时间靠右;空间不足时时间换行到下一行仍靠右 */
+.event-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.event-row .pet-name { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.event .event-seq { font-size: 13px; font-variant-numeric: tabular-nums; }
+.event .event-time { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.event.hl { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: #2a2410; }
+/* 事件行:序号 / 名称 / 时间统一 13px */
+.event-row, .event-row .pet-name, .event .event-seq, .event .event-time { font-size: 13px; }
+
+/* 高亮规则侧边栏标题行:标题在左、AND/OR 切换靠右;✕ 关闭仅移动端抽屉显示 */
+.rules-header { display: flex; align-items: center; gap: 10px; }
+.rules-title { margin: 0; font-size: 15px; }
+.rules-close { display: none; }
+/* 规则编辑:各维度纵向堆叠,label 在上、chip 换行在下(同宠物列表筛选条件) */
+.rule-groups { display: flex; flex-direction: column; gap: 12px; }
+/* 「种类」自由输入:输入框弹性填充、按钮不缩 */
+.rule-species-add { display: flex; gap: 8px; }
+.rule-species-add .input { flex: 1 1 auto; min-width: 0; max-width: 240px; }
+.rule-species-add .btn { flex: none; white-space: nowrap; }
+/* 多规则联合逻辑:说明文字 + AND/OR 切换,两端对齐 */
+.rule-logic { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rule-logic-toggle { display: flex; gap: 4px; margin-left: auto; }
+.btn.small { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+.muted.small { font-weight: 400; font-size: 13px; }
+
+@media (max-width: 760px) {
+  /* 移动端抽屉:标题行吸顶,✕ 关闭显示(标题与 AND/OR 同行,靠右) */
+  .rules-header {
+    position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+  }
+  .rules-close { display: grid; place-items: center; }
+  /* 事件页头部:窄屏收紧按钮间距(按钮本身已是图标,标题「共 N 只」不再被挤到两行) */
+  .event-head { gap: 8px; }
+}

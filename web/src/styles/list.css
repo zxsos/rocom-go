@@ -1,0 +1,70 @@
+/* 宠物列表页:盒子示意图、桌面表格、移动卡片、分页、右键菜单。 */
+
+/* 盒子位置示意图 */
+.boxmap { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.boxmap-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.boxmap-name { font-size: 13px; font-weight: 600; }
+.boxmap-nav { display: flex; gap: 4px; }
+.boxmap-btn {
+  width: 22px; height: 22px; line-height: 1; border-radius: 6px; cursor: pointer;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg);
+}
+.boxmap-btn:hover:not(:disabled) { border-color: var(--accent); }
+.boxmap-btn:disabled { opacity: 0.35; cursor: default; }
+/* 预留 6 排高度(队伍 6×3 最高),切换容器时下方筛选条件不上下抖动 */
+.boxmap-grid { display: grid; gap: 4px; justify-content: center; align-content: start; min-height: 260px; }
+.boxmap-cell { width: 40px; height: 40px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.boxmap-cell.filled { background: var(--bg-3); border-color: var(--accent); cursor: pointer; }
+.boxmap-cell.filled:hover { outline: 2px solid var(--accent); }
+.boxmap-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.boxmap-cell.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+/* 桌面表格(.table-wrap 调试页亦复用;移动端隐藏,调试页用内联 display:block 盖回) */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; }
+table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
+table.pets tr:hover td { background: var(--bg-2); }
+table.pets tbody tr { cursor: pointer; user-select: none; }
+table.pets tr.selected td { background: #1c2740; }
+table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* 移动卡片(默认隐藏) */
+.cards { display: none; }
+.card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+/* 分页 */
+.pager { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.pager-size { width: 110px; }
+
+/* 右键/长按上下文菜单 */
+.ctx-menu {
+  position: fixed; z-index: 100; min-width: 120px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 4px; user-select: none;
+}
+.ctx-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.ctx-item:hover { background: var(--bg-3); }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+
+@media (max-width: 760px) {
+  .table-wrap { display: none; }
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1); padding: 12px;
+    display: flex; flex-direction: column; gap: 8px; user-select: none;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; }
+  .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 13px; }
+  /* 六维在窄屏铺满等分三列,避免「物攻 235 ↑ +10」挤到两行 */
+  .card .six { grid-template-columns: repeat(3, 1fr); }
+  /* 竖屏卡片窄、六维占两行使单卡过高,竖屏隐藏(横屏更宽则保留);详情页仍可查看 */
+  @media (orientation: portrait) {
+    .card .six { display: none; }
+  }
+  /* 分页栏单行显示:收紧按钮/间距、缩窄档位下拉,不再换行 */
+  .pager { flex-wrap: nowrap; justify-content: center; gap: 6px; margin-top: 14px; }
+  .pager .btn { padding: 6px 8px; font-size: 13px; white-space: nowrap; }
+  .pager .muted { font-size: 13px; white-space: nowrap; }
+  .pager-size { width: 104px; flex: none; font-size: 13px; padding-left: 8px; padding-right: 6px; }
+}

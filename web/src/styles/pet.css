@@ -1,0 +1,51 @@
+/* 宠物通用小部件:头像/搭档标记/名称徽标行/六维/血脉/蛋组(列表、事件、详情共用)。 */
+
+.pet-cell { display: flex; align-items: center; gap: 8px; }
+.pet-avatar { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-size: 16px; }
+img.pet-avatar { object-fit: cover; }
+/* 头像 + 左上角搭档标记徽章 */
+.avatar-wrap { position: relative; display: inline-flex; line-height: 0; flex: none; }
+.pet-mark { position: absolute; top: -5px; left: -6px; width: 20px; height: 20px; pointer-events: none; z-index: 1; }
+.pet-mark img { position: absolute; object-fit: contain; }
+.pet-mark-frame { top: 0; left: 0; width: 100%; height: 100%; }
+/* 白色标记符号居中叠在橙色外框上 */
+.pet-mark-ic { top: 50%; left: 50%; width: 58%; height: 58%; transform: translate(-50%, -50%); }
+/* 名称 + 性别/异色/血脉/形态/蛋组等徽标同行:用 flex 垂直居中,消除各元素高度不一造成的错位 */
+.pet-name { font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+/* flex 下改由 gap 统一间距,清掉徽标行内布局用的 margin-left,避免间距叠加不均 */
+.pet-name > .mark, .pet-name > .mark-img { margin-left: 0; }
+.gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
+.gender.male { color: #4ea3ff; }
+.gender.female { color: #ff6fae; }
+.pet-sub { font-size: 12px; color: var(--fg-dim); }
+/* 位置标签整体折行,不在中日韩字符间断开 */
+.pet-sub .loc { white-space: nowrap; }
+/* 固定三列等宽:各宠物的 .six 是独立 grid,用 auto 会让每行列宽随本行数值变化而错位,
+   改为定宽让「生命/物攻/物防」三列在所有行间对齐(84px 可容纳「生命 118 ↑+10」级最宽内容)。 */
+.six { display: grid; grid-template-columns: repeat(3, 84px); gap: 1px 10px; font-size: 12px; }
+.six b { color: var(--gold); }
+.six > div { display: flex; align-items: center; }
+/* 行内小图标(系别外的通用行内图标 / 六维属性小图) */
+.inline-ic { width: 15px; height: 15px; object-fit: contain; margin-right: 3px; vertical-align: -3px; }
+.stat-ic { width: 14px; height: 14px; object-fit: contain; margin-right: 2px; vertical-align: -2px; }
+/* 血脉(主图标 + 短名;无背景色) */
+.blood { display: inline-flex; align-items: center; gap: 2px; font-size: 11px;
+  margin-left: 4px; font-weight: 600; color: var(--fg); vertical-align: middle; }
+/* 血脉图标与异色/炫彩标记图统一大小(见 .mark-img) */
+.blood-ic { width: 18px; height: 18px; object-fit: contain; }
+/* 奖牌图标(详情奖牌墙;墙内经 .medals .medal-ic 放大) */
+.medal-ic { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
+.up { color: var(--green); } .down { color: var(--red); }
+.talent { color: var(--gold); font-size: 11px; margin-left: 3px; font-weight: 600; }
+/* 文字徽标(异/彩回退、形态):vertical-align middle 让形态徽标与左侧图标/文字高度对齐 */
+.mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; vertical-align: middle; }
+/* 异色/炫彩标记图(取代文字徽标;缺图时组件自动退回 .mark 文字),与血脉图标同大小 */
+.mark-img { width: 18px; height: 18px; object-fit: contain; margin-left: 4px; vertical-align: middle; }
+.mark-shiny { background: #3a2f6b; color: #c9b6ff; }
+.mark-colorful { background: #6b2f50; color: #ffb6e0; }
+.mark-form { background: #2f4a3a; color: #a8e6c0; font-weight: 500; }
+
+/* 蛋组(繁殖组)标签:多个组名并排,hover 显示官方描述 */
+.egg-groups { display: inline-flex; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
+.egg-group { font-size: 11px; padding: 0 6px; border-radius: 5px; line-height: 18px;
+  background: #2f3f57; color: #b9ccef; white-space: nowrap; cursor: default; }

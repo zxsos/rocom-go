@@ -1,6 +1,8 @@
-import React, { useEffect, useState, createContext } from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
+import { AccountContext, IconsContext } from './context'
+import { dropBoxFilter } from './pages/pet-list/filters'
 
 const NAV = [
   { to: '/pets', label: '宠物列表', icon: '🐾' },
@@ -9,15 +11,10 @@ const NAV = [
   { to: '/debug', label: '调试', icon: '🐞' },
 ]
 
-// AccountContext 提供当前选中账号(玩家 user_id key),供各页对 SSE 按账号过滤。
-export const AccountContext = createContext('')
-
-// IconsContext 提供全局固定图标(六维属性小图 + 异色/炫彩/污染标记图);App 启动拉一次。
-export const IconsContext = createContext({ stat: {} })
-
 // uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
 const uidOf = (acc) => (acc || '').replace(/^UID:/, '')
 
+// App 全局壳:顶栏导航 + 账号切换 + 底部 tab(移动),并分发账号/图标两个全局 Context。
 export default function App() {
   const [accounts, setAccounts] = useState([])
   const [account, setAccount] = useState(getCurrentAccount())
@@ -49,12 +46,17 @@ export default function App() {
   const switchAccount = (a) => {
     if (!a || a === account) return
     setCurrentAccount(a)
-    try {
-      const f = JSON.parse(sessionStorage.getItem('petListFilter'))
-      if (f && f.box) { delete f.box; sessionStorage.setItem('petListFilter', JSON.stringify(f)) }
-    } catch { /* ignore */ }
+    dropBoxFilter()
     setAccount(a)
   }
+
+  const navLinks = (base) => NAV.map((n) => (
+    <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
+      className={({ isActive }) => base + (isActive ? ' active' : '')}>
+      <span className={base === 'tab' ? 'tab-icon' : 'nav-icon'}>{n.icon}</span>
+      <span className={base === 'tab' ? 'tab-label' : 'nav-label'}>{n.label}</span>
+    </NavLink>
+  ))
 
   return (
     <AccountContext.Provider value={account}>
@@ -62,15 +64,7 @@ export default function App() {
       <div className="app">
         <header className="topbar">
           <div className="brand">洛克助手 <span className="brand-sub">宠物统计</span></div>
-          <nav className="topnav">
-            {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
-                className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
-                <span className="nav-icon">{n.icon}</span>
-                <span className="nav-label">{n.label}</span>
-              </NavLink>
-            ))}
-          </nav>
+          <nav className="topnav">{navLinks('navlink')}</nav>
           {accounts.length > 0 && (
             <select
               className="select account-select"
@@ -88,15 +82,7 @@ export default function App() {
           <Outlet />
         </main>
 
-        <nav className="bottomnav">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
-              className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>
-              <span className="tab-icon">{n.icon}</span>
-              <span className="tab-label">{n.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+        <nav className="bottomnav">{navLinks('tab')}</nav>
       </div>
       </IconsContext.Provider>
     </AccountContext.Provider>

@@ -1,0 +1,40 @@
+/* App 壳:顶栏导航(桌面)/底部 tab(移动)/内容区。 */
+
+.app { display: flex; flex-direction: column; min-height: 100%; }
+
+/* ---- 顶栏 ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px; background: var(--bg-1); border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; font-size: 16px; }
+.brand-sub { color: var(--fg-dim); font-weight: 400; font-size: 12px; margin-left: 4px; }
+.topnav { display: flex; gap: 4px; }
+.navlink {
+  display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; color: var(--fg-dim);
+}
+.navlink.active { background: var(--bg-3); color: var(--fg); }
+.navlink:hover { color: var(--fg); }
+.account-select { margin-left: auto; max-width: 220px; }
+
+/* ---- 底部 tab(移动) ---- */
+.bottomnav { display: none; }
+
+.content { flex: 1; padding: 16px; }
+
+@media (max-width: 760px) {
+  .topnav { display: none; }
+  .bottomnav {
+    display: flex; position: sticky; bottom: 0; z-index: 30; background: var(--bg-1);
+    border-top: 1px solid var(--line);
+  }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; color: var(--fg-dim); }
+  .tab.active { color: var(--accent); }
+  .tab-icon { font-size: 18px; }
+  .tab-label { font-size: 11px; }
+  .content { padding: 12px; padding-bottom: 70px; }
+  /* 地图页占满高度:底部导航为 sticky(在流内),content 的 flex:1 已停在其上方,
+     故去掉为滚动页预留的额外 70px 底距,只留与两侧一致的 12px。 */
+  .content:has(.map-page) { padding-bottom: 12px; }
+}
