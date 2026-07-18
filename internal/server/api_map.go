@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -44,11 +43,12 @@ func (s *Server) handlePosition(w http.ResponseWriter, r *http.Request) {
 
 // poiKind 是一个 POI 图层(前端的一个开关):图层键、中文名、图标路径、是否默认开启。
 type poiKind struct {
-	K    string `json:"k"`
-	N    string `json:"n"`
-	Icon string `json:"icon"` // /img/<此路径>
-	On   bool   `json:"on"`   // 默认开启(魔力之源、炼金釜)
-	Num  int    `json:"num"`  // 本场景该图层的点数(前端显示,0 则该层置灰)
+	K       string `json:"k"`
+	N       string `json:"n"`
+	Icon    string `json:"icon"`    // /img/<此路径>
+	On      bool   `json:"on"`      // 默认开启(魔力之源、炼金釜)
+	Num     int    `json:"num"`     // 本场景该图层的点数(前端显示,0 则该层置灰)
+	Collect bool   `json:"collect"` // 可收集图层(眠枭之星/不咕钟零件):前端「收集模式」覆盖这些层
 }
 
 // poiPoint 是一个 POI 标记:底图归一化坐标(与玩家位置同一投影)+ 名称。
@@ -91,7 +91,7 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		pt := poiPoint{K: p.K, U: u, V: v, N: p.N}
-		if strings.HasPrefix(p.K, "star") {
+		if s.db.CollectibleKind(p.K) {
 			pt.R, pt.Z, pt.St = p.R, p.Z, states[p.R]
 		}
 		pts = append(pts, pt)
@@ -99,7 +99,7 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 	}
 	kinds := []poiKind{}
 	for _, k := range s.db.POIKinds() {
-		kinds = append(kinds, poiKind{K: k.K, N: k.N, Icon: s.db.POIIcon(k), On: k.On, Num: num[k.K]})
+		kinds = append(kinds, poiKind{K: k.K, N: k.N, Icon: s.db.POIIcon(k), On: k.On, Num: num[k.K], Collect: k.Collect})
 	}
 	// 按区域的收集进度(服务器口径):点的候选区域全部收满 ⇒ 可隐藏(见 poiPoint.Z)。
 	agg := map[int32]*zoneProgress{}

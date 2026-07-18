@@ -58,16 +58,27 @@
   user-select: none; -webkit-user-drag: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
 }
-/* 收集模式下「已确认还在」的眠枭之星:描一圈金色,与尚未走到过的候选点区分开。 */
+/* 收集模式下「已确认还在」的可收集点(星星/零件):描一圈金色,与尚未走到过的候选点区分开。 */
 .map-poi.sure { filter: drop-shadow(0 0 3px #ffd54a) drop-shadow(0 0 6px #ffd54a); }
-/* 收集模式的说明文字 */
-.map-star-stat { font-size: 12px; line-height: 1.5; }
-/* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数。图标同样只定高不定宽(见上)。 */
+/* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
+   图标同样只定高不定宽(见上)。 */
+.map-layer-row { display: flex; align-items: stretch; gap: 6px; }
+.map-layer-row .map-layer-btn { flex: 1; min-width: 0; }
 .map-layer-btn {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line);
   color: var(--fg-dim); font-size: 13px; line-height: 1; cursor: pointer; text-align: left;
 }
+/* 收集模式小开关:开 = 隐藏该图层已收集的点(无文字,悬停给 title 提示);图层关闭时禁用。 */
+.map-collect-btn {
+  flex: none; width: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line);
+  color: var(--fg-dim); font-size: 14px; cursor: pointer;
+}
+.map-collect-btn:hover:not(:disabled) { border-color: var(--accent); }
+.map-collect-btn:not(.on) { opacity: .45; }
+.map-collect-btn.on { color: var(--accent); border-color: var(--accent); opacity: 1; }
+.map-collect-btn:disabled { opacity: .2; cursor: default; }
 .map-layer-btn img { width: auto; height: 22px; display: block; flex: none; }
 .map-layer-name { flex: 1; }
 .map-layer-btn:hover { border-color: var(--accent); }

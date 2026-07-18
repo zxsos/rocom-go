@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"math"
-	"strings"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
@@ -10,7 +9,11 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
-// ---- 眠枭之星收集判定(见 docs/data.md 3.4)----
+// ---- 眠枭之星/不咕钟零件收集判定(见 docs/data.md 3.4)----
+//
+// 不咕钟零件(part_bugu 图层)的实体行为与星/光点完全同套,复用全部判定路径;差别只有一点:
+// 服务器不给它分区进度(不在 WORLD_EXPLORING_STATISTIC_CONF 里),点位不带候选区域(Z 空),
+// 故 sweepStars 的 got=0 守卫对它逐点放行、bumpStarZone 对它自然 no-op。
 //
 // 星/光点:已收集的服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
 //
@@ -24,7 +27,9 @@ import (
 //
 // AOI 是**按格子**下发的(配置里有「跨aoi拆分」的区域),不是圆形半径:实测多次出现「更远的实体
 // 下发了、更近的没下发」。故不能拿单一半径当 AOI 边界,只能取一个**保守判定半径**——4 份 pcap 里
-// 凡距玩家轨迹 ≤100m 的固定 POI(必定存在那些)全部下发,无一例外,故 80m 留足余量。
+// 凡距玩家轨迹 ≤100m 的固定 POI(必定存在那些)全部下发,无一例外,曾据此取 80m;
+// 2026-07-19 用户实测 80m 下仍偶发「接近途中先消失再出现」(结账后实体才到,见下),收窄到 50m
+// ——判定圈越小,实体下发越可靠、回撤结账位置也越近,代价只是要走得更近才能确认已收集。
 //
 // 但「进圈时刻」不能立即结账:实体按跨格触发下发,可以晚于进圈 4-31s、晚到时玩家已近至 21-59m
 // (12 份 pcap 共 5 例),圈边缘徘徊时延迟无上界——进圈即判会闪烁(先判已收集隐藏图标,实体
@@ -34,7 +39,7 @@ import (
 // 要来早来了)。回撤结账在圈外也生效(擦圈边而过的点,回撤 15m 时往往已出圈)。代价只是
 // 结账推迟到走过之后几秒,12 份 pcap 复演:零闪烁、无误判、无漏判(仅 pcap 截断处未及结账)。
 const (
-	starSweepRadius   = 8000                    // 判定半径(厘米):玩家进到此距离内仍无实体 ⇒ 该点已收集(结账另看时机)
+	starSweepRadius   = 5000                    // 判定半径(厘米):玩家进到此距离内仍无实体 ⇒ 该点已收集(结账另看时机)
 	starCommitNear    = 1000                    // 贴脸结账距离:实体最早在 21m 处必已下发,10m 留足余量
 	starCommitBack    = 1500                    // 回撤结账迟滞:距离回升超过最近点这么多 ⇒ 接近段结束
 	starCollectRadius = 3000                    // 实体离开 AOI 时,玩家在此距离内 ⇒ 是被收走了(而非走远出 AOI)
@@ -135,7 +140,7 @@ func (p *Pipeline) bumpStarZone(acc string, res int32, rid int32) {
 	}
 	var zs []int32
 	for _, poi := range p.db.POIs(uint32(res)) {
-		if poi.R == rid && strings.HasPrefix(poi.K, "star") {
+		if poi.R == rid && p.db.CollectibleKind(poi.K) {
 			zs = poi.Z
 			break
 		}
@@ -226,7 +231,7 @@ func (p *Pipeline) sweepStars(conn, acc string, res int32, x, y int32, now time.
 		return
 	}
 	for _, poi := range p.db.POIs(uint32(res)) {
-		if !strings.HasPrefix(poi.K, "star") {
+		if !p.db.CollectibleKind(poi.K) {
 			continue
 		}
 		d := math.Hypot(float64(x-poi.X), float64(y-poi.Y))

@@ -66,6 +66,12 @@ WORLDMAP = {
     "owl_worldmap_fruit_A3_png":            "紫色精灵果实",
 }
 
+# worldmap 组的整张贴图补充:游戏大地图钉直接复用背包图标的收集品(MEGAMAP_CONF.icon 即
+# BagItem 编号),不在 WorldMapNpc 图集里,走 copy_texture(basename 回退命中 BagItem 目录)。
+WORLDMAP_TEX = {
+    "100946": "不咕钟零件",
+}
+
 
 # ── 基础设施 ──────────────────────────────────────────────
 
@@ -201,6 +207,7 @@ def main():
     total += gen_group("blood", icon_refs("PET_BLOOD_CONF", "icon"), crop_sprite)
     total += gen_group("static", list(STATIC), crop_sprite)
     total += gen_group("worldmap", list(WORLDMAP), crop_sprite)
+    total += gen_group("worldmap", list(WORLDMAP_TEX), copy_texture)
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
