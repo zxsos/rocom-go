@@ -57,7 +57,7 @@ uv sync
 uv run python scripts/gen_proto.py     # all.pb → internal/pb
 uv run python scripts/gen_gamedata.py  # Bin 配置 + all.pb → names.json(含图标索引)
 uv run python scripts/gen_images.py    # 宠物头像/全身图 → img/{HeadIcon,BigHeadIcon256,Pet256} webp
-uv run python scripts/gen_icons.py     # 属性/血脉/奖牌等 UI 图标 → img/{filter,blood,static,medal} webp
+uv run python scripts/gen_icons.py     # 属性/血脉/奖牌/POI 等 UI 图标 → img/{filter,blood,static,worldmap,medal} webp
 uv run python scripts/gen_bigmap.py    # 大地图/分层切片 → img/bigmap{,/layer} webp(实时地图页)
 
 # 2. 构建前端到 embed 目录
