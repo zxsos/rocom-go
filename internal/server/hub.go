@@ -7,7 +7,7 @@ import (
 
 // envelope 是推送给前端的统一消息封装。
 type envelope struct {
-	Type    string `json:"type"`              // pet | event | debug
+	Type    string `json:"type"`              // pet | event | position | stars | starzones | debug
 	Account string `json:"account,omitempty"` // 所属账号("" = 全局/调试,前端不按账号过滤)
 	Data    any    `json:"data"`
 }
@@ -50,14 +50,19 @@ func (h *Hub) unsubscribe(ch chan streamMsg) {
 
 // Broadcast 把一条消息广播给所有订阅者(满则丢弃，避免阻塞)。account 为消息所属账号,
 // 传 "" 表示全局消息(所有连接都收);订阅端按 account/type 决定是否转发(见 handleStream)。
+// 无订阅者(没有页面连着)时直接返回,省去 json.Marshal——实时抓包对每条消息都发 debug 广播、
+// 页同步时每只宠物再发一次,常态下无人订阅,这层早退把该开销清零。
 func (h *Hub) Broadcast(typ, account string, data any) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.subs) == 0 {
+		return
+	}
 	msg, err := json.Marshal(envelope{Type: typ, Account: account, Data: data})
 	if err != nil {
 		return
 	}
 	m := streamMsg{typ: typ, account: account, data: msg}
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	for ch := range h.subs {
 		select {
 		case ch <- m:

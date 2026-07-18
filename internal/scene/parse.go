@@ -8,6 +8,8 @@ import (
 	"bytes"
 
 	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/whoisnian/rocom-capture/internal/wire"
 )
 
 // tsf4gMark 是应用层 protobuf body 之后的 tsf4g 尾标记;解码在其前停止(见 docs/protocol.md)。
@@ -401,37 +403,8 @@ func retFailed(b []byte) bool {
 	return failed
 }
 
-// scanFields 遍历顶层 protobuf 字段;对 varint 传 v,对 bytes 传 val(子消息/字符串原始字节)。
-// 解码出错即静默停止(容忍尾部 tsf4g 等非 protobuf 残留)。
-func scanFields(b []byte, fn func(num protowire.Number, typ protowire.Type, val []byte, v uint64)) {
-	rest := b
-	for len(rest) > 0 {
-		num, typ, n := protowire.ConsumeTag(rest)
-		if n < 0 {
-			return
-		}
-		rest = rest[n:]
-		switch typ {
-		case protowire.VarintType:
-			v, m := protowire.ConsumeVarint(rest)
-			if m < 0 {
-				return
-			}
-			fn(num, typ, nil, v)
-			rest = rest[m:]
-		case protowire.BytesType:
-			val, m := protowire.ConsumeBytes(rest)
-			if m < 0 {
-				return
-			}
-			fn(num, typ, val, 0)
-			rest = rest[m:]
-		default:
-			m := protowire.ConsumeFieldValue(num, typ, rest)
-			if m < 0 {
-				return
-			}
-			rest = rest[m:]
-		}
-	}
-}
+// scanFields/subMsg 是 wire 包同名函数的包内别名(本包调用密集,免去处处带包名)。
+var (
+	scanFields = wire.ScanFields
+	subMsg     = wire.SubMsg
+)
