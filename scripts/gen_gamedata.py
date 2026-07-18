@@ -387,17 +387,19 @@ for v in rows("LAYERED_WORLD_MAP_CONF.json").values():
 #     refresh_type=4 → SCENE_OBJECT_CONF[param].position_xyz(眠枭庇护所,actor 名 BP_NPCOwl_*)
 # 注意 SCENE_OBJECT_AWARD 与 SCENE_OBJECT_CONF **id 相同但含义不同**(前者是可采集物),别取错表。
 #
-# 图层清单(k=键 / n=中文 / icon=图标原始文件名,须在 gen_icons.py 的 WORLDMAP 组里 / on=默认开启)。
-# 非星星图层的 icon 同时是**匹配依据**:该图标出现在 WORLD_MAP_CONF 行的任意图标字段即算属于本图层。
+# 图层清单(k=键 / n=中文 / icon=图标原始文件名,须在 gen_icons.py 的 WORLDMAP 组里 / on=默认开启 /
+# collect=可收集图层:点带刷新点 id 参与收集判定,前端「收集模式」按此隐藏已收集的点)。
+# 非白名单图层的 icon 同时是**匹配依据**:该图标出现在 WORLD_MAP_CONF 行的任意图标字段即算属于本图层。
 POI_KINDS = [
     {"k": "mana",        "n": "魔力之源",       "icon": "Interestplace_Campinglan_png",         "on": True},
     {"k": "alchemy",     "n": "炼金釜",         "icon": "Alchemy_png",                          "on": True},
     {"k": "guard",       "n": "守护地",         "icon": "Interestplace_Underground_Unlock_png"},
     {"k": "owl_big",     "n": "大型眠枭庇护所", "icon": "img_gaojimianxiao_weifangman_png"},
     {"k": "owl_small",   "n": "小型眠枭庇护所", "icon": "img_dijimianxiao_weifangman_png"},
-    {"k": "star_blue",   "n": "蓝色眠枭之星",   "icon": "img_miaoxianzhixing_lan_png"},
-    {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png"},
-    {"k": "star_purple", "n": "紫色眠枭之星",   "icon": "img_miaoxianzhixing_zi_png"},
+    {"k": "star_blue",   "n": "蓝色眠枭之星",   "icon": "img_miaoxianzhixing_lan_png",          "collect": True},
+    {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png",        "collect": True},
+    {"k": "star_purple", "n": "紫色眠枭之星",   "icon": "img_miaoxianzhixing_zi_png",           "collect": True},
+    {"k": "part_bugu",   "n": "不咕钟零件",     "icon": "100946",                               "collect": True},
 ]
 
 # 眠枭之星图层不走 WORLD_MAP 匹配,按 NPC_CONF id 白名单直取刷新行。口径 = 攻略/游戏总数:
@@ -424,6 +426,14 @@ STAR_NPCS = {
 }
 STAR_STANDALONE = {55162, 55163, 55601}  # 独立星(要做多顶点奖励行排除的就这一形态)
 STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_CONF 里)
+
+# 不咕钟零件(2026-07 更新的收集品,道具 104501,MEGAMAP_GATHERING「不咕钟零件」采集物):
+# 与眠枭之星同为 NPC 白名单直取刷新行(NPC 55901「A2-2-不咕钟零件」,90 行候选中启用 51 行,
+# 与三方攻略全收集数一致)。实体判定与星/光点完全同套(未收集才刷、npc_content_cfg_id=刷新行 id,
+# pcap 实测),但**不在 WORLD_EXPLORING_STATISTIC_CONF 里**——服务器不给分区进度,
+# 收集模式只走逐点判定,故点位不带候选区域(z)。
+# NPC_WHITELIST 是「按 npc id 白名单取点」图层的总表:星星在此之上另做奖励行/装饰石像排除。
+NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}}
 
 npc_pendant = rows("NPC_PENDANT_CONF.json")
 
@@ -537,9 +547,10 @@ def _poi_pos(refresh_id):
 pois = {}
 for kind in POI_KINDS:
     icon, seen = kind["icon"], set()
-    if kind["k"] in STAR_NPCS:
-        # 眠枭之星:按 npc 白名单直取刷新行(构成与排除项见 STAR_NPCS 注释)
-        star = STAR_NPCS[kind["k"]]
+    if kind["k"] in NPC_WHITELIST:
+        # 眠枭之星/不咕钟零件:按 npc 白名单直取刷新行(星星的排除项见 STAR_NPCS 注释;
+        # 零件无奖励行/石像形态,下面两个排除对它自然不命中)
+        star = NPC_WHITELIST[kind["k"]]
         todo = []
         for r in npc_refresh.values():
             nid = int(r.get("npc_id") or 0)

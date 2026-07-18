@@ -27,13 +27,15 @@ const (
 	OpNpcPendantInteractRsp = 0x0273 // ZONE_SCENE_NPC_PENDANT_INTERACT_RSP,s2c:回包(ret=0 成功)
 )
 
-// 眠枭之星的 NPC_CONF id:A1=蓝、A2=黄、A2-2=紫(2026-07 版新区);「之星」「光点」「石像」
-// 三种形态都算一颗星(光点交互后出一颗星;石像被星星魔法命中后浮现一颗星,触碰收集)。
-// 与 gen_gamedata.py 的 STAR_NPCS 同一批;蓝 147/黄 228/紫 104 的构成见 docs/data.md 3.3。
+// 可收集物的 NPC_CONF id。眠枭之星:A1=蓝、A2=黄、A2-2=紫(2026-07 版新区);「之星」「光点」
+// 「石像」三种形态都算一颗星(光点交互后出一颗星;石像被星星魔法命中后浮现一颗星,触碰收集)。
+// 不咕钟零件(55901)是 2026-07 更新的收集品,实体行为与星/光点同套(未收集才刷)。
+// 与 gen_gamedata.py 的 NPC_WHITELIST 同一批;蓝 147/黄 228/紫 104 的构成见 docs/data.md 3.3。
 var starNpc = map[int32]bool{
 	55162: true, 55163: true, 55601: true, // 独立星
 	55500: true, 55510: true, 55602: true, // 光点
 	58308: true, 58318: true, 55632: true, // 石像
+	55901: true, // 不咕钟零件(51 点,无分区计数,见 docs/data.md 3.3)
 }
 
 // 石像与星/光点的**实体行为不同**(见 docs/data.md 3.4):石像本体收集后不消失、实体一直下发,
@@ -41,10 +43,19 @@ var starNpc = map[int32]bool{
 // (见 NpcActor.Pendant),收集动作是 c2s 挂件交互(OpNpcPendantInteractReq)。
 var statueNpc = map[int32]bool{58308: true, 58318: true, 55632: true}
 
-// 挂件(石像的星)状态,ActorInfo 的 NpcPendantItemInfo.status 取值(pcap 实测)。
+// 挂件(石像的星)状态,ActorInfo 的 NpcPendantItemInfo.status 取值。全集见客户端枚举
+// ProtoEnum.PendantItemStatus:PIS_NONE=0、PIS_DISABLE=1、PIS_ENABLE=2、PIS_TRANSPARENT=3
+// (Scene/Component/Pendant)。14 份 pcap 实测石像只出现过 1/2 两值。
+//
+// 判「这颗星该不该在地图上显示」= 是否仍可收集:客户端 AttacheeComponent 在
+// status∈{ENABLE(2),TRANSPARENT(3)} 时才发收集请求,故这两者都是「未收集/仍显示」;
+// NONE(0) 是初始态(挂件字段常缺省),同样保守显示。只有 DISABLE(1) 才是已收走。
+// (注:PendantComponent:IsAllCollected 把 TRANSPARENT 也算「已完成」,那是 UI 全收集徽章
+// 的另一口径,与地图显示无关,勿据此把 3 判为已收集。)
+// 故下面只需区分「已收走(1)」与「其余一律仍显示」,starSee/parseActorInfo 即按此二分。
 const (
-	PendantUncollected = 2 // 星还挂着(未收集)
-	PendantCollected   = 1 // 已收集
+	PendantUncollected = 2 // PIS_ENABLE:星还挂着(未收集);0/3 同样走「仍显示」分支
+	PendantCollected   = 1 // PIS_DISABLE:已收走
 )
 
 // NpcActor 是服务器下发的一个 NPC 实体(只取判定收集状态需要的字段)。
@@ -56,7 +67,7 @@ type NpcActor struct {
 	Pos       Position
 }
 
-// IsStar 报告该实体是不是眠枭之星(含光点/石像形态)。
+// IsStar 报告该实体是不是收集判定关心的可收集物(眠枭之星含光点/石像形态,及不咕钟零件)。
 func (a NpcActor) IsStar() bool { return starNpc[a.CfgID] }
 
 // IsStatue 报告该实体是不是眠枭石像(收集状态看 Pendant,不看实体存在与否)。

@@ -41,10 +41,11 @@ type LayerInfo struct {
 
 // POIKind 是一类大地图 POI(实时地图页的一个可开关图层),取自 names.json 的 poi_kinds。
 type POIKind struct {
-	K    string `json:"k"`    // 图层键(alchemy/mana/…),与 POI.K 对应
-	N    string `json:"n"`    // 中文名(炼金釜/魔力之源…)
-	Icon string `json:"icon"` // 图标原始文件名;Go 侧拼 worldmap/<原名>.webp
-	On   bool   `json:"on"`   // 默认开启(魔力之源、炼金釜)
+	K       string `json:"k"`       // 图层键(alchemy/mana/…),与 POI.K 对应
+	N       string `json:"n"`       // 中文名(炼金釜/魔力之源…)
+	Icon    string `json:"icon"`    // 图标原始文件名;Go 侧拼 worldmap/<原名>.webp
+	On      bool   `json:"on"`      // 默认开启(魔力之源、炼金釜)
+	Collect bool   `json:"collect"` // 可收集图层(眠枭之星/不咕钟零件):点带刷新点 id,参与收集判定
 }
 
 // POI 是一个大地图标记点(世界坐标,厘米)。名称取自 WORLD_MAP_CONF.element_text_name
@@ -126,8 +127,19 @@ func (db *DB) LayerIn(res int32, activeFuncs map[uint32]bool) (LayerInfo, bool) 
 	return LayerInfo{}, false
 }
 
-// POIKinds 返回大地图 POI 图层清单(有序:魔力之源、炼金釜、守护地、庇护所、眠枭之星)。
+// POIKinds 返回大地图 POI 图层清单(有序:魔力之源、炼金釜、守护地、庇护所、眠枭之星、不咕钟零件)。
 func (db *DB) POIKinds() []POIKind { return db.poiKinds }
+
+// CollectibleKind 报告某图层是不是可收集图层(眠枭之星/不咕钟零件):其点位带刷新点 id,
+// 参与收集状态判定与前端「收集模式」隐藏。清单个位数,线性扫即可。
+func (db *DB) CollectibleKind(k string) bool {
+	for _, kind := range db.poiKinds {
+		if kind.K == k {
+			return kind.Collect
+		}
+	}
+	return false
+}
 
 // POIs 返回某场景的全部 POI(世界坐标);无底图的场景不收录,返回 nil。
 func (db *DB) POIs(resID uint32) []POI { return db.pois[resID] }

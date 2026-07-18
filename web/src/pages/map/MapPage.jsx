@@ -146,7 +146,7 @@ export default function MapPage() {
                 落在层图上。 */}
             {pois.marks.map((p, i) => (
               <img key={i} alt="" draggable={false}
-                className={'map-poi' + (pois.starMode && pois.isSure(p) ? ' sure' : '')}
+                className={'map-poi' + (pois.isSure(p) ? ' sure' : '')}
                 src={imgURL(pois.iconOf[p.k])} title={p.n}
                 style={{ left: p.u * mapPx, top: p.v * mapPx }} />
             ))}
