@@ -122,7 +122,7 @@ def find(ref: str, ext: str) -> str:
 
 
 def crop_sprite(ref: str, dst: str) -> str | None:
-    """PaperSprite:读 Save Properties JSON 的 UV,从图集 PNG 裁切并写 webp。返回失败原因或 None。"""
+    """PaperSprite:读属性 JSON 的 UV,从图集 PNG 裁切并写 webp。返回失败原因或 None。"""
     jf = find(ref, ".json")
     if not jf:
         return "缺 JSON"
@@ -143,7 +143,7 @@ def crop_sprite(ref: str, dst: str) -> str | None:
 
 
 def copy_texture(ref: str, dst: str) -> str | None:
-    """Texture2D:Save Texture 出的整张 PNG 直接转码。返回失败原因或 None。"""
+    """Texture2D:整张 PNG 直接转码。返回失败原因或 None。"""
     png = find(ref, ".png")
     if not png:
         return "缺 PNG"
