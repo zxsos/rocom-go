@@ -1,0 +1,21 @@
+/* 调试页:游戏事件流表格 + 忽略列表。 */
+
+.debug-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }
+.debug-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); }
+.dir-c2s { color: var(--accent); } .dir-s2c { color: var(--gold); }
+.debug-table td:last-child { width: 1%; text-align: right; padding-right: 6px; }
+.btn-ignore { background: none; border: 0; cursor: pointer; padding: 0 4px; opacity: 0.35; font-size: 12px; }
+.btn-ignore:hover { opacity: 1; }
+
+/* 已忽略 opcode 的可点击胶囊(点击取消) */
+.ignore-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; }
+.ignore-bar .chip { font-family: ui-monospace, monospace; }
+
+@media (max-width: 760px) {
+  /* 移动端精简为「时间/方向/名称」:隐藏说明文字、账号列与冗长的 opcode 列,
+     名称长词换行,避免横向溢出 */
+  .toolbar-hint { display: none; }
+  .debug-table .dbg-acct, .debug-table .dbg-op { display: none; }
+  .debug-table td { padding: 5px 8px; }
+  .debug-table .dbg-name { word-break: break-all; }
+}

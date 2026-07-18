@@ -1,36 +1,22 @@
 import React, { useState, useEffect, useRef, useContext } from 'react'
 import { subscribe } from '../api'
-import { AccountContext } from '../App'
+import { AccountContext } from '../context'
+import { useStoredJSON } from '../hooks/useStoredState'
+import { fmtClock } from '../utils/format'
 
 // 默认忽略高频且无分析价值的场景 NPC 位置同步(每秒多条,会淹没事件流)。
+// localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
 const DEFAULT_IGNORED = ['ZONE_SCENE_SET_NPC_POS_REQ', 'ZONE_SCENE_SET_NPC_POS_RSP', 'ZONE_SCENE_PLAY_ACTS_NOTIFY']
-
-// 实时流事件全在「当下」发生,日期冗余;只显示时:分:秒,省横向宽度(移动端尤甚)。
-const clock = (ts) => {
-  if (!ts) return '-'
-  const d = new Date(ts * 1000)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-}
-
-// 忽略列表持久化:localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
-function loadIgnored() {
-  const v = localStorage.getItem('debugIgnore')
-  if (v === null) return DEFAULT_IGNORED
-  try { return JSON.parse(v) } catch { return DEFAULT_IGNORED }
-}
 
 export default function Debug() {
   const account = useContext(AccountContext)
   const [rows, setRows] = useState([])
   const [paused, setPaused] = useState(false)
   const [filter, setFilter] = useState('')
-  const [ignored, setIgnored] = useState(loadIgnored)
+  const [ignored, setIgnored] = useStoredJSON(localStorage, 'debugIgnore', DEFAULT_IGNORED)
   // 忽略集合放进 ref,避免每次增删都重新订阅;订阅回调里以名称精确匹配丢弃。
   const ignoredRef = useRef(ignored)
   ignoredRef.current = ignored
-
-  useEffect(() => { localStorage.setItem('debugIgnore', JSON.stringify(ignored)) }, [ignored])
 
   // 仅本页(且未暂停)才订阅高频 debug 流;暂停 = 关闭连接,服务端随之停止推送,而非前端丢弃。
   // account 变化时重订阅(切换账号后只看新账号的流量)。
@@ -75,7 +61,7 @@ export default function Debug() {
           <tbody>
             {shown.map((r, i) => (
               <tr key={i}>
-                <td className="muted dbg-time">{clock(r.time)}</td>
+                <td className="muted dbg-time">{fmtClock(r.time)}</td>
                 <td className={r.dir === 'c2s' ? 'dir-c2s' : 'dir-s2c'}>{r.dir}</td>
                 <td className="muted dbg-acct">{(r.account || '').replace(/^ip:/, '')}</td>
                 <td className="dbg-op">{r.opcode}</td>
