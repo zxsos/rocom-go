@@ -1,6 +1,10 @@
 package scene
 
-import "google.golang.org/protobuf/encoding/protowire"
+import (
+	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/whoisnian/rocom-capture/internal/wire"
+)
 
 // 眠枭之星的收集状态判定(见 docs/data.md 3.4)。
 //
@@ -166,7 +170,7 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 // acts(1) → actor_leave(2,SpaceAct_ActorLeave) → actor_ids(1,重复 uint64)。
 //
 // 「离开」既可能是走远出了 AOI,也可能是**星星被玩家收走**。两者只能靠距离区分:玩家不可能
-// 隔着几十米收集,故只在玩家就在旁边时才据此判已收集(见 cmd/rocom-capture 的 starCollectRadius)。
+// 隔着几十米收集,故只在玩家就在旁边时才据此判已收集(见 pipeline 的 starCollectRadius)。
 func ParseActorLeave(body []byte) []uint64 {
 	var out []uint64
 	scanFields(body, func(num protowire.Number, typ protowire.Type, acts []byte, _ uint64) {
@@ -186,15 +190,7 @@ func ParseActorLeave(body []byte) []uint64 {
 					return
 				}
 				if t3 == protowire.BytesType { // packed repeated
-					rest := packed
-					for len(rest) > 0 {
-						x, n := protowire.ConsumeVarint(rest)
-						if n < 0 {
-							return
-						}
-						out = append(out, x)
-						rest = rest[n:]
-					}
+					out = append(out, wire.PackedVarints(packed)...)
 				}
 			})
 		})
@@ -303,15 +299,4 @@ func ParsePendantInteractRsp(body []byte) (retOK bool) {
 		}
 	})
 	return retOK
-}
-
-// subMsg 取 b 里首个指定字段号的子消息(length-delimited);没有返回 nil。
-func subMsg(b []byte, want protowire.Number) []byte {
-	var found []byte
-	scanFields(b, func(num protowire.Number, typ protowire.Type, val []byte, _ uint64) {
-		if found == nil && num == want && typ == protowire.BytesType {
-			found = val
-		}
-	})
-	return found
 }

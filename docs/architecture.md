@@ -12,7 +12,7 @@
                          └───────────────────┬──────────────────────────┘
                                              │ chan Message{dir,opcode,appBody}
                                              ▼
-                              ┌──────── consume(main) ────────┐
+                              ┌──────── pipeline.Run ─────────┐
                               │ connID→account 归属(见 §5)    │
                               │ 0x1346 → pet.ParsePetListRsp   │
                               │       → pet.ToPet(+gamedata)   │
@@ -36,9 +36,12 @@
 | `gcp` | GCP 分帧(`Deframe`)、密钥提取(`ExtractKey`)、AES 解密(`DecryptData`)、明文自检(`ValidPlain`)、opcode 提取 |
 | `capture` | 数据源(`afpacket` 实时 / `pcapgo` 离线)+ `reassembly` TCP 重组 + 会话密钥管理(可选 `KeyStore` 持久化，见 §3)，输出 `Message` |
 | `pb` | 游戏描述符 all.pb 生成的宠物消息结构(生成物) |
+| `wire` | 无 schema 的 protobuf wire 级扫描辅助(`ScanFields`/`SubMsg`/`Walk` 等),供 `pet`/`scene` 共用 |
 | `pet` | `ParsePetListRsp` 解析宠物列表；`ToPet` 转中文化业务模型；`ParseLoginAccount` 取登录 user_id/昵称 |
+| `scene` | 场景移动/切换/区域/星星实体消息解析(实时地图页) |
 | `gamedata` | embed 的 id→中文名 查找库 |
 | `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件 + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3) |
+| `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星状态(原 main 的 consume 循环;按 pets/position/stars 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源 |
 
 `cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
@@ -58,7 +61,7 @@
 - **会话密钥持久化(重启续解)**：密钥仅在连接建立时的 `0x1002 ACK` 明文下发一次;抓包
   服务若在密钥协商之后才启动/重启,拿不到密钥则整条连接的 DATA 全被当无密钥丢弃。
   为此 `Engine.Keys`(可选 `KeyStore`,由 `store` 实现)把 `connID→密钥` 落库:连接首次
-  出现时预热密钥、收到 ACK 时落盘;`consume` 同步持久化 `connID→account` 归属并在启动时
+  出现时预热密钥、收到 ACK 时落盘;`pipeline` 同步持久化 `connID→account` 归属并在启动时
   预热。因 AES-CBC 每个 DATA 包自带 IV(或固定零 IV)、解密无跨包状态,只要密钥在手,重启后
   从流中段接上的 DATA 即可独立解密并归属。**防误用**:四元组被新连接复用时可能套到陈旧
   缓存密钥,故解密后用 `gcp.ValidPlain` 校验 s2c 明文固定标记 `0x55aa`,不符即丢弃(新连接
@@ -81,7 +84,7 @@
   (`pet.ParseLoginAccount`)。**不用客户端 IP**——多台设备常经 NAT 共用同一 IP(实测两设备
   同为 `10.0.3.201`,仅连不同游戏服),会把不同用户合并;`user_id` 全局唯一、跨设备/跨服/
   换 IP 稳定。(旁证:s2c internal header `[6:10]` 是响应序号 seq 而非 uid,不能用作身份。)
-- **归属**:`consume` 维护 `connID→account` 映射。遇 `LOGIN_RSP` **先**解析 user_id 写映射、
+- **归属**:`pipeline` 维护 `connID→account` 映射。遇 `LOGIN_RSP` **先**解析 user_id 写映射、
   **再**据 connID 求 account(登录回包自带背包/队伍/奖牌快照,须先登记否则错归到旧账号);
   未登记连接(登录前/漏抓登录)的消息直接丢弃,不回退 IP。
 - **存储**:`pets/pet_box/pet_team/pet_medal` 均加 `account` 列 + 复合主键 `(account,gid)`
