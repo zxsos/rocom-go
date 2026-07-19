@@ -125,8 +125,8 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 		}
 	}
 	p.pushPos(acc, pos)
-	// 玩家走到哪,就把周围的星星判一遍(走近了却没实体 ⇒ 已收集)。
-	p.sweepStars(m.Session, acc, res, mr.Pos.X, mr.Pos.Y, m.Time)
+	// 玩家走到哪,就把周围的星星判一遍(走近了却没实体 ⇒ 已收集;z 供洞穴层守卫)。
+	p.sweepStars(m.Session, acc, res, mr.Pos.X, mr.Pos.Y, mr.Pos.Z, m.Time)
 }
 
 // pushPos 缓存并广播一条位置(缓存供地图页加载即时回显)。

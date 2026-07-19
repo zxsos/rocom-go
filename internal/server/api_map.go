@@ -54,18 +54,18 @@ type poiKind struct {
 // poiPoint 是一个 POI 标记:底图归一化坐标(与玩家位置同一投影)+ 名称。
 // 眠枭之星另带刷新点 id、候选区域与收集状态(见 docs/data.md 3.4)。
 type poiPoint struct {
-	K  string  `json:"k"`
-	U  float64 `json:"u"`
-	V  float64 `json:"v"`
-	N  string  `json:"n"`
-	R  int32   `json:"r,omitempty"`  // 刷新点 id(星星:前端据此接收状态增量)
-	Z  []int32 `json:"z,omitempty"`  // 候选区域营地 id 列表;全部收满才可隐藏(重叠带语义见 docs/data.md 3.4)
-	St int     `json:"st,omitempty"` // 收集状态:0 未确认 / 1 未收集 / 2 已收集
+	K    string  `json:"k"`
+	U    float64 `json:"u"`
+	V    float64 `json:"v"`
+	N    string  `json:"n"`
+	R    int32   `json:"r,omitempty"`    // 刷新点 id(星星:前端据此接收状态增量)
+	Zone []int32 `json:"zone,omitempty"` // 候选区域营地 id 列表;全部收满才可隐藏(重叠带语义见 docs/data.md 3.4)
+	St   int     `json:"st,omitempty"`   // 收集状态:0 未确认 / 1 未收集 / 2 已收集
 }
 
 // zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的独立星/光点/石像)。
 type zoneProgress struct {
-	Camp int32  `json:"camp"` // 区域键(营地 id),与 poiPoint.Z 的元素对应
+	Camp int32  `json:"camp"` // 区域键(营地 id),与 poiPoint.Zone 的元素对应
 	Name string `json:"name"` // 区域名(商店街周边…)
 	Got  int32  `json:"got"`
 	Tot  int32  `json:"tot"`
@@ -92,7 +92,7 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 		}
 		pt := poiPoint{K: p.K, U: u, V: v, N: p.N}
 		if s.db.CollectibleKind(p.K) {
-			pt.R, pt.Z, pt.St = p.R, p.Z, states[p.R]
+			pt.R, pt.Zone, pt.St = p.R, p.Zone, states[p.R]
 		}
 		pts = append(pts, pt)
 		num[p.K]++

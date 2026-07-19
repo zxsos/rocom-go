@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -12,7 +13,7 @@ import (
 // ---- 眠枭之星/不咕钟零件收集判定(见 docs/data.md 3.4)----
 //
 // 不咕钟零件(part_bugu 图层)的实体行为与星/光点完全同套,复用全部判定路径;差别只有一点:
-// 服务器不给它分区进度(不在 WORLD_EXPLORING_STATISTIC_CONF 里),点位不带候选区域(Z 空),
+// 服务器不给它分区进度(不在 WORLD_EXPLORING_STATISTIC_CONF 里),点位不带候选区域(Zone 空),
 // 故 sweepStars 的 got=0 守卫对它逐点放行、bumpStarZone 对它自然 no-op。
 //
 // 星/光点:已收集的服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
@@ -43,46 +44,62 @@ const (
 	starCommitNear    = 1000                    // 贴脸结账距离:实体最早在 21m 处必已下发,10m 留足余量
 	starCommitBack    = 1500                    // 回撤结账迟滞:距离回升超过最近点这么多 ⇒ 接近段结束
 	starCollectRadius = 3000                    // 实体离开 AOI 时,玩家在此距离内 ⇒ 是被收走了(而非走远出 AOI)
+	starLayerDz       = 800                     // 洞穴层守卫(厘米):见下
 	starSettle        = 1500 * time.Millisecond // 进场景后等快照到齐再判定,免得把还没下发的当成已收集
 )
+
+// 洞穴层守卫(starLayerDz):平面距离进圈不等于真走近——部分星点落在洞穴/分层地图**里**,
+// 玩家走在其正上方的地表时平面距离可以贴脸,但服务器按实际空间下发 AOI,实体不会来,
+// 纯 2D 判定会把这些未收集的点误判成已收集,且不进洞就永不自愈(实体永无机会出现翻回)。
+// 故结账另要求:本场景内玩家与该点的**最小高度差**(minDz,与 minD 同步维护)≤ starLayerDz。
+// 同层走近时脚底与星点的高差通常仅数米(星略浮空 + 地形起伏);洞穴层与地表的高差远大于此
+// (家园地下室与一楼实测已差 6m,野外洞穴更深)。取 8m 为初值,高差超限只是不判、照常显示,
+// 待玩家真正进到同层(实体出现或高差进圈)再判——方向安全,代价是坡地上个别结账推迟。
+// 「实体离开+人在旁」的判定同加此守卫:防玩家离开洞穴后站在洞顶时,洞内实体出 AOI 的
+// 离开事件被平面距离误认作「刚收走」。
 
 // starTracker 是一个连接在**当前场景会话**内的星星观测态(换场景/传送即重置)。
 type starTracker struct {
 	seen   map[int32]bool    // 本场景收到过实体的刷新点 id ⇒ 未收集
 	actor  map[uint64]int32  // 实体 actor_id -> 刷新点 id(实体离开时只给 actor_id)
-	minD   map[int32]float64 // 刷新点 id -> 本场景内玩家距它的最近距离(只记进过判定圈的,结账时机用)
+	minD   map[int32]float64 // 刷新点 id -> 本场景内玩家距它的最近平面距离(只记进过判定圈的,结账时机用)
+	minDz  map[int32]float64 // 刷新点 id -> 进判定圈期间与该点的最小高度差(洞穴层守卫,见 starLayerDz)
 	snapAt time.Time         // 周边实体快照(0x014a)到达时刻;零值 = 还没到,不做已收集判定
 	res    int32             // 当前场景 res(星点按场景取)
 }
 
 func newStarTracker(res int32) *starTracker {
-	return &starTracker{seen: map[int32]bool{}, actor: map[uint64]int32{}, minD: map[int32]float64{}, res: res}
+	return &starTracker{seen: map[int32]bool{}, actor: map[uint64]int32{},
+		minD: map[int32]float64{}, minDz: map[int32]float64{}, res: res}
 }
 
-// posXY 从位置推送里取玩家世界坐标。
-func posXY(pos map[string]any) (int32, int32, bool) {
+// posXYZ 从位置推送里取玩家世界坐标(z 为脚底高度)。
+func posXYZ(pos map[string]any) (int32, int32, int32, bool) {
 	x, ok1 := pos["x"].(int32)
 	y, ok2 := pos["y"].(int32)
-	return x, y, ok1 && ok2
+	z, ok3 := pos["z"].(int32)
+	return x, y, z, ok1 && ok2 && ok3
 }
 
-// starPos 查某刷新点的世界坐标(星点来自 gamedata 的 POI 表)。
-func (p *Pipeline) starPos(res int32, refreshID int32) [2]int32 {
+// starPoi 查某刷新点的点位(星点来自 gamedata 的 POI 表)。
+func (p *Pipeline) starPoi(res int32, refreshID int32) (gamedata.POI, bool) {
 	for _, poi := range p.db.POIs(uint32(res)) {
 		if poi.R == refreshID {
-			return [2]int32{poi.X, poi.Y}
+			return poi, true
 		}
 	}
-	return [2]int32{}
+	return gamedata.POI{}, false
 }
 
-// near 报告 (x,y) 是否在点 p 的 r 厘米内(平面距离;星星有同 xy 叠放的,z 不参与)。
-func near(x, y int32, p [2]int32, r int32) bool {
-	if p == ([2]int32{}) {
-		return false
-	}
-	dx, dy := float64(x-p[0]), float64(y-p[1])
+// near 报告 (x,y) 是否在点位的 r 厘米内(平面距离;高度差另由 starLayerDz 守卫)。
+func near(x, y int32, poi gamedata.POI, r int32) bool {
+	dx, dy := float64(x-poi.X), float64(y-poi.Y)
 	return math.Hypot(dx, dy) <= float64(r)
+}
+
+// sameFloor 报告玩家脚底高度与点位的高差是否在同层范围内(洞穴层守卫,见 starLayerDz)。
+func sameFloor(pz int32, poi gamedata.POI) bool {
+	return math.Abs(float64(pz-poi.Z)) <= starLayerDz
 }
 
 // knownStars 返回该账号已确认的星星状态(首次访问从库预热)。
@@ -141,7 +158,7 @@ func (p *Pipeline) bumpStarZone(acc string, res int32, rid int32) {
 	var zs []int32
 	for _, poi := range p.db.POIs(uint32(res)) {
 		if poi.R == rid && p.db.CollectibleKind(poi.K) {
-			zs = poi.Z
+			zs = poi.Zone
 			break
 		}
 	}
@@ -201,8 +218,12 @@ func (p *Pipeline) observeStars(conn, acc string, body []byte) {
 			continue
 		}
 		delete(ts.actor, id)
-		// 玩家不可能隔着几十米收集:只有他就在旁边时,实体消失才是「被收走」。
-		if px, py, ok := posXY(pos); ok && near(px, py, p.starPos(ts.res, rid), starCollectRadius) {
+		// 玩家不可能隔着几十米收集:只有他就在旁边(平面且同层)时,实体消失才是「被收走」。
+		px, py, pz, ok := posXYZ(pos)
+		if !ok {
+			continue
+		}
+		if poi, found := p.starPoi(ts.res, rid); found && near(px, py, poi, starCollectRadius) && sameFloor(pz, poi) {
 			delete(ts.seen, rid)
 			states[rid] = store.StarCollected
 			p.bumpStarZone(acc, ts.res, rid) // 刚收走:分区进度本地 +1(凑满即触发前端整区隐藏)
@@ -212,7 +233,8 @@ func (p *Pipeline) observeStars(conn, acc string, body []byte) {
 }
 
 // sweepStars 按玩家当前位置判定周围的星星:走到判定半径内却没收到实体 ⇒ 已收集。
-func (p *Pipeline) sweepStars(conn, acc string, res int32, x, y int32, now time.Time) {
+// z 为玩家脚底高度:同层与否由 minDz 守卫(见 starLayerDz),防把洞穴层里的点在洞顶误判。
+func (p *Pipeline) sweepStars(conn, acc string, res int32, x, y, z int32, now time.Time) {
 	cs := p.conns[conn]
 	if cs == nil {
 		return
@@ -246,20 +268,30 @@ func (p *Pipeline) sweepStars(conn, acc string, res int32, x, y int32, now time.
 			}
 			continue
 		}
-		if d <= starSweepRadius && (!entered || d < md) {
-			ts.minD[poi.R], md, entered = d, d, true
+		if d <= starSweepRadius {
+			if !entered || d < md {
+				ts.minD[poi.R], md, entered = d, d, true
+			}
+			dz := math.Abs(float64(z - poi.Z))
+			if cur, has := ts.minDz[poi.R]; !has || dz < cur {
+				ts.minDz[poi.R] = dz
+			}
 		}
-		// 守卫:候选区域(见 POI.Z)只要有一个**有计数行且 got=0**,「已收集」就不可能成立
+		// 守卫:候选区域(见 POI.Zone)只要有一个**有计数行且 got=0**,「已收集」就不可能成立
 		//(真实归属区必在候选之中),多半是该点还没开放刷出——不判,保持显示。
 		// 服务器**根本没给计数行**的候选(如月兔暗港,该区不注册任何星)不可能是真归属区,
 		// 跳过不挡——否则重叠带上的点会被永远卡住(2026-07-17 pcap 实测:望风半岛 3 点
 		// 已收集却因候选含月兔暗港而永不隐藏)。
 		ok := true
-		for _, c := range poi.Z {
+		for _, c := range poi.Zone {
 			if g, tracked := got[c]; tracked && g == 0 {
 				ok = false
 				break
 			}
+		}
+		// 洞穴层守卫:进圈期间从未与该点同层过(最小高度差超限)⇒ 多半隔着洞穴层,不判。
+		if mdz, has := ts.minDz[poi.R]; !has || mdz > starLayerDz {
+			continue
 		}
 		// 结账时机:贴脸,或已过最近点回撤(实体若在早就该到了,见 starCommitNear/Back 注释)。
 		if ok && (d <= starCommitNear || (entered && d >= md+starCommitBack)) {
@@ -308,7 +340,7 @@ func (p *Pipeline) onPendantRsp(m capture.Message, acc string) {
 		return
 	}
 	// 只认当前场景确有该刷新点的 POI(其它 NPC 的挂件交互对不上星点,自然被滤掉)。
-	if p.starPos(ts.res, rid) == ([2]int32{}) {
+	if _, found := p.starPoi(ts.res, rid); !found {
 		return
 	}
 	delete(ts.seen, rid)

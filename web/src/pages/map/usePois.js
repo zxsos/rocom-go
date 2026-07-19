@@ -17,8 +17,8 @@ const loadKeys = (key) => {
 // —— 收集模式(可收集图层:眠枭之星与不咕钟零件,后端 kinds[].collect 标记;按图层各自开关)——
 // 开启后隐藏该图层已收集的点,只留还没拿的。判定全部来自实测流量(见 docs/data.md 3.4),不做猜测:
 //   1) 候选区域全部收满(服务器按区域给「已收集/总数」;点在管辖区重叠带上会有多个候选,
-//      p.z 列表里的区域全部 got>=tot 才算)→ 隐藏,不必逐个走到;仅眠枭之星——不咕钟零件
-//      没有服务器分区进度,点不带 z,只走第 2 条;
+//      p.zone 列表里的区域全部 got>=tot 才算)→ 隐藏,不必逐个走到;仅眠枭之星——不咕钟零件
+//      没有服务器分区进度,点不带 zone,只走第 2 条;
 //   2) 逐点确认:玩家走到某点 50m 内而服务器没下发该点的实体 ⇒ 已收集(已收集的不再刷)
 //      → 隐藏(石像走挂件状态,见后端)。
 // 两条都没命中的点一律**照常显示**——宁可多显示,不能藏掉没拿的。
@@ -81,8 +81,8 @@ export function usePois(account, res) {
   const iconOf = Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon]))
   // 已收满的区域(服务器口径 got>=tot)。
   const doneZones = new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp))
-  // 收集模式下隐藏「已收集」的点:逐点确认过的,或候选区域(p.z 列表)全部收满的。其余一律显示。
-  const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.z?.length > 0 && p.z.every((c) => doneZones.has(c)))
+  // 收集模式下隐藏「已收集」的点:逐点确认过的,或候选区域(p.zone 列表)全部收满的。其余一律显示。
+  const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.zone?.length > 0 && p.zone.every((c) => doneZones.has(c)))
   const marks = poi.pois.filter((p) => {
     if (!poiOn.has(p.k)) return false
     if (!p.r || !collectOn.has(p.k)) return true
