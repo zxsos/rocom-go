@@ -431,7 +431,7 @@ STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_C
 # 与眠枭之星同为 NPC 白名单直取刷新行(NPC 55901「A2-2-不咕钟零件」,90 行候选中启用 51 行,
 # 与三方攻略全收集数一致)。实体判定与星/光点完全同套(未收集才刷、npc_content_cfg_id=刷新行 id,
 # pcap 实测),但**不在 WORLD_EXPLORING_STATISTIC_CONF 里**——服务器不给分区进度,
-# 收集模式只走逐点判定,故点位不带候选区域(z)。
+# 收集模式只走逐点判定,故点位不带候选区域(zone)。
 # NPC_WHITELIST 是「按 npc id 白名单取点」图层的总表:星星在此之上另做奖励行/装饰石像排除。
 NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}}
 
@@ -475,7 +475,7 @@ world_map = {k: w for k, w in world_map.items()
 #   CAMP_CONF(行 id = 营地刷新点 id)→ manage_area_func(营地管辖区)
 #     → AREA_FUNC_CONF.area_id → AREA_CONF 多边形(每区恰一个)
 # 相邻管辖区有重叠带,个别星点会同时落入两区且归属无法静态定夺(实测两种决胜规则都会
-# 与服务器分区计数矛盾),故 POI 的 z 是**候选区域列表**:前端仅当列表非空且全部收满才隐藏
+# 与服务器分区计数矛盾),故 POI 的 zone 是**候选区域列表**:前端仅当列表非空且全部收满才隐藏
 # ——绝不误藏(服务器归属必在候选之中,已用回放 star_zone 的分区 tot 全量校验:0 矛盾)。
 # 勿再试的歧路见 docs/data.md 3.4(按区域名匹配 AREA_FUNC 得到的是播报触发体,错 265 点)。
 zone_name = {}   # camp_refresh_id -> 区域名
@@ -517,7 +517,7 @@ def zones_of(x, y):
 
 
 def _poi_pos(refresh_id):
-    """刷新行 → (scene_res_id, x, y);禁用/无刷新规则的行与解不出坐标的返回 None。"""
+    """刷新行 → (scene_res_id, x, y, z);禁用/无刷新规则的行与解不出坐标的返回 None。"""
     r = npc_refresh.get(str(int(refresh_id)))
     if not r or r.get("disable"):  # 策划留的废弃/未启用点位
         return None
@@ -538,11 +538,12 @@ def _poi_pos(refresh_id):
         xyz, res = row.get("position_xyz"), row.get("scene_res_conf_id")
     if not (xyz and res):
         return None
-    return int(res), int(xyz[0]), int(xyz[1])
+    return int(res), int(xyz[0]), int(xyz[1]), int(xyz[2])
 
 
-# pois: scene_res_id -> [{k:图层键, x, y, n:名称}](世界坐标,厘米;Go 侧用 maps 的同一投影换算成
-# 底图归一化 uv,见 gamedata.Project——投影公式只此一处)。只收有底图的场景:其余(副本/独立洞穴
+# pois: scene_res_id -> [{k:图层键, x, y, z, n:名称}](世界坐标,厘米,z 为高度;Go 侧用 maps 的
+# 同一投影换算成底图归一化 uv,见 gamedata.Project——投影公式只此一处,z 供收集判定的洞穴层守卫,
+# 见 pipeline/stars.go)。只收有底图的场景:其余(副本/独立洞穴
 # 场景)无从投影。洞穴/楼层的点仍属地表 res(如 10003),会照常落在底图上。
 pois = {}
 for kind in POI_KINDS:
@@ -577,17 +578,17 @@ for kind in POI_KINDS:
         got = _poi_pos(rid)
         if not got:
             continue
-        res, x, y = got
+        res, x, y, z = got
         if str(res) not in maps:
             continue
         name = owner.get("element_text_name") or owner.get("name") or kind["n"]
         # r=刷新点 id(NPC_REFRESH_CONTENT_CONF.id):服务器下发的 NPC 实体带同一个 id
         #   (ActorInfo.npc.npc_base.npc_content_cfg_id),据此把实体对回这个点位。见 docs/data.md 3.4。
-        # z=候选区域营地 id 列表(仅眠枭之星;语义见上方区域注释)。
-        e = {"k": kind["k"], "r": rid, "x": x, "y": y, "n": name}
+        # zone=候选区域营地 id 列表(仅眠枭之星;语义见上方区域注释)。
+        e = {"k": kind["k"], "r": rid, "x": x, "y": y, "z": z, "n": name}
         if kind["k"].startswith("star"):
             if zz := zones_of(x, y):
-                e["z"] = zz
+                e["zone"] = zz
         pois.setdefault(str(res), []).append(e)
 
 data = {
@@ -603,7 +604,7 @@ data = {
     # 分层地图(洞穴/地下层):层id -> {名称,组,scene_res,层图,cave前缀,投影 ox/oy/side}。见上。
     "layers": layers,
     # 大地图 POI(实时地图页可开关的图标图层):poi_kinds 是图层清单(有序,on=默认开启),
-    # pois 是 scene_res_id -> [{k:图层键, r:刷新点id, x, y, n:名称, z:所属区域(仅星星)}]。
+    # pois 是 scene_res_id -> [{k:图层键, r:刷新点id, x, y, z:高度, n:名称, zone:候选区域(仅星星)}]。
     # 见上与 docs/data.md 3.3/3.4。
     "poi_kinds": POI_KINDS,
     "pois": pois,

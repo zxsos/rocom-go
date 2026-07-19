@@ -51,12 +51,13 @@ type POIKind struct {
 // POI 是一个大地图标记点(世界坐标,厘米)。名称取自 WORLD_MAP_CONF.element_text_name
 // (如「月牙湖岸的魔力之源」),无名时退到图层名。坐标来源与提取见 docs/data.md 3.3。
 type POI struct {
-	K string  `json:"k"` // 所属图层键
-	R int32   `json:"r"` // 刷新点 id(NPC_REFRESH_CONTENT_CONF.id);服务器下发的 NPC 实体带同一个 id
-	X int32   `json:"x"` // 世界坐标 X(厘米)
-	Y int32   `json:"y"` // 世界坐标 Y
-	N string  `json:"n"` // 名称(悬停显示)
-	Z []int32 `json:"z"` // 候选区域营地 id 列表(仅眠枭之星;管辖区重叠带上的点会有多个,见 docs/data.md 3.4)
+	K    string  `json:"k"`    // 所属图层键
+	R    int32   `json:"r"`    // 刷新点 id(NPC_REFRESH_CONTENT_CONF.id);服务器下发的 NPC 实体带同一个 id
+	X    int32   `json:"x"`    // 世界坐标 X(厘米)
+	Y    int32   `json:"y"`    // 世界坐标 Y
+	Z    int32   `json:"z"`    // 世界坐标 Z(高度):收集判定据此挡住「站在洞穴层星点正上方的地表」的平面误判
+	N    string  `json:"n"`    // 名称(悬停显示)
+	Zone []int32 `json:"zone"` // 候选区域营地 id 列表(仅眠枭之星;管辖区重叠带上的点会有多个,见 docs/data.md 3.4)
 }
 
 // SceneName 返回场景名(scene_cfg_id → SCENE_CONF.scene_name)。
