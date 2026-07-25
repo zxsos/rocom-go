@@ -1456,6 +1456,8 @@ const (
 	BattleType_BT_PVP_SCARE                       BattleType = 35
 	BattleType_BT_TEST_PVP_AUTO_SKILL_PERFORMANCE BattleType = 36
 	BattleType_BT_STORY_TEAM_BATTLE               BattleType = 37
+	BattleType_BT_PVP_GAME1                       BattleType = 39
+	BattleType_BT_PVP_GAME2                       BattleType = 40
 )
 
 // Enum value maps for BattleType.
@@ -1498,6 +1500,8 @@ var (
 		35: "BT_PVP_SCARE",
 		36: "BT_TEST_PVP_AUTO_SKILL_PERFORMANCE",
 		37: "BT_STORY_TEAM_BATTLE",
+		39: "BT_PVP_GAME1",
+		40: "BT_PVP_GAME2",
 	}
 	BattleType_value = map[string]int32{
 		"BT_INVALID":                         0,
@@ -1537,6 +1541,8 @@ var (
 		"BT_PVP_SCARE":                       35,
 		"BT_TEST_PVP_AUTO_SKILL_PERFORMANCE": 36,
 		"BT_STORY_TEAM_BATTLE":               37,
+		"BT_PVP_GAME1":                       39,
+		"BT_PVP_GAME2":                       40,
 	}
 )
 
@@ -5324,6 +5330,7 @@ const (
 	ActionResultType_SUBMIT_FREE_MWDYLA       ActionResultType = 28
 	ActionResultType_SUBMIT_FREE_MWDYLB       ActionResultType = 29
 	ActionResultType_SUBMIT_FREE_MWDYLC       ActionResultType = 30
+	ActionResultType_PVP_TEAM_RULE            ActionResultType = 31
 )
 
 // Enum value maps for ActionResultType.
@@ -5360,6 +5367,7 @@ var (
 		28: "SUBMIT_FREE_MWDYLA",
 		29: "SUBMIT_FREE_MWDYLB",
 		30: "SUBMIT_FREE_MWDYLC",
+		31: "PVP_TEAM_RULE",
 	}
 	ActionResultType_value = map[string]int32{
 		"ART_NONE":                 0,
@@ -5393,6 +5401,7 @@ var (
 		"SUBMIT_FREE_MWDYLA":       28,
 		"SUBMIT_FREE_MWDYLB":       29,
 		"SUBMIT_FREE_MWDYLC":       30,
+		"PVP_TEAM_RULE":            31,
 	}
 )
 
@@ -25442,6 +25451,7 @@ const (
 	SpaceActorLogicStatus_SALS_STORY_FULL_LOCKDOWN           SpaceActorLogicStatus = 86
 	SpaceActorLogicStatus_SALS_STORY_NOVISIT_LOCKDOWN        SpaceActorLogicStatus = 87
 	SpaceActorLogicStatus_SALS_PUMPKIN_ILLUMINATED_DEFAULT   SpaceActorLogicStatus = 90
+	SpaceActorLogicStatus_SALS_GRASS_TRIAL_CHALLENGING       SpaceActorLogicStatus = 91
 	SpaceActorLogicStatus_SALS_LOCKED                        SpaceActorLogicStatus = 1001
 	SpaceActorLogicStatus_SALS_GROUWUP                       SpaceActorLogicStatus = 1002
 	SpaceActorLogicStatus_SALS_PET_WALL                      SpaceActorLogicStatus = 1003
@@ -25629,6 +25639,7 @@ var (
 		86:   "SALS_STORY_FULL_LOCKDOWN",
 		87:   "SALS_STORY_NOVISIT_LOCKDOWN",
 		90:   "SALS_PUMPKIN_ILLUMINATED_DEFAULT",
+		91:   "SALS_GRASS_TRIAL_CHALLENGING",
 		1001: "SALS_LOCKED",
 		1002: "SALS_GROUWUP",
 		1003: "SALS_PET_WALL",
@@ -25813,6 +25824,7 @@ var (
 		"SALS_STORY_FULL_LOCKDOWN":           86,
 		"SALS_STORY_NOVISIT_LOCKDOWN":        87,
 		"SALS_PUMPKIN_ILLUMINATED_DEFAULT":   90,
+		"SALS_GRASS_TRIAL_CHALLENGING":       91,
 		"SALS_LOCKED":                        1001,
 		"SALS_GROUWUP":                       1002,
 		"SALS_PET_WALL":                      1003,
@@ -30590,6 +30602,8 @@ const (
 	PlayerTeamType_PTT_PVE_BOSS_CHALLENGE_FIGHT   PlayerTeamType = 9
 	PlayerTeamType_PTT_PVP_BATTLE_5               PlayerTeamType = 10
 	PlayerTeamType_PTT_PVE_WEEKLY_CHALLENGE_FIGHT PlayerTeamType = 11
+	PlayerTeamType_PTT_PVP_BATTLE_6               PlayerTeamType = 12
+	PlayerTeamType_PTT_PVP_BATTLE_7               PlayerTeamType = 13
 )
 
 // Enum value maps for PlayerTeamType.
@@ -30607,6 +30621,8 @@ var (
 		9:  "PTT_PVE_BOSS_CHALLENGE_FIGHT",
 		10: "PTT_PVP_BATTLE_5",
 		11: "PTT_PVE_WEEKLY_CHALLENGE_FIGHT",
+		12: "PTT_PVP_BATTLE_6",
+		13: "PTT_PVP_BATTLE_7",
 	}
 	PlayerTeamType_value = map[string]int32{
 		"PTT_INVALID":                    0,
@@ -30621,6 +30637,8 @@ var (
 		"PTT_PVE_BOSS_CHALLENGE_FIGHT":   9,
 		"PTT_PVP_BATTLE_5":               10,
 		"PTT_PVE_WEEKLY_CHALLENGE_FIGHT": 11,
+		"PTT_PVP_BATTLE_6":               12,
+		"PTT_PVP_BATTLE_7":               13,
 	}
 )
 
@@ -61027,6 +61045,68 @@ func (PlayerAnimationCustomizeType) EnumDescriptor() ([]byte, []int) {
 	return file_xls_enum_proto_rawDescGZIP(), []int{757}
 }
 
+type PvpPetTeamType int32
+
+const (
+	PvpPetTeamType_PPTT_PET_ALL   PvpPetTeamType = 0
+	PvpPetTeamType_PPTT_PET_BASE  PvpPetTeamType = 1
+	PvpPetTeamType_PPTT_PET_TYPE  PvpPetTeamType = 2
+	PvpPetTeamType_PPTT_PET_BLOOD PvpPetTeamType = 3
+)
+
+// Enum value maps for PvpPetTeamType.
+var (
+	PvpPetTeamType_name = map[int32]string{
+		0: "PPTT_PET_ALL",
+		1: "PPTT_PET_BASE",
+		2: "PPTT_PET_TYPE",
+		3: "PPTT_PET_BLOOD",
+	}
+	PvpPetTeamType_value = map[string]int32{
+		"PPTT_PET_ALL":   0,
+		"PPTT_PET_BASE":  1,
+		"PPTT_PET_TYPE":  2,
+		"PPTT_PET_BLOOD": 3,
+	}
+)
+
+func (x PvpPetTeamType) Enum() *PvpPetTeamType {
+	p := new(PvpPetTeamType)
+	*p = x
+	return p
+}
+
+func (x PvpPetTeamType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PvpPetTeamType) Descriptor() protoreflect.EnumDescriptor {
+	return file_xls_enum_proto_enumTypes[758].Descriptor()
+}
+
+func (PvpPetTeamType) Type() protoreflect.EnumType {
+	return &file_xls_enum_proto_enumTypes[758]
+}
+
+func (x PvpPetTeamType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Do not use.
+func (x *PvpPetTeamType) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = PvpPetTeamType(num)
+	return nil
+}
+
+// Deprecated: Use PvpPetTeamType.Descriptor instead.
+func (PvpPetTeamType) EnumDescriptor() ([]byte, []int) {
+	return file_xls_enum_proto_rawDescGZIP(), []int{758}
+}
+
 type FacePhotoLoginType int32
 
 const (
@@ -61057,11 +61137,11 @@ func (x FacePhotoLoginType) String() string {
 }
 
 func (FacePhotoLoginType) Descriptor() protoreflect.EnumDescriptor {
-	return file_xls_enum_proto_enumTypes[758].Descriptor()
+	return file_xls_enum_proto_enumTypes[759].Descriptor()
 }
 
 func (FacePhotoLoginType) Type() protoreflect.EnumType {
-	return &file_xls_enum_proto_enumTypes[758]
+	return &file_xls_enum_proto_enumTypes[759]
 }
 
 func (x FacePhotoLoginType) Number() protoreflect.EnumNumber {
@@ -61080,7 +61160,7 @@ func (x *FacePhotoLoginType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use FacePhotoLoginType.Descriptor instead.
 func (FacePhotoLoginType) EnumDescriptor() ([]byte, []int) {
-	return file_xls_enum_proto_rawDescGZIP(), []int{758}
+	return file_xls_enum_proto_rawDescGZIP(), []int{759}
 }
 
 type FacePhotoConditionType int32
@@ -61119,11 +61199,11 @@ func (x FacePhotoConditionType) String() string {
 }
 
 func (FacePhotoConditionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_xls_enum_proto_enumTypes[759].Descriptor()
+	return file_xls_enum_proto_enumTypes[760].Descriptor()
 }
 
 func (FacePhotoConditionType) Type() protoreflect.EnumType {
-	return &file_xls_enum_proto_enumTypes[759]
+	return &file_xls_enum_proto_enumTypes[760]
 }
 
 func (x FacePhotoConditionType) Number() protoreflect.EnumNumber {
@@ -61142,7 +61222,7 @@ func (x *FacePhotoConditionType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use FacePhotoConditionType.Descriptor instead.
 func (FacePhotoConditionType) EnumDescriptor() ([]byte, []int) {
-	return file_xls_enum_proto_rawDescGZIP(), []int{759}
+	return file_xls_enum_proto_rawDescGZIP(), []int{760}
 }
 
 type SocialExtDataType int32
@@ -61178,11 +61258,11 @@ func (x SocialExtDataType) String() string {
 }
 
 func (SocialExtDataType) Descriptor() protoreflect.EnumDescriptor {
-	return file_xls_enum_proto_enumTypes[760].Descriptor()
+	return file_xls_enum_proto_enumTypes[761].Descriptor()
 }
 
 func (SocialExtDataType) Type() protoreflect.EnumType {
-	return &file_xls_enum_proto_enumTypes[760]
+	return &file_xls_enum_proto_enumTypes[761]
 }
 
 func (x SocialExtDataType) Number() protoreflect.EnumNumber {
@@ -61201,7 +61281,7 @@ func (x *SocialExtDataType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use SocialExtDataType.Descriptor instead.
 func (SocialExtDataType) EnumDescriptor() ([]byte, []int) {
-	return file_xls_enum_proto_rawDescGZIP(), []int{760}
+	return file_xls_enum_proto_rawDescGZIP(), []int{761}
 }
 
 type ActivityComposeVariableType int32
@@ -61237,11 +61317,11 @@ func (x ActivityComposeVariableType) String() string {
 }
 
 func (ActivityComposeVariableType) Descriptor() protoreflect.EnumDescriptor {
-	return file_xls_enum_proto_enumTypes[761].Descriptor()
+	return file_xls_enum_proto_enumTypes[762].Descriptor()
 }
 
 func (ActivityComposeVariableType) Type() protoreflect.EnumType {
-	return &file_xls_enum_proto_enumTypes[761]
+	return &file_xls_enum_proto_enumTypes[762]
 }
 
 func (x ActivityComposeVariableType) Number() protoreflect.EnumNumber {
@@ -61260,7 +61340,7 @@ func (x *ActivityComposeVariableType) UnmarshalJSON(b []byte) error {
 
 // Deprecated: Use ActivityComposeVariableType.Descriptor instead.
 func (ActivityComposeVariableType) EnumDescriptor() ([]byte, []int) {
-	return file_xls_enum_proto_rawDescGZIP(), []int{761}
+	return file_xls_enum_proto_rawDescGZIP(), []int{762}
 }
 
 var File_xls_enum_proto protoreflect.FileDescriptor
@@ -61524,7 +61604,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\rSE_INTER_AREA\x10\x80 \x12\x10\n" +
 	"\vSE_MARK_BAN\x10\x80@\x12\x1d\n" +
 	"\x17SE_ETERNAL_NIGHT_REGION\x10\x80\x80\x01\x12\x19\n" +
-	"\x13SE_SET_MIN_MAX_TEMP\x10\x80\x80\x02*\xac\x06\n" +
+	"\x13SE_SET_MIN_MAX_TEMP\x10\x80\x80\x02*\xd0\x06\n" +
 	"\n" +
 	"BattleType\x12\x0e\n" +
 	"\n" +
@@ -61570,7 +61650,9 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x0fBT_TRAIN_BATTLE\x10\"\x12\x10\n" +
 	"\fBT_PVP_SCARE\x10#\x12&\n" +
 	"\"BT_TEST_PVP_AUTO_SKILL_PERFORMANCE\x10$\x12\x18\n" +
-	"\x14BT_STORY_TEAM_BATTLE\x10%*P\n" +
+	"\x14BT_STORY_TEAM_BATTLE\x10%\x12\x10\n" +
+	"\fBT_PVP_GAME1\x10'\x12\x10\n" +
+	"\fBT_PVP_GAME2\x10(*P\n" +
 	"\x10VictoryCondition\x12\v\n" +
 	"\aVC_NONE\x10\x00\x12\x10\n" +
 	"\fVC_BUFF_TIME\x10\x01\x12\x1d\n" +
@@ -62403,7 +62485,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x12\x12\n" +
 	"\x0eTGAT_POINT_SET\x10\v\x12\x17\n" +
 	"\x13TGAT_TELE_STRUCTURE\x10\f\x12\x16\n" +
-	"\x12TGAT_WILD_CREATURE\x10\r*\xe6\x05\n" +
+	"\x12TGAT_WILD_CREATURE\x10\r*\xf9\x05\n" +
 	"\x10ActionResultType\x12\f\n" +
 	"\bART_NONE\x10\x00\x12\x1c\n" +
 	"\x18BattleFailInUnSafetyArea\x10\x01\x12\r\n" +
@@ -62436,7 +62518,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x14SUBMIT_FREE_QSSYYXSX\x10\x1b\x12\x16\n" +
 	"\x12SUBMIT_FREE_MWDYLA\x10\x1c\x12\x16\n" +
 	"\x12SUBMIT_FREE_MWDYLB\x10\x1d\x12\x16\n" +
-	"\x12SUBMIT_FREE_MWDYLC\x10\x1e*\xb2\v\n" +
+	"\x12SUBMIT_FREE_MWDYLC\x10\x1e\x12\x11\n" +
+	"\rPVP_TEAM_RULE\x10\x1f*\xb2\v\n" +
 	"\x19TaskStateChangeActionType\x12\x0e\n" +
 	"\n" +
 	"TSCAT_NONE\x10\x00\x12\x11\n" +
@@ -65528,7 +65611,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x16HSD_SEQUENCE_NUMBER_UP\x10\x02*Q\n" +
 	"\x16HandbookSequenceSwitch\x12\x19\n" +
 	"\x15HSS_SEQUENCE_LEVEL_UP\x10\x01\x12\x1c\n" +
-	"\x18HSS_SEQUENCE_NUMBER_DOWN\x10\x02*\xcd$\n" +
+	"\x18HSS_SEQUENCE_NUMBER_DOWN\x10\x02*\xef$\n" +
 	"\x15SpaceActorLogicStatus\x12\r\n" +
 	"\tSALS_NONE\x10\x00\x12\x0f\n" +
 	"\vSALS_NORMAL\x10\x01\x12\x14\n" +
@@ -65615,7 +65698,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x1cSALS_TAKE_PHOTO_MYSELF_FLOAT\x10U\x12\x1c\n" +
 	"\x18SALS_STORY_FULL_LOCKDOWN\x10V\x12\x1f\n" +
 	"\x1bSALS_STORY_NOVISIT_LOCKDOWN\x10W\x12$\n" +
-	" SALS_PUMPKIN_ILLUMINATED_DEFAULT\x10Z\x12\x10\n" +
+	" SALS_PUMPKIN_ILLUMINATED_DEFAULT\x10Z\x12 \n" +
+	"\x1cSALS_GRASS_TRIAL_CHALLENGING\x10[\x12\x10\n" +
 	"\vSALS_LOCKED\x10\xe9\a\x12\x11\n" +
 	"\fSALS_GROUWUP\x10\xea\a\x12\x12\n" +
 	"\rSALS_PET_WALL\x10\xeb\a\x12\x18\n" +
@@ -66714,7 +66798,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\fBR_PET_TYPES\x10\x04\x12\x12\n" +
 	"\x0eBR_FIRST_CATCH\x10\x05\x12\x0f\n" +
 	"\vBR_SAME_PET\x10\x06\x12\x15\n" +
-	"\x11BR_CRITICAL_CATCH\x10\a*\xbf\x02\n" +
+	"\x11BR_CRITICAL_CATCH\x10\a*\xeb\x02\n" +
 	"\x0ePlayerTeamType\x12\x0f\n" +
 	"\vPTT_INVALID\x10\x00\x12\x11\n" +
 	"\rPTT_BIG_WORLD\x10\x01\x12\x14\n" +
@@ -66728,7 +66812,9 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x1cPTT_PVE_BOSS_CHALLENGE_FIGHT\x10\t\x12\x14\n" +
 	"\x10PTT_PVP_BATTLE_5\x10\n" +
 	"\x12\"\n" +
-	"\x1ePTT_PVE_WEEKLY_CHALLENGE_FIGHT\x10\v*Y\n" +
+	"\x1ePTT_PVE_WEEKLY_CHALLENGE_FIGHT\x10\v\x12\x14\n" +
+	"\x10PTT_PVP_BATTLE_6\x10\f\x12\x14\n" +
+	"\x10PTT_PVP_BATTLE_7\x10\r*Y\n" +
 	"\vBBInputType\x12\f\n" +
 	"\bBBIT_INT\x10\x01\x12\x0e\n" +
 	"\n" +
@@ -70374,7 +70460,12 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\tPACT_NONE\x10\x00\x12\x16\n" +
 	"\x12PACT_ALCHEMY_PANEL\x10\x01\x12\x18\n" +
 	"\x14PACT_PVP_LOSE_NORMAL\x10\x02\x12\x17\n" +
-	"\x13PACT_PVE_WIN_NORMAL\x10\x03*A\n" +
+	"\x13PACT_PVE_WIN_NORMAL\x10\x03*\\\n" +
+	"\x0ePvpPetTeamType\x12\x10\n" +
+	"\fPPTT_PET_ALL\x10\x00\x12\x11\n" +
+	"\rPPTT_PET_BASE\x10\x01\x12\x11\n" +
+	"\rPPTT_PET_TYPE\x10\x02\x12\x12\n" +
+	"\x0ePPTT_PET_BLOOD\x10\x03*A\n" +
 	"\x12FacePhotoLoginType\x12\x15\n" +
 	"\x11FPLT_PERIOD_FIRST\x10\x00\x12\x14\n" +
 	"\x10FPLT_DAILY_FIRST\x10\x01*x\n" +
@@ -70404,7 +70495,7 @@ func file_xls_enum_proto_rawDescGZIP() []byte {
 	return file_xls_enum_proto_rawDescData
 }
 
-var file_xls_enum_proto_enumTypes = make([]protoimpl.EnumInfo, 762)
+var file_xls_enum_proto_enumTypes = make([]protoimpl.EnumInfo, 763)
 var file_xls_enum_proto_goTypes = []any{
 	(ECOLOGY_FEATURE)(0),                     // 0: dataconfig.ECOLOGY_FEATURE
 	(HABITAT_FLAG)(0),                        // 1: dataconfig.HABITAT_FLAG
@@ -71164,10 +71255,11 @@ var file_xls_enum_proto_goTypes = []any{
 	(AIPerformGroupOverrideSource)(0),        // 755: dataconfig.AIPerformGroupOverrideSource
 	(ShowGoddess)(0),                         // 756: dataconfig.ShowGoddess
 	(PlayerAnimationCustomizeType)(0),        // 757: dataconfig.PlayerAnimationCustomizeType
-	(FacePhotoLoginType)(0),                  // 758: dataconfig.FacePhotoLoginType
-	(FacePhotoConditionType)(0),              // 759: dataconfig.FacePhotoConditionType
-	(SocialExtDataType)(0),                   // 760: dataconfig.SocialExtDataType
-	(ActivityComposeVariableType)(0),         // 761: dataconfig.ActivityComposeVariableType
+	(PvpPetTeamType)(0),                      // 758: dataconfig.PvpPetTeamType
+	(FacePhotoLoginType)(0),                  // 759: dataconfig.FacePhotoLoginType
+	(FacePhotoConditionType)(0),              // 760: dataconfig.FacePhotoConditionType
+	(SocialExtDataType)(0),                   // 761: dataconfig.SocialExtDataType
+	(ActivityComposeVariableType)(0),         // 762: dataconfig.ActivityComposeVariableType
 }
 var file_xls_enum_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -71187,7 +71279,7 @@ func file_xls_enum_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_xls_enum_proto_rawDesc), len(file_xls_enum_proto_rawDesc)),
-			NumEnums:      762,
+			NumEnums:      763,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   0,
