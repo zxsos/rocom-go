@@ -69,7 +69,7 @@ var paksPath = Path.Combine(home, "Downloads", "rocom", "Paks");
 var outDir = Path.Combine(home, "Downloads", "rocom", "parsed");
 string? aesArg = null, usmapPath = null, listFilter = null;
 var parallelism = Environment.ProcessorCount;
-var force = false; var listOnly = false; var noDefaultExcludes = false;
+var force = false; var listOnly = false; var noDefaultExcludes = false; var rawOnly = false;
 var filters = new List<string>();
 var extraExcludes = new List<string>();
 
@@ -85,6 +85,7 @@ for (var i = 0; i < args.Length; i++)
         case "--filter": filters.Add(Next(ref i).TrimStart('/')); break;
         case "--exclude": extraExcludes.Add(Next(ref i).TrimStart('/')); break;
         case "--no-exclude": noDefaultExcludes = true; break;
+        case "--raw": rawOnly = true; break;
         case "--usmap": usmapPath = Next(ref i); break;
         case "--force": force = true; break;
         case "--list":
@@ -149,10 +150,13 @@ foreach (var candidate in provider.Files.Values)
     if (filters.Count > 0 && !filters.Any(f => rel.StartsWith(f, StringComparison.OrdinalIgnoreCase))) continue;
     if (excludes.Any(x => rel.StartsWith(x, StringComparison.OrdinalIgnoreCase))) continue;
     var ext = Path.GetExtension(rel).ToLowerInvariant();
-    if (ext is ".uexp" or ".ubulk" or ".uptnl") continue; // 随 .uasset 包体自动读取
+    // --raw:包也按原始字节导,.uexp/.ubulk 各自成文件。用来看 CUE4Parse **不解**的那些段
+    // ——比如材质 cooked resource 里的 shader map SHA1(属性表里没有,要拿原始字节去
+    // shader library 的 ShaderMapHashes 里比对,见 scripts/shaderdump.py)。
+    if (!rawOnly && ext is ".uexp" or ".ubulk" or ".uptnl") continue; // 随 .uasset 包体自动读取
     if (!seen.Add(candidate.Path)) continue;
     var file = provider.Files[candidate.Path];
-    var kind = ext is ".uasset" or ".umap" ? Kind.Package : Kind.Raw;
+    var kind = !rawOnly && ext is ".uasset" or ".umap" ? Kind.Package : Kind.Raw;
     var outPath = Path.Combine(outDir, kind == Kind.Package ? Path.ChangeExtension(rel, ".json") : rel);
     // 包任务先写 .png 后写 .json,故 .json 存在即整包已完成,增量跳过安全
     if (!force && File.Exists(outPath)) skipped++;
