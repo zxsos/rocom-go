@@ -155,11 +155,11 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `all.pb` 的 `ZoneSvr
 
 链路:`PetData.conf_id` → `MONSTER_CONF`/`PET_CONF` 行的 **`base_id`** → `PETBASE_CONF.id`(基础形态)
 → 全身图取 `PETBASE.JL_res`(`Pet1024/Pet256/JL_<拼音>`),头像经 `PETBASE.model_conf` →
-`MODEL_CONF.icon`/`big_icon`(`HeadIcon/BigHeadIcon256/<n>`)。**文件名不能用 id 拼**——728 个
-形态共用他人头像(如 3228 用 3012),全身图是拼音代号而非 id,故必须存表。
+`MODEL_CONF.icon`/`big_icon`(`HeadIcon/BigHeadIcon256/<n>`)。**文件名不能用 id 拼**——461 个
+形态的头像文件名不是自身 id(如 3242 用 3012),全身图是拼音代号而非 id,故必须存表。
 
-`gen_gamedata.py` 输出两张:`images`(petbase_id → `{h,b,p,ps,…}` 文件名,1041 项)与
-`image_base`(conf_id → petbase_id,仅 base≠自身者,约 1.7 万项;base==自身者 Go 侧回退直查)。
+`gen_gamedata.py` 输出两张:`images`(petbase_id → `{h,b,p,ps,…}` 文件名,1112 项)与
+`image_base`(conf_id → petbase_id,仅 base≠自身者,约 2 万项;base==自身者 Go 侧回退直查)。
 `gamedata.PetImage(confID, shiny)` 据此拼出相对路径(`HeadIcon/3001.webp` 等),挂到 `Pet.Image`,
 前端拼到 `/img/` 下。未上线宠(如占位的圣草帝魔)无美术资源,`PetImage` 返回空,前端给占位图。
 > 实际形态以 `PetData.base_conf_id`(当前 petbase)为准:`ToPet` 优先用它取名称/头像/图鉴/形态,
@@ -167,7 +167,7 @@ PET_CONF，特长直接取 PET_TALENT_CONF，opcode 取自 `all.pb` 的 `ZoneSvr
 
 **异色(shiny)变体**:部分宠物有专属异色美术——头像 `MODEL_CONF.shiny_icon`/`big_shiny_icon`
 (形如 `3010_1`)、全身图 `PETBASE.JL_shiny_res`/`JL_small_shiny_res`(形如 `JL_<拼音>_yise`)。
-`images` 仅在与普通版**不同**时额外存 `{sh,sb,sps}`(本版本 146/123/132 项;多数宠异色复用普通图)。
+`images` 仅在与普通版**不同**时额外存 `{sh,sb,sps}`(本版本 220/196/204 项;多数宠异色复用普通图)。
 `PetImage(confID, true)` 在「索引有该字段**且**对应 webp 确已 embed」时才用异色图,否则回退普通——
 故未导出异色 PNG 时异色宠仍显示普通美术,不会出现空图标。
 
@@ -389,7 +389,7 @@ wm 30000/30001/30004 的图标文件名(lan/huang/zi)定出。石像无 wm 绑�
   区域 2/6/12 顶点)。实测石像的星走实体挂件、触碰即收(见 3.4),这些行未见刷出,不是常驻点位。
   **真星点的刷新区域全部单顶点**(三色全量验证),几何判别免维护(紫独立星无奖励行);
   **不能**用「距最近石像的距离」替代(奖励行最远离石像 394.6m,而真独立星最近仅 3.6m);
-- **装饰石像**:58303-58305(A1)/58313-58316(A2)/55633、55635、55636(-A2 名)共 248 行,
+- **装饰石像**:58303-58305(A1)/58313-58316(A2)/55633、55635、55636(-A2 名)共 251 行,
   与带星石像**坐标互不重合**,行 id 不在挂件表里——石像上没挂自己的星,服务器也不计数。
   这些 NPC id 不入 `STAR_NPCS`;
 - 50206「增加血上限_眠枭之星」(特殊星,大地图 6 行,另有 1 行 refresh_type=8 的任务刷星)与
