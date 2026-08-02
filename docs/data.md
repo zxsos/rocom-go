@@ -691,7 +691,7 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 提示格式与事件页那行对齐,一眼能对上:
 
 ```
-{种类} Lv.44 异色炫彩 W 19% · V -55
+{种类} Lv.44 异色炫彩 W 19% V -55
 ```
 
 `W` 是体重在本形态取值范围内的百分位(后端用 `pet.SizePercentile` 算好放进 `weightPct`,
@@ -704,19 +704,27 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 - **离开 AOI**(走远了,或被**别人**捉走了——这两者确实无从区分):不立刻抹掉,标 `stale`
   置灰保留 4 小时,免得刚瞥见一只稀有的、一转身标记就没了;这么久是把灰点当「本次上线在
   这一带见过什么」的备忘(野生宠刷新周期远长于几分钟),换场景/传送即清空、不会无限堆积;
-- **自己捉到了**:当场撤掉,不留灰点。两条捕捉路各有各的成功通知,都直接带 actor_id,
-  不必靠位置猜(`internal/scene/catch.go`):
+- **这只已经没了**(自己捉走或打死):当场撤掉,不留灰点。两条路各有各的结果通知,
+  都直接带 actor_id,不必靠位置猜(`internal/scene/catch.go`):
 
   | 路径 | 消息 | 字段 |
   | --- | --- | --- |
   | 战斗外直接丢球 | `0x0414`/`0x0413` 的 `acts.throw_catch_notify`(173,`SpaceAct_DeleteThrowNotify`) | `npc_id(3)` + `is_catch_success(4)`,及 `npc_catch_infos(11){npc_id(1), is_catch_success(2)}` |
-  | 污染个体(要打一场) | `0x132c` `ZoneBattleFinishNotify` | `settle_info(1).monster_info(8){state(2)==BATTLE_MONSTER_CATCHED(1), npc_obj_id(16)}` |
+  | 污染个体(要打一场) | `0x132c` `ZoneBattleFinishNotify` | `settle_info(1).monster_info(8){state(2), npc_obj_id(16)}`,`state ∈ {CATCHED(1), DEFEATED(0)}` |
 
-  两个坑:①`throw_catch_notify` 对**每次投掷物销毁**都下发(扔道具/魔法时不带 `npc_id`),
+  战斗那条**捉走与打死一视同仁**——对地图标记是一回事,那儿已经没这只了
+  (2026-08-02 两份 pcap:污染爬爬 `WIN_CATCH`、污染矿晶虫 `WIN_DEFEAT`)。
+  另两个状态 `RUNAWAY(2)`/`ALIVE(3)` 不算消失:打输或它逃了,走回去还能再遇上,
+  标记该继续按「离开 AOI」置灰。
+
+  三个坑:①`throw_catch_notify` 对**每次投掷物销毁**都下发(扔道具/魔法时不带 `npc_id`),
   且**捕捉失败也发**(`is_catch_success=false`——16 份 pcap 里失败比成功还多),见到 act 就当
   捉到会把还在的标记误撤;②没用 `0x0203 END_THROW_RSP` 的 `catch_results`:那是较新字段,
   只有最近两份 pcap 填了,且 `CRT_CATCH_SUCCESS` 恰好是枚举 0(成功时反而不上线),
-  不如显式布尔好判。战斗结算里同时含我方队伍(`npc_obj_id` 为 0),自然被过滤掉。
+  不如显式布尔好判;③`DEFEATED` 同样是枚举 0,但游戏描述符是 **proto2**(显式赋值即上线,
+  实测打死那只的 `field2` 确实带着 0),故只在字段确实下发时才采信——不把「字段缺省」当打死,
+  万一哪天真缺省了顶多是标记继续置灰,不会误撤还在的实体。
+  战斗结算里同时含我方队伍(`npc_obj_id` 为 0),自然被过滤掉。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 

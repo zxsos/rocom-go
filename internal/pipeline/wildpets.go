@@ -156,15 +156,16 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 	}
 }
 
-// onBattleFinish 处理战斗结算(0x132c):被污染的野生宠丢球只是开战,真正捉到手要等这里
-// (见 docs/data.md 3.5)。战斗期间它早已离开 AOI 被置灰,此刻当场撤掉标记。
+// onBattleFinish 处理战斗结算(0x132c):被污染的野生宠丢球只是开战,结果要等这里
+// (见 docs/data.md 3.5)。捉走与打死对标记是一回事——那儿已经没这只了,当场撤掉;
+// 战斗期间它早已离开 AOI 被置灰,这一步把灰点也抹掉。打输/它逃跑则不在此列,灰点照旧。
 func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) {
 	cs := p.conns[conn]
 	if cs == nil || cs.wilds == nil {
 		return
 	}
 	changed := false
-	for _, id := range scene.ParseCaughtInBattle(body) {
+	for _, id := range scene.ParseBattleGoneNpcs(body) {
 		if _, ok := cs.wilds.pets[id]; ok {
 			delete(cs.wilds.pets, id)
 			changed = true

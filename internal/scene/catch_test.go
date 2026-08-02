@@ -71,40 +71,61 @@ func TestParseCaughtByThrowFail(t *testing.T) {
 	}
 }
 
-// TestParseCaughtInBattle 用 2026-08-02 污染爬爬的战斗结算:
-// settle_info(1) → monster_info(8){state(2), npc_obj_id(16)}。
-func TestParseCaughtInBattle(t *testing.T) {
-	monster := func(state int, npcObjID uint64) []byte {
-		var m []byte
-		m = protowire.AppendTag(m, 2, protowire.VarintType)
-		m = protowire.AppendVarint(m, uint64(state))
-		m = protowire.AppendTag(m, 16, protowire.VarintType)
-		m = protowire.AppendVarint(m, npcObjID)
-		return m
-	}
+// battleMonster 构造一条 BattleMonsterInfo{state(2), npc_obj_id(16)}。
+func battleMonster(state int, npcObjID uint64) []byte {
+	var m []byte
+	m = protowire.AppendTag(m, 2, protowire.VarintType)
+	m = protowire.AppendVarint(m, uint64(state))
+	m = protowire.AppendTag(m, 16, protowire.VarintType)
+	m = protowire.AppendVarint(m, npcObjID)
+	return m
+}
+
+// battleFinish 把若干 BattleMonsterInfo 包成 ZoneBattleFinishNotify:settle_info(1).monster_info(8)。
+func battleFinish(monsters ...[]byte) []byte {
 	var si []byte
-	si = protowire.AppendTag(si, 8, protowire.BytesType) // 我方队伍成员:存活、npc_obj_id 为 0
-	si = protowire.AppendBytes(si, monster(3, 0))
-	si = protowire.AppendTag(si, 8, protowire.BytesType) // 被捉走的野怪
-	si = protowire.AppendBytes(si, monster(battleMonsterCatched, 9279722995167795223))
+	for _, m := range monsters {
+		si = protowire.AppendTag(si, 8, protowire.BytesType)
+		si = protowire.AppendBytes(si, m)
+	}
 	var body []byte
 	body = protowire.AppendTag(body, 1, protowire.BytesType)
 	body = protowire.AppendBytes(body, si)
+	return body
+}
 
-	got := ParseCaughtInBattle(body)
+// TestParseBattleGoneNpcs 用两份真实结算:2026-08-02 污染爬爬被**捉走**、
+// 同日污染矿晶虫被**打死**。两者对地图标记是一回事——那儿已经没这只了。
+func TestParseBattleGoneNpcs(t *testing.T) {
+	got := ParseBattleGoneNpcs(battleFinish(
+		battleMonster(3, 0), // 我方队伍成员:存活、npc_obj_id 为 0,应被过滤
+		battleMonster(battleMonsterCatched, 9279722995167795223), // 爬爬,捉走
+	))
 	if len(got) != 1 || got[0] != 9279722995167795223 {
 		t.Fatalf("应只回被捉走的那只, got %v", got)
 	}
-	// 打败/逃跑的不算捉到。
-	for _, st := range []int{0, 2, 3} {
-		var si2 []byte
-		si2 = protowire.AppendTag(si2, 8, protowire.BytesType)
-		si2 = protowire.AppendBytes(si2, monster(st, 999))
-		var b2 []byte
-		b2 = protowire.AppendTag(b2, 1, protowire.BytesType)
-		b2 = protowire.AppendBytes(b2, si2)
-		if got := ParseCaughtInBattle(b2); len(got) != 0 {
-			t.Errorf("state=%d 不该算捉到, got %v", st, got)
+	got = ParseBattleGoneNpcs(battleFinish(
+		battleMonster(3, 0),
+		battleMonster(battleMonsterDefeated, 9279722995167807470), // 矿晶虫,打死
+	))
+	if len(got) != 1 || got[0] != 9279722995167807470 {
+		t.Fatalf("应只回被打死的那只, got %v", got)
+	}
+}
+
+// TestParseBattleGoneNpcsStay:逃跑(2)/存活(3)不算消失——打输或它跑了,走回去还能再遇上,
+// 标记该继续按「离开 AOI」置灰,不能当场撤。
+func TestParseBattleGoneNpcsStay(t *testing.T) {
+	for _, st := range []int{2, 3} {
+		if got := ParseBattleGoneNpcs(battleFinish(battleMonster(st, 999))); len(got) != 0 {
+			t.Errorf("state=%d 不该算消失, got %v", st, got)
 		}
+	}
+	// state 字段缺省时不采信(DEFEATED 恰是枚举 0,宁可少撤也不误撤,见 ParseBattleGoneNpcs)。
+	var m []byte
+	m = protowire.AppendTag(m, 16, protowire.VarintType)
+	m = protowire.AppendVarint(m, 999)
+	if got := ParseBattleGoneNpcs(battleFinish(m)); len(got) != 0 {
+		t.Errorf("state 缺省不该算消失, got %v", got)
 	}
 }
