@@ -58,17 +58,53 @@ const (
 	PendantCollected   = 1 // PIS_DISABLE:已收走
 )
 
-// NpcActor 是服务器下发的一个 NPC 实体(只取判定收集状态需要的字段)。
+// NpcActor 是服务器下发的一个 NPC 实体(只取判定收集状态与野生宠物图层需要的字段)。
 type NpcActor struct {
 	ActorID   uint64 // base.actor_id;离开 AOI/被收走时服务器只给这个 id(见 ParseActorLeave)
 	CfgID     int32  // npc_cfg_id(NPC_CONF.id)
 	RefreshID int32  // npc_content_cfg_id(NPC_REFRESH_CONTENT_CONF.id),对应 POI.R
 	Pendant   int32  // 挂件状态(仅石像有:PendantUncollected/PendantCollected;其余为 0)
 	Pos       Position
+	// 以下为**野生宠物**独有的个体属性(静态 NPC 的 npc_base 里根本没有这些字段)。
+	// 捕捉后原样进 PetData,故丢球前就能筛;判据与坑见 docs/data.md 3.5。
+	Lv         int32 // base.lv
+	Height     int32 // npc_base.height(÷100=米)
+	Weight     int32 // npc_base.weight(÷1000=千克)
+	Voice      int32 // npc_base.voice(嗓音,-100~100)
+	Mutation   int32 // npc_base.mutation_type,位标志,见下 Mutation* 常量(与 PetData 同一套)
+	GlassType  int32 // npc_base.glass_info.glass_type(0=GT_NULL 非炫彩 / 1=普通炫彩 / 2=隐藏炫彩)
+	GlassValue int32 // npc_base.glass_info.glass_value(是哪一种炫彩,见 gamedata.DB.GlassDesc)
 }
+
+// 变异位标志,取自客户端 Enum.MutationDiffType(npc_base 与 PetData 的 mutation_type 同一套)。
+// MDT_GLASS(炫彩)与 glass_info 非空严格等价,故不在此单列——炫彩看 GlassType 即可(见 3.5)。
+// MDT_CHAOS 家族即玩家口中的**污染**(游戏文案「被邪恶气息污染的精灵」「污染血脉」;
+// 客户端渲染函数叫 SetNightmare*,是同一件事的两种叫法)。
+const (
+	MutationShiny           = 1   // MDT_SHINING,异色
+	MutationChaos           = 2   // MDT_CHAOS,噩梦一型
+	MutationChaosTwo        = 4   // MDT_CHAOS_TWO,噩梦二型
+	MutationGlass           = 8   // MDT_GLASS,炫彩(≡ glass_info 非空)
+	MutationChaosThree      = 32  // MDT_CHAOS_THREE,噩梦(按 id 掩码)
+	MutationVacant          = 64  // MDT_VACANT,空缺态;客户端 UIUtils 不给它出变异标,本项目同样忽略
+	MutationChaosPrimordial = 128 // MDT_CHAOS_PRIMORDIAL,太初噩梦
+	mutationPolluted        = MutationChaos | MutationChaosTwo | MutationChaosThree | MutationChaosPrimordial
+)
+
+// IsShiny 报告该实体是不是异色个体(MDT_SHINING)。
+func (a NpcActor) IsShiny() bool { return a.Mutation&MutationShiny != 0 }
+
+// IsPolluted 报告该实体是不是被污染的个体(MDT_CHAOS 家族)。野外实测全是 MDT_CHAOS_TWO(4)。
+// 污染个体**不能直接丢球捉**:丢球即进战斗,打空血量才解除污染,见 docs/data.md 3.5。
+func (a NpcActor) IsPolluted() bool { return a.Mutation&mutationPolluted != 0 }
 
 // IsStar 报告该实体是不是收集判定关心的可收集物(眠枭之星含光点/石像形态,及不咕钟零件)。
 func (a NpcActor) IsStar() bool { return starNpc[a.CfgID] }
+
+// IsWildPet 报告该实体是不是野生宠物。判据是**实体自带身高体重**:这两项由服务器按
+// PETBASE_CONF 的 height_low/high、weight_low/high 逐个体随机后下发,静态 NPC(NPC/传送点/
+// 采集物/星星)的 npc_base 里没有这两个字段。不查配置表,故新版本加宠物也无需更表。
+func (a NpcActor) IsWildPet() bool { return a.Height > 0 && a.Weight > 0 }
 
 // IsStatue 报告该实体是不是眠枭石像(收集状态看 Pendant,不看实体存在与否)。
 func (a NpcActor) IsStatue() bool { return statueNpc[a.CfgID] }
@@ -114,7 +150,8 @@ func ParseActorEnter(body []byte) []NpcActor {
 }
 
 // parseActorInfo 解 ActorInfo:npc(11) → {base(1).pt(8).pos(1), npc_base(3), pendant_info(11)}。
-// npc_base:npc_cfg_id(1)、npc_content_cfg_id(10)。非 NPC 实体(玩家/宠物)返回 ok=false。
+// npc_base:npc_cfg_id(1)、npc_content_cfg_id(10),及野生宠物个体属性 height(11)/weight(12)/
+// mutation_type(14)/glass_info(30)/voice(31);base 另取 lv(11)。非 NPC 实体返回 ok=false。
 // pendant_info(ActorInfo_NpcPendant):pendant_item_infos(3,重复 NpcPendantItemInfo)→ status(4),
 // 即石像上那颗星的状态(见 NpcActor.Pendant;石像只有一个挂件,取「有未收集则未收集」)。
 func parseActorInfo(b []byte) (NpcActor, bool) {
@@ -124,7 +161,21 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 		return a, false
 	}
 	if nb := subMsg(npc, 3); nb != nil {
-		scanFields(nb, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+		scanFields(nb, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
+			if num == 30 && typ == protowire.BytesType { // glass_info(GlassInfo)
+				scanFields(val, func(n protowire.Number, t protowire.Type, _ []byte, gv uint64) {
+					if t != protowire.VarintType {
+						return
+					}
+					switch n {
+					case 1:
+						a.GlassType = int32(gv)
+					case 2:
+						a.GlassValue = int32(gv)
+					}
+				})
+				return
+			}
 			if typ != protowire.VarintType {
 				return
 			}
@@ -133,6 +184,14 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 				a.CfgID = int32(v)
 			case 10:
 				a.RefreshID = int32(v)
+			case 11:
+				a.Height = int32(v)
+			case 12:
+				a.Weight = int32(v)
+			case 14:
+				a.Mutation = int32(v)
+			case 31:
+				a.Voice = int32(v) // int32,可为负(varint 补码 10 字节),转换即得
 			}
 		})
 	}
@@ -152,8 +211,14 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 	}
 	if base := subMsg(npc, 1); base != nil {
 		scanFields(base, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
-			if num == 2 && typ == protowire.VarintType { // actor_id
+			if typ != protowire.VarintType {
+				return
+			}
+			switch num {
+			case 2:
 				a.ActorID = v
+			case 11:
+				a.Lv = int32(v)
 			}
 		})
 	}

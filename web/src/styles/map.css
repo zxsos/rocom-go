@@ -60,6 +60,32 @@
 }
 /* 收集模式下「已确认还在」的可收集点(星星/零件):描一圈金色,与尚未走到过的候选点区分开。 */
 .map-poi.sure { filter: drop-shadow(0 0 3px #ffd54a) drop-shadow(0 0 6px #ffd54a); }
+/* 野生宠物标记:圆形头像 + 类别描边。描边色由 JS 按命中图层算(见 useWildPets 的 wildRing):
+   主描边 = 最稀有的那层,次一层再加一圈 box-shadow 外环——组合数太多,不走 CSS 类。 */
+.map-wild {
+  position: absolute; width: 30px; height: 30px;
+  transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden; background: var(--bg-1);
+  border: 2px solid var(--line); font-size: 16px; line-height: 1;
+  user-select: none; -webkit-user-drag: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
+  /* 标记不可点,只有悬浮说明:用 help 光标提示「这儿有信息」,别用 pointer 骗点击。 */
+  cursor: help;
+}
+/* 悬停时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
+.map-wild:hover { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
+.map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
+.map-wild.stale { opacity: .4; filter: grayscale(.6); }
+
+/* 图层侧栏里野生宠物那几行:没有图标,用一个同色小圆点代表标记描边色(色值同样来自 JS)。 */
+.map-wild-swatch {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--line); background: var(--bg-1);
+}
+.map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
+
 /* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
    图标同样只定高不定宽(见上)。 */
 .map-layer-row { display: flex; align-items: stretch; gap: 6px; }

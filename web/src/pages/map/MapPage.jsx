@@ -5,10 +5,26 @@ import { imgURL } from '../../components/icons'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
+import { useWildPets, wildTags, wildRing } from './useWildPets'
 import LayerPanel from './LayerPanel'
+
+// wildTitle 组一条野生宠物标记的悬停说明,格式:
+//   {种类} Lv.44 异色炫彩 W 19% · V -55
+// W 是体重在本形态取值范围内的百分位(后端算好,与宠物列表/事件页的「W xx%」同一口径),
+// V 是嗓音原值——与事件页那行保持一致,一眼能对上。
+function wildTitle(p) {
+  const head = [p.n || '野生宠物']
+  if (p.lv) head.push('Lv.' + p.lv)
+  head.push(...wildTags(p.kinds))
+  const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
+  let s = `${head.join(' ')} W ${w} · V ${p.voice}`
+  if (p.stale) s += ' ·(已离开视野,此为最后所见)'
+  return s
+}
 
 // 实时地图页:地图软件式交互——方向箭头指示朝向、可缩放平移、默认放大跟随玩家。
 // 位置来自 SSE position(玩家移动时逐包推送)+ 加载时 GET /api/position。仅自己。
+// 另叠两类实时标记:POI 图层(固定点位)与野生宠物图层(附近刷出的稀有个体)。
 // 注:组件名不能叫 Map——会遮蔽内置 Map 构造器。
 export default function MapPage() {
   const account = useContext(AccountContext)
@@ -23,6 +39,7 @@ export default function MapPage() {
   const view = usePanZoom(hasMap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
+  const wilds = useWildPets(account)
 
   // 逐帧外推的锚点:最近一个移动包的位置/速度/朝向 + 收到它时与画面位置的落差(cu/cv/dh)。
   const anchorRef = useRef(null)
@@ -124,7 +141,7 @@ export default function MapPage() {
       {/* 无工具栏:地图占满整页(场景名/坐标不再显示,位置看箭头即可);移动端的图层抽屉入口
           作为浮动控件挂在地图左下角。 */}
       <div className="map-layout">
-        <LayerPanel pois={pois} collapsed={collapsed} onClose={() => setCollapsed(true)} />
+        <LayerPanel pois={pois} wilds={wilds} collapsed={collapsed} onClose={() => setCollapsed(true)} />
 
         {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
 
@@ -149,6 +166,16 @@ export default function MapPage() {
                 className={'map-poi' + (pois.isSure(p) ? ' sure' : '')}
                 src={imgURL(pois.iconOf[p.k])} title={p.n}
                 style={{ left: p.u * mapPx, top: p.v * mapPx }} />
+            ))}
+            {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、满声音),同属 .map-world 一起
+                平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
+                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。 */}
+            {wilds.marks.map((p) => (
+              <div key={p.id} title={wildTitle(p)}
+                className={'map-wild' + (p.stale ? ' stale' : '')}
+                style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
+                {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+              </div>
             ))}
           </div>
           <div className="map-arrow" ref={arrowRef}>

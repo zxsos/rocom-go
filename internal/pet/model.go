@@ -246,13 +246,14 @@ func FillSizePercentile(db *gamedata.DB, pets ...*Pet) {
 		}
 		p.HeightMin, p.HeightMax = float64(info.HeightLow)/100, float64(info.HeightHigh)/100
 		p.WeightMin, p.WeightMax = float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000
-		p.HeightPct = percentile(p.HeightM, p.HeightMin, p.HeightMax)
-		p.WeightPct = percentile(p.WeightKg, p.WeightMin, p.WeightMax)
+		p.HeightPct = SizePercentile(p.HeightM, p.HeightMin, p.HeightMax)
+		p.WeightPct = SizePercentile(p.WeightKg, p.WeightMin, p.WeightMax)
 	}
 }
 
-// percentile 返回 cur 落在 [min,max] 内的百分位(0-100,保留两位小数);范围无效(max<=min)返回 nil。
-func percentile(cur, min, max float64) *float64 {
+// SizePercentile 返回 cur 落在 [min,max] 内的百分位(0-100,保留两位小数);范围无效(max<=min)
+// 返回 nil。宠物列表/事件页的「W xx%」与实时地图野生宠物标记共用此口径,勿各算各的。
+func SizePercentile(cur, min, max float64) *float64 {
 	if max <= min {
 		return nil
 	}

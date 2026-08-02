@@ -22,12 +22,15 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 		p.onTeleport(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsBatchNotify:
 		p.observeStars(m.Session, acc, m.AppBody)
+		p.observeWilds(m.Session, acc, m.AppBody, m.Time, false)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcPendantInteractReq:
 		p.onPendantReq(m)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpNpcPendantInteractRsp:
 		p.onPendantRsp(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
 		p.onPlayActs(m, acc)
+	case m.Direction == gcp.S2C && m.Opcode == scene.OpBattleFinishNotify:
+		p.onBattleFinish(m.Session, acc, m.AppBody, m.Time)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
 		p.onMove(m, acc)
 	default:
@@ -47,6 +50,7 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		p.resetAreas(m.Session)
 		// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
 		cs.stars = newStarTracker(res)
+		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(并推空列表,前端立刻清屏)
 	}
 	p.applyZoneProgress(m, acc)
 }
@@ -63,15 +67,18 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	cs.res, cs.room = tp.ResID, tp.Room
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.resetAreas(m.Session)
+	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)
 	p.pushPos(acc, pos)
 }
 
-// onPlayActs 处理区域动作通知:同一个通知里既有区域进/出(选层),也有 AOI 实体进/离(星星判定)。
+// onPlayActs 处理区域动作通知:同一个通知里既有区域进/出(选层),
+// 也有 AOI 实体进/离(星星判定、野生宠物图层)。
 func (p *Pipeline) onPlayActs(m capture.Message, acc string) {
 	p.observeStars(m.Session, acc, m.AppBody)
+	p.observeWilds(m.Session, acc, m.AppBody, m.Time, false)
 	// 区域进/出:玩家真正踩进/离开区域触发体(3D 体积)时服务器才下发,是选层的权威依据。
 	acts := scene.ParseAreaActs(m.AppBody)
 	if len(acts) == 0 {

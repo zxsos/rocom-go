@@ -113,6 +113,49 @@ func (db *DB) PetBase(petbaseID uint32) (PetBaseInfo, bool) {
 	return v, ok
 }
 
+// NpcPetBase 返回野生宠物 NPC(NPC_CONF.id)对应的 petbase 形态 id;ok=false 表示该 NPC
+// 不在可捕捉野生宠清单里(表只用于取名称/头像,判定实体是不是野生宠见 scene.NpcActor.IsWildPet)。
+func (db *DB) NpcPetBase(npcCfgID uint32) (uint32, bool) {
+	v, ok := db.npcPets[npcCfgID]
+	return v, ok
+}
+
+// 炫彩类型(GlassInfo.glass_type,dataconfig.GlassType)。
+const (
+	GlassNull   = 0 // GT_NULL,非炫彩
+	GlassCommon = 1 // GT_COMMON,普通炫彩(glass_value 是打包色号)
+	GlassHidden = 2 // GT_HIDDEN,隐藏炫彩(glass_value 是 HIDDEN_GLASS_CONF.id)
+)
+
+// glassParticleShift 是普通炫彩色号的打包位宽:glass_value = (粒子id << 20) | 配色id
+// (客户端 PetUtils.GetShineDataValue 即按 20 位拆)。
+const glassParticleShift = 20
+
+// GlassDesc 返回炫彩外观的中文描述(见 docs/data.md 3.5):
+// 隐藏炫彩给外观名(暗夜拾光…),普通炫彩给「粒子·配色」(四角星·亮X暗 - 浅紫橙)。
+// 非炫彩或查不到时返回空串(调用方自行兜底)。
+func (db *DB) GlassDesc(glassType, glassValue int32) string {
+	switch glassType {
+	case GlassHidden:
+		return db.glassNames[key(uint32(glassValue))]
+	case GlassCommon:
+		if glassValue <= 0 {
+			return ""
+		}
+		particle := db.glassParticles[key(uint32(glassValue)>>glassParticleShift)]
+		color := db.glassColors[key(uint32(glassValue)&(1<<glassParticleShift-1))]
+		switch {
+		case particle != "" && color != "":
+			return particle + "·" + color
+		case color != "":
+			return color
+		default:
+			return particle
+		}
+	}
+	return ""
+}
+
 // PetEggGroups 返回某 petbase 形态的蛋组列表(社区名+描述,按配置顺序);无则返回 nil。
 func (db *DB) PetEggGroups(petbaseID uint32) []EggGroup {
 	info, ok := db.petbase[petbaseID]

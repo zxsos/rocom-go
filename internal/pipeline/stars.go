@@ -317,6 +317,7 @@ func (p *Pipeline) onSceneSnapshot(m capture.Message, acc string) {
 	}
 	ts.snapAt = m.Time
 	p.saveStars(acc, states)
+	p.observeWilds(m.Session, acc, m.AppBody, m.Time, true) // 快照里的野生宠物同批收下
 }
 
 // onPendantReq 记录 c2s 挂件交互(触碰石像上浮现的星):请求直接带石像刷新行 id,

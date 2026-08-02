@@ -42,8 +42,13 @@ type DB struct {
 	imageBase    map[string]string      // conf_id -> petbase_id(base==自身者不入表)
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
 	eggGroup     map[uint32]EggGroup    // 蛋组id(1-15) -> 社区名/描述
-	evoIndex     map[uint32][]uint32    // 进化链分组 -> 该链各 petbase_id
-	imgFiles     map[string]bool        // 实际 embed 的图片相对路径(异色图缺失时回退普通)
+	npcPets      map[uint32]uint32      // 野生宠 NPC_CONF id -> petbase_id(取名称/头像,见 3.5)
+	// 炫彩外观(见 GlassDesc):隐藏炫彩名 / 普通炫彩的粒子名与配色名。
+	glassNames     map[string]string
+	glassColors    map[string]string
+	glassParticles map[string]string
+	evoIndex       map[uint32][]uint32 // 进化链分组 -> 该链各 petbase_id
+	imgFiles       map[string]bool     // 实际 embed 的图片相对路径(异色图缺失时回退普通)
 	// UI 图标索引: 语义键 -> 图标原始文件名(webp 保持原名),Go 侧拼 <组>/<原名>.webp。
 	filterIcons map[string]map[string]string // 组名 -> {枚举整数值: 原名}(filter/)
 	bloodIcons  map[string]string            // 血脉id -> 原名(blood/)
@@ -64,24 +69,28 @@ type DB struct {
 // Load 加载 embed 的名称表。
 func Load() (*DB, error) {
 	var raw struct {
-		Species      map[string]string            `json:"species"`
-		Nature       map[string]string            `json:"nature"`
-		SkillDamType map[string]string            `json:"skill_dam_type"`
-		TalentRate   map[string]string            `json:"talent_rate"`
-		PartnerMark  map[string]string            `json:"partner_mark"`
-		Speciality   map[string]string            `json:"speciality"`
-		Medal        map[string]Medal             `json:"medal"`
-		Opcodes      map[string]string            `json:"opcodes"`
-		NatureEffect map[string]NatureEffect      `json:"nature_effect"`
-		FilterIcons  map[string]map[string]string `json:"filter_icons"`
-		BloodIcons   map[string]string            `json:"blood_icons"`
-		BloodNames   map[string]string            `json:"blood_names"`
-		MedalIcons   map[string]string            `json:"medal_icons"`
-		StaticIcons  map[string]string            `json:"static_icons"`
-		Images       map[string]imageEntry        `json:"images"`
-		ImageBase    map[string]uint32            `json:"image_base"`
-		EggGroup     map[string]EggGroup          `json:"egg_group"`
-		Petbase      map[string]struct {
+		Species        map[string]string            `json:"species"`
+		Nature         map[string]string            `json:"nature"`
+		SkillDamType   map[string]string            `json:"skill_dam_type"`
+		TalentRate     map[string]string            `json:"talent_rate"`
+		PartnerMark    map[string]string            `json:"partner_mark"`
+		Speciality     map[string]string            `json:"speciality"`
+		Medal          map[string]Medal             `json:"medal"`
+		Opcodes        map[string]string            `json:"opcodes"`
+		NatureEffect   map[string]NatureEffect      `json:"nature_effect"`
+		FilterIcons    map[string]map[string]string `json:"filter_icons"`
+		BloodIcons     map[string]string            `json:"blood_icons"`
+		BloodNames     map[string]string            `json:"blood_names"`
+		MedalIcons     map[string]string            `json:"medal_icons"`
+		StaticIcons    map[string]string            `json:"static_icons"`
+		Images         map[string]imageEntry        `json:"images"`
+		ImageBase      map[string]uint32            `json:"image_base"`
+		EggGroup       map[string]EggGroup          `json:"egg_group"`
+		NpcPets        map[string]uint32            `json:"npc_pets"`
+		GlassNames     map[string]string            `json:"glass_names"`
+		GlassColors    map[string]string            `json:"glass_colors"`
+		GlassParticles map[string]string            `json:"glass_particles"`
+		Petbase        map[string]struct {
 			N  string   `json:"n"`
 			B  uint32   `json:"b"`
 			F  string   `json:"f"`
@@ -146,6 +155,12 @@ func Load() (*DB, error) {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
 		}
 	}
+	npcPets := make(map[uint32]uint32, len(raw.NpcPets))
+	for k, v := range raw.NpcPets {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			npcPets[uint32(id)] = v
+		}
+	}
 	eggGroup := make(map[uint32]EggGroup, len(raw.EggGroup))
 	for k, v := range raw.EggGroup {
 		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
@@ -183,34 +198,38 @@ func Load() (*DB, error) {
 		}
 	}
 	return &DB{
-		scenes:       raw.Scenes,
-		sceneDefRes:  raw.SceneDefaultRes,
-		sceneRes:     raw.SceneRes,
-		maps:         maps,
-		layers:       layers,
-		poiKinds:     raw.POIKinds,
-		pois:         pois,
-		zones:        raw.Zones,
-		species:      raw.Species,
-		nature:       raw.Nature,
-		skillDamType: raw.SkillDamType,
-		talentRate:   raw.TalentRate,
-		partnerMark:  raw.PartnerMark,
-		speciality:   raw.Speciality,
-		medal:        raw.Medal,
-		opcodes:      opcodes,
-		natureEffect: raw.NatureEffect,
-		filterIcons:  raw.FilterIcons,
-		bloodIcons:   raw.BloodIcons,
-		bloodNames:   raw.BloodNames,
-		medalIcons:   raw.MedalIcons,
-		staticIcons:  raw.StaticIcons,
-		images:       raw.Images,
-		imageBase:    imageBase,
-		petbase:      petbase,
-		eggGroup:     eggGroup,
-		evoIndex:     evoIndex,
-		imgFiles:     imgFiles,
+		scenes:         raw.Scenes,
+		sceneDefRes:    raw.SceneDefaultRes,
+		sceneRes:       raw.SceneRes,
+		maps:           maps,
+		layers:         layers,
+		poiKinds:       raw.POIKinds,
+		pois:           pois,
+		zones:          raw.Zones,
+		species:        raw.Species,
+		nature:         raw.Nature,
+		skillDamType:   raw.SkillDamType,
+		talentRate:     raw.TalentRate,
+		partnerMark:    raw.PartnerMark,
+		speciality:     raw.Speciality,
+		medal:          raw.Medal,
+		opcodes:        opcodes,
+		natureEffect:   raw.NatureEffect,
+		filterIcons:    raw.FilterIcons,
+		bloodIcons:     raw.BloodIcons,
+		bloodNames:     raw.BloodNames,
+		medalIcons:     raw.MedalIcons,
+		staticIcons:    raw.StaticIcons,
+		images:         raw.Images,
+		imageBase:      imageBase,
+		petbase:        petbase,
+		eggGroup:       eggGroup,
+		npcPets:        npcPets,
+		glassNames:     raw.GlassNames,
+		glassColors:    raw.GlassColors,
+		glassParticles: raw.GlassParticles,
+		evoIndex:       evoIndex,
+		imgFiles:       imgFiles,
 	}, nil
 }
 
