@@ -9,7 +9,7 @@ import { useWildPets, wildTags, wildRing } from './useWildPets'
 import LayerPanel from './LayerPanel'
 
 // wildTitle 组一条野生宠物标记的悬停说明,格式:
-//   {种类} Lv.44 异色炫彩 W 19% · V -55
+//   {种类} Lv.44 异色炫彩 W 19% V -55
 // W 是体重在本形态取值范围内的百分位(后端算好,与宠物列表/事件页的「W xx%」同一口径),
 // V 是嗓音原值——与事件页那行保持一致,一眼能对上。
 function wildTitle(p) {
@@ -17,8 +17,8 @@ function wildTitle(p) {
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(...wildTags(p.kinds))
   const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
-  let s = `${head.join(' ')} W ${w} · V ${p.voice}`
-  if (p.stale) s += ' ·(已离开视野,此为最后所见)'
+  let s = `${head.join(' ')} W ${w} V ${p.voice}`
+  if (p.stale) s += ' (已离开视野)'
   return s
 }
 
