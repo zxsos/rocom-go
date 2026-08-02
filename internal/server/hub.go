@@ -7,7 +7,7 @@ import (
 
 // envelope 是推送给前端的统一消息封装。
 type envelope struct {
-	Type    string `json:"type"`              // pet | event | position | stars | starzones | debug
+	Type    string `json:"type"`              // pet | event | position | stars | starzones | wildpets | debug
 	Account string `json:"account,omitempty"` // 所属账号("" = 全局/调试,前端不按账号过滤)
 	Data    any    `json:"data"`
 }

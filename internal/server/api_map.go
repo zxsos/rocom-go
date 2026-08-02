@@ -41,6 +41,26 @@ func (s *Server) handlePosition(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, pos) // pos 为 nil 时输出 null
 }
 
+// SetLastWildPets 缓存某账号最近一次野生宠物标记(由消费管线在广播 wildpets 时调用),
+// 供实时地图页加载时经 GET /api/wildpets 即时回显。
+func (s *Server) SetLastWildPets(account string, payload any) {
+	if account == "" {
+		return
+	}
+	s.posMu.Lock()
+	s.lastWild[account] = payload
+	s.posMu.Unlock()
+}
+
+// handleWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音);无记录返回 null。
+// 与位置不同,这里不做过期抹除:标记本身已带 stale 标志(实体离开 AOI 后由管线置位并限时保留)。
+func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {
+	s.posMu.Lock()
+	v := s.lastWild[s.acct(r)]
+	s.posMu.Unlock()
+	writeJSON(w, v)
+}
+
 // poiKind 是一个 POI 图层(前端的一个开关):图层键、中文名、图标路径、是否默认开启。
 type poiKind struct {
 	K       string `json:"k"`

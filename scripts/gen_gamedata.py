@@ -245,6 +245,30 @@ for pid, p in _petbase.items():
             e[dst] = p[src]
     petbase[pid] = e
 
+# ---- 野生宠物 NPC(实时地图的野生宠物图层,见 docs/data.md 3.5)----
+# 大世界里的野生宠物是 NPC 实体:NPC_CONF 行经 traverse_data_param 外键指向 PETBASE_CONF
+# (10782→3758 珀尔鼬),据此拿到形态名与头像。只收**可丢球捕捉**的行
+# (throwing_interact_type 1=普通野生 / 4=首领;其余映射到 petbase 的行是剧情/家园装饰 NPC,
+# 不会作为野生宠刷出),1483 行约 19KB。
+# 注:实体是不是野生宠**不靠这张表判**(靠实体自带 height/weight,见 scene.NpcActor.IsWildPet),
+# 表只用于显示名称/头像;表里没有的行照样显示,只是没名字。
+npc_pets = {k: v["traverse_data_param"][0] for k, v in rows("NPC_CONF.json").items()
+            if v.get("throwing_interact_type") in (1, 4)
+            and v.get("traverse_data_param") and str(v["traverse_data_param"][0]) in _petbase}
+
+# ---- 炫彩(MDT_GLASS / GlassInfo)的外观描述 ----
+# 「炫彩」= PetData.mutation_type 的 bit3(Enum.MutationDiffType.MDT_GLASS),与 glass_info 非空
+# 严格等价(全部 pcap 363 只变异宠物零反例);glass_info 只是进一步说明**是哪一种**炫彩:
+#   glass_type=GT_HIDDEN(2) → glass_value 是 HIDDEN_GLASS_CONF.id,给出隐藏炫彩名(暗夜拾光…);
+#   glass_type=GT_COMMON(1) → glass_value 是打包的色号 (particle_id << 20) | color_id
+#     (客户端 PetUtils.GetShineDataValue 按 20 位拆,见 UMG_Pet_DazzlingTips_C:ShowNormalGlassInfo),
+#     分别查 PARTICLE_RANDOM_CONF(粒子:四角星…)与 COLOR_RANDOM_CONF(配色:亮X暗 - 浅紫橙…)。
+# 隐藏炫彩名带富文本标记(<span color="#eebf31">暗夜拾光</>),剥掉标签只留文字。
+glass_names = {k: re.sub(r"<[^>]*>", "", v["name"]).strip()
+               for k, v in rows("HIDDEN_GLASS_CONF.json").items() if v.get("name")}
+glass_colors = id_names("COLOR_RANDOM_CONF.json", "id", "name")
+glass_particles = id_names("PARTICLE_RANDOM_CONF.json", "id", "name")
+
 # 性格增减维度(权威表，按性格名匹配；维度编号 1生命 2物攻 3魔攻 4物防 5魔防 6速度)。
 # NATURE_CONF 推导对个别性格(如平和)的 id 错位，故以名为准。
 NATURE_TABLE = {
@@ -643,6 +667,13 @@ data = {
     "image_base": image_base,
     # petbase 形态元数据(名称/图鉴号/形态名/阶段/进化链分组),按 base_conf_id 取当前形态。
     "petbase": petbase,
+    # 野生宠物 NPC: NPC_CONF.id -> petbase_id(取名称/头像)。实时地图的野生宠物图层用,
+    # 见上与 docs/data.md 3.5。
+    "npc_pets": npc_pets,
+    # 炫彩外观描述:隐藏炫彩名(HIDDEN_GLASS_CONF)+ 普通炫彩的粒子/配色名(见上)。
+    "glass_names": glass_names,
+    "glass_colors": glass_colors,
+    "glass_particles": glass_particles,
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
     # 与 internal/pb 同源同版本,无需手工补充。

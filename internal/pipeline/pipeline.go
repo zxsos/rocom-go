@@ -52,6 +52,7 @@ type connState struct {
 	areas      map[uint32]map[uint32]bool
 	layer      *layerState  // 分层地图去抖状态(见 layerDebounce)
 	stars      *starTracker // 眠枭之星观测态(换场景/传送即重置)
+	wilds      *wildTracker // 野生宠物图层观测态(同上,见 wildpets.go)
 	pendantRid int32        // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
 }
 

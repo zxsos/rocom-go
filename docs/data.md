@@ -568,6 +568,156 @@ pcap 实测),而配置/攻略总数为 147/228。差额有三种来历:少数星
 **其余一律仍显示**(宁可多显示,不能藏掉没拿的)。确认「还在」的点描一圈金色。状态按账号存库
 (`star_state`/`star_zone`),玩家一边走后端一边判、经 SSE(`stars`)推增量。
 
+## 3.5 野生宠物的个体属性(实时地图页「野生宠物」图层)
+
+大世界里的野生宠物就是普通 NPC 实体(`ActorInfo`),**个体属性直接挂在 `npc_base` 上**,
+来源与星星同两处:进场景/传送后的周边快照(`0x014a` 的 `other_actors`)、移动中随 AOI 补发的
+`actor_enter`(`0x0413`/`0x0414`)。解析见 `scene.NpcActor`/`parseActorInfo`。
+
+**捕捉前后一致的属性**(2026-08-02 `rocom-20260802-190313.pcap00` 实测:捕捉珀尔鼬与友爱天天,
+把野生侧 `npc_base` 与捕捉后 `ZONE_GOODS_REWARD_NOTIFY`(0x0243)里的 `PetData` 逐字段核对):
+
+| 野生 `npc_base` / `base` | 捕捉后 `PetData` | 珀尔鼬 | 友爱天天 |
+| --- | --- | --- | --- |
+| `base.lv`(11) | `level` / `catch_lv` | 38 | 13 |
+| `height`(11) | `height` | 74 | 32 |
+| `weight`(12) | `weight` | 11048 | 3360 |
+| `voice`(31) | `voice` | -75 | 100 |
+| `mutation_type`(14) | `mutation_type` | 0 | 0 |
+| `glass_info`(30) | `glass_info` | GT_NULL | GT_NULL |
+| `npc_cfg_id`(1) →`NPC_CONF.traverse_data_param` | `base_conf_id`/`catch_base_id` | 10782→3758 | 10254→3228 |
+| `blood_mix_skill_dam_type`(20),无则 `blood_normal_…`(27) | `blood_id`(经 `PET_BLOOD_CONF.blood_type`) | 2 → 血脉 1 | 2 → 血脉 1 |
+
+身高/体重逐个体随机、落在 `PETBASE_CONF` 的 `height_low/high`、`weight_low/high` 内(同批三只
+友爱天天为 32/32/35,叫声 54/100/-51),故**丢球之前就能筛**身高、体重、叫声、血脉、等级。
+元素属性(`skill_dam_type`)取自 `PETBASE_CONF.unit_type`,是种族固定值,前后一致是当然的。
+
+> **上表的 `mutation_type` 与 `blood_id` 只对「直接丢球捉到」的个体成立。**
+> 被污染的个体要打一场,战斗会把污染洗掉,这两项随之变化——见下「污染个体」。
+> 等级/身高/体重/叫声则连打带捉全程不变(2026-08-02 污染爬爬实测)。
+
+**捕捉后才有**:个体值(`attribute_info.*.talent`/`talent_rank`)、性格 `nature`、性别 `gender`、
+特性 `speciality_id`、技能表,以及 gid/exp/add_time/caught_camp 等。野生包里没有这些。
+
+**两个坑**:`npc_base.nature`(13)对全场 26 只野生宠**恒为 30**,是占位常量而非性格
+(真性格 22/20 只在捕捉后出现,已用 `nature_effect` 的 pos/neg 与 `attribute_new_info` 的
+type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world_nature`,是种族常量。
+另有只在野生侧存在的 `height_scale`(量化为 n/130),`PetData` 无对应字段。
+
+**是不是野生宠物,两道闸**(`scene.NpcActor.IsWildPet` + `gamedata.DB.NpcPetBase`):
+
+1. 实体自带 `height`+`weight` ⇒ 是一只宠物实体(静态 NPC/传送点/采集物/星星都没有这两项);
+2. 该 `npc_cfg_id` 在**可丢球捕捉**清单里(`npc_pets`,由 `NPC_CONF.throwing_interact_type ∈ {1,4}`
+   且 `traverse_data_param` 指向 `PETBASE_CONF` 生成,1483 行)⇒ 是野外能抓的。只靠第 1 道会把
+   **家园里摆着的自己的宠物**也算进去(实测幽星光 710346、鸭吉吉 710012 同样带身高体重叫声,
+   但 `NPC_CONF` 没有 `throwing_interact_type`)。该表同时用于取形态名与头像。
+
+**变异(`mutation_type`)是位标志**,取值即客户端 `Enum.MutationDiffType`
+(`Data/Config/Enum.lua`),`npc_base` 与 `PetData` 同一套:
+
+| 位 | 枚举 | 含义 | 客户端渲染入口(`PetMutationUtils.UpdateMutation`) |
+| --- | --- | --- | --- |
+| 1 | `MDT_SHINING` | 异色 | `SetColorDiffMutation` |
+| 2 | `MDT_CHAOS` | 噩梦一型 | `SetNightmareFirstMutation` |
+| 4 | `MDT_CHAOS_TWO` | 噩梦二型 | `SetNightmareSecondMutation` |
+| 8 | `MDT_GLASS` | **炫彩** | `SetGlassyDiffMutation` |
+| 32 | `MDT_CHAOS_THREE` | 噩梦(按 id 掩码) | `SetNightmareByIDMask` |
+| 64 | `MDT_VACANT` | 空缺态 | `SetVacantMutation`(客户端 `UIUtils` 不给它出变异标,本项目同样忽略) |
+| 128 | `MDT_CHAOS_PRIMORDIAL` | 太初噩梦 | `SetNightmarePrimordial` |
+
+**炫彩 = `MDT_GLASS` = `glass_info` 非空,三者是一回事**(全部 pcap 的 363 只变异宠物零反例)。
+`glass_info{glass_type, glass_value}` 只是进一步说明**是哪一种**炫彩:
+
+- `glass_type=GT_HIDDEN(2)` → `glass_value` 是 `HIDDEN_GLASS_CONF.id`,即**隐藏炫彩**名
+  (1 暗夜拾光、2 狂欢怪谈、3 铅字幻梦、1000 黑白;名称带富文本标签,`gen_gamedata.py` 剥掉后存
+  `glass_names`);
+- `glass_type=GT_COMMON(1)` → `glass_value` 是**打包色号** `(粒子id << 20) | 配色id`
+  (客户端 `PetUtils.GetShineDataValue` 即按 20 位拆,见 `UMG_Pet_DazzlingTips_C:ShowNormalGlassInfo`),
+  分别查 `PARTICLE_RANDOM_CONF`/`COLOR_RANDOM_CONF`,如 1048609 → 「四角星·亮X暗 - 浅紫橙」。
+  **不要拿它去查 `HIDDEN_GLASS_CONF`**——那是两套编号。
+
+组装成中文描述的是 `gamedata.DB.GlassDesc(glassType, glassValue)`。宠物列表里的
+`Pet.Colorful`(`mutation_type & 8`)与这里的炫彩是同一件事,只是那边不解析具体外观。
+
+**污染个体**(`mutation_type` 的 `MDT_CHAOS` 家族;游戏文案叫「污染」,客户端渲染函数叫
+`SetNightmare*`,同一件事)。野外实测 4 只全是 `MDT_CHAOS_TWO(4)`。它与其它稀有个体**流程不同**
+——**丢球不会直接捉住,而是进战斗**(2026-08-02 `rocom-20260802-204107.pcap00`,污染爬爬全流程):
+
+```
+0x0200/0x0202 丢球  →  0x1316 BATTLE_ENTER_NOTIFY(敌方 mutation_type=4, nightmare_elite_id=100000)
+  →  0x131a 回合1(仍 mutation_type=4)  →  打空血量
+  →  0x131a 回合2(mutation_type **变 0**,污染解除;nightmare_elite_id 仍在)
+  →  0x0243 GOODS_REWARD_NOTIFY 给出 PetData  +  0x132c BATTLE_FINISH_NOTIFY(result=TRUE_BATTLE_RESULT_WIN_CATCH)
+```
+
+捕捉前后对照(野生污染爬爬 → 捕捉后 gid 36251):
+
+| 字段 | 野生(污染中) | 捕捉后 | |
+| --- | --- | --- | --- |
+| `lv` / `height` / `weight` / `voice` | 44 / 38 / 6054 / -55 | 44 / 38 / 6054 / -55 | **不变** |
+| `mutation_type` | 4 | 0 | 战斗中洗掉 |
+| 血脉 | `blood_normal_skill_dam_type=1`(SDT_NONE,即 `blood_type=1` 那批特殊血脉) | `blood_id=11` 虫系血脉(= 种族 `unit_type[0]`) | 随污染解除而变 |
+| `nightmare_elite_id` | 野生侧**没有这个字段** | 100000 | 捕捉后才出现,是「曾被污染」的印记 |
+
+`NIGHTMARE_ELITE_CONF` 100000 给的是**战斗中**的强化(体型 ×1.4、护盾/攻防 ×2、`IV_fix_min/max=8/10`);
+这些**不进捕捉后的 PetData**——实测这只捉到手是 `talent_rank=1`、个体值 0/0/0/0/0/7,就是普通爬爬
+(与用户观察一致)。污染的真正甜头在血脉:`PET_BLOOD_CONF` 23「污染血脉」的描述说
+「削弱精灵的魔力后,一部分噩梦能量**可能**会残留在精灵身上,形成独特的污染血脉」——即打完有几率
+留下 blood 23;这次没留下(拿到的是种族普通的虫系血脉 11)。
+
+野生污染个体在 `ActorInfo` 里另有两处旁证(判定用不到,排查时有用):`attrs.hp` 是实数
+(191/191,普通野生宠是 0/0——它要打,所以有血条)、`misc_info.size_scale=0`(普通野生宠是 100)。
+
+**位置只有一次**:标记位置就是实体下发时的位置,之后不再更新。野生宠的 AI 跑在客户端
+(`NpcBase.is_server_ai` 为假),它在刷新点附近溜达根本不过网——16 份 pcap 里 `server_move`(12)
+只出现 1 次、`client_move`(11)3387 次全属玩家 avatar,没有一条属于野生宠;`set_npc_pos`(222)与
+`npc_mutation_info_change`(515)一次都没出现过。故标记位置≈刷新点,误差是它自己绕的那几米。
+
+**前端**:图层栏「野生宠物」一组三个开关(`WILD_LAYERS`),选择记忆于 localStorage:
+
+| 开关 | 覆盖的后端 `wildKinds` | 默认 |
+| --- | --- | --- |
+| 异色/炫彩 | `shiny` + `colorful` | **开** |
+| 污染 | `pollution` | 关 |
+| 满声音 | `voice` | 关 |
+
+一个开关可覆盖多个后端类别(异色与炫彩合成一个),故后端仍分开推 4 个 kind——悬浮提示要按
+细粒度说(两者兼具时用游戏自己的合称「异色炫彩」)。存储键带 `.v2`:图层键整体改过,
+沿用旧键会让存着旧选择的人一个图层都不开,与「默认勾选」相悖。
+
+标记是圆形头像(异色个体用异色头像)+ 类别描边:描边色由 JS 按命中**图层**算(`wildRing`,
+主描边取最稀有的那层,次一层再加一圈外环),不走 CSS 类组合——组合数太多。标记不可点击,
+只有悬浮说明,故用 `cursor: help`(别用 `pointer` 骗点击),悬停另放大 1.15× 便于确认指到了哪只。
+提示格式与事件页那行对齐,一眼能对上:
+
+```
+{种类} Lv.44 异色炫彩 W 19% · V -55
+```
+
+`W` 是体重在本形态取值范围内的百分位(后端用 `pet.SizePercentile` 算好放进 `weightPct`,
+与宠物列表/事件页的「W xx%」同一口径,勿各算各的),`V` 是嗓音原值。
+数据经 SSE(`wildpets`,成员或状态变化时推全量,实体进出 AOI 是低频事件故不节流)+ 加载时
+`GET /api/wildpets` 回显;换场景/传送即清空重来。
+
+标记的撤下分两种:
+
+- **离开 AOI**(走远了,或被**别人**捉走了——这两者确实无从区分):不立刻抹掉,标 `stale`
+  置灰保留 4 小时,免得刚瞥见一只稀有的、一转身标记就没了;这么久是把灰点当「本次上线在
+  这一带见过什么」的备忘(野生宠刷新周期远长于几分钟),换场景/传送即清空、不会无限堆积;
+- **自己捉到了**:当场撤掉,不留灰点。两条捕捉路各有各的成功通知,都直接带 actor_id,
+  不必靠位置猜(`internal/scene/catch.go`):
+
+  | 路径 | 消息 | 字段 |
+  | --- | --- | --- |
+  | 战斗外直接丢球 | `0x0414`/`0x0413` 的 `acts.throw_catch_notify`(173,`SpaceAct_DeleteThrowNotify`) | `npc_id(3)` + `is_catch_success(4)`,及 `npc_catch_infos(11){npc_id(1), is_catch_success(2)}` |
+  | 污染个体(要打一场) | `0x132c` `ZoneBattleFinishNotify` | `settle_info(1).monster_info(8){state(2)==BATTLE_MONSTER_CATCHED(1), npc_obj_id(16)}` |
+
+  两个坑:①`throw_catch_notify` 对**每次投掷物销毁**都下发(扔道具/魔法时不带 `npc_id`),
+  且**捕捉失败也发**(`is_catch_success=false`——16 份 pcap 里失败比成功还多),见到 act 就当
+  捉到会把还在的标记误撤;②没用 `0x0203 END_THROW_RSP` 的 `catch_results`:那是较新字段,
+  只有最近两份 pcap 填了,且 `CRT_CATCH_SUCCESS` 恰好是枚举 0(成功时反而不上线),
+  不如显式布尔好判。战斗结算里同时含我方队伍(`npc_obj_id` 为 0),自然被过滤掉。
+
 ## 4. 宠物列表解析流程(`internal/pet`)
 
 ```
@@ -642,8 +792,8 @@ s2c 0x1346 DATA 明文 body
   - 判据**对称**、不依赖 opcode:送出方 `catched_uin`==本账号故仍记「捕捉」,接收方 `related_uin`==本账号
     故记「赠送获得」(`catchWayName` 据 `uidFromAcc(acc)` 判定)。实测两侧样本(20645 送出、20646 受赠)
     各自事件与宠物库变更均正确;
-- **异色/炫彩**：`mutation_type` 为位标志,bit0=异色、bit3=炫彩(9 样本实测验证);
-  炫彩的颜色/粒子细节(`glass_value`)不解析,仅记录是否炫彩。
+- **异色/炫彩**：`mutation_type` 为位标志,bit0=异色(`MDT_SHINING`)、bit3=炫彩(`MDT_GLASS`);
+  全部位与炫彩外观的解读见 3.5(宠物列表这边不解析 `glass_value` 的具体外观,只记是否炫彩)。
 - **盒子位置**：`PetData` 无位置字段,位置由仓库布局 `PetBackpackInfo` 表达——
   `ZONE_LOGIN_RSP(0x0102)` 登录数据(或盒子操作回包 6272-6292)携带 `boxes[]`,每个 `PetBox` 有
   `box_id`(**盒号即展示位置,1 起**)、`mark_type`(WarehouseMarkType:1首领/2污染/4奇异/8炫彩/16闪光)、

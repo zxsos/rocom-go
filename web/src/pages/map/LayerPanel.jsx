@@ -1,10 +1,12 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
+import { WILD_LAYERS } from './useWildPets'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
-// (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。
+// (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
+// 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
-export default function LayerPanel({ pois, collapsed, onClose }) {
+export default function LayerPanel({ pois, wilds, collapsed, onClose }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   return (
     <>
@@ -33,6 +35,22 @@ export default function LayerPanel({ pois, collapsed, onClose }) {
               )}
             </div>
           ))}
+        </div>
+        <div className="filter-group">
+          <label>野生宠物</label>
+          {WILD_LAYERS.map(({ k, n, color }) => (
+            <div className="map-layer-row" key={k}>
+              <button className={'map-layer-btn map-wild-btn' + (wilds.on.has(k) ? ' on' : '')}
+                onClick={() => wilds.toggle(k)}>
+                <span className="map-wild-swatch" style={{ borderColor: color }} />
+                <span className="map-layer-name">{n}</span>
+                <span className="muted">{wilds.num[k] || 0}</span>
+              </button>
+            </div>
+          ))}
+          <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            只标出周围已下发的野生宠(走近才知道);位置≈刷新点。灰色 = 已离开视野的最后所见。
+          </span>
         </div>
         <div className="filters-foot">
           <button className="btn primary" onClick={onClose}>查看地图</button>
