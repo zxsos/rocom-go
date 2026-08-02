@@ -18,9 +18,11 @@
 
 ## 效果预览
 
-| 宠物列表 | 宠物详情 |
-| --- | --- |
-| ![宠物列表](docs/images/pet-list.webp) | ![宠物详情](docs/images/pet-detail.webp) |
+### 宠物列表
+![宠物列表](docs/images/pet-list.webp)
+
+### 实时地图
+![实时地图](docs/images/live-map.webp)
 
 ## 架构
 
