@@ -6,7 +6,8 @@
 # 从 ~/Downloads/rocom/Paks/(游戏目录原样复制的 pak)全量导出到 ~/Downloads/rocom/parsed/,
 # 按虚拟路径镜像:uasset/umap → json(纹理另出 png),其余(.bytes/.non/.pb/.lua 等)原样字节。
 # 生成脚本(gen_proto/gen_gamedata/gen_images/gen_icons/gen_bigmap)直接读 parsed/。
-# 并行解码,默认跳过已存在文件(增量);默认排除纯客户端运行时资源(三维美术/视频/音频/着色器等,
+# 并行解码,增量跳过产物不比来源 pak 旧的项(补丁包原地改的同名文件会自动重导);
+# 默认排除纯客户端运行时资源(三维美术/视频/音频/着色器等,
 # 约占全量 74G/80G,清单见 --help),--exclude 追加、--no-exclude 恢复真·全量。
 #
 # 导出后自动跑两个后置步骤(增量,--no-post 跳过;缺依赖时提示后继续):
