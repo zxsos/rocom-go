@@ -4717,6 +4717,7 @@ const (
 	TaskClassType_TCT_SADV_CHALLENGE      TaskClassType = 22
 	TaskClassType_TCT_CAMPAIGN_REPEAT     TaskClassType = 23
 	TaskClassType_TCT_RECALL_BP           TaskClassType = 24
+	TaskClassType_TCT_SADV_WEEKLY         TaskClassType = 27
 )
 
 // Enum value maps for TaskClassType.
@@ -4747,6 +4748,7 @@ var (
 		22: "TCT_SADV_CHALLENGE",
 		23: "TCT_CAMPAIGN_REPEAT",
 		24: "TCT_RECALL_BP",
+		27: "TCT_SADV_WEEKLY",
 	}
 	TaskClassType_value = map[string]int32{
 		"TCT_NONE":                0,
@@ -4774,6 +4776,7 @@ var (
 		"TCT_SADV_CHALLENGE":      22,
 		"TCT_CAMPAIGN_REPEAT":     23,
 		"TCT_RECALL_BP":           24,
+		"TCT_SADV_WEEKLY":         27,
 	}
 )
 
@@ -5849,6 +5852,7 @@ const (
 	SeasonAdventureChapterType_SACT_NONE   SeasonAdventureChapterType = 0
 	SeasonAdventureChapterType_SACT_NORMAL SeasonAdventureChapterType = 1
 	SeasonAdventureChapterType_SACT_BADGE  SeasonAdventureChapterType = 2
+	SeasonAdventureChapterType_SACT_WEEKLY SeasonAdventureChapterType = 3
 )
 
 // Enum value maps for SeasonAdventureChapterType.
@@ -5857,11 +5861,13 @@ var (
 		0: "SACT_NONE",
 		1: "SACT_NORMAL",
 		2: "SACT_BADGE",
+		3: "SACT_WEEKLY",
 	}
 	SeasonAdventureChapterType_value = map[string]int32{
 		"SACT_NONE":   0,
 		"SACT_NORMAL": 1,
 		"SACT_BADGE":  2,
+		"SACT_WEEKLY": 3,
 	}
 )
 
@@ -62400,7 +62406,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x16TKT_GRASS_TRIAL_SETTLE\x10\x83\x03\x12*\n" +
 	"%TKT_GRASS_TRIAL_PREPARE_HAS_STORYFLAG\x10\x84\x03\x12\x1b\n" +
 	"\x16TKT_BUILDING_NPC_LEVEL\x10\x85\x03\x12\x12\n" +
-	"\rTKT_OTHER_MAX\x10\x90\x03*\xfe\x03\n" +
+	"\rTKT_OTHER_MAX\x10\x90\x03*\x93\x04\n" +
 	"\rTaskClassType\x12\f\n" +
 	"\bTCT_NONE\x10\x00\x12\v\n" +
 	"\aTCT_SUB\x10\x01\x12\f\n" +
@@ -62429,7 +62435,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x0fTCT_SADV_NORMAL\x10\x15\x12\x16\n" +
 	"\x12TCT_SADV_CHALLENGE\x10\x16\x12\x17\n" +
 	"\x13TCT_CAMPAIGN_REPEAT\x10\x17\x12\x11\n" +
-	"\rTCT_RECALL_BP\x10\x18*j\n" +
+	"\rTCT_RECALL_BP\x10\x18\x12\x13\n" +
+	"\x0fTCT_SADV_WEEKLY\x10\x1b*j\n" +
 	"\x11TaskStructureType\x12\r\n" +
 	"\tTSTT_NONE\x10\x00\x12\x0f\n" +
 	"\vTSTT_BATTLE\x10\x01\x12\x11\n" +
@@ -62593,12 +62600,13 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x10TBPC_ENTER_BLACK\x10\x01\x12\x13\n" +
 	"\x0fTBPC_EXIT_BLACK\x10\x02\x12\x13\n" +
 	"\x0fTBPC_ENTER_SKIP\x10\x03\x12\x12\n" +
-	"\x0eTBPC_EXIT_SKIP\x10\x04*L\n" +
+	"\x0eTBPC_EXIT_SKIP\x10\x04*]\n" +
 	"\x1aSeasonAdventureChapterType\x12\r\n" +
 	"\tSACT_NONE\x10\x00\x12\x0f\n" +
 	"\vSACT_NORMAL\x10\x01\x12\x0e\n" +
 	"\n" +
-	"SACT_BADGE\x10\x02*k\n" +
+	"SACT_BADGE\x10\x02\x12\x0f\n" +
+	"\vSACT_WEEKLY\x10\x03*k\n" +
 	"\x18SeasonAdventureBadgeType\x12\r\n" +
 	"\tSABT_NONE\x10\x00\x12\r\n" +
 	"\tSABT_STAR\x10\x01\x12\x0e\n" +
