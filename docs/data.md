@@ -27,8 +27,10 @@
 > `~/Downloads/rocom/parsed/`(顶层即挂载根 `NRC/Content/...`):`.uasset`/`.umap` 导出为
 > 同路径属性 **.json**(含 PaperSprite UV 等全部导出属性),内含纹理的包另出同路径 **.png**
 > (Texture2D 解码);其余文件(`.bytes`/`.non`/`.pb`/`.lua`/`.luac`/`.ini` 等)**原样字节**;
-> `.uexp`/`.ubulk` 随包体读取不单独落盘。`Parallel.ForEach` 并行解码,默认跳过已存在文件
-> (增量),`--list` 预览、`--filter` 按前缀选导、`--force` 覆盖。**默认排除**纯客户端运行时
+> `.uexp`/`.ubulk` 随包体读取不单独落盘。`Parallel.ForEach` 并行解码,**增量**跳过产物存在
+> 且不比其来源 pak 旧的项(小版本补丁包 `_N_P` 多是原地改同名文件,只判存在与否会把这些改动
+> 全部静默跳过、解包停在旧版本,故按 mtime 比对),`--list` 预览、`--filter` 按前缀选导、
+> `--force` 全部重导。**默认排除**纯客户端运行时
 > 资源(ArtRes 三维美术、Movies 视频、WwiseAudio 音频、AI 行为树、PVS/着色器/PSO 缓存、Engine;
 > 约占全量 74G/80G,下游脚本零引用,清单见 `--help`),`--exclude <前缀>` 追加排除、
 > `--no-exclude` 恢复真·全量。RenderTarget/视频纹理无像素数据,只出属性 json 不出 png

@@ -20,6 +20,8 @@ using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
+using CUE4Parse.UE4.VirtualFileSystem;
+using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
 using Newtonsoft.Json;
 using Serilog;
@@ -39,7 +41,8 @@ const string Usage = """
       --exclude <prefix> 排除虚拟路径前缀(可重复,叠加在默认排除之上)
       --no-exclude      清空默认排除清单(真·全量导出;--exclude 仍生效)
       --usmap <path>    可选 .usmap 映射(当前版本无需)
-      --force           覆盖已存在文件(默认跳过,增量导出)
+      --force           全部重导(默认增量:产物存在且不比其来源 pak 旧才跳过,
+                        故补丁包原地改过的同名文件会自动重导)
       --list [substr]   只列出将导出的虚拟路径(可选子串过滤)后退出
 
     默认排除(纯客户端运行时资源,下游脚本零引用;约占全量 74G/80G):
@@ -142,6 +145,7 @@ Console.WriteLine($"挂载 {provider.MountedVfs.Count} 个包,{provider.Files.Co
 // 输出路径 = 完整虚拟路径(如 NewRocoGame/Content/...),不同 mount 间天然无冲突。
 var jobs = new List<(GameFile File, Kind Kind, string OutPath)>();
 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+var srcMtimeCache = new ConcurrentDictionary<string, DateTime>();
 var skipped = 0;
 var excludes = (noDefaultExcludes ? [] : defaultExcludes.AsEnumerable()).Concat(extraExcludes).ToArray();
 foreach (var candidate in provider.Files.Values)
@@ -158,8 +162,11 @@ foreach (var candidate in provider.Files.Values)
     var file = provider.Files[candidate.Path];
     var kind = !rawOnly && ext is ".uasset" or ".umap" ? Kind.Package : Kind.Raw;
     var outPath = Path.Combine(outDir, kind == Kind.Package ? Path.ChangeExtension(rel, ".json") : rel);
-    // 包任务先写 .png 后写 .json,故 .json 存在即整包已完成,增量跳过安全
-    if (!force && File.Exists(outPath)) skipped++;
+    // 增量跳过:产物存在 **且** 不比其来源 pak 旧。只看存在与否是不够的——小版本更新的补丁包
+    // (_N_P)大多是原地改同名文件(如 PETBASE_CONF.bytes / all.pb),产物路径不变,
+    // 纯存在性判断会把这些改动全部静默跳过,解包结果停留在旧版本。
+    // 包任务先写 .png 后写 .json,故 .json 的时间戳即整包完成时间,增量跳过安全。
+    if (!force && IsUpToDate(outPath, file)) skipped++;
     else jobs.Add((file, kind, outPath));
 }
 
@@ -196,7 +203,6 @@ Parallel.ForEach(jobs, new ParallelOptions { MaxDegreeOfParallelism = parallelis
                     try
                     {
                         var decoded = tex.Decode() ?? throw new InvalidOperationException($"纹理解码失败({tex.Format})");
-                        FixBc7ChannelOrder(tex, decoded);
                         // 单纹理包(常态)用包名;罕见多纹理包时后续项以导出名附加,避免互相覆盖
                         var path = Path.ChangeExtension(job.OutPath, n == 0 ? ".png" : $"{tex.Name}.png");
                         File.WriteAllBytes(path, decoded.Encode(ETextureFormat.Png, false, out _));
@@ -227,6 +233,23 @@ foreach (var err in errors.Take(20)) Console.Error.WriteLine($"[err] {err}");
 if (errors.Count > 20) Console.Error.WriteLine($"[err] ... 共 {errors.Count} 个失败");
 return errors.IsEmpty ? 0 : 2;
 
+// 产物是否已是最新:存在且不早于其来源 pak 的修改时间。
+// 来源取该文件的胜出 VFS(补丁包优先)对应的磁盘文件;取不到(如 apk 内嵌)则退回 --paks 本身。
+bool IsUpToDate(string outPath, GameFile file)
+{
+    var outInfo = new FileInfo(outPath);
+    if (!outInfo.Exists) return false;
+    var srcPath = (file as VfsEntry)?.Vfs.Path;
+    return outInfo.LastWriteTimeUtc >= SourceMtime(srcPath is not null && File.Exists(srcPath) ? srcPath : paksPath);
+}
+
+// pak 的 mtime 按路径缓存:每个 pak 几万个文件,不必反复 stat
+DateTime SourceMtime(string path) => srcMtimeCache.GetOrAdd(path, static p =>
+{
+    try { return File.GetLastWriteTimeUtc(p); }
+    catch { return DateTime.MaxValue; }   // 拿不到时间就当作「永远更新」,宁可重导也不漏导
+});
+
 string Next(ref int i)
 {
     if (i + 1 >= args.Length) { Console.Error.WriteLine($"{args[i]} 缺少参数值\n{Usage}"); Environment.Exit(1); }
@@ -237,19 +260,6 @@ static int Fail(string msg)
 {
     Console.Error.WriteLine(msg);
     return 1;
-}
-
-// 上游 bug 修正:TextureDecoder 的 PF_BC7 在 AssetRipper 托管分支里用 ColorRGBA 解码,
-// 却把 colorType 标成 PF_B8G8R8A8(那是 Detex 原生分支的字节序),R/B 全图对调。
-// 双重条件防御:上游若改 colorType 修复,此处自动失效;若改成 ColorBGRA 修复则需删掉本函数。
-static void FixBc7ChannelOrder(UTexture tex, CTexture decoded)
-{
-    if (!TextureDecoder.UseAssetRipperTextureDecoder) return;
-    if (tex.Format != CUE4Parse.UE4.Assets.Exports.Texture.EPixelFormat.PF_BC7) return;
-    if (decoded.PixelFormat != CUE4Parse.UE4.Assets.Exports.Texture.EPixelFormat.PF_B8G8R8A8) return;
-    var d = decoded.Data;
-    for (var i = 0; i + 3 < d.Length; i += 4)
-        (d[i], d[i + 2]) = (d[i + 2], d[i]);
 }
 
 internal enum Kind { Raw, Package }
