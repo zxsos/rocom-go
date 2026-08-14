@@ -32,6 +32,8 @@
 
 - Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(all.pb → internal/pb)、
   `uv run python scripts/gen_gamedata.py`(Bin 配置 + all.pb → names.json)、
+  `uv run python scripts/gen_pbdesc.py`(all.pb + ProtoCMD.lua → internal/pbdesc/data:
+  裁剪后的描述符集 + opcode→消息名,供 pcapdump 精确解码)、
   `uv run python scripts/gen_images.py`(解包 PNG → internal/gamedata/data/img 的宠物图 webp)、
   `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,worldmap,medal}:属性/
   六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图;图集精灵从解包属性 JSON + 图集 PNG 裁切,
@@ -48,9 +50,12 @@
   (三维之外的 Bin 配置、图标、大地图都靠它)。
 - pcap 调试:`go run ./cmd/pcapdump -pcap <文件>` 把回放消息输出为「适合 AI 分析」的结构化文本,
   免去为调试新协议临时写一次性程序。三种模式:无参=opcode 概览(次数/方向/名称);
-  `-op 0x1888,FREE`=转储匹配 opcode 的消息头 + 通用 protobuf 解码树(opcode 支持 hex/十进制/名称子串,
-  `-hex` 附原始字节);`-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。解码为 wire 级、
-  不依赖 .proto(规避版本错位),自动跳过 c2s 子头并在 tsf4g 尾前停止。
+  `-op 0x1888,FREE`=转储匹配 opcode 的消息(opcode 支持 hex/十进制/名称子串,`-hex` 附原始字节);
+  `-gid 20508,15895`=扫描某宠物编号出现在哪些 opcode。
+  转储默认**精确解码**:按 opcode 查 `internal/pbdesc` 内嵌的游戏描述符,用真实消息类型解出带
+  字段名/枚举名的树(消息边界靠「无未知字段 + 消费最多 + 回序列化长度一致」在 c2s 子头/tsf4g 尾之间试出);
+  opcode 未映射或该版本对不上时自动退回通用 wire 级解码(只有字段编号)。`-msg .Next.XxxRsp` 可
+  强制消息类型,`-wire` 强制只用 wire 级。
 - 数据来源**均为自行解包提取**,不依赖外部数据仓库:中文名称表来自解包目录的 Bin 配置
   (由 `scripts/bin2json.py` 按 CUE4Parse 的 FRocoBinData 算法解为 JSON);`internal/pb` 结构、opcode、枚举同出
   游戏描述符 all.pb(前者经 protoc `--descriptor_set_in` 生成 Go,后者经 `scripts/pbdesc.py`
@@ -59,5 +64,6 @@
   重跑生成脚本(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
-- `internal/pb/*.pb.go` 与 `internal/gamedata/data/names.json` 为生成物，改动应改生成脚本而非手改。
+- `internal/pb/*.pb.go`、`internal/gamedata/data/names.json`、`internal/pbdesc/data/*` 为生成物，
+  改动应改生成脚本而非手改。
 - 相关工具与开源项目清单见 [docs/reference.md](docs/reference.md)。
