@@ -138,6 +138,28 @@ com_monster/com_pet_skill/com_season/rpc_options/xls_enum/com_pet_team),
 | 捕捉时间 | `add_time`(unix 秒) |
 | 六维 | `attribute_new_info`(最终面板值，按 AttributeType 1-6 取) |
 
+## 2.1 描述符 → pcapdump 精确解码(`scripts/gen_pbdesc.py`)
+
+`internal/pb` 只覆盖宠物相关那几个消息(线上解析路径要静态类型),调试新协议时够不着。
+`gen_pbdesc.py` 另出一份**运行时反射用**的生成物 `internal/pbdesc/data/`(已提交,embed):
+
+- `opmsg.json`:opcode → 消息全名(1625 条)。映射表在客户端 `ProtoCMD.lua`
+  (`[ProtoCMD.ZoneSvrCmd.X] = ".Next.Y"`),opcode 数值取 all.pb 的 `ZoneSvrCmd`/`ZoneSvrGmCmd`
+  枚举,两边对得上才收(有 20 个消息名 lua 里有、描述符里还没有,跳过)。
+- `proto.desc.gz`:裁剪过的 `FileDescriptorSet`(gzip 178KB)。只留从上述消息**字段可达**的
+  消息与枚举(3085/3816 消息、170/1088 枚举),service/自定义 option 扩展全丢;
+  被引用的嵌套枚举若其外层消息用不上,外层留个空壳撑住命名(否则解析报找不到类型)。
+
+pcapdump 用它 + `dynamicpb` 解出带字段名/枚举名的树(`cmd/pcapdump/typed.go`)。消息在
+`AppBody` 里的边界要试:头部 s2c 是 0、c2s 还剩 6 字节子头,尾部是 tsf4g 校验尾,
+以 `"tsf4g"` 为锚在 `[起始 0..16] × [结束 tail-24..tail]` 里取「解出来没有未知字段 +
+消费字节最多 + 回序列化长度一致」的候选。104 种 opcode 实测 103 种能精确解出,
+唯一的例外 `0x013f ZONE_SCENE_HEARTBEAT_RESULT_NTY` 根本不是 protobuf(定长二进制结构),
+自动退回通用 wire 级解码。
+
+> 回序列化只比长度不比字节:Go 按字段**声明顺序**编码,服务端按**字段号**顺序,
+> 本协议里两者常不一致,字节序列不同但长度必然相同。
+
 ## 3. 名称表 → JSON(`scripts/gen_gamedata.py`)
 
 从上述表提取精简 `id → 中文名` 写入 `internal/gamedata/data/names.json`(已提交)，

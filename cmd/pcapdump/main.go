@@ -3,14 +3,16 @@
 //
 //	概览(默认):各 opcode 的出现次数/方向/名称,按次数倒序。
 //	  go run ./cmd/pcapdump -pcap x.pcap00
-//	消息转储(-op):打印匹配 opcode 的每条消息头 + 通用 protobuf 解码树(+可选 hex)。
+//	消息转储(-op):打印匹配 opcode 的每条消息头 + protobuf 解码树(+可选 hex)。
 //	  go run ./cmd/pcapdump -pcap x.pcap00 -op 0x1888,FREE
 //	gid 扫描(-gid):某宠物 gid 出现在哪些 opcode 里(定位某编号的数据来源)。
 //	  go run ./cmd/pcapdump -pcap x.pcap00 -gid 20508,15895
 //
 // opcode 过滤项可写十六进制(0x1888)、十进制(6280)或名称子串(大小写不敏感,如 FREE/BOX_CHANGE)。
-// protobuf 解码为「通用 wire 级」:不依赖 .proto 定义(规避版本错位),自动跳过 c2s 子头、
-// 在校验和/tsf4g 尾处停止,并把剩余字节作为 trailer 展示。
+// 转储默认「精确解码」:按 opcode 查 internal/pbdesc 内嵌的游戏描述符,用真实消息类型解出
+// 带字段名/枚举名的树(见 typed.go)。opcode 未映射、或该版本描述符对不上时自动退回
+// 「通用 wire 级」解码:不依赖 .proto 定义,只有字段编号,自动跳过 c2s 子头、在 tsf4g 尾处停止。
+// -msg 可指定消息类型(如给 c2s 或想按别的类型试解),-wire 强制只用通用解码。
 package main
 
 import (
@@ -27,6 +29,8 @@ import (
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
+	"github.com/whoisnian/rocom-capture/internal/pbdesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func main() {
@@ -36,6 +40,8 @@ func main() {
 	gidScan := flag.String("gid", "", "扫描这些宠物 gid 出现在哪些 opcode(逗号分隔)")
 	showHex := flag.Bool("hex", false, "转储模式下附带 AppBody 十六进制")
 	noProto := flag.Bool("no-proto", false, "转储模式下不做 protobuf 解码")
+	msgType := flag.String("msg", "", "强制按此消息类型精确解码(全名,如 .Next.ZoneGetAllHatchStatusRsp)")
+	wireOnly := flag.Bool("wire", false, "只用通用 wire 级解码,不查描述符")
 	limit := flag.Int("limit", 20, "转储模式下每个 opcode 最多打印多少条")
 	maxBody := flag.Int("maxbody", 4096, "单条消息解码/转储的最大字节数(超出截断,避免登录包刷屏)")
 	port := flag.Int("port", 8195, "游戏服务器端口")
@@ -58,14 +64,38 @@ func main() {
 		return "?"
 	}
 
+	opts := dumpOpts{showHex: *showHex, doProto: !*noProto, limit: *limit, maxBody: *maxBody}
+	if opts.doProto && !*wireOnly {
+		opts.typeOf = messageResolver(*msgType)
+	}
+
 	switch {
 	case *gidScan != "":
 		runGidScan(*pcapPath, *port, parseGids(*gidScan), nameOf)
 	case *opFilter != "":
-		runDump(*pcapPath, *port, parseOpFilter(*opFilter, names), nameOf, *showHex, !*noProto, *limit, *maxBody)
+		runDump(*pcapPath, *port, parseOpFilter(*opFilter, names), nameOf, opts)
 	default:
 		runSummary(*pcapPath, *port, nameOf)
 	}
+}
+
+// messageResolver 返回 opcode -> 消息类型的查询函数(内嵌描述符不可用时返回 nil)。
+// forced 非空时忽略 opcode,一律按该消息名解码。
+func messageResolver(forced string) func(uint16) protoreflect.MessageDescriptor {
+	db, err := pbdesc.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "# 描述符加载失败,退回通用 wire 解码:", err)
+		return nil
+	}
+	if forced != "" {
+		md, err := db.Find(forced)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "找不到消息类型:", err)
+			os.Exit(1)
+		}
+		return func(uint16) protoreflect.MessageDescriptor { return md }
+	}
+	return db.FindOp
 }
 
 // ---- 模式实现 ----
@@ -119,7 +149,16 @@ func runSummary(path string, port int, nameOf func(uint16) string) {
 	}
 }
 
-func runDump(path string, port int, ops map[uint16]bool, nameOf func(uint16) string, showHex, doProto bool, limit, maxBody int) {
+// dumpOpts 是转储模式的输出选项。typeOf 为 nil 表示不做精确解码。
+type dumpOpts struct {
+	showHex bool
+	doProto bool
+	limit   int
+	maxBody int
+	typeOf  func(uint16) protoreflect.MessageDescriptor
+}
+
+func runDump(path string, port int, ops map[uint16]bool, nameOf func(uint16) string, o dumpOpts) {
 	if len(ops) == 0 {
 		fmt.Fprintln(os.Stderr, "未匹配到任何 opcode")
 		os.Exit(1)
@@ -134,23 +173,51 @@ func runDump(path string, port int, ops map[uint16]bool, nameOf func(uint16) str
 		if !ops[m.Opcode] {
 			continue
 		}
-		if seen[m.Opcode] >= limit {
+		if seen[m.Opcode] >= o.limit {
 			continue
 		}
 		seen[m.Opcode]++
+		// 精确解码需要完整 body(截断会解不出),通用解码/hex 才按 maxBody 截。
+		var md protoreflect.MessageDescriptor
+		if o.doProto && o.typeOf != nil {
+			md = o.typeOf(m.Opcode)
+		}
+		var typed *typedResult
+		if md != nil {
+			hint := startHintS2C
+			if m.Direction.String() == "c2s" {
+				hint = startHintC2S
+			}
+			typed = decodeTyped(md, m.AppBody, hint)
+		}
 		body := m.AppBody
 		trunc := false
-		if len(body) > maxBody {
-			body = body[:maxBody]
+		if len(body) > o.maxBody {
+			body = body[:o.maxBody]
 			trunc = true
 		}
 		fmt.Printf("\n== op=0x%04x %s [%s] t=%s len=%d#%d %s\n",
 			m.Opcode, nameOf(m.Opcode), m.Direction.String(), m.Time.Format("15:04:05"),
-			len(m.AppBody), seen[m.Opcode], ifStr(trunc, "(截断)", ""))
-		if showHex {
+			len(m.AppBody), seen[m.Opcode], ifStr(trunc && typed == nil, "(截断)", ""))
+		if o.showHex {
 			fmt.Print(indentBlock(hex.Dump(body), "  "))
 		}
-		if doProto {
+		switch {
+		case !o.doProto:
+		case typed != nil:
+			if n := len(m.AppBody) - typed.start - typed.trailer; n == 0 {
+				fmt.Printf("  %s (空消息):\n", md.FullName())
+			} else {
+				fmt.Printf("  %s (起始偏移 %d, 尾部 %dB%s):\n", md.FullName(),
+					typed.start, typed.trailer, ifStr(typed.exact, "", ", 边界存疑"))
+			}
+			var sb strings.Builder
+			renderMsg(typed.msg, 2, &sb)
+			fmt.Print(sb.String())
+		default:
+			if md != nil {
+				fmt.Printf("  # %s 解码失败(描述符与该版本不符?),退回 wire 级\n", md.FullName())
+			}
 			start, fields, consumed := decodeAuto(body)
 			fmt.Printf("  proto (起始偏移 %d, 已解码 %d/%dB):\n", start, consumed, len(body))
 			var sb strings.Builder
