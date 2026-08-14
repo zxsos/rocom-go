@@ -115,18 +115,20 @@ function Tooltip({ content, anchor }) {
 // StatRange 渲染身高/体重值;悬停时 tooltip 以 `99.67% (下限-上限)` 显示当前值百分位与该形态取值范围。
 // 范围/百分位来自后端 FillSizePercentile(按当前形态注入);未知形态无范围时退化为纯文本(无 tooltip)。
 // tooltip 经 portal 渲染到 body、fixed 定位:不受列表 .table-wrap 的 overflow 裁剪。
-export function StatRange({ value, min, max, pct, unit }) {
+// stacked(列表用):百分位直接换行显示在数值下方,tooltip 只留取值范围。
+export function StatRange({ value, min, max, pct, unit, stacked }) {
   const text = `${value}${unit}`
   const ref = React.useRef(null)
   const [anchor, setAnchor] = React.useState(null) // 悬停时锚点元素的视口矩形
   if (!(max > min)) return <>{text}</>
   const pctText = pct != null ? `${pct.toFixed(2)}%` : null
-  const content = pctText ? `${pctText} (${min}-${max})` : `${min}-${max}`
+  const content = stacked ? `${min}-${max}` : (pctText ? `${pctText} (${min}-${max})` : `${min}-${max}`)
   const show = () => { if (ref.current) setAnchor(ref.current.getBoundingClientRect()) }
   const hide = () => setAnchor(null)
   return (
-    <span ref={ref} onMouseEnter={show} onMouseLeave={hide}>
+    <span ref={ref} className={stacked ? 'stat-2l' : undefined} onMouseEnter={show} onMouseLeave={hide}>
       {text}
+      {stacked && pctText && <span className="stat-pct">{pctText}</span>}
       {anchor && <Tooltip content={content} anchor={anchor} />}
     </span>
   )
