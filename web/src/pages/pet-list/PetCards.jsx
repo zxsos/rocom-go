@@ -25,8 +25,8 @@ export default function PetCards({ pets, selected, itemProps }) {
             <div>特长：{p.speciality || '无'}</div>
             <div>奖牌：{p.medal || '-'}</div>
             {p.eggGroups?.length > 0 && <div className="egg-cell">蛋组：<EggGroups groups={p.eggGroups} /></div>}
-            <div>体重：<span className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></span></div>
-            <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></div>
+            <div>体重：<span className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" stacked /></span></div>
+            <div>身高：<StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" stacked /></div>
             <div>声音：<span className={voiceHot(p.voice)}>{p.voice}</span></div>
           </div>
           <Six p={p} />

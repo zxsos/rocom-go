@@ -39,8 +39,8 @@ export default function PetTable({ pets, selected, sort, order, onSort, itemProp
               <td>{p.speciality || '无'}</td>
               <td>{p.medal || '-'}</td>
               <td className={voiceHot(p.voice)}>{p.voice}</td>
-              <td className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" /></td>
-              <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" /></td>
+              <td className={pctHot(p.weightPct)}><StatRange value={p.weightKg} min={p.weightMin} max={p.weightMax} pct={p.weightPct} unit=" kg" stacked /></td>
+              <td><StatRange value={p.heightM} min={p.heightMin} max={p.heightMax} pct={p.heightPct} unit=" m" stacked /></td>
               <td><Six p={p} /></td>
               <td className="muted">{fmtTime(p.catchTime)}</td>
             </tr>
