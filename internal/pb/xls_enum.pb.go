@@ -4315,6 +4315,7 @@ const (
 	TaskKeyType_TKT_GRASS_TRIAL_SETTLE                TaskKeyType = 387
 	TaskKeyType_TKT_GRASS_TRIAL_PREPARE_HAS_STORYFLAG TaskKeyType = 388
 	TaskKeyType_TKT_BUILDING_NPC_LEVEL                TaskKeyType = 389
+	TaskKeyType_TKT_PET_BOND_PROGRESS                 TaskKeyType = 391
 	TaskKeyType_TKT_OTHER_MAX                         TaskKeyType = 400
 )
 
@@ -4483,6 +4484,7 @@ var (
 		387: "TKT_GRASS_TRIAL_SETTLE",
 		388: "TKT_GRASS_TRIAL_PREPARE_HAS_STORYFLAG",
 		389: "TKT_BUILDING_NPC_LEVEL",
+		391: "TKT_PET_BOND_PROGRESS",
 		400: "TKT_OTHER_MAX",
 	}
 	TaskKeyType_value = map[string]int32{
@@ -4648,6 +4650,7 @@ var (
 		"TKT_GRASS_TRIAL_SETTLE":                387,
 		"TKT_GRASS_TRIAL_PREPARE_HAS_STORYFLAG": 388,
 		"TKT_BUILDING_NPC_LEVEL":                389,
+		"TKT_PET_BOND_PROGRESS":                 391,
 		"TKT_OTHER_MAX":                         400,
 	}
 )
@@ -33173,6 +33176,7 @@ const (
 	FunctionEntrance_FE_DUNGEON_EXIT                   FunctionEntrance = 94
 	FunctionEntrance_FE_QQMUSIC                        FunctionEntrance = 95
 	FunctionEntrance_FE_QQMUSIC_LANGUAGE               FunctionEntrance = 96
+	FunctionEntrance_FE_SHIELD_PLAYER_STRANGER         FunctionEntrance = 97
 	FunctionEntrance_FE_PET_ADD_PET_EXP                FunctionEntrance = 1010000
 	FunctionEntrance_FE_PET_GROW                       FunctionEntrance = 1020000
 	FunctionEntrance_FE_PET_FREE                       FunctionEntrance = 1030000
@@ -33297,6 +33301,10 @@ const (
 	FunctionEntrance_FE_AI_COACH_CHAT                  FunctionEntrance = 81040000
 	FunctionEntrance_FE_AI_COACH_ACTIVITY              FunctionEntrance = 81050000
 	FunctionEntrance_FE_AI_COACH_TEAM                  FunctionEntrance = 81060000
+	FunctionEntrance_FE_AI_COACH_BOX                   FunctionEntrance = 81090000
+	FunctionEntrance_FE_AI_COACH_Squad                 FunctionEntrance = 81100000
+	FunctionEntrance_FE_AI_COACH_Team_Edit             FunctionEntrance = 81110000
+	FunctionEntrance_FE_AI_COACH_MagicHandbook_Match   FunctionEntrance = 81120000
 	FunctionEntrance_FE_RANKBOARD_FETCH_DB             FunctionEntrance = 89010000
 	FunctionEntrance_FE_BATTLE_GET_BALL                FunctionEntrance = 90000001
 	FunctionEntrance_FE_FASHION_CHANGE_RENAME          FunctionEntrance = 18010000
@@ -33407,6 +33415,7 @@ var (
 		94:       "FE_DUNGEON_EXIT",
 		95:       "FE_QQMUSIC",
 		96:       "FE_QQMUSIC_LANGUAGE",
+		97:       "FE_SHIELD_PLAYER_STRANGER",
 		1010000:  "FE_PET_ADD_PET_EXP",
 		1020000:  "FE_PET_GROW",
 		1030000:  "FE_PET_FREE",
@@ -33531,6 +33540,10 @@ var (
 		81040000: "FE_AI_COACH_CHAT",
 		81050000: "FE_AI_COACH_ACTIVITY",
 		81060000: "FE_AI_COACH_TEAM",
+		81090000: "FE_AI_COACH_BOX",
+		81100000: "FE_AI_COACH_Squad",
+		81110000: "FE_AI_COACH_Team_Edit",
+		81120000: "FE_AI_COACH_MagicHandbook_Match",
 		89010000: "FE_RANKBOARD_FETCH_DB",
 		90000001: "FE_BATTLE_GET_BALL",
 		18010000: "FE_FASHION_CHANGE_RENAME",
@@ -33638,6 +33651,7 @@ var (
 		"FE_DUNGEON_EXIT":                   94,
 		"FE_QQMUSIC":                        95,
 		"FE_QQMUSIC_LANGUAGE":               96,
+		"FE_SHIELD_PLAYER_STRANGER":         97,
 		"FE_PET_ADD_PET_EXP":                1010000,
 		"FE_PET_GROW":                       1020000,
 		"FE_PET_FREE":                       1030000,
@@ -33762,6 +33776,10 @@ var (
 		"FE_AI_COACH_CHAT":                  81040000,
 		"FE_AI_COACH_ACTIVITY":              81050000,
 		"FE_AI_COACH_TEAM":                  81060000,
+		"FE_AI_COACH_BOX":                   81090000,
+		"FE_AI_COACH_Squad":                 81100000,
+		"FE_AI_COACH_Team_Edit":             81110000,
+		"FE_AI_COACH_MagicHandbook_Match":   81120000,
 		"FE_RANKBOARD_FETCH_DB":             89010000,
 		"FE_BATTLE_GET_BALL":                90000001,
 		"FE_FASHION_CHANGE_RENAME":          18010000,
@@ -35117,6 +35135,7 @@ const (
 	RedPointReason_RPR_PANDORA_TIPS                           RedPointReason = 207
 	RedPointReason_RPR_GRASS_TRIAL_SLOT_FINAL_REWARD          RedPointReason = 216
 	RedPointReason_RPR_GRASS_TRIAL_HANDBOOK                   RedPointReason = 217
+	RedPointReason_RPR_NONE                                   RedPointReason = 999
 )
 
 // Enum value maps for RedPointReason.
@@ -35297,6 +35316,7 @@ var (
 		207: "RPR_PANDORA_TIPS",
 		216: "RPR_GRASS_TRIAL_SLOT_FINAL_REWARD",
 		217: "RPR_GRASS_TRIAL_HANDBOOK",
+		999: "RPR_NONE",
 	}
 	RedPointReason_value = map[string]int32{
 		"RPR_NEW_PET":                                1,
@@ -35474,6 +35494,7 @@ var (
 		"RPR_PANDORA_TIPS":                           207,
 		"RPR_GRASS_TRIAL_SLOT_FINAL_REWARD":          216,
 		"RPR_GRASS_TRIAL_HANDBOOK":                   217,
+		"RPR_NONE":                                   999,
 	}
 )
 
@@ -40043,6 +40064,7 @@ const (
 	ActivityType_ATP_EVENING_REST               ActivityType = 59
 	ActivityType_ATP_PET_PRODUCT                ActivityType = 60
 	ActivityType_ATP_SEASON_SPRINT              ActivityType = 63
+	ActivityType_ATP_PET_GIFT                   ActivityType = 67
 )
 
 // Enum value maps for ActivityType.
@@ -40107,6 +40129,7 @@ var (
 		59: "ATP_EVENING_REST",
 		60: "ATP_PET_PRODUCT",
 		63: "ATP_SEASON_SPRINT",
+		67: "ATP_PET_GIFT",
 	}
 	ActivityType_value = map[string]int32{
 		"ATP_ACTIVITY_SPECIAL":           1,
@@ -40168,6 +40191,7 @@ var (
 		"ATP_EVENING_REST":               59,
 		"ATP_PET_PRODUCT":                60,
 		"ATP_SEASON_SPRINT":              63,
+		"ATP_PET_GIFT":                   67,
 	}
 )
 
@@ -40406,6 +40430,9 @@ const (
 	ActiviyMixSlotFunciton_AMSF_CONDITION_TEXT     ActiviyMixSlotFunciton = 9
 	ActiviyMixSlotFunciton_AMSF_TASK_DONE          ActiviyMixSlotFunciton = 10
 	ActiviyMixSlotFunciton_AMSF_SHOP_CHANGE_DONE   ActiviyMixSlotFunciton = 11
+	ActiviyMixSlotFunciton_AMSF_PET_ATTR           ActiviyMixSlotFunciton = 12
+	ActiviyMixSlotFunciton_AMSF_GET_TASK           ActiviyMixSlotFunciton = 13
+	ActiviyMixSlotFunciton_AMSF_SHOW_REWARD        ActiviyMixSlotFunciton = 19
 	ActiviyMixSlotFunciton_AMSF_CONFIG_MAX         ActiviyMixSlotFunciton = 1000
 	ActiviyMixSlotFunciton_AMSF_PREREQUISITE_TASKS ActiviyMixSlotFunciton = 1001
 	ActiviyMixSlotFunciton_AMSF_MUST_DO_TASKS      ActiviyMixSlotFunciton = 1002
@@ -40426,6 +40453,9 @@ var (
 		9:    "AMSF_CONDITION_TEXT",
 		10:   "AMSF_TASK_DONE",
 		11:   "AMSF_SHOP_CHANGE_DONE",
+		12:   "AMSF_PET_ATTR",
+		13:   "AMSF_GET_TASK",
+		19:   "AMSF_SHOW_REWARD",
 		1000: "AMSF_CONFIG_MAX",
 		1001: "AMSF_PREREQUISITE_TASKS",
 		1002: "AMSF_MUST_DO_TASKS",
@@ -40443,6 +40473,9 @@ var (
 		"AMSF_CONDITION_TEXT":     9,
 		"AMSF_TASK_DONE":          10,
 		"AMSF_SHOP_CHANGE_DONE":   11,
+		"AMSF_PET_ATTR":           12,
+		"AMSF_GET_TASK":           13,
+		"AMSF_SHOW_REWARD":        19,
 		"AMSF_CONFIG_MAX":         1000,
 		"AMSF_PREREQUISITE_TASKS": 1001,
 		"AMSF_MUST_DO_TASKS":      1002,
@@ -52154,40 +52187,43 @@ func (SeasonItemGoImgLocation) EnumDescriptor() ([]byte, []int) {
 type RelationTreeBasic int32
 
 const (
-	RelationTreeBasic_RLTB_OPEN_CARD           RelationTreeBasic = 1
-	RelationTreeBasic_RLTB_WORLD_INF           RelationTreeBasic = 2
-	RelationTreeBasic_RLTB_HOME_INF            RelationTreeBasic = 3
-	RelationTreeBasic_RLTB_BLACK_PLAYER        RelationTreeBasic = 4
-	RelationTreeBasic_RLTB_REPORT_PLAYER       RelationTreeBasic = 5
-	RelationTreeBasic_RLTB_NICKNAME            RelationTreeBasic = 6
-	RelationTreeBasic_RLTB_SP_ATTENTION        RelationTreeBasic = 7
-	RelationTreeBasic_RLTB_DELETE_FRIEND       RelationTreeBasic = 8
-	RelationTreeBasic_RLTB_BLACK_PLAYER_REMOVE RelationTreeBasic = 9
+	RelationTreeBasic_RLTB_OPEN_CARD              RelationTreeBasic = 1
+	RelationTreeBasic_RLTB_WORLD_INF              RelationTreeBasic = 2
+	RelationTreeBasic_RLTB_HOME_INF               RelationTreeBasic = 3
+	RelationTreeBasic_RLTB_BLACK_PLAYER           RelationTreeBasic = 4
+	RelationTreeBasic_RLTB_REPORT_PLAYER          RelationTreeBasic = 5
+	RelationTreeBasic_RLTB_NICKNAME               RelationTreeBasic = 6
+	RelationTreeBasic_RLTB_SP_ATTENTION           RelationTreeBasic = 7
+	RelationTreeBasic_RLTB_DELETE_FRIEND          RelationTreeBasic = 8
+	RelationTreeBasic_RLTB_BLACK_PLAYER_REMOVE    RelationTreeBasic = 9
+	RelationTreeBasic_RLTB_SHIELD_PLAYER_STRANGER RelationTreeBasic = 10
 )
 
 // Enum value maps for RelationTreeBasic.
 var (
 	RelationTreeBasic_name = map[int32]string{
-		1: "RLTB_OPEN_CARD",
-		2: "RLTB_WORLD_INF",
-		3: "RLTB_HOME_INF",
-		4: "RLTB_BLACK_PLAYER",
-		5: "RLTB_REPORT_PLAYER",
-		6: "RLTB_NICKNAME",
-		7: "RLTB_SP_ATTENTION",
-		8: "RLTB_DELETE_FRIEND",
-		9: "RLTB_BLACK_PLAYER_REMOVE",
+		1:  "RLTB_OPEN_CARD",
+		2:  "RLTB_WORLD_INF",
+		3:  "RLTB_HOME_INF",
+		4:  "RLTB_BLACK_PLAYER",
+		5:  "RLTB_REPORT_PLAYER",
+		6:  "RLTB_NICKNAME",
+		7:  "RLTB_SP_ATTENTION",
+		8:  "RLTB_DELETE_FRIEND",
+		9:  "RLTB_BLACK_PLAYER_REMOVE",
+		10: "RLTB_SHIELD_PLAYER_STRANGER",
 	}
 	RelationTreeBasic_value = map[string]int32{
-		"RLTB_OPEN_CARD":           1,
-		"RLTB_WORLD_INF":           2,
-		"RLTB_HOME_INF":            3,
-		"RLTB_BLACK_PLAYER":        4,
-		"RLTB_REPORT_PLAYER":       5,
-		"RLTB_NICKNAME":            6,
-		"RLTB_SP_ATTENTION":        7,
-		"RLTB_DELETE_FRIEND":       8,
-		"RLTB_BLACK_PLAYER_REMOVE": 9,
+		"RLTB_OPEN_CARD":              1,
+		"RLTB_WORLD_INF":              2,
+		"RLTB_HOME_INF":               3,
+		"RLTB_BLACK_PLAYER":           4,
+		"RLTB_REPORT_PLAYER":          5,
+		"RLTB_NICKNAME":               6,
+		"RLTB_SP_ATTENTION":           7,
+		"RLTB_DELETE_FRIEND":          8,
+		"RLTB_BLACK_PLAYER_REMOVE":    9,
+		"RLTB_SHIELD_PLAYER_STRANGER": 10,
 	}
 )
 
@@ -55147,6 +55183,7 @@ const (
 	ActivityMixSlot_AMSLOT_4 ActivityMixSlot = 4
 	ActivityMixSlot_AMSLOT_5 ActivityMixSlot = 5
 	ActivityMixSlot_AMSLOT_6 ActivityMixSlot = 6
+	ActivityMixSlot_AMSLOT_7 ActivityMixSlot = 7
 )
 
 // Enum value maps for ActivityMixSlot.
@@ -55158,6 +55195,7 @@ var (
 		4: "AMSLOT_4",
 		5: "AMSLOT_5",
 		6: "AMSLOT_6",
+		7: "AMSLOT_7",
 	}
 	ActivityMixSlot_value = map[string]int32{
 		"AMSLOT_1": 1,
@@ -55166,6 +55204,7 @@ var (
 		"AMSLOT_4": 4,
 		"AMSLOT_5": 5,
 		"AMSLOT_6": 6,
+		"AMSLOT_7": 7,
 	}
 )
 
@@ -58939,34 +58978,46 @@ func (NpcSizeChangeType) EnumDescriptor() ([]byte, []int) {
 type AIcoachSceneType int32
 
 const (
-	AIcoachSceneType_AST_Match_Prepare    AIcoachSceneType = 1
-	AIcoachSceneType_AST_Match_Battle     AIcoachSceneType = 2
-	AIcoachSceneType_AST_Friend_Interface AIcoachSceneType = 3
-	AIcoachSceneType_AST_Friend_Chat      AIcoachSceneType = 4
-	AIcoachSceneType_AST_Shinning_Weekend AIcoachSceneType = 5
-	AIcoachSceneType_AST_Group_Recommend  AIcoachSceneType = 6
-	AIcoachSceneType_AST_Group_Detail     AIcoachSceneType = 7
+	AIcoachSceneType_AST_Match_Prepare       AIcoachSceneType = 1
+	AIcoachSceneType_AST_Match_Battle        AIcoachSceneType = 2
+	AIcoachSceneType_AST_Friend_Interface    AIcoachSceneType = 3
+	AIcoachSceneType_AST_Friend_Chat         AIcoachSceneType = 4
+	AIcoachSceneType_AST_Shinning_Weekend    AIcoachSceneType = 5
+	AIcoachSceneType_AST_Group_Recommend     AIcoachSceneType = 6
+	AIcoachSceneType_AST_Group_Detail        AIcoachSceneType = 7
+	AIcoachSceneType_AST_Elf_Box             AIcoachSceneType = 8
+	AIcoachSceneType_AST_Match_Elf_Squad     AIcoachSceneType = 9
+	AIcoachSceneType_AST_Match_Team_Edit     AIcoachSceneType = 10
+	AIcoachSceneType_AST_MagicHandbook_Match AIcoachSceneType = 11
 )
 
 // Enum value maps for AIcoachSceneType.
 var (
 	AIcoachSceneType_name = map[int32]string{
-		1: "AST_Match_Prepare",
-		2: "AST_Match_Battle",
-		3: "AST_Friend_Interface",
-		4: "AST_Friend_Chat",
-		5: "AST_Shinning_Weekend",
-		6: "AST_Group_Recommend",
-		7: "AST_Group_Detail",
+		1:  "AST_Match_Prepare",
+		2:  "AST_Match_Battle",
+		3:  "AST_Friend_Interface",
+		4:  "AST_Friend_Chat",
+		5:  "AST_Shinning_Weekend",
+		6:  "AST_Group_Recommend",
+		7:  "AST_Group_Detail",
+		8:  "AST_Elf_Box",
+		9:  "AST_Match_Elf_Squad",
+		10: "AST_Match_Team_Edit",
+		11: "AST_MagicHandbook_Match",
 	}
 	AIcoachSceneType_value = map[string]int32{
-		"AST_Match_Prepare":    1,
-		"AST_Match_Battle":     2,
-		"AST_Friend_Interface": 3,
-		"AST_Friend_Chat":      4,
-		"AST_Shinning_Weekend": 5,
-		"AST_Group_Recommend":  6,
-		"AST_Group_Detail":     7,
+		"AST_Match_Prepare":       1,
+		"AST_Match_Battle":        2,
+		"AST_Friend_Interface":    3,
+		"AST_Friend_Chat":         4,
+		"AST_Shinning_Weekend":    5,
+		"AST_Group_Recommend":     6,
+		"AST_Group_Detail":        7,
+		"AST_Elf_Box":             8,
+		"AST_Match_Elf_Squad":     9,
+		"AST_Match_Team_Edit":     10,
+		"AST_MagicHandbook_Match": 11,
 	}
 )
 
@@ -61349,6 +61400,101 @@ func (ActivityComposeVariableType) EnumDescriptor() ([]byte, []int) {
 	return file_xls_enum_proto_rawDescGZIP(), []int{762}
 }
 
+type IdipPetStatusBit int32
+
+const (
+	IdipPetStatusBit_IPS_BIT_IN_PVP_TEAM                   IdipPetStatusBit = 0
+	IdipPetStatusBit_IPS_BIT_IN_WEEKLY_CHALLENGE_TEAM      IdipPetStatusBit = 1
+	IdipPetStatusBit_IPS_BIT_IN_GRASS_TRIAL                IdipPetStatusBit = 2
+	IdipPetStatusBit_IPS_BIT_IN_PET_TRIP                   IdipPetStatusBit = 3
+	IdipPetStatusBit_IPS_BIT_PARTNER_MARKED                IdipPetStatusBit = 4
+	IdipPetStatusBit_IPS_BIT_IN_LORD_EVOLUTION             IdipPetStatusBit = 5
+	IdipPetStatusBit_IPS_BIT_HOME_PET                      IdipPetStatusBit = 6
+	IdipPetStatusBit_IPS_BIT_HOME_GUARD                    IdipPetStatusBit = 7
+	IdipPetStatusBit_IPS_BIT_TASK_TOGETHER                 IdipPetStatusBit = 8
+	IdipPetStatusBit_IPS_BIT_TASK_FORCE_LOCK               IdipPetStatusBit = 9
+	IdipPetStatusBit_IPS_BIT_CONFIG_BAN_FREE               IdipPetStatusBit = 10
+	IdipPetStatusBit_IPS_BIT_PET_BAN_USE                   IdipPetStatusBit = 11
+	IdipPetStatusBit_IPS_BIT_LAST_NORMAL_IN_BIG_WORLD_TEAM IdipPetStatusBit = 12
+	IdipPetStatusBit_IPS_BIT_BACKTRACKABLE                 IdipPetStatusBit = 13
+	IdipPetStatusBit_IPS_BIT_IN_LOCKED_BOX                 IdipPetStatusBit = 14
+)
+
+// Enum value maps for IdipPetStatusBit.
+var (
+	IdipPetStatusBit_name = map[int32]string{
+		0:  "IPS_BIT_IN_PVP_TEAM",
+		1:  "IPS_BIT_IN_WEEKLY_CHALLENGE_TEAM",
+		2:  "IPS_BIT_IN_GRASS_TRIAL",
+		3:  "IPS_BIT_IN_PET_TRIP",
+		4:  "IPS_BIT_PARTNER_MARKED",
+		5:  "IPS_BIT_IN_LORD_EVOLUTION",
+		6:  "IPS_BIT_HOME_PET",
+		7:  "IPS_BIT_HOME_GUARD",
+		8:  "IPS_BIT_TASK_TOGETHER",
+		9:  "IPS_BIT_TASK_FORCE_LOCK",
+		10: "IPS_BIT_CONFIG_BAN_FREE",
+		11: "IPS_BIT_PET_BAN_USE",
+		12: "IPS_BIT_LAST_NORMAL_IN_BIG_WORLD_TEAM",
+		13: "IPS_BIT_BACKTRACKABLE",
+		14: "IPS_BIT_IN_LOCKED_BOX",
+	}
+	IdipPetStatusBit_value = map[string]int32{
+		"IPS_BIT_IN_PVP_TEAM":                   0,
+		"IPS_BIT_IN_WEEKLY_CHALLENGE_TEAM":      1,
+		"IPS_BIT_IN_GRASS_TRIAL":                2,
+		"IPS_BIT_IN_PET_TRIP":                   3,
+		"IPS_BIT_PARTNER_MARKED":                4,
+		"IPS_BIT_IN_LORD_EVOLUTION":             5,
+		"IPS_BIT_HOME_PET":                      6,
+		"IPS_BIT_HOME_GUARD":                    7,
+		"IPS_BIT_TASK_TOGETHER":                 8,
+		"IPS_BIT_TASK_FORCE_LOCK":               9,
+		"IPS_BIT_CONFIG_BAN_FREE":               10,
+		"IPS_BIT_PET_BAN_USE":                   11,
+		"IPS_BIT_LAST_NORMAL_IN_BIG_WORLD_TEAM": 12,
+		"IPS_BIT_BACKTRACKABLE":                 13,
+		"IPS_BIT_IN_LOCKED_BOX":                 14,
+	}
+)
+
+func (x IdipPetStatusBit) Enum() *IdipPetStatusBit {
+	p := new(IdipPetStatusBit)
+	*p = x
+	return p
+}
+
+func (x IdipPetStatusBit) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IdipPetStatusBit) Descriptor() protoreflect.EnumDescriptor {
+	return file_xls_enum_proto_enumTypes[763].Descriptor()
+}
+
+func (IdipPetStatusBit) Type() protoreflect.EnumType {
+	return &file_xls_enum_proto_enumTypes[763]
+}
+
+func (x IdipPetStatusBit) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Do not use.
+func (x *IdipPetStatusBit) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = IdipPetStatusBit(num)
+	return nil
+}
+
+// Deprecated: Use IdipPetStatusBit.Descriptor instead.
+func (IdipPetStatusBit) EnumDescriptor() ([]byte, []int) {
+	return file_xls_enum_proto_rawDescGZIP(), []int{763}
+}
+
 var File_xls_enum_proto protoreflect.FileDescriptor
 
 const file_xls_enum_proto_rawDesc = "" +
@@ -62240,7 +62386,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\bCUT_NONE\x10\x00\x12\x14\n" +
 	"\x10CUT_RESET_OPTION\x10\x01\x12\x14\n" +
 	"\x10CUT_RESET_RESULT\x10\x02\x12\x11\n" +
-	"\rCUT_RESET_ALL\x10\x03*\x90\"\n" +
+	"\rCUT_RESET_ALL\x10\x03*\xac\"\n" +
 	"\vTaskKeyType\x12\f\n" +
 	"\bTKT_NONE\x10\x00\x12\x0f\n" +
 	"\vTKT_BAT_MIN\x10\x01\x12\x18\n" +
@@ -62405,7 +62551,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x15TKT_STATE_PATH_FINISH\x10\x82\x03\x12\x1b\n" +
 	"\x16TKT_GRASS_TRIAL_SETTLE\x10\x83\x03\x12*\n" +
 	"%TKT_GRASS_TRIAL_PREPARE_HAS_STORYFLAG\x10\x84\x03\x12\x1b\n" +
-	"\x16TKT_BUILDING_NPC_LEVEL\x10\x85\x03\x12\x12\n" +
+	"\x16TKT_BUILDING_NPC_LEVEL\x10\x85\x03\x12\x1a\n" +
+	"\x15TKT_PET_BOND_PROGRESS\x10\x87\x03\x12\x12\n" +
 	"\rTKT_OTHER_MAX\x10\x90\x03*\x93\x04\n" +
 	"\rTaskClassType\x12\f\n" +
 	"\bTCT_NONE\x10\x00\x12\v\n" +
@@ -67114,7 +67261,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x12\x0e\n" +
 	"\n" +
 	"WH_FALLING\x10\v\x12\x11\n" +
-	"\rWH_DRILL_IMME\x10\f*\xfc+\n" +
+	"\rWH_DRILL_IMME\x10\f*\x93-\n" +
 	"\x10FunctionEntrance\x12\n" +
 	"\n" +
 	"\x06FE_PET\x10\x01\x12\n" +
@@ -67226,7 +67373,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x0fFE_DUNGEON_EXIT\x10^\x12\x0e\n" +
 	"\n" +
 	"FE_QQMUSIC\x10_\x12\x17\n" +
-	"\x13FE_QQMUSIC_LANGUAGE\x10`\x12\x18\n" +
+	"\x13FE_QQMUSIC_LANGUAGE\x10`\x12\x1d\n" +
+	"\x19FE_SHIELD_PLAYER_STRANGER\x10a\x12\x18\n" +
 	"\x12FE_PET_ADD_PET_EXP\x10\xd0\xd2=\x12\x11\n" +
 	"\vFE_PET_GROW\x10\xe0\xa0>\x12\x11\n" +
 	"\vFE_PET_FREE\x10\xf0\xee>\x12\x18\n" +
@@ -67350,7 +67498,11 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x12FE_AI_COACH_FRIEND\x10\xf0\xd6\xd1&\x12\x17\n" +
 	"\x10FE_AI_COACH_CHAT\x10\x80\xa5\xd2&\x12\x1b\n" +
 	"\x14FE_AI_COACH_ACTIVITY\x10\x90\xf3\xd2&\x12\x17\n" +
-	"\x10FE_AI_COACH_TEAM\x10\xa0\xc1\xd3&\x12\x1c\n" +
+	"\x10FE_AI_COACH_TEAM\x10\xa0\xc1\xd3&\x12\x16\n" +
+	"\x0fFE_AI_COACH_BOX\x10Ы\xd5&\x12\x18\n" +
+	"\x11FE_AI_COACH_Squad\x10\xe0\xf9\xd5&\x12\x1c\n" +
+	"\x15FE_AI_COACH_Team_Edit\x10\xf0\xc7\xd6&\x12&\n" +
+	"\x1fFE_AI_COACH_MagicHandbook_Match\x10\x80\x96\xd7&\x12\x1c\n" +
 	"\x15FE_RANKBOARD_FETCH_DB\x10\xd0\u07b8*\x12\x19\n" +
 	"\x12FE_BATTLE_GET_BALL\x10\x81\x95\xf5*\x12\x1f\n" +
 	"\x18FE_FASHION_CHANGE_RENAME\x10\x90\x9f\xcb\b\x12\x1a\n" +
@@ -67493,7 +67645,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x06PT_ADD\x10\x01\x12\x0f\n" +
 	"\vPT_DISCOUNT\x10\x02\x12\r\n" +
 	"\tPT_RETURN\x10\x03\x12\f\n" +
-	"\bPT_SUPER\x10\x04*\x9b)\n" +
+	"\bPT_SUPER\x10\x04*\xaa)\n" +
 	"\x0eRedPointReason\x12\x0f\n" +
 	"\vRPR_NEW_PET\x10\x01\x12\x15\n" +
 	"\x11RPR_PET_NEW_SKILL\x10\x02\x12\x13\n" +
@@ -67670,7 +67822,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x14RPR_QUIET_PET_EVOLVE\x10\xce\x01\x12\x15\n" +
 	"\x10RPR_PANDORA_TIPS\x10\xcf\x01\x12&\n" +
 	"!RPR_GRASS_TRIAL_SLOT_FINAL_REWARD\x10\xd8\x01\x12\x1d\n" +
-	"\x18RPR_GRASS_TRIAL_HANDBOOK\x10\xd9\x01*W\n" +
+	"\x18RPR_GRASS_TRIAL_HANDBOOK\x10\xd9\x01\x12\r\n" +
+	"\bRPR_NONE\x10\xe7\a*W\n" +
 	"\fRedPointType\x12\x0e\n" +
 	"\n" +
 	"RPT_COMMON\x10\x01\x12\v\n" +
@@ -68178,7 +68331,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x10WCERS_PROCESSING\x10\x00\x12\x12\n" +
 	"\x0eWCERS_COMPLETE\x10\x01\x12\x0e\n" +
 	"\n" +
-	"WCERS_FAIL\x10\x02*\xc9\v\n" +
+	"WCERS_FAIL\x10\x02*\xdb\v\n" +
 	"\fActivityType\x12\x18\n" +
 	"\x14ATP_ACTIVITY_SPECIAL\x10\x01\x12 \n" +
 	"\x1cATP_ACTIVITY_REWARD_BY_STAGE\x10\x02\x12\x1d\n" +
@@ -68241,7 +68394,8 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x0fATP_GRASS_TRIAL\x10:\x12\x14\n" +
 	"\x10ATP_EVENING_REST\x10;\x12\x13\n" +
 	"\x0fATP_PET_PRODUCT\x10<\x12\x15\n" +
-	"\x11ATP_SEASON_SPRINT\x10?*X\n" +
+	"\x11ATP_SEASON_SPRINT\x10?\x12\x10\n" +
+	"\fATP_PET_GIFT\x10C*X\n" +
 	"\x15ActivityLoginRequired\x12\x10\n" +
 	"\fALR_LOGIN_QQ\x10\x01\x12\x14\n" +
 	"\x10ALR_LOGIN_WECHAT\x10\x02\x12\x17\n" +
@@ -68255,7 +68409,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x1aActivityIconChangeRequired\x12\x16\n" +
 	"\x12AICR_SUCCESS_CLICK\x10\x01\x12\x15\n" +
 	"\x11AICR_RECEIVE_NOTE\x10\x02\x12\r\n" +
-	"\tAICR_NONE\x10\x03*\xee\x02\n" +
+	"\tAICR_NONE\x10\x03*\xaa\x03\n" +
 	"\x16ActiviyMixSlotFunciton\x12\r\n" +
 	"\tAMSF_NONE\x10\x00\x12\x14\n" +
 	"\x10AMSF_CHECK_VITEM\x10\x01\x12\x11\n" +
@@ -68269,7 +68423,10 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x13AMSF_CONDITION_TEXT\x10\t\x12\x12\n" +
 	"\x0eAMSF_TASK_DONE\x10\n" +
 	"\x12\x19\n" +
-	"\x15AMSF_SHOP_CHANGE_DONE\x10\v\x12\x14\n" +
+	"\x15AMSF_SHOP_CHANGE_DONE\x10\v\x12\x11\n" +
+	"\rAMSF_PET_ATTR\x10\f\x12\x11\n" +
+	"\rAMSF_GET_TASK\x10\r\x12\x14\n" +
+	"\x10AMSF_SHOW_REWARD\x10\x13\x12\x14\n" +
 	"\x0fAMSF_CONFIG_MAX\x10\xe8\a\x12\x1c\n" +
 	"\x17AMSF_PREREQUISITE_TASKS\x10\xe9\a\x12\x17\n" +
 	"\x12AMSF_MUST_DO_TASKS\x10\xea\a*7\n" +
@@ -69622,7 +69779,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x17SeasonItemGoImgLocation\x12\x13\n" +
 	"\x0fSIGI_LOCATION_1\x10\x01\x12\x13\n" +
 	"\x0fSIGI_LOCATION_2\x10\x02\x12\x13\n" +
-	"\x0fSIGI_LOCATION_3\x10\x03*\xdd\x01\n" +
+	"\x0fSIGI_LOCATION_3\x10\x03*\xfe\x01\n" +
 	"\x11RelationTreeBasic\x12\x12\n" +
 	"\x0eRLTB_OPEN_CARD\x10\x01\x12\x12\n" +
 	"\x0eRLTB_WORLD_INF\x10\x02\x12\x11\n" +
@@ -69632,7 +69789,9 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\rRLTB_NICKNAME\x10\x06\x12\x15\n" +
 	"\x11RLTB_SP_ATTENTION\x10\a\x12\x16\n" +
 	"\x12RLTB_DELETE_FRIEND\x10\b\x12\x1c\n" +
-	"\x18RLTB_BLACK_PLAYER_REMOVE\x10\t*\x9f\x01\n" +
+	"\x18RLTB_BLACK_PLAYER_REMOVE\x10\t\x12\x1f\n" +
+	"\x1bRLTB_SHIELD_PLAYER_STRANGER\x10\n" +
+	"*\x9f\x01\n" +
 	"\x14UserSubscribeTplType\x12 \n" +
 	"\x1cUSER_SUBSCRIBE_TPL_TYPE_NONE\x10\x00\x12 \n" +
 	"\x1cUSER_SUBSCRIBE_TPL_TYPE_FUNC\x10\x01\x12\x1f\n" +
@@ -69919,14 +70078,15 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\fPCT_THISWEEK\x10\x01*\x1a\n" +
 	"\bRollBack\x12\x0e\n" +
 	"\n" +
-	"RB_CANROLL\x10\x01*e\n" +
+	"RB_CANROLL\x10\x01*s\n" +
 	"\x0fActivityMixSlot\x12\f\n" +
 	"\bAMSLOT_1\x10\x01\x12\f\n" +
 	"\bAMSLOT_2\x10\x02\x12\f\n" +
 	"\bAMSLOT_3\x10\x03\x12\f\n" +
 	"\bAMSLOT_4\x10\x04\x12\f\n" +
 	"\bAMSLOT_5\x10\x05\x12\f\n" +
-	"\bAMSLOT_6\x10\x06*\\\n" +
+	"\bAMSLOT_6\x10\x06\x12\f\n" +
+	"\bAMSLOT_7\x10\a*\\\n" +
 	"\x17ActivitySLotFuctionType\x12\x19\n" +
 	"\x15ASFT_JUMP_INSTRUCTION\x10\x01\x12\x11\n" +
 	"\rASFT_WORLDMAP\x10\x02\x12\x13\n" +
@@ -70266,7 +70426,7 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x11NpcSizeChangeType\x12\x12\n" +
 	"\x0eNSCT_TO_TARGET\x10\x00\x12\f\n" +
 	"\bNSCT_ADD\x10\x01\x12\x11\n" +
-	"\rNSCT_MULTIPLY\x10\x02*\xb7\x01\n" +
+	"\rNSCT_MULTIPLY\x10\x02*\x97\x02\n" +
 	"\x10AIcoachSceneType\x12\x15\n" +
 	"\x11AST_Match_Prepare\x10\x01\x12\x14\n" +
 	"\x10AST_Match_Battle\x10\x02\x12\x18\n" +
@@ -70274,7 +70434,12 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x0fAST_Friend_Chat\x10\x04\x12\x18\n" +
 	"\x14AST_Shinning_Weekend\x10\x05\x12\x17\n" +
 	"\x13AST_Group_Recommend\x10\x06\x12\x14\n" +
-	"\x10AST_Group_Detail\x10\a*v\n" +
+	"\x10AST_Group_Detail\x10\a\x12\x0f\n" +
+	"\vAST_Elf_Box\x10\b\x12\x17\n" +
+	"\x13AST_Match_Elf_Squad\x10\t\x12\x17\n" +
+	"\x13AST_Match_Team_Edit\x10\n" +
+	"\x12\x1b\n" +
+	"\x17AST_MagicHandbook_Match\x10\v*v\n" +
 	"\x10EnumHeadWearType\x12\x11\n" +
 	"\rEHWT_HeadWear\x10\x00\x12\x11\n" +
 	"\rEHWT_SideWear\x10\x01\x12\x12\n" +
@@ -70489,7 +70654,24 @@ const file_xls_enum_proto_rawDesc = "" +
 	"\x1bActivityComposeVariableType\x12\r\n" +
 	"\tACVT_NONE\x10\x00\x12 \n" +
 	"\x1cACVT_MUST_DO_TASKS_DONE_TIME\x10\x01\x12%\n" +
-	"!ACVT_PREREQUISITE_TASKS_DONE_TIME\x10\x02"
+	"!ACVT_PREREQUISITE_TASKS_DONE_TIME\x10\x02*\xbe\x03\n" +
+	"\x10IdipPetStatusBit\x12\x17\n" +
+	"\x13IPS_BIT_IN_PVP_TEAM\x10\x00\x12$\n" +
+	" IPS_BIT_IN_WEEKLY_CHALLENGE_TEAM\x10\x01\x12\x1a\n" +
+	"\x16IPS_BIT_IN_GRASS_TRIAL\x10\x02\x12\x17\n" +
+	"\x13IPS_BIT_IN_PET_TRIP\x10\x03\x12\x1a\n" +
+	"\x16IPS_BIT_PARTNER_MARKED\x10\x04\x12\x1d\n" +
+	"\x19IPS_BIT_IN_LORD_EVOLUTION\x10\x05\x12\x14\n" +
+	"\x10IPS_BIT_HOME_PET\x10\x06\x12\x16\n" +
+	"\x12IPS_BIT_HOME_GUARD\x10\a\x12\x19\n" +
+	"\x15IPS_BIT_TASK_TOGETHER\x10\b\x12\x1b\n" +
+	"\x17IPS_BIT_TASK_FORCE_LOCK\x10\t\x12\x1b\n" +
+	"\x17IPS_BIT_CONFIG_BAN_FREE\x10\n" +
+	"\x12\x17\n" +
+	"\x13IPS_BIT_PET_BAN_USE\x10\v\x12)\n" +
+	"%IPS_BIT_LAST_NORMAL_IN_BIG_WORLD_TEAM\x10\f\x12\x19\n" +
+	"\x15IPS_BIT_BACKTRACKABLE\x10\r\x12\x19\n" +
+	"\x15IPS_BIT_IN_LOCKED_BOX\x10\x0e"
 
 var (
 	file_xls_enum_proto_rawDescOnce sync.Once
@@ -70503,7 +70685,7 @@ func file_xls_enum_proto_rawDescGZIP() []byte {
 	return file_xls_enum_proto_rawDescData
 }
 
-var file_xls_enum_proto_enumTypes = make([]protoimpl.EnumInfo, 763)
+var file_xls_enum_proto_enumTypes = make([]protoimpl.EnumInfo, 764)
 var file_xls_enum_proto_goTypes = []any{
 	(ECOLOGY_FEATURE)(0),                     // 0: dataconfig.ECOLOGY_FEATURE
 	(HABITAT_FLAG)(0),                        // 1: dataconfig.HABITAT_FLAG
@@ -71268,6 +71450,7 @@ var file_xls_enum_proto_goTypes = []any{
 	(FacePhotoConditionType)(0),              // 760: dataconfig.FacePhotoConditionType
 	(SocialExtDataType)(0),                   // 761: dataconfig.SocialExtDataType
 	(ActivityComposeVariableType)(0),         // 762: dataconfig.ActivityComposeVariableType
+	(IdipPetStatusBit)(0),                    // 763: dataconfig.IdipPetStatusBit
 }
 var file_xls_enum_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -71287,7 +71470,7 @@ func file_xls_enum_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_xls_enum_proto_rawDesc), len(file_xls_enum_proto_rawDesc)),
-			NumEnums:      763,
+			NumEnums:      764,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   0,
