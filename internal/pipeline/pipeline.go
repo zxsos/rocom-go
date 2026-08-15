@@ -54,6 +54,8 @@ type connState struct {
 	stars      *starTracker // 眠枭之星观测态(换场景/传送即重置)
 	wilds      *wildTracker // 野生宠物图层观测态(同上,见 wildpets.go)
 	pendantRid int32        // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
+	home       *homeState   // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
+	crackEgg   uint32       // 最近一次破壳请求(0x030b)的 egg_gid,等回包给出孵出的宠物 gid
 }
 
 // acctState 是单个账号的消费状态。
@@ -64,6 +66,7 @@ type acctState struct {
 	zoneGot map[int32]int32
 	// starKnown: 已确认的星星状态(库内快照,只写增量);nil=尚未从库预热。
 	starKnown map[int32]int
+	eggSweep  *eggSweep      // 正在累积的分页背包快照(末页对账,见 eggs.go)
 	lastPos   map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
 }
 
@@ -152,6 +155,10 @@ func (p *Pipeline) handle(m capture.Message) {
 	if cs := p.conns[m.Session]; cs != nil && cs.layer != nil && !cs.layer.since.IsZero() {
 		p.settleLayer(m.Session, acc, m.Time)
 	}
+
+	// 精灵蛋与宠物、场景都相关(破壳回包同时带新宠物,收蛋通知也走奖励通道),
+	// 故不参与「消费即返回」的分发,单独过一遍。
+	p.handleEgg(m, acc)
 
 	if p.handleScene(m, acc) {
 		return
