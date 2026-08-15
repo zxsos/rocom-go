@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_FALLBACK, clamp } from './motion'
 
+// tapSlop 是「按下到抬起」还算点一下的位移上限(px):超过就当在拖地图。
+const tapSlop = 6
+
 // usePanZoom 地图视图状态与手势:zoom 缩放、follow 跟随玩家(玩家居中)、
 // 指针拖动(单指/鼠标)平移、双指捏合与滚轮缩放。
 // 视口中心对应的地图归一化坐标放 focusRef(跟随时每帧跟着玩家走,不进 state,否则每帧重渲染整页);
 // zoom/follow/vp 同时放进 stRef 供指针回调与逐帧循环即时读取,避免闭包过期。
 // active=视口元素当前是否渲染(随 hasMap 出现/消失,重挂 ResizeObserver)。
-export function usePanZoom(active) {
+// onTap(target) = 在地图上点了一下(没拖动)时回调,target 是**按下那一刻**的元素:
+// 地图内的标记不能用普通 onClick——平移要 setPointerCapture,pointerup 被重定向到视口后
+// 浏览器就不再往标记上派发 click 了(桌面端点头像没反应正是这个原因),故这里自己判点击。
+export function usePanZoom(active, onTap) {
   const vpRef = useRef(null)
   const [vp, setVp] = useState({ w: 0, h: 0 }) // 视口尺寸(归一化坐标 → 像素;地图边长 = min(w,h)*zoom)
   const [zoom, setZoom] = useState(ZOOM_FALLBACK)
@@ -41,20 +47,31 @@ export function usePanZoom(active) {
 
   const ptrs = useRef(new Map())
   const pinch = useRef(0)
+  const tap = useRef(null) // 本次按下是否还够得上「点一下」(拖过/多指即作废)
+  const tapCb = useRef(onTap)
+  tapCb.current = onTap
   const onPointerDown = (e) => {
     // 点在缩放/回中控件上:不捕获指针、不启动平移,否则 setPointerCapture 会把 pointerup
     // 重定向到视口,桌面端按钮的 click 事件就不触发(移动端触摸 click 合成方式不同,不受影响)。
     if (e.target.closest?.('.map-ctrl')) return
     vpRef.current.setPointerCapture?.(e.pointerId)
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // 记下按下那一刻的元素:之后指针被捕获,move/up 的 target 一律是视口。
+    tap.current = ptrs.current.size > 1 ? null
+      : { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target }
   }
   const onPointerMove = (e) => {
     const p = ptrs.current.get(e.pointerId)
     if (!p) return
+    const t = tap.current
+    if (t && (Math.abs(e.clientX - t.x) > tapSlop || Math.abs(e.clientY - t.y) > tapSlop)) {
+      tap.current = null // 拖开了,这次不算点击
+    }
     const prev = { x: p.x, y: p.y }
     p.x = e.clientX; p.y = e.clientY
     const pts = [...ptrs.current.values()]
     if (pts.length >= 2) {
+      tap.current = null
       // 捏合:按两指距离变化缩放,锚点为两指中点(相对视口)。
       const [a, b] = pts
       const dist = Math.hypot(a.x - b.x, a.y - b.y)
@@ -75,6 +92,11 @@ export function usePanZoom(active) {
   const onPointerUp = (e) => {
     ptrs.current.delete(e.pointerId)
     if (ptrs.current.size < 2) pinch.current = 0
+    const t = tap.current
+    tap.current = null
+    if (t && t.id === e.pointerId && e.type === 'pointerup') {
+      tapCb.current?.(t.target)
+    }
   }
   const onWheel = (e) => {
     const rect = vpRef.current.getBoundingClientRect()
