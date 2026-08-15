@@ -81,10 +81,13 @@ export function useWildPets(account) {
   // 开着的图层覆盖哪些后端类别;一只宠物命中任一即画(可同时命中多层)。
   const shown = new Set(WILD_LAYERS.filter((l) => on.has(l.k)).flatMap((l) => l.kinds))
   const marks = pets.filter((p) => (p.kinds || []).some((k) => shown.has(k)))
-  // 图层行上的计数只算「还在视野里的」(stale 是最后所见,不代表现在还在)。
-  const num = Object.fromEntries(WILD_LAYERS.map((l) => [
-    l.k, pets.filter((p) => !p.stale && (p.kinds || []).some((k) => l.kinds.includes(k))).length,
-  ]))
+  // 图层行上的计数与地图上画出的标记一一对应:灰点(已离开视野的最后所见)也画在图上,
+  // 故也计入——否则侧栏显示 0 而图上还挂着几个,只会让人以为标记出错了。
+  // 另单算其中的灰点数,供侧栏悬浮说明拆开「视野内 / 已离开」(见 LayerPanel)。
+  const count = (l, pick) => pets.filter(
+    (p) => pick(p) && (p.kinds || []).some((k) => l.kinds.includes(k))).length
+  const num = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, () => true)]))
+  const numStale = Object.fromEntries(WILD_LAYERS.map((l) => [l.k, count(l, (p) => p.stale)]))
 
-  return { marks, num, on, toggle }
+  return { marks, num, numStale, on, toggle }
 }
