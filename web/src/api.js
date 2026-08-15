@@ -90,10 +90,10 @@ export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)
 // 之后由 SSE home 覆盖;从未进过家园时返回 null。
 export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
 
-// getEggs 返回精灵蛋列表与各状态计数:
-//   {eggs:[{gid,name,species,icon,heightM,weightKg,heightPct,weightPct,obtainedAt,parents,…}],
-//    counts:{inBag,hatching,hatched}}
-export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { eggs: [], counts: {} })
+// getEggs 返回背包里的精灵蛋(库里存的就是背包现状,破壳/送人的行已删):
+//   {eggs:[{gid,name,species,icon,typeName,medals,heightM,weightKg,heightPct,weightPct,
+//           obtainedAt,hatching,parents,…}]}
+export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { eggs: [] })
 
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export const getEvolution = (base) => getJSON('/api/evolution?base=' + base)

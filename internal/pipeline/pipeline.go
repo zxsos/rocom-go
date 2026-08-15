@@ -55,7 +55,7 @@ type connState struct {
 	wilds      *wildTracker // 野生宠物图层观测态(同上,见 wildpets.go)
 	pendantRid int32        // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
 	home       *homeState   // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
-	crackEgg   uint32       // 最近一次破壳请求(0x030b)的 egg_gid,等回包给出孵出的宠物 gid
+	crackEgg   uint32       // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
 }
 
 // acctState 是单个账号的消费状态。

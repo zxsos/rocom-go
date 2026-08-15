@@ -114,7 +114,7 @@
 | `GET /api/pois` | 某场景(`?res=<scene_res_cfg_id>`)的大地图 POI:图层清单 + 已投影为底图归一化 u/v 的标记点;眠枭之星另带收集状态与按区域进度(见 docs/data.md 3.3/3.4) |
 | `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、满声音,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
 | `GET /api/home` | 家园的精灵小窝图层:每个窝的位置(已投影 u/v)、入住宠物简要信息与配对、窝上还没收的蛋;不在家园时 `nests` 为空(见 docs/data.md 3.6) |
-| `GET /api/eggs` | 精灵蛋列表与计数(`state=0\|1\|2\|all`、`hatching=1`、`search`、`sort=obtained\|weight\|height\|name`、`order`);含蛋图/尺寸百分位/获得时间/孵化进度/双亲快照 |
+| `GET /api/eggs` | 背包里的精灵蛋(`search`、`sort=quality\|obtained`、`order`——复刻游戏内背包的两种排序);含蛋图/品类角标/尺寸百分位/百分位奖牌/获得时间/孵化进度/双亲快照 |
 | `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|debug\|position\|stars\|starzones\|wildpets\|home\|eggs, account, data}` |
 | `GET /*` | 前端 SPA(未匹配路径回退 index.html) |
 

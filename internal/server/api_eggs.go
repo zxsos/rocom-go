@@ -2,52 +2,43 @@ package server
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
-// handleEggs 返回当前账号的精灵蛋列表(默认只看还在背包里的)。
+// handleEggs 返回当前账号背包里的精灵蛋(库里存的就是背包现状,破壳/送人的行已删)。
 //
 // 参数:
 //
-//	state=0|1|2|all  0=在背包(默认) 1=已破壳(历史) 2=已不在背包
-//	hatching=1       只看正在孵蛋器里的
 //	search=          按蛋名/物种名模糊
-//	sort=obtained|weight|height|name  order=asc|desc
+//	sort=quality|obtained  order=asc|desc(复刻游戏内背包的两种排序,见 docs/data.md 3.6)
 //
-// 返回 {eggs:[…], counts:{inBag, hatching, hatched}}——计数供页面上的标签页显示。
+// 页面不分标签页:一次取回全部,孵蛋器那几颗按 hatching 标志自行分栏
+// (与游戏一致——在孵的蛋不出现在背包格子里)。**排序只作用于背包那部分**:客户端也是先把
+// 在孵的蛋摘掉(IsRemoveEggItem)再 table.sort,喂给排序的列表不同,同键蛋的落位就不同。
 func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := store.EggFilter{
-		State:    store.EggInBag,
-		Hatching: q.Get("hatching") == "1",
-		Search:   q.Get("search"),
-		Sort:     q.Get("sort"),
-		Order:    q.Get("order"),
-	}
-	switch st := q.Get("state"); st {
-	case "":
-	case "all":
-		f.State = -1
-	default:
-		if n, err := strconv.Atoi(st); err == nil {
-			f.State = n
-		}
-	}
-	sc := s.store.For(s.acct(r))
-	eggs, err := sc.ListEggs(f)
+	eggs, err := s.store.For(s.acct(r)).ListEggs(store.EggFilter{Search: q.Get("search")})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	inBag, hatching, hatched := sc.CountEggs()
-	if eggs == nil {
-		eggs = []*pet.EggView{} // 空列表输出 [],前端不必再判 null
+	for i, e := range eggs {
+		// 按当前名称库重算(旧行可能是本工具还没有异色标记/排序键时写的),
+		// 顺带补上要等双亲快照才算得出的推测嗓音与奖牌。
+		eggs[i] = pet.RefreshEggView(e, s.db)
 	}
-	writeJSON(w, map[string]any{
-		"eggs":   eggs,
-		"counts": map[string]int{"inBag": inBag, "hatching": hatching, "hatched": hatched},
-	})
+	// 排序键来自上面的重算,故排在其后;在孵的蛋原样留在最前(它们属于孵蛋器,不参与背包排序)。
+	hatching, bag := []*pet.EggView{}, []*pet.EggView{}
+	for _, e := range eggs {
+		if e.Hatching {
+			hatching = append(hatching, e)
+		} else {
+			bag = append(bag, e)
+		}
+	}
+	pet.SortEggs(bag, q.Get("sort"), q.Get("order") == "asc")
+	eggs = append(hatching, bag...)
+	writeJSON(w, map[string]any{"eggs": eggs})
 }

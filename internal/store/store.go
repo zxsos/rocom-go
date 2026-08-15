@@ -120,11 +120,9 @@ CREATE TABLE IF NOT EXISTS eggs (
   item_id INTEGER, conf_id INTEGER, name TEXT, species TEXT,
   height REAL, weight REAL, height_pct REAL, weight_pct REAL,
   src INTEGER, hatching INTEGER, obtained_at INTEGER,
-  state INTEGER DEFAULT 0, hatched_at INTEGER, pet_gid INTEGER,
-  parents TEXT, first_seen INTEGER, updated_at INTEGER, data TEXT,
+  seq INTEGER, parents TEXT, first_seen INTEGER, updated_at INTEGER, data TEXT,
   PRIMARY KEY(account, gid)
 );
-CREATE INDEX IF NOT EXISTS idx_eggs_account_state ON eggs(account, state);
 CREATE TABLE IF NOT EXISTS star_state (
   account TEXT NOT NULL, refresh_id INTEGER,
   state INTEGER, updated_at INTEGER,
@@ -150,6 +148,14 @@ CREATE TABLE IF NOT EXISTS star_zone (
 	// NULL(排序排末尾),清库重登后即补齐。
 	s.db.Exec(`ALTER TABLE pets ADD COLUMN weight_pct REAL`)
 	s.db.Exec(`ALTER TABLE pets ADD COLUMN height_pct REAL`)
+	// eggs 表曾留过破壳/送人的历史行(state/hatched_at/pet_gid),页面从不看,已改成
+	// 「表里只有背包现状」:旧库清掉那些行并去掉这三列(索引先删,否则 DROP COLUMN 不让动)。
+	s.db.Exec(`DELETE FROM eggs WHERE state IS NOT NULL AND state!=0`)
+	s.db.Exec(`DROP INDEX IF EXISTS idx_eggs_account_state`)
+	for _, col := range []string{"state", "hatched_at", "pet_gid"} {
+		s.db.Exec(`ALTER TABLE eggs DROP COLUMN ` + col)
+	}
+	s.db.Exec(`ALTER TABLE eggs ADD COLUMN seq INTEGER`) // 背包里的原始次序(服务器下发顺序)
 	return nil
 }
 
