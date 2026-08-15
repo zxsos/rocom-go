@@ -195,6 +195,17 @@ def egg_icon_refs():
                 yield m.group(0)
 
 
+def eggtype_icon_refs():
+    """蛋品类角标(EGG_TYPE_CONF:异色/炫彩/珍贵/唯一…):Common/Raw/Frames 下的图集精灵,
+    取 small_icon(卡片上是个二十来像素的小圆标),缺则回退 icon。与蛋图同放 img/egg/。"""
+    for r in load_rows("EGG_TYPE_CONF").values():
+        ic = r.get("small_icon") or r.get("icon")
+        if isinstance(ic, str) and ic:
+            m = re.search(r"/Game/[^']+", ic)
+            if m:
+                yield m.group(0)
+
+
 def gen_group(group: str, refs, writer) -> int:
     """按 basename 去重,逐个 writer(ref, dst) 产出 <group>/<原名>.webp。"""
     out = os.path.join(OUT_ROOT, group)
@@ -229,6 +240,7 @@ def main():
     total += gen_group("worldmap", list(WORLDMAP_TEX), copy_texture)
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     total += gen_group("egg", egg_icon_refs(), copy_texture)
+    total += gen_group("egg", eggtype_icon_refs(), crop_sprite)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
         sys.exit(f"未产出任何 webp:确认 {SRC} 下已有 unpack.sh 的全量解包产物。")
