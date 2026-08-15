@@ -38,18 +38,25 @@ export default function LayerPanel({ pois, wilds, home, collapsed, onClose }) {
         </div>
         <div className="filter-group">
           <label>野生宠物</label>
-          {WILD_LAYERS.map(({ k, n, color }) => (
-            <div className="map-layer-row" key={k}>
-              <button className={'map-layer-btn map-wild-btn' + (wilds.on.has(k) ? ' on' : '')}
-                onClick={() => wilds.toggle(k)}>
-                <span className="map-wild-swatch" style={{ borderColor: color }} />
-                <span className="map-layer-name">{n}</span>
-                <span className="muted">{wilds.num[k] || 0}</span>
-              </button>
-            </div>
-          ))}
+          {WILD_LAYERS.map(({ k, n, color }) => {
+            // 计数含灰点(与图上标记一致),悬浮再拆开说明其中多少已离开视野。
+            const num = wilds.num[k] || 0
+            const gone = wilds.numStale[k] || 0
+            return (
+              <div className="map-layer-row" key={k}>
+                <button className={'map-layer-btn map-wild-btn' + (wilds.on.has(k) ? ' on' : '')}
+                  onClick={() => wilds.toggle(k)}
+                  title={gone ? `视野内 ${num - gone} · 已离开视野 ${gone}` : undefined}>
+                  <span className="map-wild-swatch" style={{ borderColor: color }} />
+                  <span className="map-layer-name">{n}</span>
+                  <span className="muted">{num}</span>
+                </button>
+              </div>
+            )
+          })}
           <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-            只标出周围已下发的野生宠(走近才知道);位置≈刷新点。灰色 = 已离开视野的最后所见。
+            只标出周围已下发的野生宠(走近才知道);位置≈刷新点。灰色 = 已离开视野的最后所见,
+            同样计入数量(悬浮看拆分)。
           </span>
         </div>
         {home.total > 0 && (
