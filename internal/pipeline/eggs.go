@@ -12,17 +12,19 @@ import (
 // ---- 精灵蛋(见 docs/data.md 3.6)----
 //
 // 蛋从四处露面,处理方式各异:
-//   - 0x1344 背包分页全量:入库 + 末页对账(不在背包的标 gone,与宠物列表同一套路)
+//   - 0x1344 背包分页全量:入库 + 末页对账(不在背包的删掉,与宠物列表同一套路)
 //   - 0x0243 奖励通知:新得的蛋;flow_reason=223 即家园小窝下的蛋,顺手记双亲
 //   - 0x0164 用道具 / 0x0312 孵化状态:同一颗蛋的进度更新(入孵时刻、已孵秒数)
-//   - 0x030b/0x030c 破壳:请求带 egg_gid、回包带孵出的宠物 gid,配对后标记这颗蛋已孵化
+//   - 0x030b/0x030c 破壳:请求带 egg_gid,回包一到就把这颗蛋从库里删掉(它已不在背包里)
 //
+// 库里存的就是**背包现状**:页面只看背包,破壳/送人的蛋没人回看,故不留历史行。
 // 双亲只在**收蛋那一刻**能确定:蛋 NPC 趴在母本的窝上,配对由服务器下发(见 home.go)。
-// 快照落库后与宠物表脱钩,亲本日后被放生/赠送也不影响已记录的双亲。
+// 快照落库后与宠物表脱钩,亲本日后被放生/赠送也不影响这颗蛋上已记录的双亲。
 
 // eggSweep 累积一轮分页背包全量,末页对账(与 petSweep 同构,见 pets.go)。
 type eggSweep struct {
 	gids     map[uint32]bool
+	order    []uint32 // 服务器下发顺序(背包里的原始次序,见 store.SetEggOrder)
 	nextPage uint32
 	valid    bool
 	start    time.Time
@@ -35,16 +37,16 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 	switch {
 	case m.Direction == gcp.C2S && m.Opcode == pet.OpCrackEggReq:
 		if gid := pet.ParseCrackEggReq(m.AppBody); gid != 0 {
-			p.conn(m.Session).crackEgg = gid // 等回包给出孵出的宠物 gid
+			p.conn(m.Session).crackEgg = gid // 等回包确认破壳成功再删
 		}
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetBagItemInfoByPageRsp:
 		p.applyEggPage(m, sc, acc)
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpCrackEggRsp:
-		p.upsertEggs(sc, acc, pet.ParseChangedEggs(m.AppBody))
-		if egg := p.conn(m.Session).crackEgg; egg != 0 {
-			sc.MarkEggHatched(egg, pet.ParseCrackEggRsp(m.AppBody), m.Time.Unix())
+		// 破壳成功(回包带孵出的宠物 gid):这颗蛋没了,当场删行,不必等下次开背包对账。
+		if egg := p.conn(m.Session).crackEgg; egg != 0 && pet.ParseCrackEggRsp(m.AppBody) != 0 {
+			sc.DeleteEgg(egg)
 			p.conn(m.Session).crackEgg = 0
 			p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 		}
@@ -55,7 +57,7 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		if len(eggs) == 0 {
 			return
 		}
-		p.upsertEggs(sc, acc, eggs)
+		p.upsertEggs(sc, acc, eggs, m.Time)
 		if m.Opcode == pet.OpGoodsRewardNotify && pet.ParseFlowReason(m.AppBody) == pet.FlowReasonHomeLay {
 			p.recordEggParents(m.Session, sc, eggs, m.Time)
 		}
@@ -65,7 +67,7 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 // applyEggPage 处理背包分页全量:本页的蛋入库,收齐 1..total 后对账。
 func (p *Pipeline) applyEggPage(m capture.Message, sc *store.Scoped, acc string) {
 	eggs, page, total := pet.ParseBagEggs(m.AppBody)
-	p.upsertEggs(sc, acc, eggs)
+	p.upsertEggs(sc, acc, eggs, m.Time)
 
 	as := p.acct(acc)
 	sw := as.eggSweep
@@ -78,6 +80,9 @@ func (p *Pipeline) applyEggPage(m capture.Message, sc *store.Scoped, acc string)
 	}
 	sw.nextPage = page + 1
 	for _, e := range eggs {
+		if !sw.gids[e.Gid] {
+			sw.order = append(sw.order, e.Gid)
+		}
 		sw.gids[e.Gid] = true
 	}
 	if total == 0 || page < total {
@@ -85,13 +90,15 @@ func (p *Pipeline) applyEggPage(m capture.Message, sc *store.Scoped, acc string)
 	}
 	if sw.valid {
 		sc.PruneMissingEggs(sw.gids, sw.start.Unix())
+		sc.SetEggOrder(sw.order) // 收齐了才落次序:半轮的顺序是错的
 	}
 	as.eggSweep = nil
 	p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 }
 
 // upsertEggs 把解析出的蛋转成展示模型入库,并通知前端刷新。
-func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg) {
+// now 是消息时刻(离线回放同样按包走,见 store.UpsertEggs)。
+func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now time.Time) {
 	if len(eggs) == 0 {
 		return
 	}
@@ -99,7 +106,7 @@ func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg) {
 	for _, e := range eggs {
 		views = append(views, pet.ToEggView(e, p.db))
 	}
-	if err := sc.UpsertEggs(views); err == nil {
+	if err := sc.UpsertEggs(views, now.Unix()); err == nil {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}
 }

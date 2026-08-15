@@ -4,125 +4,130 @@ import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { fmtTime, pctHot, voiceHot } from '../../utils/format'
-import { hatchProgress, HATCH_RATE_NOTE } from './hatch'
+import { Marks } from '../../components/badges'
+import { hatchProgress } from './hatch'
 
-// 精灵蛋页面:背包里的蛋 + 家园收的蛋记下的双亲。
-// 数据来自后端 eggs 表(见 internal/store/egg.go);孵化进度按「当前值 + 倍率 × 已过秒数」
-// 本地外推(倍率由后端两次采样得出,加速活动期间会变,见 docs/data.md 3.6)。
-const TABS = [
-  { k: 'inBag', label: '背包中', state: '0' },
-  { k: 'hatching', label: '孵化中', state: '0', hatching: '1' },
-  { k: 'hatched', label: '已破壳', state: '1' },
-]
-
+// 精灵蛋页面:左栏孵蛋器(在孵的那几颗)、右栏背包(其余的,每行六个,同游戏内布局)。
+// 不分标签页——在孵的蛋本来就不出现在背包格子里(客户端 BagModuleData.IsRemoveEggItem),
+// 两栏一摆就把「在孵 / 在包」说清楚了,不必再给个过滤器。
+// 排序复刻游戏内背包的两种(见 docs/data.md 3.6 与 internal/pet.SortEggs)。
 const SORTS = [
-  { k: 'obtained', label: '获得时间' },
-  { k: 'weight', label: '体重百分位' },
-  { k: 'height', label: '身高百分位' },
-  { k: 'name', label: '名称' },
+  { k: 'quality', label: '品质' },
+  { k: 'obtained', label: '获取时间' },
 ]
+
+// 孵蛋器格子数:实测 3 个(玩家上限可能随等级/道具变,故按实际在孵数取大)。
+const HATCH_SLOTS = 3
 
 export default function EggList() {
   const account = useContext(AccountContext)
-  const [tab, setTab] = useState('inBag')
-  const [sort, setSort] = useState('obtained')
+  const [sort, setSort] = useState('quality')
   const [order, setOrder] = useState('desc')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState({ eggs: [], counts: {} })
+  const [data, setData] = useState({ eggs: [] })
   const [detailGid, setDetailGid] = useState(null)
   const [now, setNow] = useState(() => Date.now())
 
-  const t = TABS.find((x) => x.k === tab) || TABS[0]
-  const load = () => getEggs({ state: t.state, hatching: t.hatching, search, sort, order })
-    .then((d) => setData(d || { eggs: [], counts: {} })).catch(() => {})
+  const load = () => getEggs({ search, sort, order })
+    .then((d) => setData(d || { eggs: [] })).catch(() => {})
 
-  useEffect(() => { load() }, [account, tab, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
-  // 后端在蛋有变动(收蛋/入孵/进度/破壳)时推 eggs,收到就重拉当前视图。
-  useEffect(() => subscribe((m) => { if (m.type === 'eggs') load() }), [account, tab, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
-  // 孵化进度随时间涨:秒级刷新即可(只在「孵化中」有意义)。
+  useEffect(() => { load() }, [account, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 后端在蛋有变动(收蛋/入孵/进度/破壳)时推 eggs,收到就重拉。
+  useEffect(() => subscribe((m) => { if (m.type === 'eggs') load() }), [account, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 孵化进度随时间涨:秒级刷新即可。
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  const counts = data.counts || {}
+  const hatching = data.eggs.filter((e) => e.hatching)
+  const bag = data.eggs.filter((e) => !e.hatching)
+  const slots = Math.max(HATCH_SLOTS, hatching.length)
+
   return (
     <div className="eggs-page">
-      <div className="eggs-bar">
-        <div className="eggs-tabs">
-          {TABS.map((x) => (
-            <button key={x.k} className={'chip' + (tab === x.k ? ' on' : '')} onClick={() => setTab(x.k)}>
-              {x.label} <span className="muted">{counts[x.k] ?? 0}</span>
-            </button>
+      <div className="eggs-cols">
+        <aside className="eggs-incu">
+          <div className="eggs-col-t">孵蛋器 <span className="muted">{hatching.length}/{slots}</span></div>
+          {Array.from({ length: slots }, (_, i) => hatching[i]).map((e, i) => (
+            e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
+              : <div key={'s' + i} className="egg-slot-empty">空格子</div>
           ))}
-        </div>
-        <input className="input eggs-search" placeholder="搜索蛋名/物种" value={search}
-          onChange={(e) => setSearch(e.target.value)} />
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value)}>
-          {SORTS.map((s) => <option key={s.k} value={s.k}>按{s.label}</option>)}
-        </select>
-        <button className="btn" onClick={() => setOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
-          title="切换升序/降序">{order === 'desc' ? '↓ 降序' : '↑ 升序'}</button>
+        </aside>
+
+        <section className="eggs-bag">
+          <div className="eggs-bar">
+            <div className="eggs-col-t">背包 <span className="muted">{bag.length} 颗</span></div>
+            <div className="eggs-sorts">
+              {SORTS.map((s) => (
+                <button key={s.k} className={'chip' + (sort === s.k ? ' on' : '')}
+                  onClick={() => setSort(s.k)}>{s.label}</button>
+              ))}
+              <button className="btn" onClick={() => setOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
+                title="反向排序(同游戏内那个箭头)">{order === 'desc' ? '↓' : '↑'}</button>
+            </div>
+            <input className="input eggs-search" placeholder="搜索蛋名/物种" value={search}
+              onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {bag.length === 0
+            ? <div className="empty">背包里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
+            : (
+              <div className="egg-grid">
+                {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />)}
+              </div>
+            )}
+        </section>
       </div>
-
-      {data.eggs.length === 0 && (
-        <div className="empty">暂无精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
-      )}
-
-      <div className="egg-grid">
-        {data.eggs.map((e) => (
-          <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
-        ))}
-      </div>
-
-      {tab === 'hatching' && data.eggs.length > 0 && (
-        <p className="muted eggs-note">{HATCH_RATE_NOTE}</p>
-      )}
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>
   )
 }
 
-// EggCard 一颗蛋:图标 + 名称 + 尺寸(值 + 百分位两行,与宠物列表同一口径)+ 获得时间,
-// 在孵的另有进度条,家园收的另附双亲。
+// EggCard 一颗蛋。布局固定(缺什么都留位置,免得同一行的卡片高低不齐):
+//   [蛋图] 名称 / 奖牌标签        [品类角标][孵出物种头像]
+//   重量 / 声音 / 高度 / 时间
+//   (在孵才有的进度条)
+//   双亲两行(非家园蛋留占位)
 function EggCard({ egg, now, onPet }) {
   const p = hatchProgress(egg, now)
+  const src = egg.srcName ? `来源:${egg.srcName}` : ''
   return (
     <div className="egg-card">
       <div className="egg-head">
         <img className="egg-icon" src={imgURL(egg.icon)} alt="" draggable={false} />
         <div className="egg-title">
-          <div className="egg-name">
-            {egg.name}
-            {egg.random && <span className="pill egg-pill">未知物种</span>}
-            {egg.hatched && <span className="pill egg-pill">已破壳</span>}
-          </div>
-          <div className="muted egg-sub">
-            {egg.species ? `孵出 ${egg.species}` : '孵出前无从得知是谁'}
-            {egg.srcName ? ` · ${egg.srcName}` : ''}
+          <div className="egg-name" title={[egg.name, egg.species && `孵出 ${egg.species}`, src]
+            .filter(Boolean).join(' · ')}>{egg.name}</div>
+          <div className="egg-tags">
+            {(egg.medals || []).map((m) => (
+              <span key={m.dim} className="egg-chip" title={`${DIM_NAME[m.dim] || ''}奖牌`}>{m.name}</span>
+            ))}
           </div>
         </div>
-        {egg.petImg && <img className="egg-pet" src={imgURL(egg.petImg)} alt="" draggable={false} />}
-      </div>
-
-      <div className="egg-grid2">
-        <Field label="身高" value={`${egg.heightM} m`} pct={egg.heightPct} />
-        <Field label="体重" value={`${egg.weightKg} kg`} pct={egg.weightPct} />
-      </div>
-      {(egg.adultHeightM > 0 || egg.adultWeightKg > 0) && (
-        <div className="muted egg-adult" title="蛋的百分位在破壳时原样保留,故可提前算出成体尺寸(随机蛋不适用)">
-          孵出后约 {egg.adultHeightM} m / {egg.adultWeightKg} kg
+        <div className="egg-marks">
+          {/* 异色/炫彩蛋用全站统一的那两个标记(同宠物列表),其余品类(珍贵/唯一/噩梦…)
+              用游戏自己的蛋品类角标;普通蛋什么都不画(卡片高度由右边的头像撑着,不会塌)。 */}
+          {egg.shiny || egg.colorful
+            ? <span className="egg-type" title={egg.typeName}><Marks p={egg} /></span>
+            : egg.typeIcon
+              ? <img className="egg-type" src={imgURL(egg.typeIcon)} alt="" title={egg.typeName} draggable={false} />
+              : null}
+          {egg.petImg
+            ? <img className="egg-pet" src={imgURL(egg.petImg)} alt="" title={egg.species} draggable={false} />
+            : <span className="egg-pet ph" title="孵出前无从得知是谁">?</span>}
         </div>
-      )}
+      </div>
 
       <div className="egg-rows">
-        <div><span className="muted">获得</span> {fmtTime(egg.obtainedAt)}</div>
-        {egg.hatched && egg.petGid > 0 && (
-          <div>
-            <span className="muted">破壳</span> {fmtTime(egg.hatchedAt)} ·{' '}
-            <button className="linkish" onClick={() => onPet(egg.petGid)}>看孵出的宠物</button>
-          </div>
-        )}
+        <Row k="重量" v={egg.weightKg ? `${egg.weightKg} kg` : ''} pct={egg.weightPct}
+          title={egg.adultWeightKg ? `孵出后约 ${egg.adultWeightKg} kg(百分位破壳后原样保留)` : ''} />
+        <Row k="声音" v={voiceText(egg)} hot={egg.voice != null && egg.voiceMax == null ? voiceHot(egg.voice) : ''}
+          title={egg.voice != null
+            ? '按双亲嗓音均值向下取整推出(蛋上没有嗓音字段)' + (egg.voiceMax != null ? ',串窝父本不唯一故给区间' : '')
+            : '蛋上没有嗓音字段,双亲也没记下,破壳才知道'} />
+        <Row k="高度" v={egg.heightM ? `${egg.heightM} m` : ''} pct={egg.heightPct}
+          title={egg.adultHeightM ? `孵出后约 ${egg.adultHeightM} m(百分位破壳后原样保留)` : ''} />
+        <Row k="时间" v={fmtTime(egg.obtainedAt)} title={`获得时间 ${fmtTime(egg.obtainedAt)}`} />
       </div>
 
       {p && (
@@ -132,46 +137,58 @@ function EggCard({ egg, now, onPet }) {
         </div>
       )}
 
-      {egg.parents && <Parents p={egg.parents} onPet={onPet} />}
+      <Parents p={egg.parents} onPet={onPet} />
     </div>
   )
 }
 
-function Field({ label, value, pct }) {
+// 奖牌只在**确定**拿得到时才列(后端已判好,判不了的不下发),纯文字,没有就空着——
+// 那一行仍占着高度(见 .egg-tags 的 min-height),卡片才不会一行高一行矮。
+const DIM_NAME = { 2: '体型', 3: '嗓音' }
+
+// voiceText 渲染推测嗓音:串窝(父本不唯一)时给区间,推不出来时留空(由 Row 显示破折号)。
+function voiceText(egg) {
+  if (egg.voice == null) return ''
+  return egg.voiceMax != null ? `${egg.voice}~${egg.voiceMax}` : String(egg.voice)
+}
+
+// Row 一行「标签 值 百分位」。值缺失时留破折号占位。
+function Row({ k, v, pct, title, hot }) {
+  const cls = hot || pctHot(pct) || ''
   return (
-    <div className="egg-field">
-      <span className="muted">{label}</span>
-      <b className={pctHot(pct)}>{value}</b>
-      {pct != null && <span className={'egg-pct ' + (pctHot(pct) || '')}>{pct.toFixed(2)}%</span>}
+    <div className="egg-row" title={title || ''}>
+      <span className="muted egg-row-k">{k}</span>
+      <span className={'egg-row-v ' + cls}>{v || '—'}</span>
+      <span className={'egg-row-p ' + cls}>{pct != null ? pct.toFixed(2) + '%' : ''}</span>
     </div>
   )
 }
 
-// Parents 双亲:母本确定(蛋趴在她的窝上),父本取服务器下发的配对候选;
-// 多个候选即「串窝」,实际父本无从确定(见 docs/data.md 3.6)。
+// Parents 双亲快照:母本确定(蛋趴在她的窝上),父本取服务器下发的配对候选,
+// 几个窝挨太近「串窝」时有多个候选、实际父本无从确定(见 docs/data.md 3.6)。
+// 非家园蛋没有双亲可言,留同样高度的占位,保证卡片等高。
 function Parents({ p, onPet }) {
-  const one = (x, role) => (
-    <button key={role + x.gid} className="egg-parent" onClick={() => onPet(x.gid)}
-      title="点击查看该亲本的宠物详情(若已放生则查无此宠,双亲快照仍留在这里)">
-      {x.img ? <img src={imgURL(x.img)} alt="" draggable={false} /> : <span className="egg-parent-ph">🐾</span>}
-      <span className="egg-parent-info">
-        <span className="egg-parent-name">{role} {x.name}{x.gender ? ` ${x.gender}` : ''}</span>
-        <span className="muted egg-parent-sub">
-          {x.weightPct != null && <span className={pctHot(x.weightPct)}>体重 {x.weightPct.toFixed(1)}%</span>}
-          {x.voice != null && <span className={voiceHot(x.voice)}> · 声音 {x.voice}</span>}
-          {x.nature ? ` · ${x.nature}` : ''}
-        </span>
-      </span>
-    </button>
-  )
+  const rows = []
+  if (p?.mother) rows.push(['♀', p.mother])
+  for (const f of p?.fathers || []) rows.push(['♂', f])
   return (
     <div className="egg-parents">
-      <div className="muted egg-parents-t">
-        双亲(收蛋时记下的快照)
-        {p.ambiguous && <span className="pill egg-pill" title="几个小窝挨得太近会串窝,协议里没有实际父本的记录">串窝</span>}
-      </div>
-      {p.mother && one(p.mother, '母')}
-      {(p.fathers || []).map((f) => one(f, '父'))}
+      {rows.length === 0 && <div className="egg-parent-ph2">无双亲记录</div>}
+      {rows.slice(0, 2).map(([role, x], i) => (
+        <button key={i} className="egg-parent" onClick={() => onPet(x.gid)}
+          title={`点击查看${role === '♀' ? '母本' : '父本'}详情(已放生也不影响这里的快照)` +
+            (p.ambiguous && role === '♂' ? ' · 串窝:父本不唯一' : '')}>
+          {x.img ? <img src={imgURL(x.img)} alt="" draggable={false} /> : <span className="egg-parent-noimg">🐾</span>}
+          <span className="egg-parent-txt">
+            {role} {x.name}
+            {x.weightPct != null && <span className={pctHot(x.weightPct)}> W {Math.round(x.weightPct)}%</span>}
+            {x.voice != null && ` V ${x.voice}`}
+            {x.nature ? ` ${x.nature}` : ''}
+            {p.ambiguous && role === '♂' && <span className="egg-amb">?</span>}
+          </span>
+        </button>
+      ))}
+      {rows.length === 1 && <div className="egg-parent-ph2">父本未知</div>}
     </div>
   )
 }

@@ -107,3 +107,55 @@ func TestParseFlowReason(t *testing.T) {
 		t.Errorf("flow_reason = %d, want %d", got, FlowReasonHomeLay)
 	}
 }
+
+func TestSortEggs(t *testing.T) {
+	// 复刻游戏内「品质排序」的键:品类升 → 品质降 → 物品排序号升 → 获得时间降。
+	mk := func(name string, order, quality, sortID int32, at int64) *EggView {
+		return &EggView{Name: name, TypeOrder: order, Quality: quality, SortID: sortID, ObtainedAt: at}
+	}
+	eggs := []*EggView{
+		mk("普通-新", 100000, 4, 650100, 300),
+		mk("异色-小号", 104, 5, 630082, 100),
+		mk("普通-旧", 100000, 4, 650100, 200),
+		mk("异色-大号", 104, 5, 630105, 500),
+		mk("唯一", 101, 5, 640001, 50),
+	}
+	SortEggs(eggs, "quality", false)
+	var got []string
+	for _, e := range eggs {
+		got = append(got, e.Name)
+	}
+	want := []string{"唯一", "异色-小号", "异色-大号", "普通-新", "普通-旧"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("品质排序 = %v, want %v", got, want)
+		}
+	}
+	// 获取时间:只看 update_time 降;asc 即游戏里那个反向开关。
+	SortEggs(eggs, "obtained", false)
+	if eggs[0].Name != "异色-大号" || eggs[len(eggs)-1].Name != "唯一" {
+		t.Errorf("时间排序 = %s … %s", eggs[0].Name, eggs[len(eggs)-1].Name)
+	}
+	SortEggs(eggs, "obtained", true)
+	if eggs[0].Name != "唯一" {
+		t.Errorf("反向时间排序 = %s", eggs[0].Name)
+	}
+}
+
+func TestSortEggsTie(t *testing.T) {
+	// 同一时刻入包的两颗同种蛋:所有键都分不出高低,谁在前由排序算法决定——我们复刻的是
+	// 客户端那套 Lua table.sort(见 luasort.go 与其对拍测试)。只有两颗时它不会动相等项,
+	// 故正反两个方向都应保持传入的背包原始次序(元素更多时会像游戏里那样出现换位)。
+	mk := func(gid uint32) *EggView {
+		return &EggView{Gid: gid, Name: "神奇的蛋", TypeOrder: 100000, Quality: 4, SortID: 606100, ObtainedAt: 100}
+	}
+	for _, by := range []string{"quality", "obtained"} {
+		for _, asc := range []bool{false, true} {
+			eggs := []*EggView{mk(2994), mk(2996)} // 背包次序:2994 在前
+			SortEggs(eggs, by, asc)
+			if eggs[0].Gid != 2994 || eggs[1].Gid != 2996 {
+				t.Errorf("%s asc=%v = %d,%d,应保持背包次序 2994,2996", by, asc, eggs[0].Gid, eggs[1].Gid)
+			}
+		}
+	}
+}
