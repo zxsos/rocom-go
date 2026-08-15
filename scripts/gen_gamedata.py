@@ -622,19 +622,24 @@ NEST_INTERACT_TYPE = 3   # FURNITURE_ITEM_CONF.interact_type:可入住宠物的�
 
 
 def _egg_tables():
-    """产出 egg_conf(物种蛋)/egg_items(背包蛋物品)/nest_furniture(小窝家具)三张表。
+    """产出 egg_conf(物种蛋)/egg_items(背包蛋物品)/egg_types(蛋品类)/nest_furniture(小窝家具)。
 
     - egg_conf:  PET_EGG_CONF.id(= 宠物 conf_id) -> {n:物种名, hl/hh/wl/wh:蛋自身的
-                 身高体重区间(百分位口径,与成体 PETBASE_CONF 区间不是一套数), t:孵化秒数}
+                 身高体重区间(百分位口径,与成体 PETBASE_CONF 区间不是一套数), t:孵化秒数,
+                 p:蛋品类 precious_egg_type(0=普通;异色/炫彩等见 egg_types)}
     - egg_items: BAG_ITEM_CONF 里 type==8 的物品 -> {n:显示名, c:物种 conf_id(随机蛋为 0),
-                 img:图标原名(egg/<原名>.webp), npc:窝上蛋 NPC 的 NPC_CONF id}
+                 img:图标原名(egg/<原名>.webp), npc:窝上蛋 NPC 的 NPC_CONF id,
+                 q:物品品质 item_quality, s:排序号 sort_id(两者都是游戏内「品质排序」的键)}
                  显示名按 known_name 模板("{0}的蛋")填物种名;无模板/随机蛋用 name。
+    - egg_types: EGG_TYPE_CONF 的 precious_egg_type -> {n:品类名(异色精灵蛋…), o:display_order
+                 (游戏内品质排序的首要键,越小越靠前), img:小图标原名(egg/<原名>.webp)}
     - nest_furniture: {家具 config_id: 家具名},即家园里能住宠物的小窝(实测仅 1001071 精灵小窝)。
     """
-    econf, eitems, nests = {}, {}, {}
+    econf, eitems, etypes, nests = {}, {}, {}, {}
     for k, v in rows("PET_EGG_CONF.json").items():
         econf[k] = {"n": v.get("name", ""), "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
-                    "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0)}
+                    "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0),
+                    "p": v.get("precious_egg_type", 0)}
     for k, v in rows("BAG_ITEM_CONF.json").items():
         if v.get("type") != EGG_ITEM_TYPE:
             continue
@@ -647,17 +652,60 @@ def _egg_tables():
         name = v.get("known_name") or v.get("name") or ""
         if "{0}" in name:
             name = name.replace("{0}", econf.get(str(conf), {}).get("n", "未知精灵"))
-        e = {"n": name, "c": conf, "img": texkey(v.get("icon", ""))}
+        e = {"n": name, "c": conf, "img": texkey(v.get("icon", "")),
+             "q": v.get("item_quality", 0), "s": v.get("sort_id", 0)}
         if v.get("npcid"):
             e["npc"] = int(v["npcid"])
         eitems[k] = e
+    # 蛋品类:precious_egg_type 是键(不是行 ID);没有该字段的那行即「普通蛋」(0),
+    # 它没有名字/图标,只提供排序号(100000,排在所有特殊蛋之后)。
+    for v in rows("EGG_TYPE_CONF.json").values():
+        t = {"o": v.get("display_order", 0)}
+        if v.get("name"):
+            t["n"] = v["name"]
+        if texkey(v.get("small_icon") or v.get("icon")):
+            t["img"] = texkey(v.get("small_icon") or v.get("icon"))
+        etypes[str(v.get("precious_egg_type", 0))] = t
     for k, v in rows("FURNITURE_ITEM_CONF.json").items():
         if v.get("interact_type") == NEST_INTERACT_TYPE:
             nests[k] = v.get("name", "")
-    return econf, eitems, nests
+    return econf, eitems, etypes, nests
 
 
-egg_conf, egg_items, nest_furniture = _egg_tables()
+def _size_medals():
+    """按尺寸/嗓音百分位自动授予的奖牌(MEDAL_TASK_CONF 里 get_condition==3 的四条)。
+
+    -> [{id, n:奖牌名, d:维度(2=体重 3=嗓音), lo, hi}](蛋卡片上是纯文字标签,不取图标)
+    维度取自 condition_data1、百分位窗口取自 condition_data2(如 大块头 = 体重 98~100%)。
+    **desc 里写的是「身高」,实际判的是体重**:本机 812 只宠物里戴「小不点」的体重百分位
+    全在 [0,2](与配置窗口严丝合缝),而身高百分位到 5;「大块头」两者都 ≥98.1 不区分。
+    蛋的百分位孵化后原样保留(见 docs/data.md 3.6),故体重那两枚破壳前就能算出来;
+    嗓音那两枚要等破壳(PetEggBrief 没有 voice 字段)。
+    """
+    medals = rows("MEDAL_CONF.json")
+    by_task = {}
+    for m in medals.values():
+        for t in m.get("task_ids") or []:
+            by_task[str(t)] = m
+    out = []
+    for k, v in rows("MEDAL_TASK_CONF.json").items():
+        if v.get("get_condition") != MEDAL_COND_PERCENTILE:
+            continue
+        m = by_task.get(k)
+        win = v.get("condition_data2") or []
+        dim = (v.get("condition_data1") or [0])[0]
+        if not m or len(win) != 2:
+            continue
+        out.append({"id": int(m["id"]), "n": m.get("name", ""),
+                    "d": dim, "lo": win[0], "hi": win[1]})
+    return sorted(out, key=lambda x: x["id"])
+
+
+# MEDAL_TASK_CONF.get_condition:3 = 按百分位窗口自动授予(体重/嗓音那四枚)。
+MEDAL_COND_PERCENTILE = 3
+
+egg_conf, egg_items, egg_types, nest_furniture = _egg_tables()
+size_medals = _size_medals()
 
 data = {
     "species": species,
@@ -721,6 +769,8 @@ data = {
     # 精灵蛋:物种蛋区间/孵化时长、背包蛋物品(显示名/图标/窝上 NPC)、家园小窝家具。见上与 3.6。
     "egg_conf": egg_conf,
     "egg_items": egg_items,
+    "egg_types": egg_types,
+    "size_medals": size_medals,
     "nest_furniture": nest_furniture,
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),

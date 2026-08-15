@@ -18,15 +18,64 @@ type EggConf struct {
 	WeightLow  int32  `json:"wl"` // 蛋体重区间(÷1000 千克)
 	WeightHigh int32  `json:"wh"`
 	HatchSecs  int32  `json:"t"` // 孵化所需秒数(hatch_data;无加速活动时即真实秒数)
+	Precious   int32  `json:"p"` // 蛋品类 precious_egg_type(0=普通,2=异色…见 EggType)
 }
 
 // EggItem 是一件背包里的蛋物品(BAG_ITEM_CONF 里 type==8 的行)。
 type EggItem struct {
-	ID   uint32 // 物品 id
-	Name string // 显示名(「友爱天天的蛋」/「神奇的蛋」;known_name 模板已填好)
-	Conf uint32 // 物种 conf_id(对应 EggConf);随机蛋(神奇的蛋)为 0
-	Icon string // 图标原始文件名,前端拼 egg/<Icon>.webp
+	ID      uint32 // 物品 id
+	Name    string // 显示名(「友爱天天的蛋」/「神奇的蛋」;known_name 模板已填好)
+	Conf    uint32 // 物种 conf_id(对应 EggConf);随机蛋(神奇的蛋)为 0
+	Icon    string // 图标原始文件名,前端拼 egg/<Icon>.webp
+	Quality int32  // 物品品质(item_quality,4/5)——游戏内「品质排序」的键之一
+	SortID  int32  // 物品排序号(sort_id)——同品质时的次级键
 }
+
+// EggType 是蛋的品类(EGG_TYPE_CONF 的 precious_egg_type:异色/炫彩/珍贵/唯一…)。
+// Order 即游戏内「品质排序」的首要键(display_order,越小越靠前;普通蛋 100000 垫底)。
+type EggType struct {
+	ID    int32  `json:"-"`
+	Name  string `json:"n,omitempty"`
+	Order int32  `json:"o"`
+	Icon  string `json:"img,omitempty"` // 角标原名,前端拼 egg/<Icon>.webp
+}
+
+// SizeMedal 是按百分位自动授予的奖牌(MEDAL_TASK_CONF 里 get_condition==3 的四枚:
+// 大块头/小不点看体重、婉转声/粗嗓门看嗓音)。蛋的百分位孵化后原样保留,故体重那两枚
+// 破壳前就能算出来;嗓音那两枚要等破壳(见 docs/data.md 3.6)。
+type SizeMedal struct {
+	ID   uint32 `json:"id"`
+	Name string `json:"n"`
+	Dim  int32  `json:"d"`  // 判定维度:2=体重百分位 3=嗓音百分位
+	Low  int32  `json:"lo"` // 百分位窗口(含)
+	High int32  `json:"hi"`
+}
+
+// 自动奖牌的判定维度(MEDAL_TASK_CONF.condition_data1)。
+const (
+	MedalDimWeight = 2
+	MedalDimVoice  = 3
+)
+
+// EggTypeInfo 返回蛋品类信息(precious_egg_type);普通蛋(0)或未知返回 ok=false。
+func (db *DB) EggTypeInfo(t int32) (EggType, bool) {
+	v, ok := db.eggTypes[t]
+	if !ok || t == 0 {
+		return EggType{}, false
+	}
+	return v, true
+}
+
+// EggTypeOrder 返回蛋品类的排序号(display_order);未知品类排在最后。
+func (db *DB) EggTypeOrder(t int32) int32 {
+	if v, ok := db.eggTypes[t]; ok {
+		return v.Order
+	}
+	return 1 << 30
+}
+
+// SizeMedals 返回按百分位自动授予的奖牌清单(4 枚,按 id 升序)。
+func (db *DB) SizeMedals() []SizeMedal { return db.sizeMedals }
 
 // EggItemInfo 返回蛋物品信息。
 func (db *DB) EggItemInfo(id uint32) (EggItem, bool) { e, ok := db.eggItems[id]; return e, ok }
