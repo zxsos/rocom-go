@@ -874,6 +874,10 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
 
 - **蛋挂在母本的窝上**:蛋 NPC 的 `attach_item_info.attach_item_id` == 母本
   `home_pet_info.furniture_guid`(一件家具 = 一个窝 = 一只宠物)。
+- **配对只在进场景快照里下发一次**。2026-08-15 第五份 pcap:进家园时有个空窝,随后一只点点
+  住了进去——新住户的 actor 只出现在 AOI 通知(0x0414)与喂食请求(0x8205)里,**没有任何消息
+  重发 `lay_egg_couple`**(`ZONE_HOME_INFO_CHANGE_NOTIFY` 只是访客标志)。所以本次停留期间
+  再有宠物进/出窝,手上的配对就可能不全,得重进一次家园才刷新(代码里标 `couplesStale`)。
 - **相邻由窝的摆放位置决定**(`home_pet_info.pos`,家园局部坐标)。该 pcap 的 10 只宠物
   正好两两配成 5 对(每对间距 160,跨对间距 ≥ 400),每对都是一公一母且蛋组有交集 ——
   但**这只是这份布局摆得干净**:窝可以在家园里自由挪动,几个窝挨太近会**串窝**,

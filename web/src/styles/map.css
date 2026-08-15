@@ -138,12 +138,16 @@
 }
 .map-nest:hover { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
 .map-nest img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
-/* 空窝:虚线圈 + 一个「空」字,压暗以免抢住户的注意力。 */
+/* 空窝:虚线圈 + 一个「空」字。背景**半透明**——相邻两窝在地图上只隔几十像素,
+   实心底色会糊成一团黑;小一圈也是为了不抢住户的注意力。 */
 .map-nest.empty {
-  border-style: dashed; border-color: var(--line); background: var(--bg-2);
-  cursor: default; opacity: .7;
+  width: 26px; height: 26px;
+  border-style: dashed; border-color: var(--fg-dim);
+  background: rgba(11, 14, 19, .35);
+  cursor: default; filter: none;
 }
-.map-nest-empty { font-size: 12px; color: var(--fg-dim); }
+.map-nest.empty:hover { transform: translate(-50%, -50%) scale(1.15); filter: none; }
+.map-nest-empty { font-size: 11px; color: var(--fg-dim); }
 /* 窝上还没收的蛋:挂在右上角,略微出框 */
 .map-nest-egg {
   position: absolute; right: -8px; top: -8px;
