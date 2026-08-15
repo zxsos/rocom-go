@@ -16,6 +16,7 @@
   - static:   下方 STATIC 清单(人工挑选的杂项精灵)                   → img/static/
   - worldmap: 下方 WORLDMAP 清单(人工挑选的大地图 POI 精灵)          → img/worldmap/
   - medal:    MEDAL_CONF.icon(BagItem 奖牌小图,整张贴图)            → img/medal/
+  - egg:      BAG_ITEM_CONF 里 type==8 的精灵蛋 icon(整张贴图)      → img/egg/
 
 webp 转码确定性(同 libwebp 下同源字节一致),默认跳过已存在;--force 强制重编(见 gen_images.py)。
 前置:scripts/unpack.sh 全量解包(uasset → 属性 .json,纹理 → PNG,同名同目录)。
@@ -106,6 +107,9 @@ ATLAS_DIRS = [
     "NewRoco/Modules/System/PetUI/Raw/Atlas/PetUI",
     "NewRoco/Modules/System/BigMap/Raw/Atlas/WorldMapNpc",
     "NewRoco/Modules/System/Common/Icon/BagItem",
+    # 少数精灵蛋图标只有大图版本(Item190),BagItem 下没有同名小图:放在最后作 basename 兜底,
+    # 不影响前面各目录已能命中的名字。
+    "NewRoco/Modules/System/Common/Icon/Item190",
 ]
 
 _by_base: dict[str, dict[str, str]] = {}
@@ -164,12 +168,27 @@ def copy_texture(ref: str, dst: str) -> str | None:
 # 的血脉主图标同为 XueMai 图集精灵,照单全收会往 img/filter 重复转码 21 张 img/blood 已有的图。
 FILTER_ENUMS = {"SkillDamType", "AttributeType", "PetPartnerMarkType"}
 
+# 精灵蛋在 BAG_ITEM_CONF 里的 type(与 gen_gamedata.py 的 EGG_ITEM_TYPE 同一常量)
+EGG_ITEM_TYPE = 8
+
 
 def icon_refs(table: str, field: str, enums: set | None = None):
     for r in load_rows(table).values():
         if enums and r.get("filter_enum_name") not in enums:
             continue
         ic = r.get(field)
+        if isinstance(ic, str) and ic:
+            m = re.search(r"/Game/[^']+", ic)
+            if m:
+                yield m.group(0)
+
+
+def egg_icon_refs():
+    """精灵蛋(BAG_ITEM_CONF.type==8)的背包图标;近 300 张,同一物种的多种蛋共用一张。"""
+    for r in load_rows("BAG_ITEM_CONF").values():
+        if r.get("type") != EGG_ITEM_TYPE:
+            continue
+        ic = r.get("icon")
         if isinstance(ic, str) and ic:
             m = re.search(r"/Game/[^']+", ic)
             if m:
@@ -209,6 +228,7 @@ def main():
     total += gen_group("worldmap", list(WORLDMAP), crop_sprite)
     total += gen_group("worldmap", list(WORLDMAP_TEX), copy_texture)
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
+    total += gen_group("egg", egg_icon_refs(), copy_texture)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
         sys.exit(f"未产出任何 webp:确认 {SRC} 下已有 unpack.sh 的全量解包产物。")

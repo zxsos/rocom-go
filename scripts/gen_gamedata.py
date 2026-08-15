@@ -615,6 +615,50 @@ for kind in POI_KINDS:
                 e["zone"] = zz
         pois.setdefault(str(res), []).append(e)
 
+# ---- 精灵蛋与家园小窝(精灵蛋页面 + 实时地图家园图层,见 docs/data.md 3.6)----
+
+EGG_ITEM_TYPE = 8        # BAG_ITEM_CONF.type:精灵蛋(与 gen_icons.py 同一常量)
+NEST_INTERACT_TYPE = 3   # FURNITURE_ITEM_CONF.interact_type:可入住宠物的小窝
+
+
+def _egg_tables():
+    """产出 egg_conf(物种蛋)/egg_items(背包蛋物品)/nest_furniture(小窝家具)三张表。
+
+    - egg_conf:  PET_EGG_CONF.id(= 宠物 conf_id) -> {n:物种名, hl/hh/wl/wh:蛋自身的
+                 身高体重区间(百分位口径,与成体 PETBASE_CONF 区间不是一套数), t:孵化秒数}
+    - egg_items: BAG_ITEM_CONF 里 type==8 的物品 -> {n:显示名, c:物种 conf_id(随机蛋为 0),
+                 img:图标原名(egg/<原名>.webp), npc:窝上蛋 NPC 的 NPC_CONF id}
+                 显示名按 known_name 模板("{0}的蛋")填物种名;无模板/随机蛋用 name。
+    - nest_furniture: {家具 config_id: 家具名},即家园里能住宠物的小窝(实测仅 1001071 精灵小窝)。
+    """
+    econf, eitems, nests = {}, {}, {}
+    for k, v in rows("PET_EGG_CONF.json").items():
+        econf[k] = {"n": v.get("name", ""), "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
+                    "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0)}
+    for k, v in rows("BAG_ITEM_CONF.json").items():
+        if v.get("type") != EGG_ITEM_TYPE:
+            continue
+        conf = 0
+        for beh in v.get("item_behavior") or []:
+            for r in beh.get("ratio") or []:
+                if str(r) in econf:
+                    conf = int(r)
+                    break
+        name = v.get("known_name") or v.get("name") or ""
+        if "{0}" in name:
+            name = name.replace("{0}", econf.get(str(conf), {}).get("n", "未知精灵"))
+        e = {"n": name, "c": conf, "img": texkey(v.get("icon", ""))}
+        if v.get("npcid"):
+            e["npc"] = int(v["npcid"])
+        eitems[k] = e
+    for k, v in rows("FURNITURE_ITEM_CONF.json").items():
+        if v.get("interact_type") == NEST_INTERACT_TYPE:
+            nests[k] = v.get("name", "")
+    return econf, eitems, nests
+
+
+egg_conf, egg_items, nest_furniture = _egg_tables()
+
 data = {
     "species": species,
     # 蛋组: id -> {name:社区流行名, desc:官方描述}。petbase[].eg 引用这些 id。
@@ -674,6 +718,10 @@ data = {
     "glass_names": glass_names,
     "glass_colors": glass_colors,
     "glass_particles": glass_particles,
+    # 精灵蛋:物种蛋区间/孵化时长、背包蛋物品(显示名/图标/窝上 NPC)、家园小窝家具。见上与 3.6。
+    "egg_conf": egg_conf,
+    "egg_items": egg_items,
+    "nest_furniture": nest_furniture,
     # opcode 整数 -> ZoneSvrCmd 名称(供 debug 页面展示事件名)。
     # 取自 all.pb 的 ZoneSvrCmd 全集(含 6531=ZONE_SCENE_THROW_CATCH_FINISH_RSP 等),
     # 与 internal/pb 同源同版本,无需手工补充。
