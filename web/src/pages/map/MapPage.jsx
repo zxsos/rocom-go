@@ -6,6 +6,8 @@ import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from 
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
 import { useWildPets, wildTags, wildRing } from './useWildPets'
+import { useHomeNests, nestTitle } from './useHomeNests'
+import { PetDetailModal } from '../../components/PetDetailModal'
 import LayerPanel from './LayerPanel'
 
 // wildTitle 组一条野生宠物标记的悬停说明,格式:
@@ -40,6 +42,8 @@ export default function MapPage() {
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
+  const home = useHomeNests(account)
+  const [detailGid, setDetailGid] = useState(null) // 点小窝里的宠物 → 宠物详情弹窗
 
   // 逐帧外推的锚点:最近一个移动包的位置/速度/朝向 + 收到它时与画面位置的落差(cu/cv/dh)。
   const anchorRef = useRef(null)
@@ -141,7 +145,7 @@ export default function MapPage() {
       {/* 无工具栏:地图占满整页(场景名/坐标不再显示,位置看箭头即可);移动端的图层抽屉入口
           作为浮动控件挂在地图左下角。 */}
       <div className="map-layout">
-        <LayerPanel pois={pois} wilds={wilds} collapsed={collapsed} onClose={() => setCollapsed(true)} />
+        <LayerPanel pois={pois} wilds={wilds} home={home} collapsed={collapsed} onClose={() => setCollapsed(true)} />
 
         {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
 
@@ -166,6 +170,19 @@ export default function MapPage() {
                 className={'map-poi' + (pois.isSure(p) ? ' sure' : '')}
                 src={imgURL(pois.iconOf[p.k])} title={p.n}
                 style={{ left: p.u * mapPx, top: p.v * mapPx }} />
+            ))}
+            {/* 家园小窝:空窝画个虚线圈,住了宠物画头像;窝上有蛋则右上角挂个蛋图标。
+                悬浮看简要信息(见 nestTitle),点住户看宠物详情。同属 .map-world 一起平移。 */}
+            {home.marks.map((n) => (
+              <div key={n.id} title={nestTitle(n)}
+                className={'map-nest' + (n.pet ? '' : ' empty')}
+                style={{ left: n.u * mapPx, top: n.v * mapPx }}
+                onClick={(e) => { if (n.pet) { e.stopPropagation(); setDetailGid(n.pet.gid) } }}>
+                {n.pet
+                  ? (n.pet.img ? <img src={imgURL(n.pet.img)} alt="" draggable={false} /> : <span>🐾</span>)
+                  : <span className="map-nest-empty">空</span>}
+                {n.egg && <img className="map-nest-egg" src={imgURL(n.egg.icon)} alt="" draggable={false} />}
+              </div>
             ))}
             {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、满声音),同属 .map-world 一起
                 平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
@@ -202,6 +219,7 @@ export default function MapPage() {
           </div>
         ))}
       </div>
+      {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>
   )
 }

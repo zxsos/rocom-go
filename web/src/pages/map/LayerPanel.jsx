@@ -6,7 +6,7 @@ import { WILD_LAYERS } from './useWildPets'
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
 // 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
-export default function LayerPanel({ pois, wilds, collapsed, onClose }) {
+export default function LayerPanel({ pois, wilds, home, collapsed, onClose }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   return (
     <>
@@ -52,6 +52,21 @@ export default function LayerPanel({ pois, wilds, collapsed, onClose }) {
             只标出周围已下发的野生宠(走近才知道);位置≈刷新点。灰色 = 已离开视野的最后所见。
           </span>
         </div>
+        {home.total > 0 && (
+          <div className="filter-group">
+            <label>家园</label>
+            <div className="map-layer-row">
+              <button className={'map-layer-btn' + (home.on ? ' on' : '')} onClick={home.toggle}>
+                <span className="map-nest-swatch" />
+                <span className="map-layer-name">精灵小窝</span>
+                <span className="muted">{home.used}/{home.total}</span>
+              </button>
+            </div>
+            <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              空窝画虚线圈;窝上有蛋则挂蛋图标({home.eggs} 颗待收)。悬浮看住户简要信息,点头像看详情。
+            </span>
+          </div>
+        )}
         <div className="filters-foot">
           <button className="btn primary" onClick={onClose}>查看地图</button>
         </div>

@@ -7,6 +7,7 @@ import { dropBoxFilter } from './pages/pet-list/filters'
 const NAV = [
   { to: '/pets', label: '宠物列表', icon: '🐾' },
   { to: '/events', label: '捕获事件', icon: '🔔' },
+  { to: '/eggs', label: '精灵蛋', icon: '🥚' },
   { to: '/map', label: '实时地图', icon: '🗺️' },
   { to: '/debug', label: '调试', icon: '🐞' },
 ]

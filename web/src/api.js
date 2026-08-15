@@ -85,6 +85,16 @@ export const getPois = (res) => getJSON('/api/pois?res=' + res, { kinds: [], poi
 // 之后由 SSE wildpets 增量覆盖;从未收到过任何 AOI 通知时返回 null。
 export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)
 
+// getHome 返回当前账号最近一次家园小窝图层(不在家园时 nests 为空):
+//   {sceneResId, level, roomLevel, nests:[{id,u,v,x,y,name,pet:{…},egg:{…}}]}
+// 之后由 SSE home 覆盖;从未进过家园时返回 null。
+export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
+
+// getEggs 返回精灵蛋列表与各状态计数:
+//   {eggs:[{gid,name,species,icon,heightM,weightKg,heightPct,weightPct,obtainedAt,parents,…}],
+//    counts:{inBag,hatching,hatched}}
+export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { eggs: [], counts: {} })
+
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export const getEvolution = (base) => getJSON('/api/evolution?base=' + base)
 

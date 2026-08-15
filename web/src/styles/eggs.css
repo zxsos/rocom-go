@@ -1,0 +1,67 @@
+/* 精灵蛋页面:顶部标签/搜索/排序 + 卡片网格。 */
+
+.eggs-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.eggs-tabs { display: flex; gap: 6px; }
+.eggs-search { width: 180px; flex: none; }
+/* .select 默认撑满容器(筛选面板里的用法),这里是横向工具条,收成自适应宽度 */
+.eggs-bar .select { width: auto; min-width: 130px; flex: none; }
+.eggs-note { font-size: 12px; line-height: 1.6; margin-top: 12px; }
+
+.egg-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.egg-card {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1);
+  padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.egg-head { display: flex; align-items: center; gap: 10px; }
+.egg-icon { width: 46px; height: 46px; object-fit: contain; flex: none; }
+/* 孵出物种的头像:右上角小图,一眼认出是谁的蛋(随机蛋没有) */
+.egg-pet { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; opacity: .9; }
+.egg-title { flex: 1; min-width: 0; }
+.egg-name { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.egg-sub { font-size: 12px; }
+.egg-pill { font-size: 11px; padding: 1px 6px; }
+
+.egg-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 一格 = 标签 + 值 + 百分位;标签与单位都不许换行(「体重」被拆成两行很难看) */
+.egg-field { display: flex; align-items: baseline; gap: 6px; font-size: 14px; white-space: nowrap; }
+.egg-field .muted { font-size: 12px; flex: none; }
+.egg-field b { overflow: hidden; text-overflow: ellipsis; }
+.egg-pct { font-size: 12px; opacity: .75; }
+.egg-adult { font-size: 12px; }
+.egg-rows { font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.egg-rows .muted { font-size: 12px; }
+
+/* 孵化进度条 */
+.egg-hatch { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.egg-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-3); overflow: hidden; }
+.egg-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s linear; }
+
+/* 双亲快照 */
+.egg-parents { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.egg-parents-t { font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.egg-parent {
+  display: flex; align-items: center; gap: 8px; text-align: left;
+  background: none; border: 0; padding: 2px; cursor: pointer; color: inherit; font: inherit;
+}
+.egg-parent:hover .egg-parent-name { color: var(--accent); }
+.egg-parent img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; }
+.egg-parent-ph { width: 28px; text-align: center; }
+.egg-parent-info { display: flex; flex-direction: column; min-width: 0; }
+.egg-parent-name { font-size: 13px; }
+.egg-parent-sub { font-size: 12px; }
+
+/* 行内文字按钮(看孵出的宠物/亲本详情) */
+.linkish {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer;
+}
+.linkish:hover { text-decoration: underline; }
+
+@media (max-width: 760px) {
+  .egg-grid { grid-template-columns: 1fr; }
+  .eggs-search { flex: 1; width: auto; min-width: 120px; }
+}
