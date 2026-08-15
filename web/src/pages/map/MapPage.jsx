@@ -37,13 +37,20 @@ export default function MapPage() {
   const sceneRef = useRef(null) // 当前底图名(换底图=换场景/等级才重置缩放/跟随)
   const layerRef = useRef(null) // 当前叠加层图名(换层仅重试层图,不动缩放)
 
+  const [detailGid, setDetailGid] = useState(null) // 点小窝里的宠物 → 宠物详情弹窗
+  // 地图内标记的「点一下」由 usePanZoom 判定后回调(平移要捕获指针,标记收不到 click),
+  // 故这里认按下时的元素:落在住了宠物的小窝上就开详情。
+  const onTap = useCallback((target) => {
+    const gid = target.closest?.('.map-nest')?.dataset.gid
+    if (gid) setDetailGid(Number(gid))
+  }, [])
+
   const hasMap = !!(pos && pos.u != null && pos.img && !imgError)
-  const view = usePanZoom(hasMap)
+  const view = usePanZoom(hasMap, onTap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
   const home = useHomeNests(account)
-  const [detailGid, setDetailGid] = useState(null) // 点小窝里的宠物 → 宠物详情弹窗
 
   // 逐帧外推的锚点:最近一个移动包的位置/速度/朝向 + 收到它时与画面位置的落差(cu/cv/dh)。
   const anchorRef = useRef(null)
@@ -145,7 +152,7 @@ export default function MapPage() {
       {/* 无工具栏:地图占满整页(场景名/坐标不再显示,位置看箭头即可);移动端的图层抽屉入口
           作为浮动控件挂在地图左下角。 */}
       <div className="map-layout">
-        <LayerPanel pois={pois} wilds={wilds} home={home} collapsed={collapsed} onClose={() => setCollapsed(true)} />
+        <LayerPanel pois={pois} wilds={wilds} collapsed={collapsed} onClose={() => setCollapsed(true)} />
 
         {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
 
@@ -174,10 +181,10 @@ export default function MapPage() {
             {/* 家园小窝:空窝画个虚线圈,住了宠物画头像;窝上有蛋则右上角挂个蛋图标。
                 悬浮看简要信息(见 nestTitle),点住户看宠物详情。同属 .map-world 一起平移。 */}
             {home.marks.map((n) => (
-              <div key={n.id} title={nestTitle(n, home.stale)}
+              <div key={n.id} title={nestTitle(n)}
                 className={'map-nest' + (n.pet ? '' : ' empty')}
-                style={{ left: n.u * mapPx, top: n.v * mapPx }}
-                onClick={(e) => { if (n.pet) { e.stopPropagation(); setDetailGid(n.pet.gid) } }}>
+                data-gid={n.pet ? n.pet.gid : undefined}
+                style={{ left: n.u * mapPx, top: n.v * mapPx }}>
                 {n.pet
                   ? (n.pet.img ? <img src={imgURL(n.pet.img)} alt="" draggable={false} /> : <span>🐾</span>)
                   : <span className="map-nest-empty">空</span>}
