@@ -107,6 +107,21 @@ func (db *DB) imageOf(petbaseID string, shiny bool) PetImage {
 	return img
 }
 
+// PetBaseOf 按宠物 conf_id 取所属 petbase 形态(与 PetImage 同一套 base 归并):
+// 蛋只带 conf_id(如 3062001),而身高体重区间挂在 petbase(3062)上,故需这一跳。
+func (db *DB) PetBaseOf(confID uint32) (uint32, PetBaseInfo, bool) {
+	pid := key(confID)
+	if b, ok := db.imageBase[pid]; ok {
+		pid = b
+	}
+	id, err := strconv.ParseUint(pid, 10, 32)
+	if err != nil {
+		return 0, PetBaseInfo{}, false
+	}
+	info, ok := db.petbase[uint32(id)]
+	return uint32(id), info, ok
+}
+
 // PetBase 返回 petbase 形态元数据(base_conf_id);ok=false 表示未知。
 func (db *DB) PetBase(petbaseID uint32) (PetBaseInfo, bool) {
 	v, ok := db.petbase[petbaseID]

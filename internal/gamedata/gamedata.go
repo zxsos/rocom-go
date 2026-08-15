@@ -64,6 +64,11 @@ type DB struct {
 	poiKinds    []POIKind           // 大地图 POI 图层清单(有序,前端开关)
 	pois        map[uint32][]POI    // scene_res_cfg_id -> 该场景的 POI(世界坐标)
 	zones       map[string]string   // 区域(营地 id) -> 区域名;眠枭之星收集进度按此键统计
+	// 精灵蛋与家园小窝(见 docs/data.md 3.6):
+	eggConf  map[uint32]EggConf // 物种 conf_id -> 蛋自身的身高体重区间与孵化时长
+	eggItems map[uint32]EggItem // 背包蛋物品 id -> 显示名/物种/图标
+	eggNPCs  map[uint32]uint32  // 窝上蛋 NPC 的 NPC_CONF id -> 蛋物品 id
+	nestFurn map[uint32]string  // 小窝家具 config_id -> 家具名(实测仅 1001071 精灵小窝)
 }
 
 // Load 加载 embed 的名称表。
@@ -123,9 +128,17 @@ func Load() (*DB, error) {
 			Side int32  `json:"side"`
 			Afid uint32 `json:"afid"`
 		} `json:"layers"`
-		POIKinds []POIKind         `json:"poi_kinds"`
-		POIs     map[string][]POI  `json:"pois"`  // scene_res_id -> 该场景 POI(世界坐标)
-		Zones    map[string]string `json:"zones"` // 营地 id -> 区域名
+		EggConf  map[string]EggConf `json:"egg_conf"`
+		EggItems map[string]struct {
+			N   string `json:"n"`
+			C   uint32 `json:"c"`
+			Img string `json:"img"`
+			NPC uint32 `json:"npc"`
+		} `json:"egg_items"`
+		NestFurniture map[string]string `json:"nest_furniture"`
+		POIKinds      []POIKind         `json:"poi_kinds"`
+		POIs          map[string][]POI  `json:"pois"`  // scene_res_id -> 该场景 POI(世界坐标)
+		Zones         map[string]string `json:"zones"` // 营地 id -> 区域名
 	}
 	if err := json.Unmarshal(namesJSON, &raw); err != nil {
 		return nil, err
@@ -191,6 +204,30 @@ func Load() (*DB, error) {
 			Img: v.Img, OX: v.OX, OY: v.OY, Side: v.Side, AreaFunc: v.Afid})
 	}
 	sort.Slice(layers, func(i, j int) bool { return layers[i].ID < layers[j].ID })
+	eggConf := make(map[uint32]EggConf, len(raw.EggConf))
+	for k, v := range raw.EggConf {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			eggConf[uint32(id)] = v
+		}
+	}
+	eggItems := make(map[uint32]EggItem, len(raw.EggItems))
+	eggNPCs := make(map[uint32]uint32, len(raw.EggItems))
+	for k, v := range raw.EggItems {
+		id, err := strconv.ParseUint(k, 10, 32)
+		if err != nil {
+			continue
+		}
+		eggItems[uint32(id)] = EggItem{ID: uint32(id), Name: v.N, Conf: v.C, Icon: v.Img}
+		if v.NPC != 0 {
+			eggNPCs[v.NPC] = uint32(id)
+		}
+	}
+	nestFurn := make(map[uint32]string, len(raw.NestFurniture))
+	for k, v := range raw.NestFurniture {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			nestFurn[uint32(id)] = v
+		}
+	}
 	pois := make(map[uint32][]POI, len(raw.POIs))
 	for k, v := range raw.POIs {
 		if res, err := strconv.ParseUint(k, 10, 32); err == nil {
@@ -230,6 +267,10 @@ func Load() (*DB, error) {
 		glassParticles: raw.GlassParticles,
 		evoIndex:       evoIndex,
 		imgFiles:       imgFiles,
+		eggConf:        eggConf,
+		eggItems:       eggItems,
+		eggNPCs:        eggNPCs,
+		nestFurn:       nestFurn,
 	}, nil
 }
 
