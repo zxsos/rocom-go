@@ -35,6 +35,11 @@ type homeState struct {
 	pets      map[uint64]*scene.HomePet // actor_id -> 入住宠物
 	eggs      map[uint64]*homeEgg       // actor_id -> 窝上的蛋
 	couples   map[uint64][]uint64       // 母本 actor -> 候选父本 actor(服务器下发)
+	// couplesStale:进场景之后又有宠物进/出小窝。配对(lay_egg_couple)**只在进场景快照里下发一次**,
+	// 之后哪怕新住进一只、凑成了新的一对,服务器也不再重发(2026-08-15 第五份 pcap 实测:新住户的
+	// actor 只出现在 AOI 通知与喂食请求里,没有任何消息重发配对)。故此时手上的配对已可能不全,
+	// 据此标记并告知前端,别让人以为「这窝没配上」。重进一次家园即可刷新。
+	couplesStale bool
 	// pendingEgg 是最近一次交互的蛋实体(c2s 0x0137 的 npc_id):随后到来的收蛋奖励通知
 	// 据此知道这颗蛋来自哪个窝,进而记下双亲。
 	pendingEgg   *homeEgg
@@ -86,7 +91,7 @@ func (p *Pipeline) onHomeSnapshot(conn, acc string, body []byte, res int32) bool
 		h.couples[c.FemaleActor] = c.MaleActors
 	}
 	for _, a := range scene.ParseSceneActors(body) {
-		p.addHomeActor(h, a)
+		p.addHomeActor(h, a, true)
 	}
 	p.conn(conn).home = h
 	p.pushHome(conn, acc)
@@ -94,8 +99,12 @@ func (p *Pipeline) onHomeSnapshot(conn, acc string, body []byte, res int32) bool
 }
 
 // addHomeActor 收下一个可能与小窝有关的实体(入住宠物 / 窝上的蛋)。
-func (p *Pipeline) addHomeActor(h *homeState, a scene.NpcActor) bool {
+// snapshot=false(AOI 增量)时新来的住户会让配对信息过期,见 homeState.couplesStale。
+func (p *Pipeline) addHomeActor(h *homeState, a scene.NpcActor, snapshot bool) bool {
 	if a.HomePet != nil {
+		if _, known := h.pets[a.ActorID]; !known && !snapshot {
+			h.couplesStale = true
+		}
 		hp := *a.HomePet
 		h.pets[a.ActorID] = &hp
 		return true
@@ -116,13 +125,14 @@ func (p *Pipeline) observeHome(conn, acc string, body []byte) {
 	}
 	changed := false
 	for _, a := range scene.ParseActorEnter(body) {
-		if p.addHomeActor(cs.home, a) {
+		if p.addHomeActor(cs.home, a, false) {
 			changed = true
 		}
 	}
 	for _, id := range scene.ParseActorLeave(body) {
 		if _, ok := cs.home.pets[id]; ok {
 			delete(cs.home.pets, id)
+			cs.home.couplesStale = true // 住户搬走同样让配对过期
 			changed = true
 		}
 		if _, ok := cs.home.eggs[id]; ok {
@@ -240,6 +250,7 @@ func (p *Pipeline) pushHome(conn, acc string) {
 	payload["sceneResId"] = h.res
 	payload["level"] = h.level
 	payload["roomLevel"] = h.roomLevel
+	payload["couplesStale"] = h.couplesStale
 	p.srv.SetLastHome(acc, payload)
 	p.srv.Hub().Broadcast("home", acc, payload)
 }

@@ -64,6 +64,7 @@ export default function LayerPanel({ pois, wilds, home, collapsed, onClose }) {
             </div>
             <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
               空窝画虚线圈;窝上有蛋则挂蛋图标({home.eggs} 颗待收)。悬浮看住户简要信息,点头像看详情。
+              {home.stale && ' 本次进家园后有宠物进出窝,配对信息可能不全——重进一次家园即刷新。'}
             </span>
           </div>
         )}

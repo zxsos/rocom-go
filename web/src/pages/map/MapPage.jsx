@@ -174,7 +174,7 @@ export default function MapPage() {
             {/* 家园小窝:空窝画个虚线圈,住了宠物画头像;窝上有蛋则右上角挂个蛋图标。
                 悬浮看简要信息(见 nestTitle),点住户看宠物详情。同属 .map-world 一起平移。 */}
             {home.marks.map((n) => (
-              <div key={n.id} title={nestTitle(n)}
+              <div key={n.id} title={nestTitle(n, home.stale)}
                 className={'map-nest' + (n.pet ? '' : ' empty')}
                 style={{ left: n.u * mapPx, top: n.v * mapPx }}
                 onClick={(e) => { if (n.pet) { e.stopPropagation(); setDetailGid(n.pet.gid) } }}>
