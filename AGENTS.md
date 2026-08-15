@@ -35,10 +35,10 @@
   `uv run python scripts/gen_pbdesc.py`(all.pb + ProtoCMD.lua → internal/pbdesc/data:
   裁剪后的描述符集 + opcode→消息名,供 pcapdump 精确解码)、
   `uv run python scripts/gen_images.py`(解包 PNG → internal/gamedata/data/img 的宠物图 webp)、
-  `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,worldmap,medal}:属性/
-  六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图;图集精灵从解包属性 JSON + 图集 PNG 裁切,
-  奖牌等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;详见
-  docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
+  `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,worldmap,medal,egg}:属性/
+  六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图、精灵蛋图;图集精灵从解包属性 JSON + 图集 PNG 裁切,
+  奖牌与精灵蛋等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;
+  详见 docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
   抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
   (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq

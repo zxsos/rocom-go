@@ -847,6 +847,62 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 `h`/`w` 用作候选筛选这一维因此存疑(本例真值没被筛掉,但只有 n=1),
 **时长维(`max_hatched_secs` == `hatch_data`)才是有实测支撑的那个**。
 
+### 蛋从哪来:家园小窝下蛋与亲本(2026-08-15 第四份 pcap)
+
+`src == EAWT_HOME` 的蛋出自家园的小窝。蛋在窝上是个**场景 NPC**(`0x014a` 进场景数据里
+`other_actors.npc`,`detail_type 13`,`npc_cfg_id` 形如 `930xxx`),收取动作**没有专门的
+opcode**,走通用的场景交互:
+
+```
+c2s 0x0137 ZoneSceneNpcNextActReq{npc_id(=actor_id), option_id}   option_id = 830000000 + (npc_cfg_id − 930000)
+s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 gid},
+                                 goods_change_info.changes.bag_item.egg_data{…},
+                                 reward_reason/flow_reason: 223, reward_source: 13}
+```
+
+`223` 即 `ProtoEnum.FlowReason.FLOW_REASON_PET_HOME_LAY`(家园宠物下蛋;描述符里这两个字段
+是裸 uint32,不是枚举类型,所以 pcapdump 只会打数字)。
+
+**收之前就能看出是什么蛋**:`npc_cfg_id` 反查 `BAG_ITEM_CONF` 里 `npcid` 等于它的那件蛋物品
+(如 930028 → 107028),再走 `item_behavior.ratio` → `PET_EGG_CONF` 得物种。但窝上 NPC 的
+`npc_base.height/weight/voice` 全是 0,**尺寸要收下来才知道**。
+
+**双亲能对上**。玩法规则(玩家告知):家园最多 10 个小窝,每窝住自己的一只宠物,
+**相邻**两窝若一公一母且蛋组匹配,母本就有概率在一段时间后产出一颗蛋;蛋的**物种必定随母本**,
+性格与天赋有概率继承双亲,孵出的体重在**双亲百分位均值**上下浮动,声音基本是双亲均值向下取整。
+场景数据正好能把这套关系还原出来:
+
+- **蛋挂在母本的窝上**:蛋 NPC 的 `attach_item_info.attach_item_id` == 母本
+  `home_pet_info.furniture_guid`(一件家具 = 一个窝 = 一只宠物)。
+- **相邻由窝的摆放位置决定**(`home_pet_info.pos`,家园局部坐标)。该 pcap 的 10 只宠物
+  正好两两配成 5 对(每对间距 160,跨对间距 ≥ 400),每对都是一公一母且蛋组有交集 ——
+  但**这只是这份布局摆得干净**:窝可以在家园里自由挪动,几个窝挨太近会**串窝**,
+  届时同一颗蛋有多个候选父本。协议里既没有父本字段、也没有"这颗蛋配的是谁"的记录,
+  所以**父本只能靠布局推,推不出来的时候就是推不出来**;能确定的只有母本(蛋挂在她的窝上)。
+- **物种随母本**有两个跨物种的直接证据:点点♀ + 幽星光♂ 那窝出的是**点点的蛋**、
+  大耳帽兜♀ + 治愈兔♂ 那窝出的是**大耳帽兜的蛋**(蛋种类由 `npc_cfg_id` 反查得到,见上)。
+
+体重按双亲均值这条在两颗已收的蛋上都对得上(蛋自己的百分位 vs 双亲成体百分位的均值):
+
+| 蛋 | 母本 w% | 父本 w% | 双亲均值 | 蛋实测 | 偏差 |
+| --- | --- | --- | --- | --- | --- |
+| 小独角兽的蛋 | 37610♀ 93.043% | 37620♂ 96.177% | 94.610% | **96.332%** | +1.72pp |
+| 友爱天天的蛋 | 39302♀ 99.918% | 39048♂ 99.590% | 99.754% | **100%** | +0.25pp |
+
+性格/天赋的概率继承也吻合:小独角兽双亲性格 21/21、天赋 rank 2/2 → 孵出的 39339 是 21 / rank 2;
+友爱天天双亲 22/22、4/4 → 39322 是 22 / rank 4;而 39323(点点)性格 19 不来自任何一方,
+即「概率没中时另滚」。声音那条本仓库还没抓到反例,可证伪的预测是:大耳帽兜♀(-12) + 治愈兔♂(13)
+那窝的蛋应孵出 `voice = floor(0.5) = 0`。
+
+**声音为 0 有两个来源,别混为一谈**:牧场蛋是 `floor(双亲均值)`,双亲一正一负就容易收敛到 0;
+而**商店买的、活动送的蛋多数直接固定 0**(玩家告知)。3.6 前面那份统计(孵化 catch_way=3
+的宠物 71.9% 声音为 0,野捕只有 0.5%)是这两者叠加的结果,不能单独归因于任一条。
+本仓库的实例:远行商人处买的神奇的蛋孵出的权杖-Ⅱ `voice: 0`,同期两只牧场蛋孵出的都是 100。
+`PetData` 里没有「这只从什么蛋来」的字段,所以事后无法把两类拆开统计。
+
+`home_pet_info` 另带 `pet_gid`/`name`/`feed_info`(食物 + 起止时间)/`feed_round`/`status`,
+喂食轮数与产蛋节奏应该在这里,尚未细究。
+
 ### 放入孵蛋器 / 破壳(2026-08-15 第二份 pcap)
 
 - **放入孵蛋器**走通用的用道具:`0x0163 ZoneUseBagItemReq{gid, num:1, item_conf_id}`,
@@ -877,6 +933,26 @@ hatched_secs = 250 + 倍率 × (last_hatch_update_sec − start_hatch_time)
 `voice == 0`,孵化(3)224 只却有 **71.9%** 为 0 —— 孵化出来的嗓音不像野捕那样满范围随机,
 多数直接是 0,少数带值的按种类扎堆(幽星光/海盔虫/鸭吉吉/友爱天天…),与「牧场蛋继承亲代嗓音」
 的猜想一致,但协议里既无亲代字段也无蛋上嗓音,破壳前无从验证。
+
+### 3.6 在本项目里落地成了什么
+
+| 面向 | 落点 |
+| --- | --- |
+| 蛋图 | `gen_icons.py` 的 **egg 组**:`BAG_ITEM_CONF` 里 `type==8` 的 `icon`(整张贴图)→ `img/egg/<原名>.webp`,293 个唯一图标转出 276(17 个未上线物种的贴图没随包解出,Go 侧回退 `egg_tongyong`) |
+| 索引 | `gen_gamedata.py` 三张表:`egg_conf`(物种蛋区间 + 孵化秒数)、`egg_items`(蛋物品 → 显示名/物种/图标/窝上 NPC id)、`nest_furniture`(小窝家具,按 `interact_type==3` 取,实测仅 1001071) |
+| 解析 | `internal/pet/egg.go`(BagItem+PetEggBrief、破壳请求/回包、flow_reason)、`internal/scene/home.go`(home_info 的家具与配对、home_pet 实体、蛋 NPC 的 attach_item) |
+| 入库 | `internal/store/egg.go` 的 `eggs` 表:蛋一行,`parents` 单列存**收蛋那一刻**的双亲快照(亲本被放生也不受影响);破壳只标记不删行 |
+| 管线 | `internal/pipeline/eggs.go`(背包分页对账 + 收蛋认领双亲 + 破壳关联宠物)、`internal/pipeline/home.go`(小窝图层的实时状态与推送) |
+| 页面 | 精灵蛋页(`web/src/pages/eggs/`)与实时地图的小窝图层(`web/src/pages/map/useHomeNests.js`) |
+
+两个实现上的取舍值得记一笔:
+
+- **小窝取自家具列表而不是实体**。空窝没有任何实体,只有 `room_layout` 里那一行家具;
+  而「哪个窝还空着」正是要显示的信息。窝↔宠物靠 `furniture_guid` 对上,窝↔蛋靠蛋实体的
+  `attach_item_info.attach_item_id` 对上。
+- **双亲在收蛋那一刻认领**。`0x0243` 只说「你得到了一颗蛋」,不说来自哪个窝;认领靠玩家点窝上
+  那颗蛋时的 `0x0137`(记下蛋实体 id),再经 `attach_item_id → 母本的窝 → lay_egg_couple` 得双亲。
+  漏抓那次交互时退一步按蛋物品 id 在当前家园里找唯一匹配的窝,仍不唯一就不记(宁缺毋错)。
 
 ## 4. 宠物列表解析流程(`internal/pet`)
 
