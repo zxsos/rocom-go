@@ -23,12 +23,16 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsBatchNotify:
 		p.observeStars(m.Session, acc, m.AppBody)
 		p.observeWilds(m.Session, acc, m.AppBody, m.Time, false)
+		p.observeHome(m.Session, acc, m.AppBody)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcPendantInteractReq:
 		p.onPendantReq(m)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpNpcPendantInteractRsp:
 		p.onPendantRsp(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsNotify:
 		p.onPlayActs(m, acc)
+		p.observeHome(m.Session, acc, m.AppBody)
+	case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcNextActReq:
+		p.onNpcInteract(m.Session, m.AppBody, m.Time)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpBattleFinishNotify:
 		p.onBattleFinish(m.Session, acc, m.AppBody, m.Time)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
@@ -45,6 +49,7 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		cs := p.conn(m.Session)
 		cs.res, cs.room = res, room
 		p.st.SaveSessionScene(m.Session, res, room) // 落盘供重启恢复
+		p.leaveHome(m.Session, acc, res)            // 出了家园就撤掉小窝图层
 		// 换场景/传送后旧区域一律作废:服务器不为它们补发离开事件,只在落地后重发进入事件
 		// (客户端同样在传送时清空区域,见 AreaAndZoneModule:OnTeleportClearAreaInfo)。
 		p.resetAreas(m.Session)
@@ -66,6 +71,7 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	cs := p.conn(m.Session)
 	cs.res, cs.room = tp.ResID, tp.Room
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
+	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
 	p.resetAreas(m.Session)
 	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{

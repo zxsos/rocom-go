@@ -32,6 +32,7 @@ type Server struct {
 	posMu    sync.Mutex                // 保护 lastPos / lastWild
 	lastPos  map[string]map[string]any // 账号 -> 最近一次位置(实时地图页加载时即时回显,不必等下一次移动)
 	lastWild map[string]any            // 账号 -> 最近一次野生宠物标记(同上,免得进页面要等下一条 AOI 通知)
+	lastHome map[string]any            // 账号 -> 最近一次家园小窝图层(同上;不在家园时为空列表)
 }
 
 // iconMeta 是全局固定图标(每只宠物都一样,不随宠物下发):六维属性小图 + 异色/炫彩/污染标记图。
@@ -51,6 +52,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
 	s.lastPos = map[string]map[string]any{}
 	s.lastWild = map[string]any{}
+	s.lastHome = map[string]any{}
 	s.medalIDs = map[string][]uint32{}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
@@ -109,6 +111,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/position", s.handlePosition)
 	s.mux.HandleFunc("GET /api/pois", s.handlePois)
 	s.mux.HandleFunc("GET /api/wildpets", s.handleWildPets)
+	s.mux.HandleFunc("GET /api/home", s.handleHome)
+	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
 	imgFS := http.FileServerFS(gamedata.ImageFS())

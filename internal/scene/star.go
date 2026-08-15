@@ -74,6 +74,9 @@ type NpcActor struct {
 	Mutation   int32 // npc_base.mutation_type,位标志,见下 Mutation* 常量(与 PetData 同一套)
 	GlassType  int32 // npc_base.glass_info.glass_type(0=GT_NULL 非炫彩 / 1=普通炫彩 / 2=隐藏炫彩)
 	GlassValue int32 // npc_base.glass_info.glass_value(是哪一种炫彩,见 gamedata.DB.GlassDesc)
+	// 以下为**家园**实体独有(见 home.go 与 docs/data.md 3.6):
+	AttachItem uint64   // attach_item_info.attach_item_id;窝上的蛋即所属小窝的 furniture_guid
+	HomePet    *HomePet // 入住小窝的宠物(home_pet_info);非家园宠物实体为 nil
 }
 
 // 变异位标志,取自客户端 Enum.MutationDiffType(npc_base 与 PetData 的 mutation_type 同一套)。
@@ -209,6 +212,14 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 			})
 		})
 	}
+	if att := subMsg(npc, 23); att != nil { // attach_item_info(ActorInfo_AttachItem)
+		scanFields(att, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+			if num == 2 && typ == protowire.VarintType {
+				a.AttachItem = v
+			}
+		})
+	}
+	a.HomePet = parseHomePet(npc)
 	if base := subMsg(npc, 1); base != nil {
 		scanFields(base, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
 			if typ != protowire.VarintType {
@@ -239,7 +250,9 @@ func parseActorInfo(b []byte) (NpcActor, bool) {
 			})
 		}
 	}
-	return a, a.CfgID != 0
+	// 家园里入住小窝的宠物实体也算数(它的 npc_base 在实测数据里带 npc_cfg_id,
+	// 但判据以 home_pet 为准更贴切:这条路径要的是「这是谁、住哪个窝」)。
+	return a, a.CfgID != 0 || a.HomePet != nil
 }
 
 // ParseActorLeave 从 0x0414/0x0413 取离开 AOI 的实体 id:

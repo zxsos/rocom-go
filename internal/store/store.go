@@ -112,6 +112,19 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 -- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
 -- 没有实体——已收集的星星服务器不刷,见 docs/data.md 3.4)。没有行 = 尚未确认(前端照常显示)。
+-- 精灵蛋(背包物品 gid 为键)。parents 是收蛋那一刻的双亲快照 JSON:亲本可能被放生/赠送,
+-- 蛋上的双亲信息不应随之消失,故存快照而非引用 pets(见 docs/data.md 3.6)。
+-- state: 0=在背包 1=已破壳(保留作历史) 2=已不在背包。
+CREATE TABLE IF NOT EXISTS eggs (
+  account TEXT NOT NULL, gid INTEGER,
+  item_id INTEGER, conf_id INTEGER, name TEXT, species TEXT,
+  height REAL, weight REAL, height_pct REAL, weight_pct REAL,
+  src INTEGER, hatching INTEGER, obtained_at INTEGER,
+  state INTEGER DEFAULT 0, hatched_at INTEGER, pet_gid INTEGER,
+  parents TEXT, first_seen INTEGER, updated_at INTEGER, data TEXT,
+  PRIMARY KEY(account, gid)
+);
+CREATE INDEX IF NOT EXISTS idx_eggs_account_state ON eggs(account, state);
 CREATE TABLE IF NOT EXISTS star_state (
   account TEXT NOT NULL, refresh_id INTEGER,
   state INTEGER, updated_at INTEGER,

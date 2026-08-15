@@ -304,6 +304,8 @@ func (p *Pipeline) sweepStars(conn, acc string, res int32, x, y, z int32, now ti
 // onSceneSnapshot 处理进场景/传送后的周边实体快照(0x014a):一次性给出 AOI 内的实体。
 // 星/光点实体 ⇒ 那些点未收集;石像实体按挂件状态直接定收集与否(见 starSee)。
 func (p *Pipeline) onSceneSnapshot(m capture.Message, acc string) {
+	// 家园快照同走这条(0x014a 里的 home_info + 小窝实体),见 pipeline/home.go。
+	p.onHomeSnapshot(m.Session, acc, m.AppBody, p.conn(m.Session).res)
 	cs := p.conns[m.Session]
 	if cs == nil || cs.stars == nil {
 		return

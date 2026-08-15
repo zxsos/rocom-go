@@ -61,6 +61,25 @@ func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+// SetLastHome 缓存某账号最近一次家园小窝图层(由消费管线在广播 home 时调用),
+// 供实时地图页加载时经 GET /api/home 即时回显。玩家不在家园时缓存的是空列表。
+func (s *Server) SetLastHome(account string, payload any) {
+	if account == "" {
+		return
+	}
+	s.posMu.Lock()
+	s.lastHome[account] = payload
+	s.posMu.Unlock()
+}
+
+// handleHome 返回当前账号最近一次家园小窝图层(空窝也在内);无记录返回 null。
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	s.posMu.Lock()
+	v := s.lastHome[s.acct(r)]
+	s.posMu.Unlock()
+	writeJSON(w, v)
+}
+
 // poiKind 是一个 POI 图层(前端的一个开关):图层键、中文名、图标路径、是否默认开启。
 type poiKind struct {
 	K       string `json:"k"`
