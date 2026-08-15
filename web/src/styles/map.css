@@ -123,3 +123,35 @@
 }
 .map-nomap-name { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
 .map-coords { margin-top: 14px; font-family: ui-monospace, monospace; font-size: 15px; color: var(--fg); }
+
+/* ---- 家园小窝图层(见 useHomeNests.js)---- */
+/* 与野生宠物标记同一套定位方式:尺寸恒定,故 left/top 定锚点 + translate(-50%,-50%) 居中。
+   住了宠物的窝可点(开宠物详情),空窝只是个虚线圈、不可点。 */
+.map-nest {
+  position: absolute; width: 34px; height: 34px;
+  transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--bg-1);
+  border: 2px solid var(--gold); overflow: visible;
+  user-select: none; -webkit-user-drag: none; cursor: pointer;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
+}
+.map-nest:hover { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
+.map-nest img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
+/* 空窝:虚线圈 + 一个「空」字,压暗以免抢住户的注意力。 */
+.map-nest.empty {
+  border-style: dashed; border-color: var(--line); background: var(--bg-2);
+  cursor: default; opacity: .7;
+}
+.map-nest-empty { font-size: 12px; color: var(--fg-dim); }
+/* 窝上还没收的蛋:挂在右上角,略微出框 */
+.map-nest-egg {
+  position: absolute; right: -8px; top: -8px;
+  width: 20px !important; height: 20px !important; border-radius: 0 !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
+}
+/* 图层侧栏那一行的小图示(同野生宠物那圈色点的做法) */
+.map-nest-swatch {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--gold); background: var(--bg-1);
+}
