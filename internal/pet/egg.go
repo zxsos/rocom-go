@@ -528,4 +528,22 @@ func SortEggs(eggs []*EggView, by string, asc bool) {
 	})
 }
 
+// SortHatchingEggs 把孵蛋器里的蛋排成游戏内的槽位顺序:**按入孵时刻升序**
+// (先放进去的占 1 号槽)。复刻客户端 UMG_PetHatching_C:UpdatePanel:
+//
+//	table.sort(backpackEggList, function(a, b)
+//	  return a.eggData.start_hatch_time < b.eggData.start_hatch_time end)
+//	for i = 1, 3 do ... positionIndex = i ... end
+//
+// 槽位顺序与背包次序无关(实测三颗在孵的蛋,背包次序恰好是入孵次序的倒序,页面就整个反了)。
+// 客户端喂给 table.sort 的是 PetBackpackInfo.egg_gid 的顺序,本工具手头只有背包次序,
+// 两颗蛋同秒入孵时落位可能与游戏不同(实测未见);排序仍走 luaSort,见 SortEggs 的说明。
+func SortHatchingEggs(eggs []*EggView) {
+	luaSort(len(eggs), func(i, j int) bool {
+		return eggs[i-1].StartHatch < eggs[j-1].StartHatch
+	}, func(i, j int) {
+		eggs[i-1], eggs[j-1] = eggs[j-1], eggs[i-1]
+	})
+}
+
 func round3(v float64) float64 { return math.Round(v*1000) / 1000 }

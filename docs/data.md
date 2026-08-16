@@ -915,6 +915,11 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
   RSP 回来的 `bag_item.egg_data` 就带上了 `start_hatch_time`;下一次 `0x0312` 里
   该 `egg_gid` 才出现(`hatched_secs: 0`)。孵蛋器 3 格,`egg_gid[]` 就是当前占用的格子。
 - **孵满**后 `hatched_secs` 停在上限(`28800/28800`;实测有一例 `57620/57600` 溢出 20 秒)。
+- **三个槽位按入孵时刻升序**,与背包次序无关。客户端
+  `UMG_PetHatching_C:UpdatePanel` 取 `PlayerDataModel:GetPlayerBackpackEggInfo()`
+  (即 `PetBackpackInfo.egg_gid` 那串)后先 `table.sort(…, a.start_hatch_time < b.start_hatch_time)`,
+  再依次填 1..3 号槽。实测本机三颗在孵的蛋(3104/3109/3110)背包次序恰是入孵次序的**倒序**,
+  页面早先照背包顺序摆,看上去就与游戏内整个反了;后端 `pet.SortHatchingEggs` 照客户端重排。
 - **破壳**:`0x030b ZoneCrackEggReq{egg_gid, select_ball_gid}`(要选一个精灵球道具的 gid)
   → `0x030c RSP` 里 `ret_info.goods_reward.rewards{type: GT_PET, first_get, pet_data{…}}`
   是**完整 PetData**,末尾 `hatched_pet_gid` 给出新宠物 gid。新宠物 `catch_way: 3`(孵化)、
