@@ -29,7 +29,8 @@ func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 		// 顺带补上要等双亲快照才算得出的推测嗓音与奖牌。
 		eggs[i] = pet.RefreshEggView(e, s.db)
 	}
-	// 排序键来自上面的重算,故排在其后;在孵的蛋原样留在最前(它们属于孵蛋器,不参与背包排序)。
+	// 排序键来自上面的重算,故排在其后。在孵的蛋留在最前且不参与背包排序(它们属于孵蛋器),
+	// 但自己按槽位顺序排一遍——槽位是入孵时刻升序,与背包次序无关(见 pet.SortHatchingEggs)。
 	hatching, bag := []*pet.EggView{}, []*pet.EggView{}
 	for _, e := range eggs {
 		if e.Hatching {
@@ -38,6 +39,7 @@ func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 			bag = append(bag, e)
 		}
 	}
+	pet.SortHatchingEggs(hatching)
 	pet.SortEggs(bag, q.Get("sort"), q.Get("order") == "asc")
 	eggs = append(hatching, bag...)
 	writeJSON(w, map[string]any{"eggs": eggs})

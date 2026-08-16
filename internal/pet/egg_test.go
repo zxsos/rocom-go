@@ -142,6 +142,22 @@ func TestSortEggs(t *testing.T) {
 	}
 }
 
+func TestSortHatchingEggs(t *testing.T) {
+	// 孵蛋器槽位按入孵时刻升序,与传入的背包次序无关(实测那三颗:背包次序恰是入孵次序的倒序)。
+	eggs := []*EggView{
+		{Gid: 3104, StartHatch: 1786858404},
+		{Gid: 3109, StartHatch: 1786858369},
+		{Gid: 3110, StartHatch: 1786855793},
+	}
+	SortHatchingEggs(eggs)
+	want := []uint32{3110, 3109, 3104}
+	for i := range want {
+		if eggs[i].Gid != want[i] {
+			t.Fatalf("槽位顺序 = %d,%d,%d, want %v", eggs[0].Gid, eggs[1].Gid, eggs[2].Gid, want)
+		}
+	}
+}
+
 func TestSortEggsTie(t *testing.T) {
 	// 同一时刻入包的两颗同种蛋:所有键都分不出高低,谁在前由排序算法决定——我们复刻的是
 	// 客户端那套 Lua table.sort(见 luasort.go 与其对拍测试)。只有两颗时它不会动相等项,
