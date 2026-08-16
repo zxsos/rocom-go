@@ -59,6 +59,9 @@ func main() {
 		if err := eng.RunOffline(*pcapPath); err != nil {
 			log.Fatalf("回放失败: %v", err)
 		}
+		// 涂地是攒批落盘的(见 server/paint.go),而回放几秒就跑完一整份 pcap、一次都攒不到,
+		// 故这里补一次落盘,否则回放出来的覆盖图重启就没了。
+		srv.FlushPaint()
 		log.Printf("回放完成，%d 个账号共宠物 %d 只。Web 服务保持运行(Ctrl-C 退出)", pl.AccountCount(), pl.PetTotal())
 		if d := eng.NoKeyDropped(); d > 0 {
 			log.Printf("提示: %d 个数据包因尚无会话密钥被丢弃(抓包晚于密钥协商时属正常)", d)

@@ -43,6 +43,7 @@ type DB struct {
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
 	eggGroup     map[uint32]EggGroup    // 蛋组id(1-15) -> 社区名/描述
 	npcPets      map[uint32]uint32      // 野生宠 NPC_CONF id -> petbase_id(取名称/头像,见 3.5)
+	npcBosses    map[uint32]bool        // 野外首领的 NPC_CONF id(throwing_interact_type=4,见 3.8)
 	// 炫彩外观(见 GlassDesc):隐藏炫彩名 / 普通炫彩的粒子名与配色名。
 	glassNames     map[string]string
 	glassColors    map[string]string
@@ -94,6 +95,7 @@ func Load() (*DB, error) {
 		ImageBase      map[string]uint32            `json:"image_base"`
 		EggGroup       map[string]EggGroup          `json:"egg_group"`
 		NpcPets        map[string]uint32            `json:"npc_pets"`
+		NpcBosses      []uint32                     `json:"npc_bosses"`
 		GlassNames     map[string]string            `json:"glass_names"`
 		GlassColors    map[string]string            `json:"glass_colors"`
 		GlassParticles map[string]string            `json:"glass_particles"`
@@ -179,6 +181,10 @@ func Load() (*DB, error) {
 		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
 			npcPets[uint32(id)] = v
 		}
+	}
+	npcBosses := make(map[uint32]bool, len(raw.NpcBosses))
+	for _, id := range raw.NpcBosses {
+		npcBosses[id] = true
 	}
 	eggGroup := make(map[uint32]EggGroup, len(raw.EggGroup))
 	for k, v := range raw.EggGroup {
@@ -275,6 +281,7 @@ func Load() (*DB, error) {
 		petbase:        petbase,
 		eggGroup:       eggGroup,
 		npcPets:        npcPets,
+		npcBosses:      npcBosses,
 		glassNames:     raw.GlassNames,
 		glassColors:    raw.GlassColors,
 		glassParticles: raw.GlassParticles,

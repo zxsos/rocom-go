@@ -31,6 +31,35 @@
 .map-base { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
 /* 洞穴/地下层切片:叠加在底图上对应地理位置(透明处透出底图)。 */
 .map-layer { position: absolute; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+/* 涂地(已扫过的区域):淡填充 + 细描边两层,都铺满底图、CSS 拉到底图尺寸,压在标记之下,
+   不吃指针事件(点它要能拖地图)。
+   底图是彩虹似的彩绘图(沙、草、水、紫蘑菇林、金枫林),任何单一色的半透明填充总会在某个
+   地区糊掉,故靠**轮廓**认边界——轮廓与底色无关。
+   填充用 canvas 位图(一格 8m,浓度见 usePaint 的 FILL_RGBA):放大后被插值柔化,正好把方格
+   化开,反正是淡淡一层,糊不糊看不出来。 */
+.map-paint {
+  position: absolute; left: 0; top: 0;
+  pointer-events: none;
+}
+/* 描边用 SVG:位图描边一放大就成毛边,矢量则由浏览器按当前缩放重新栅格化,放到最大都是干净的
+   细线;non-scaling-stroke 让线宽恒为屏幕上的 1.2px,不随地图缩放变粗变细。 */
+.map-paint-edge {
+  position: absolute; left: 0; top: 0;
+  pointer-events: none; overflow: visible;
+}
+.map-paint-edge path {
+  fill: none;
+  stroke: rgba(237, 233, 254, .95);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+/* 图层栏里涂地那行的色块:照着地图上的样子来——淡紫底 + 一圈亮边(野生宠物那几行是描边圆点)。 */
+.map-paint-swatch {
+  flex: none; width: 14px; height: 14px; border-radius: 3px;
+  background: rgba(168, 85, 247, .36); border: 2px solid rgba(237, 233, 254, .9);
+  box-sizing: border-box;
+}
+.map-layer-btn.on .map-paint-swatch { opacity: 1; }
 /* 方向箭头:恒定屏幕尺寸,随朝向旋转,不随地图缩放。位置同样只用 transform(逐帧写入,见 MapPage)。 */
 .map-arrow { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 .map-arrow svg { display: block; }
