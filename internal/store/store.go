@@ -134,6 +134,13 @@ CREATE TABLE IF NOT EXISTS star_zone (
   got INTEGER, total INTEGER, updated_at INTEGER,
   PRIMARY KEY(account, camp, npc_id)
 );
+-- 涂地(实时地图页的覆盖图层,见 docs/data.md 3.8):「玩家 ↔ 已下发的野生宠」之间那条走廊
+-- 扫过的格子各记一位,cells 是 w*h 的位图(每字节 8 格,低位在前),按账号 + 场景 + 分层各存一张。
+CREATE TABLE IF NOT EXISTS paint (
+  account TEXT NOT NULL, res INTEGER, layer INTEGER,
+  w INTEGER, h INTEGER, cells BLOB, updated_at INTEGER,
+  PRIMARY KEY(account, res, layer)
+);
 `)
 	if err != nil {
 		return err

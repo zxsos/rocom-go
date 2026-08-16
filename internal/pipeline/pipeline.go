@@ -15,6 +15,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gcp"
 	"github.com/whoisnian/rocom-capture/internal/pb"
 	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -50,12 +51,14 @@ type connState struct {
 	// area(如信仰者村落一层同时进入 541030265/541030499),故按 func 存 area 集合:
 	// 离开其中一个仍在该层,集合空了才算离开。
 	areas      map[uint32]map[uint32]bool
-	layer      *layerState  // 分层地图去抖状态(见 layerDebounce)
-	stars      *starTracker // 眠枭之星观测态(换场景/传送即重置)
-	wilds      *wildTracker // 野生宠物图层观测态(同上,见 wildpets.go)
-	pendantRid int32        // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
-	home       *homeState   // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
-	crackEgg   uint32       // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
+	layer      *layerState               // 分层地图去抖状态(见 layerDebounce)
+	stars      *starTracker              // 眠枭之星观测态(换场景/传送即重置)
+	wilds      *wildTracker              // 野生宠物图层观测态(同上,见 wildpets.go)
+	pos        scene.Position            // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
+	wildSeen   map[uint64]scene.Position // 当前 AOI 里**全部**野生宠实体的位置(涂地用,不只稀有那几只)
+	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
+	home       *homeState                // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
+	crackEgg   uint32                    // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
 }
 
 // acctState 是单个账号的消费状态。

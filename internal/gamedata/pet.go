@@ -135,6 +135,11 @@ func (db *DB) NpcPetBase(npcCfgID uint32) (uint32, bool) {
 	return v, ok
 }
 
+// IsNpcBoss 报告该 NPC(NPC_CONF.id)是不是野外首领(throwing_interact_type=4:祭礼巨像/
+// 女王蜂/钻石蜗…)。它们的 AOI 下发距离远得多(实测 128-176m,普通野生宠 80m,见 docs/data.md 3.7),
+// 故涂地不能拿它们当「这条线扫过了」的凭据(见 docs/data.md 3.8);地图标记不受影响。
+func (db *DB) IsNpcBoss(npcCfgID uint32) bool { return db.npcBosses[npcCfgID] }
+
 // 炫彩类型(GlassInfo.glass_type,dataconfig.GlassType)。
 const (
 	GlassNull   = 0 // GT_NULL,非炫彩

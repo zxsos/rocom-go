@@ -120,6 +120,18 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 		actors = scene.ParseSceneActors(body)
 	}
 	for _, a := range actors {
+		// 涂地跟的是**全部**野生宠实体(见 paintSeen):任何一只下发,都证明玩家到它之间
+		// 这条线上的东西已经到手了,与它稀不稀有无关。下面的 wildMatch 才是地图标记那一套。
+		// **首领除外**:它的下发距离是 150/200m 那两档(普通野生宠 80m,见 docs/data.md 3.7),
+		// 拿它当凭据会把中间那段其实没下发过普通野生宠的地方也涂上。
+		// 同理只认**可丢球捕捉**的(同 wildMatch 的第二道闸):家园宠、剧情/活动 NPC 也带身高体重,
+		// 但它们不是野外刷出来的,下发规则未知,不该拿来当「这条线扫过了」的凭据。
+		if _, catchable := p.db.NpcPetBase(uint32(a.CfgID)); a.IsWildPet() && catchable && !p.db.IsNpcBoss(uint32(a.CfgID)) {
+			if cs.wildSeen == nil {
+				cs.wildSeen = map[uint64]scene.Position{}
+			}
+			cs.wildSeen[a.ActorID] = a.Pos
+		}
 		if !p.wildMatch(a) {
 			continue
 		}
@@ -140,6 +152,7 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 	// 离开 AOI:不立刻抹掉,置灰保留一段时间,免得刚瞥见一只稀有的、一转身标记就没了;
 	// 超过 wildStaleTTL 由 pushWilds 清理。**自己捉走的另算**(见下),那种要当场撤。
 	for _, id := range scene.ParseActorLeave(body) {
+		delete(cs.wildSeen, id) // 出了视野就不再从它身上涂(走廊只代表「此刻确实看得见」)
 		if w, ok := ts.pets[id]; ok && !w.left {
 			w.left = true
 			changed = true
@@ -149,11 +162,15 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 	// 自己丢球捉走的:实体不是「走远了」而是真没了,标记当场撤掉,不留灰点。
 	// (捕捉失败的 act 同样会来,带 is_catch_success=false,ParseCaughtByThrow 已挡掉。)
 	for _, id := range scene.ParseCaughtByThrow(body) {
+		delete(cs.wildSeen, id)
 		if _, ok := ts.pets[id]; ok {
 			delete(ts.pets, id)
 			changed = true
 		}
 	}
+
+	// 新看到的宠物 = 新的方向,当场涂一次(玩家可能站着不动,等不到下一个移动包)。
+	p.paintSeen(conn, acc, cs.res, nil)
 
 	if changed {
 		p.pushWilds(conn, acc, now)
@@ -175,6 +192,9 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 			changed = true
 		}
 	}
+	// 新看到的宠物 = 新的方向,当场涂一次(玩家可能站着不动,等不到下一个移动包)。
+	p.paintSeen(conn, acc, cs.res, nil)
+
 	if changed {
 		p.pushWilds(conn, acc, now)
 	}

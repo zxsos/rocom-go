@@ -7,7 +7,7 @@ import { WILD_LAYERS } from './useWildPets'
 // 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 家园小窝不在此列:那层始终开着,不给开关也不占图例(见 useHomeNests.js)。
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
-export default function LayerPanel({ pois, wilds, collapsed, onClose }) {
+export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   return (
     <>
@@ -55,10 +55,21 @@ export default function LayerPanel({ pois, wilds, collapsed, onClose }) {
               </div>
             )
           })}
-          <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-            只标出周围已下发的野生宠(走近才知道);位置≈刷新点。灰色 = 已离开视野的最后所见,
-            同样计入数量(悬浮看拆分)。
-          </span>
+        </div>
+        <div className="filter-group">
+          <label>涂色模式</label>
+          <div className="map-layer-row">
+            <button className={'map-layer-btn' + (paint.on ? ' on' : '')}
+              onClick={paint.toggle} disabled={!paint.available}
+              title={paint.available ? '把「刷新过野生精灵」的区域涂色' : '该场景没有底图,无法涂色'}>
+              <span className="map-paint-swatch" />
+              <span className="map-layer-name">刷新过精灵的区域</span>
+            </button>
+            {/* 重置只清当前场景/当前层。误点代价不小(要重走一遍),故要确认一次。 */}
+            <button className="map-collect-btn on" onClick={() => {
+              if (window.confirm('清空本场景已涂的区域?重来一遍要重新走。')) paint.reset()
+            }} disabled={!paint.available} title="重置本场景的涂色" aria-label="重置涂色">↺</button>
+          </div>
         </div>
         <div className="filters-foot">
           <button className="btn primary" onClick={onClose}>查看地图</button>

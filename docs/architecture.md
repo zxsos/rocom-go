@@ -42,7 +42,7 @@
 | `gamedata` | embed 的 id→中文名 查找库 |
 | `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3) |
 | `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
-| `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源 |
+| `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/data.md 3.8) |
 
 `cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
 
@@ -113,9 +113,11 @@
 | `GET /api/position` | 当前账号最近一次位置(地图页初始回显);超过 4s 未更新则抹掉速度(不给前端外推) |
 | `GET /api/pois` | 某场景(`?res=<scene_res_cfg_id>`)的大地图 POI:图层清单 + 已投影为底图归一化 u/v 的标记点;眠枭之星另带收集状态与按区域进度(见 docs/data.md 3.3/3.4) |
 | `GET /api/wildpets` | 当前账号周围的稀有野生宠物标记(异色/炫彩、污染、满声音,地图页初始回显);同样已投影为 u/v(见 docs/data.md 3.5) |
+| `GET /api/paint` | 涂地覆盖位图(`?res=<scene_res>&layer=<分层 id,0=地表>`):`{w,h,cell,corridor,safe,cells}`,`cells` 是 w*h 位的位图 base64(1=已扫过);无大地图底图的场景回 `w=0`(见 docs/data.md 3.8) |
+| `DELETE /api/paint` | 重置该场景该层的涂地(同时广播 `paint:{reset:true}`,同账号其它页面一起清屏) |
 | `GET /api/home` | 家园的精灵小窝图层:每个窝的位置(已投影 u/v)、入住宠物简要信息与配对、窝上还没收的蛋;不在家园时 `nests` 为空(见 docs/data.md 3.6) |
 | `GET /api/eggs` | 背包里的精灵蛋(`search`、`sort=quality\|obtained`、`order`——复刻游戏内背包的两种排序);含蛋图/品类角标/尺寸百分位/百分位奖牌/获得时间/孵化进度/双亲快照 |
-| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|debug\|position\|stars\|starzones\|wildpets\|home\|eggs, account, data}` |
+| `GET /api/stream` | SSE，实时推送 `{type: pet\|event\|debug\|position\|stars\|starzones\|wildpets\|paint\|home\|eggs, account, data}` |
 | `GET /*` | 前端 SPA(未匹配路径回退 index.html) |
 
 > 除 `/api/accounts` 与静态数据(`/api/medals`、`/api/evolution`)外,读接口均按 `?account=`

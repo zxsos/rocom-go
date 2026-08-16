@@ -55,6 +55,7 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		p.resetAreas(m.Session)
 		// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
 		cs.stars = newStarTracker(res)
+		cs.wildSeen = nil                         // 涂地跟踪的实体同样按场景清零(见 paintSeen)
 		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(并推空列表,前端立刻清屏)
 	}
 	p.applyZoneProgress(m, acc)
@@ -73,6 +74,8 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
 	p.resetAreas(m.Session)
+	cs.wildSeen = nil                              // 同上:涂地跟踪的实体也作废
+	cs.pos = tp.Pos                                // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
 	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
@@ -128,6 +131,8 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	if res == 0 { // 未知 res(中途开抓/无缓存):用移动包的 scene_cfg_id 兜底默认 res
 		res = p.db.DefaultSceneRes(mr.SceneCfgID)
 	}
+	prev := cs.pos  // 涂地的贴身安全带要沿「上一包 → 这一包」这段路涂,故先留住旧位置
+	cs.pos = mr.Pos // 之后画到每只野生宠的走廊都从这儿起(实体通知里没有玩家坐标)
 	pos := p.buildPos(acc, res, cs.room, mr, m.Time)
 	// 分层地图:玩家当前所在区域(服务器区域进/出事件维护)命中某层的 area_func_id 即在该层,
 	// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
@@ -140,6 +145,53 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	p.pushPos(acc, pos)
 	// 玩家走到哪,就把周围的星星判一遍(走近了却没实体 ⇒ 已收集;z 供洞穴层守卫)。
 	p.sweepStars(m.Session, acc, res, mr.Pos.X, mr.Pos.Y, mr.Pos.Z, m.Time)
+	// 涂地:贴身安全带沿这一段路涂,再把「玩家 ↔ 此刻视野里每只野生宠」的走廊涂上
+	// (见 docs/data.md 3.8)。人一动,同样几只宠的走廊也会扫过新的一片,故每包都涂一次。
+	p.paintSeen(m.Session, acc, res, p.movePath(prev, mr))
+}
+
+// paintSeen 涂一次地(见 docs/data.md 3.8):path 是玩家刚走过的一段(空则只用当前位置),
+// 沿它涂贴身安全带;再把「玩家 ↔ 当前 AOI 里每只野生宠」的走廊涂上。
+// 玩家一动、或收到新的实体通知都要涂——前者让同几只宠的走廊扫过新的一片,后者是新看到的方向。
+func (p *Pipeline) paintSeen(conn, acc string, res int32, path [][2]int32) {
+	cs := p.conns[conn]
+	if cs == nil || cs.pos == (scene.Position{}) {
+		return
+	}
+	if len(path) == 0 {
+		path = [][2]int32{{cs.pos.X, cs.pos.Y}}
+	}
+	pets := make([][2]int32, 0, len(cs.wildSeen))
+	for _, q := range cs.wildSeen {
+		pets = append(pets, [2]int32{q.X, q.Y})
+	}
+	p.srv.PaintSeen(acc, res, p.curLayerID(conn), path, pets)
+}
+
+// movePath 把玩家自上一包以来实际走过的路拼成折线(世界坐标):上一包位置 → 补报的轨迹点 →
+// 本包位置。客户端输入不变时退化成 2.5-3s 一次心跳,那几秒真走的路只在 move_seg_list 里
+// (见 buildPos),不带上它,贴身安全带就会在两包之间断成一截一截。
+// prev 为零值(刚换场景/传送落地,还没有上一包)时只回本包位置。
+func (p *Pipeline) movePath(prev scene.Position, mr scene.MoveReq) [][2]int32 {
+	path := make([][2]int32, 0, len(mr.Segs)+2)
+	if prev != (scene.Position{}) {
+		path = append(path, [2]int32{prev.X, prev.Y})
+	}
+	for _, sg := range mr.Segs {
+		path = append(path, [2]int32{sg.Pos.X, sg.Pos.Y})
+	}
+	path = append(path, [2]int32{mr.Pos.X, mr.Pos.Y})
+	return path
+}
+
+// curLayerID 返回该连接当前所在的分层地图 id(0=地表)。涂地按层各存一张:洞穴与地表
+// 是两个空间,AOI 不相通(见 docs/data.md 3.4 的洞穴层守卫)。
+func (p *Pipeline) curLayerID(conn string) int32 {
+	cs := p.conns[conn]
+	if cs == nil || cs.layer == nil || !cs.layer.curOK {
+		return 0
+	}
+	return int32(cs.layer.cur.ID)
 }
 
 // pushPos 缓存并广播一条位置(缓存供地图页加载即时回显)。
@@ -169,6 +221,7 @@ func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t tim
 		"z":          mr.Pos.Z,
 		"heading":    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
 		"stop":       mr.StopMove,
+		"paintable":  p.srv.Paintable(res), // 该场景能否涂地(见 docs/data.md 3.8),前端据此显示图层开关
 		"ts":         t.Unix(),
 		"tsMs":       t.UnixMilli(), // 前端判断缓存位置是否过期(过期则不外推)
 	}
@@ -297,6 +350,7 @@ func (p *Pipeline) layerPayload(res int32, l gamedata.LayerInfo) map[string]any 
 		return nil
 	}
 	return map[string]any{
+		"id":  l.ID, // 涂地按层各存一张,前端据此取对应的覆盖位图(见 docs/data.md 3.8)
 		"img": "layer/" + l.Img,
 		"u0":  float64(l.OX-mi.OX) / float64(mi.Side),
 		"v0":  float64(l.OY-mi.OY) / float64(mi.Side),

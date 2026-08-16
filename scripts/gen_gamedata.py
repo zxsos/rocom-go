@@ -256,6 +256,13 @@ npc_pets = {k: v["traverse_data_param"][0] for k, v in rows("NPC_CONF.json").ite
             if v.get("throwing_interact_type") in (1, 4)
             and v.get("traverse_data_param") and str(v["traverse_data_param"][0]) in _petbase}
 
+# 其中的**首领**(throwing_interact_type=4:祭礼巨像/女王蜂/钻石蜗/风暴战犬…)另出一张表。
+# 它们的 AOI 下发距离比普通野生宠远得多(实测 128-176m,普通的是 80m,见 docs/data.md 3.7),
+# 涂地若把「玩家↔首领」也算成扫过,会把中间那段其实没下发过普通野生宠的地方一并涂上,
+# 故涂地跳过首领(见 docs/data.md 3.8);地图标记不受影响。
+npc_bosses = sorted(int(k) for k, v in rows("NPC_CONF.json").items()
+                    if v.get("throwing_interact_type") == 4)
+
 # ---- 炫彩(MDT_GLASS / GlassInfo)的外观描述 ----
 # 「炫彩」= PetData.mutation_type 的 bit3(Enum.MutationDiffType.MDT_GLASS),与 glass_info 非空
 # 严格等价(全部 pcap 363 只变异宠物零反例);glass_info 只是进一步说明**是哪一种**炫彩:
@@ -762,6 +769,7 @@ data = {
     # 野生宠物 NPC: NPC_CONF.id -> petbase_id(取名称/头像)。实时地图的野生宠物图层用,
     # 见上与 docs/data.md 3.5。
     "npc_pets": npc_pets,
+    "npc_bosses": npc_bosses,
     # 炫彩外观描述:隐藏炫彩名(HIDDEN_GLASS_CONF)+ 普通炫彩的粒子/配色名(见上)。
     "glass_names": glass_names,
     "glass_colors": glass_colors,

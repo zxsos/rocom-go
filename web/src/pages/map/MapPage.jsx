@@ -7,6 +7,7 @@ import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
 import { useWildPets, wildTags, wildRing } from './useWildPets'
 import { useHomeNests, nestTitle } from './useHomeNests'
+import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import LayerPanel from './LayerPanel'
 
@@ -51,6 +52,9 @@ export default function MapPage() {
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
   const home = useHomeNests(account)
+  // 涂地:把「见到过野生宠物」的方向涂上色(玩家 ↔ 宠物之间那条带子),遍历找稀有个体时
+  // 看哪片还没扫。分层地图与地表各涂各的,故要把当前层 id 一并给它。
+  const paint = usePaint(account, pos && pos.sceneResId, pos && pos.layer && pos.layer.id, pos && pos.paintable)
 
   // 逐帧外推的锚点:最近一个移动包的位置/速度/朝向 + 收到它时与画面位置的落差(cu/cv/dh)。
   const anchorRef = useRef(null)
@@ -152,7 +156,7 @@ export default function MapPage() {
       {/* 无工具栏:地图占满整页(场景名/坐标不再显示,位置看箭头即可);移动端的图层抽屉入口
           作为浮动控件挂在地图左下角。 */}
       <div className="map-layout">
-        <LayerPanel pois={pois} wilds={wilds} collapsed={collapsed} onClose={() => setCollapsed(true)} />
+        <LayerPanel pois={pois} wilds={wilds} paint={paint} collapsed={collapsed} onClose={() => setCollapsed(true)} />
 
         {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
 
@@ -169,6 +173,20 @@ export default function MapPage() {
                   width: (pos.layer.u1 - pos.layer.u0) * mapPx, height: (pos.layer.v1 - pos.layer.v0) * mapPx,
                 }} />
             )}
+            {/* 涂地:淡填充用一张格子位图(canvas,一格 8m),边界用 SVG 路径描细线——
+                位图放大会糊,矢量则由浏览器按当前缩放重新栅格化,放到最大描边依旧是细线
+                (vector-effect:non-scaling-stroke,见 usePaint 与 map.css)。
+                两层都只在「有新格子」时重画一次;平移缩放全靠 .map-world 的 transform 与
+                CSS 尺寸,不触发重绘。压在标记之下、层图之上。 */}
+            {paint.on && paint.ready && (<>
+              <canvas className="map-paint" ref={paint.attach}
+                width={paint.w} height={paint.h}
+                style={{ width: mapPx, height: mapPx }} />
+              <svg className="map-paint-edge" viewBox={`0 0 ${paint.w} ${paint.h}`}
+                preserveAspectRatio="none" style={{ width: mapPx, height: mapPx }}>
+                <path d={paint.edge} />
+              </svg>
+            </>)}
             {/* POI 标记:与底图同属 .map-world(一起平移,不会相对底图抖动);尺寸恒定不随缩放变大,
                 故位置用 left/top + translate(-50%,-50%) 定在锚点上。洞穴层的点也用底图投影,自然
                 落在层图上。 */}
