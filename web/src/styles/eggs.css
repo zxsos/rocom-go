@@ -1,7 +1,17 @@
 /* 精灵蛋页面:左栏孵蛋器 + 右栏背包(每行六个)。卡片布局固定,缺信息留占位,保证等高。 */
 
-.eggs-cols { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
-.eggs-incu { display: flex; flex-direction: column; gap: 10px; }
+/* 两栏各自的标题(左「孵蛋器」、右「背包」+排序+搜索)是同一网格行的两个单元格,行高取两者
+   较高的那个(右栏被输入框/按钮撑高),故两栏的卡片必从同一条基线开始;左标题 stretch 满行高、
+   自身居中,文字也就与右标题齐平。别改回「标题各归各栏」——那样只能靠写死 min-height 对齐。 */
+.eggs-cols {
+  display: grid; grid-template-columns: 300px 1fr;
+  grid-template-areas: "ht hb" "incu bag";
+  column-gap: 16px; row-gap: 10px; align-items: start;
+}
+.eggs-cols > .eggs-col-t { grid-area: ht; align-self: stretch; }
+.eggs-cols > .eggs-bar { grid-area: hb; }
+.eggs-incu { grid-area: incu; display: flex; flex-direction: column; gap: 10px; }
+.eggs-bag { grid-area: bag; min-width: 0; }
 .eggs-col-t { font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .eggs-col-t .muted { font-weight: 400; font-size: 13px; }
 
@@ -11,7 +21,7 @@
   min-height: 96px; display: flex; align-items: center; justify-content: center; font-size: 13px;
 }
 
-.eggs-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.eggs-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .eggs-sorts { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .eggs-sorts .btn { padding: 4px 10px; }
 .eggs-search { width: 170px; flex: none; }
@@ -21,13 +31,29 @@
 @media (max-width: 1450px) { .egg-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .egg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
-  .eggs-cols { grid-template-columns: 1fr; }
+  /* 单栏:各标题回到自己那一段前面(否则两个标题会叠在最上方) */
+  .eggs-cols { grid-template-columns: 1fr; grid-template-areas: "ht" "incu" "hb" "bag"; }
+  .eggs-cols > .eggs-bar { margin-top: 6px; } /* 与上面的孵蛋器卡片拉开,免得两段黏在一起 */
   .eggs-incu { flex-direction: row; flex-wrap: wrap; }
-  .eggs-incu .egg-card, .egg-slot-empty { flex: 1 1 240px; }
-  .eggs-col-t { flex-basis: 100%; }
+  .eggs-incu .egg-card { flex: 1 1 240px; }
+  /* 空格子在手机上一个就占一行,却只是说「这一格还能放一颗」——标题的 n/3 已经说清了,
+     故窄屏一律收起(空着几格、还是一颗都没在孵,都不占高度)。 */
+  .egg-slot-empty { display: none; }
   .egg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 560px) { .egg-grid { grid-template-columns: 1fr; } }
+/* 手机上背包**仍是双列**(同游戏内孵蛋页选蛋的那个两列格子)。卡片只剩 ~155px 宽,
+   头部「蛋图 | 名称 | 角标+头像」三段并排放不下,故让名称换到第二行独占整行:
+   名称块(egg-title)order:1 排到最后 + flex-basis:100% 自然折行,拿到整卡宽度,
+   不至于被省略成两三个字;蛋图与角标组(都是定宽小图)留在第一行两端。
+   孵蛋器那栏不套这套(它在窄屏是整行宽的大卡),故选择器都限定在 .egg-grid 内。 */
+@media (max-width: 560px) {
+  .egg-grid { gap: 8px; }
+  .egg-grid .egg-card { padding: 8px; }
+  .egg-grid .egg-head { flex-wrap: wrap; gap: 6px; }
+  .egg-grid .egg-marks { margin-left: auto; }
+  .egg-grid .egg-title { order: 1; flex-basis: 100%; }
+  .egg-grid .egg-row-y { display: none; } /* 时间只留「月-日 时:分:秒」,年份省下的宽度够放完分秒 */
+}
 
 .egg-card {
   border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1);

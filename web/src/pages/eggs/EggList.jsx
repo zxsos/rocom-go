@@ -46,9 +46,26 @@ export default function EggList() {
 
   return (
     <div className="eggs-page">
+      {/* 两栏的标题都是 eggs-cols 的直接子级(同一网格行),行高一致,两栏的卡片才从同一条
+          基线开始;标题若各自塞回栏内,右栏被搜索框撑高就会比左栏低一截(见 eggs.css)。 */}
       <div className="eggs-cols">
+        <div className="eggs-col-t">孵蛋器 <span className="muted">{hatching.length}/{slots}</span></div>
+        <div className="eggs-bar">
+          <div className="eggs-col-t">背包 <span className="muted">{bag.length} 颗</span></div>
+          <div className="eggs-sorts">
+            {SORTS.map((s) => (
+              <button key={s.k} className={'chip' + (sort === s.k ? ' on' : '')}
+                onClick={() => setSort(s.k)}>{s.label}</button>
+            ))}
+            <button className="btn" onClick={() => setOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
+              title="反向排序(同游戏内那个箭头)">{order === 'desc' ? '↓' : '↑'}</button>
+          </div>
+          <input className="input eggs-search" placeholder="搜索蛋名/物种" value={search}
+            onChange={(e) => setSearch(e.target.value)} />
+        </div>
+
+        {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
         <aside className="eggs-incu">
-          <div className="eggs-col-t">孵蛋器 <span className="muted">{hatching.length}/{slots}</span></div>
           {Array.from({ length: slots }, (_, i) => hatching[i]).map((e, i) => (
             e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
               : <div key={'s' + i} className="egg-slot-empty">空格子</div>
@@ -56,19 +73,6 @@ export default function EggList() {
         </aside>
 
         <section className="eggs-bag">
-          <div className="eggs-bar">
-            <div className="eggs-col-t">背包 <span className="muted">{bag.length} 颗</span></div>
-            <div className="eggs-sorts">
-              {SORTS.map((s) => (
-                <button key={s.k} className={'chip' + (sort === s.k ? ' on' : '')}
-                  onClick={() => setSort(s.k)}>{s.label}</button>
-              ))}
-              <button className="btn" onClick={() => setOrder((o) => (o === 'desc' ? 'asc' : 'desc'))}
-                title="反向排序(同游戏内那个箭头)">{order === 'desc' ? '↓' : '↑'}</button>
-            </div>
-            <input className="input eggs-search" placeholder="搜索蛋名/物种" value={search}
-              onChange={(e) => setSearch(e.target.value)} />
-          </div>
           {bag.length === 0
             ? <div className="empty">背包里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
             : (
@@ -127,7 +131,7 @@ function EggCard({ egg, now, onPet }) {
             : '蛋上没有嗓音字段,双亲也没记下,破壳才知道'} />
         <Row k="高度" v={egg.heightM ? `${egg.heightM} m` : ''} pct={egg.heightPct}
           title={egg.adultHeightM ? `孵出后约 ${egg.adultHeightM} m(百分位破壳后原样保留)` : ''} />
-        <Row k="时间" v={fmtTime(egg.obtainedAt)} title={`获得时间 ${fmtTime(egg.obtainedAt)}`} />
+        <Row k="时间" v={timeNode(egg.obtainedAt)} title={`获得时间 ${fmtTime(egg.obtainedAt)}`} />
       </div>
 
       {p && (
@@ -150,6 +154,14 @@ const DIM_NAME = { 2: '体型', 3: '嗓音' }
 function voiceText(egg) {
   if (egg.voice == null) return ''
   return egg.voiceMax != null ? `${egg.voice}~${egg.voiceMax}` : String(egg.voice)
+}
+
+// timeNode 渲染获得时间。手机上背包是双列,整串「2026-08-16 03:46:45」放不下会被省略号
+// 咬掉分秒(而分秒正是「获取时间」排序看的东西),故把年份单独包一层,窄屏 CSS 藏掉即可
+// (见 eggs.css;鼠标悬停的 title 里仍是完整时间)。
+function timeNode(ts) {
+  const s = fmtTime(ts)
+  return <><span className="egg-row-y">{s.slice(0, 5)}</span>{s.slice(5)}</>
 }
 
 // Row 一行「标签 值 百分位」。值缺失时留破折号占位。
