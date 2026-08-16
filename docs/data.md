@@ -942,6 +942,22 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
 多数直接是 0,少数带值的按种类扎堆(幽星光/海盔虫/鸭吉吉/友爱天天…),与「牧场蛋继承亲代嗓音」
 的猜想一致,但协议里既无亲代字段也无蛋上嗓音,破壳前无从验证。
 
+### 商店买蛋(2026-08-16 pcap)
+
+远行商人处买蛋**不发奖励通知**(`0x0243` 那三条全是空壳),新蛋只随购买回包下来一次:
+
+```
+c2s 0x0261 ZoneShopBuyItemReq{shop_id: 3009, buy_item_info{goods_id: 68003, goods_item_num: 5}}
+s2c 0x0262 ZoneShopBuyItemRsp{ret_info.goods_change_info.changes[].bag_item.egg_data{…}}
+```
+
+`changes` 里一颗蛋一条(`OT_SET`,买 5 颗就是 5 条),载体与收蛋/入孵/破壳完全一样,
+故 `ParseChangedEggs` 直接可用,只是 `0x0262` 此前不在 `handleEgg` 的分发列表里——
+不加的话得等玩家再开一次背包(`0x1344` 全量)才补上,页面不实时。
+神奇的蛋 `item_id: 310049`、`conf_id: 0` + `random_egg_conf: 1`(随机蛋),
+`src: EAWT_NONE(0)`(**不是** `1=远行`,来源那栏因此留空),
+`max_hatched_secs` 每颗不同(28800/43200/57600),即前面说的「时长维才是可信的候选筛选维」。
+
 ### 3.6 在本项目里落地成了什么
 
 | 面向 | 落点 |
@@ -951,7 +967,7 @@ s2c 0x0243 ZoneGoodsRewardNotify{goods_reward.rewards{id=蛋物品, gids=新蛋 
 | 索引 | `gen_gamedata.py` 五张表:`egg_conf`(物种蛋区间 + 孵化秒数 + 蛋品类)、`egg_items`(蛋物品 → 显示名/物种/图标/窝上 NPC id/品质/排序号)、`egg_types`(蛋品类 → 名称/排序号/角标)、`size_medals`(按百分位自动授予的四枚奖牌)、`nest_furniture`(小窝家具,按 `interact_type==3` 取,实测仅 1001071) |
 | 解析 | `internal/pet/egg.go`(BagItem+PetEggBrief、破壳请求/回包、flow_reason)、`internal/scene/home.go`(home_info 的家具与配对、home_pet 实体、蛋 NPC 的 attach_item) |
 | 入库 | `internal/store/egg.go` 的 `eggs` 表 = **背包现状**:蛋一行,`parents` 单列存**收蛋那一刻**的双亲快照(亲本被放生也不受影响);破壳/送人/背包对账不到的直接删行(页面只看背包,不留历史) |
-| 管线 | `internal/pipeline/eggs.go`(背包分页对账 + 收蛋认领双亲 + 破壳删行)、`internal/pipeline/home.go`(小窝图层的实时状态与推送) |
+| 管线 | `internal/pipeline/eggs.go`(背包分页对账 + 收蛋/买蛋入库 + 认领双亲 + 破壳删行)、`internal/pipeline/home.go`(小窝图层的实时状态与推送) |
 | 页面 | 精灵蛋页(`web/src/pages/eggs/`)与实时地图的小窝图层(`web/src/pages/map/useHomeNests.js`) |
 
 #### 蛋的品类与「品质排序」(复刻客户端)

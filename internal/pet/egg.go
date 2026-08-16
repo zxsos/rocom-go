@@ -6,7 +6,7 @@ package pet
 // 蛋会经多条消息露面,但载体只有两种:
 //   - 背包全量分页 0x1344:bag_info(4).item_list(3).items(2)
 //   - 任何带 ret_info 的回包/通知:ret_info(1).goods_change_info(4).changes(1).bag_item(4)
-//     (收蛋 0x0243、放进孵蛋器 0x0164、孵化状态 0x0312、破壳 0x030c 都走这条)
+//     (收蛋 0x0243、商店购买 0x0262、放进孵蛋器 0x0164、孵化状态 0x0312、破壳 0x030c 都走这条)
 // 两者的元素都是 BagItem,故只需一个 parseBagItem。
 
 import (
@@ -24,6 +24,7 @@ const (
 	OpUseBagItemRsp           = 0x0164 // ZONE_USE_BAG_ITEM_RSP(356), 用道具(把蛋放进孵蛋器即走这条)
 	OpGetAllHatchStatusRsp    = 0x0312 // ZONE_GET_ALL_HATCH_STATUS_RSP(786), 孵蛋器里各蛋的进度
 	OpCrackEggReq             = 0x030b // ZONE_CRACK_EGG_REQ(779), c2s 破壳(egg_gid + 选用的球)
+	OpShopBuyItemRsp          = 0x0262 // ZONE_SHOP_BUY_ITEM_RSP(610), 商店购买(远行商人的神奇的蛋走这条,不发奖励通知)
 )
 
 // EggItemType 是精灵蛋在 BAG_ITEM_CONF/BagItem 里的 type 值。

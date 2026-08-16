@@ -14,6 +14,7 @@ import (
 // 蛋从四处露面,处理方式各异:
 //   - 0x1344 背包分页全量:入库 + 末页对账(不在背包的删掉,与宠物列表同一套路)
 //   - 0x0243 奖励通知:新得的蛋;flow_reason=223 即家园小窝下的蛋,顺手记双亲
+//   - 0x0262 商店购买:远行商人的「神奇的蛋」等,新蛋只在这条回包里下发(不另发奖励通知)
 //   - 0x0164 用道具 / 0x0312 孵化状态:同一颗蛋的进度更新(入孵时刻、已孵秒数)
 //   - 0x030b/0x030c 破壳:请求带 egg_gid,回包一到就把这颗蛋从库里删掉(它已不在背包里)
 //
@@ -52,7 +53,8 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		}
 
 	case m.Direction == gcp.S2C && (m.Opcode == pet.OpGoodsRewardNotify ||
-		m.Opcode == pet.OpUseBagItemRsp || m.Opcode == pet.OpGetAllHatchStatusRsp):
+		m.Opcode == pet.OpShopBuyItemRsp || m.Opcode == pet.OpUseBagItemRsp ||
+		m.Opcode == pet.OpGetAllHatchStatusRsp):
 		eggs := pet.ParseChangedEggs(m.AppBody)
 		if len(eggs) == 0 {
 			return
