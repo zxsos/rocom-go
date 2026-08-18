@@ -123,6 +123,24 @@
 > 除 `/api/accounts` 与静态数据(`/api/medals`、`/api/evolution`)外,读接口均按 `?account=`
 > 收窄;缺省(不传)回退到最近活跃账号。
 
+**读接口的并发与耗时**(打开宠物列表页会同时发出 `pets`/`boxes`/`teams`/`filter-options` 四个请求):
+
+- **读写分连接池**:`store` 开两个 `*sql.DB`——写池单连接(SQLite 写串行,沿用原设计),读池按
+  CPU 核数放开并发。此前读写共用那一条连接,四个请求只能排队,墙钟时间等于各自耗时之和
+  (网关实测 13+50+62+230ms 串成 330ms)。WAL 下读者互不阻塞、也不阻塞写者,放开即可。
+  约定:`Exec`/`Begin` 走写池,`Query`/`QueryRow` 走读池;pragma 必须写在 DSN 里
+  (`db.Exec("PRAGMA …")` 只作用于池中某一条连接)。
+- **盒子头像不解 blob**:`/api/boxes` 要给盒内每只宠物配头像,满盒账号八百多只。头像由
+  `(base_conf_id, conf_id, shiny)` 经 `gamedata` 内存查表即得,故这三项都落成 `pets` 的列,
+  不再逐只解 `data` JSON(本机 803 只:读列 2.4ms,读 blob 2.9ms,加 `json.Unmarshal` 23.9ms)。
+- **筛选下拉一次扫完**:`/api/filter-options` 的五个维度合并成一条 `SELECT` 再在 Go 侧去重排序,
+  替代原先每维一条 `SELECT DISTINCT`(除 `form` 外都没索引,五条各扫一遍全表)。
+  SQLite 默认 BINARY 排序与 Go 的字符串比较同为 UTF-8 字节序,结果不变。
+
+> 三项合计:本机首屏四请求墙钟 36ms → 10ms。注意**网关比开发机慢约一个数量级**且与磁盘无关
+> ——`stats` 这种近乎空响应也要 8–12ms,库才 2MB 全在 page cache 里,倍数还与读取数据量反相关,
+> 就是单核性能差距。
+
 ## 7. 前端(`web/`，React + Vite)
 
 - 路由(HashRouter)：`/pets` 列表、`/pets/:gid` 详情、`/events` 捕获事件、`/map` 实时地图、`/debug` 调试。

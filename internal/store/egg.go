@@ -85,7 +85,7 @@ func (sc *Scoped) DeleteEgg(gid uint32) error {
 // PruneMissingEggs 据一轮完整的背包全量对账:不在背包里的直接删掉。
 // before 之后才首次见到的行放过,避免与同一时刻的新蛋抢跑。
 func (sc *Scoped) PruneMissingEggs(keep map[uint32]bool, before int64) error {
-	rows, err := sc.db.Query(`SELECT gid FROM eggs WHERE account=? AND first_seen<=?`, sc.account, before)
+	rows, err := sc.rdb.Query(`SELECT gid FROM eggs WHERE account=? AND first_seen<=?`, sc.account, before)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (sc *Scoped) ListEggs(f EggFilter) ([]*pet.EggView, error) {
 	}
 	// 基准顺序 = 背包里的原始次序(见 SetEggOrder);还没对过账的新蛋没有 seq,排在最后。
 	// pet.SortEggs 用的是稳定排序,故所有键都相等的蛋会保持这个次序,与游戏内一致。
-	rows, err := sc.db.Query(
+	rows, err := sc.rdb.Query(
 		`SELECT data, parents FROM eggs WHERE `+where+
 			` ORDER BY seq IS NULL, seq, gid`, args...)
 	if err != nil {

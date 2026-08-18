@@ -12,7 +12,7 @@ type PaintGrid struct {
 // LoadPaint 取某账号某场景某层的覆盖位图;无记录返回 ok=false。
 func (s *Store) LoadPaint(account string, res, layer int32) (PaintGrid, bool) {
 	var g PaintGrid
-	err := s.db.QueryRow(`SELECT w, h, cells FROM paint WHERE account=? AND res=? AND layer=?`,
+	err := s.rdb.QueryRow(`SELECT w, h, cells FROM paint WHERE account=? AND res=? AND layer=?`,
 		account, res, layer).Scan(&g.W, &g.H, &g.Cells)
 	if err != nil || g.W <= 0 || g.H <= 0 {
 		return PaintGrid{}, false

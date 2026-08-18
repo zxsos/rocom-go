@@ -1,11 +1,11 @@
 package store
 
 import (
-	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 )
 
@@ -109,7 +109,7 @@ func (sc *Scoped) BoxLayouts() []BoxLayout {
 		return bl
 	}
 	// 盒子全集 + 盒名(含空盒)
-	if rows, err := sc.db.Query(`SELECT box_id, name FROM pet_boxes WHERE account=?`, sc.account); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT box_id, name FROM pet_boxes WHERE account=?`, sc.account); err == nil {
 		for rows.Next() {
 			var id int32
 			var name string
@@ -120,7 +120,7 @@ func (sc *Scoped) BoxLayouts() []BoxLayout {
 		rows.Close()
 	}
 	// 占用格(旧库无元数据时,盒名回退用 pet_box.box_name)
-	if rows, err := sc.db.Query(`SELECT box_id, slot, gid, box_name FROM pet_box WHERE account=?`, sc.account); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT box_id, slot, gid, box_name FROM pet_box WHERE account=?`, sc.account); err == nil {
 		for rows.Next() {
 			var boxID, slot int32
 			var gid uint32
@@ -174,7 +174,7 @@ type TeamLayout struct {
 // TeamLayouts 返回本账号大世界队伍的 18 格布局(gid=0 表示空位)。
 func (sc *Scoped) TeamLayouts() TeamLayout {
 	tl := TeamLayout{Slots: make([]uint32, 18)}
-	rows, err := sc.db.Query(`SELECT team_idx, pos, gid FROM pet_team WHERE account=?`, sc.account)
+	rows, err := sc.rdb.Query(`SELECT team_idx, pos, gid FROM pet_team WHERE account=?`, sc.account)
 	if err != nil {
 		return tl
 	}
@@ -204,6 +204,11 @@ func occupiedGids(slots []uint32) []uint32 {
 }
 
 // petHeads 批量读取本账号一组 gid 的小头像路径(image.head);空集或无图忽略。
+//
+// 头像只查 conf_id/base_conf_id/shiny 三列再经 gamedata 内存查表得出,不碰 data blob:
+// 满盒账号一次要取八百多只,逐条解 blob 的话光 json.Unmarshal 就占掉整个 /api/boxes 近九成
+// 耗时(本机实测 803 只:读列 2.4ms,读 blob 2.9ms,加解析 23.9ms)。取头像的算式与
+// pet.ToPet 一致:优先按当前形态 base_conf_id 取(进化后才不会拿到一阶的图),缺则回退 conf_id。
 func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 	if len(gids) == 0 {
 		return nil
@@ -215,21 +220,26 @@ func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 		ph[i] = "?"
 		args = append(args, g)
 	}
-	rows, err := sc.db.Query(`SELECT gid,data FROM pets WHERE account=? AND gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	rows, err := sc.rdb.Query(`SELECT gid,conf_id,COALESCE(base_conf_id,0),shiny FROM pets WHERE account=? AND gid IN (`+strings.Join(ph, ",")+`)`, args...)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	out := map[string]string{}
 	for rows.Next() {
-		var gid uint32
-		var data string
-		if rows.Scan(&gid, &data) != nil {
+		var gid, confID, base uint32
+		var shiny int
+		if rows.Scan(&gid, &confID, &base, &shiny) != nil {
 			continue
 		}
-		var p pet.Pet
-		if json.Unmarshal([]byte(data), &p) == nil && p.Image.Head != "" {
-			out[strconv.FormatUint(uint64(gid), 10)] = p.Image.Head
+		head := sc.gd.PetImage(confID, shiny != 0).Head
+		if base != 0 {
+			if img := sc.gd.PetImageByBase(base, shiny != 0); img != (gamedata.PetImage{}) {
+				head = img.Head
+			}
+		}
+		if head != "" {
+			out[strconv.FormatUint(uint64(gid), 10)] = head
 		}
 	}
 	return out
@@ -240,13 +250,13 @@ func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 func (sc *Scoped) boxLocFor(gid uint32) *pet.PetBoxLoc {
 	var boxID, slot, mark int32
 	var name string
-	err := sc.db.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid=?`, sc.account, gid).Scan(&boxID, &slot, &name, &mark)
+	err := sc.rdb.QueryRow(`SELECT box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid=?`, sc.account, gid).Scan(&boxID, &slot, &name, &mark)
 	if err != nil {
 		return nil
 	}
 	var mName string
 	var mMark int32
-	if sc.db.QueryRow(`SELECT name,mark FROM pet_boxes WHERE account=? AND box_id=?`, sc.account, boxID).Scan(&mName, &mMark) == nil {
+	if sc.rdb.QueryRow(`SELECT name,mark FROM pet_boxes WHERE account=? AND box_id=?`, sc.account, boxID).Scan(&mName, &mMark) == nil {
 		name, mark = mName, mMark
 	}
 	return &pet.PetBoxLoc{BoxID: boxID, Slot: slot, BoxName: name, Mark: pet.MarkName(mark)}
@@ -255,7 +265,7 @@ func (sc *Scoped) boxLocFor(gid uint32) *pet.PetBoxLoc {
 // teamLocFor 读取本账号单只宠物的队伍位置(无则 nil),供 GetPet 注入。
 func (sc *Scoped) teamLocFor(gid uint32) *pet.PetTeamLoc {
 	var teamIdx, pos int32
-	if sc.db.QueryRow(`SELECT team_idx,pos FROM pet_team WHERE account=? AND gid=?`, sc.account, gid).Scan(&teamIdx, &pos) != nil {
+	if sc.rdb.QueryRow(`SELECT team_idx,pos FROM pet_team WHERE account=? AND gid=?`, sc.account, gid).Scan(&teamIdx, &pos) != nil {
 		return nil
 	}
 	return &pet.PetTeamLoc{TeamIdx: teamIdx, Pos: pos}
@@ -283,7 +293,7 @@ func (sc *Scoped) batchBoxLocs(gids []uint32) map[uint32]*pet.PetBoxLoc {
 	// 先取全量盒子元数据(小,含空盒),供逐行覆盖盒名/标记。
 	meta := map[int32][2]int32{} // 仅记 mark;name 另存
 	metaName := map[int32]string{}
-	if rows, err := sc.db.Query(`SELECT box_id,name,mark FROM pet_boxes WHERE account=?`, sc.account); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT box_id,name,mark FROM pet_boxes WHERE account=?`, sc.account); err == nil {
 		for rows.Next() {
 			var id, mark int32
 			var name string
@@ -295,7 +305,7 @@ func (sc *Scoped) batchBoxLocs(gids []uint32) map[uint32]*pet.PetBoxLoc {
 		rows.Close()
 	}
 	in, args := sc.gidIn(gids)
-	rows, err := sc.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE account=? AND `+in, args...)
+	rows, err := sc.rdb.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE account=? AND `+in, args...)
 	if err != nil {
 		return out
 	}
@@ -322,7 +332,7 @@ func (sc *Scoped) batchTeamLocs(gids []uint32) map[uint32]*pet.PetTeamLoc {
 		return out
 	}
 	in, args := sc.gidIn(gids)
-	rows, err := sc.db.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE account=? AND `+in, args...)
+	rows, err := sc.rdb.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE account=? AND `+in, args...)
 	if err != nil {
 		return out
 	}
@@ -339,7 +349,7 @@ func (sc *Scoped) batchTeamLocs(gids []uint32) map[uint32]*pet.PetTeamLoc {
 
 // medalsFor 读取本账号单只宠物拥有的奖牌 id 列表(升序),供 GetPet 注入。
 func (sc *Scoped) medalsFor(gid uint32) []uint32 {
-	rows, err := sc.db.Query(`SELECT medal_id FROM pet_medal WHERE account=? AND gid=? ORDER BY medal_id`, sc.account, gid)
+	rows, err := sc.rdb.Query(`SELECT medal_id FROM pet_medal WHERE account=? AND gid=? ORDER BY medal_id`, sc.account, gid)
 	if err != nil {
 		return nil
 	}

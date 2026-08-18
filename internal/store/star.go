@@ -25,7 +25,7 @@ func (s *Store) SetStarStates(account string, states map[int32]int) error {
 // StarStates 返回某账号已确认的星星状态(刷新点 id -> 状态)。
 func (s *Store) StarStates(account string) map[int32]int {
 	out := map[int32]int{}
-	rows, err := s.db.Query(`SELECT refresh_id, state FROM star_state WHERE account=?`, account)
+	rows, err := s.rdb.Query(`SELECT refresh_id, state FROM star_state WHERE account=?`, account)
 	if err != nil {
 		return out
 	}
@@ -65,7 +65,7 @@ func (s *Store) SetStarZones(account string, rows []ZoneProgressRow) error {
 // StarZones 返回某账号的按区域收集进度。
 func (s *Store) StarZones(account string) []ZoneProgressRow {
 	var out []ZoneProgressRow
-	rows, err := s.db.Query(`SELECT camp, npc_id, got, total FROM star_zone WHERE account=?`, account)
+	rows, err := s.rdb.Query(`SELECT camp, npc_id, got, total FROM star_zone WHERE account=?`, account)
 	if err != nil {
 		return out
 	}

@@ -45,7 +45,7 @@ func (sc *Scoped) ClearEvents() error {
 // CountEvents 返回本账号事件总数(即自上次清空以来获得的宠物数,失去事件不入库)。
 func (sc *Scoped) CountEvents() (int, error) {
 	var n int
-	err := sc.db.QueryRow(`SELECT COUNT(*) FROM events WHERE account=?`, sc.account).Scan(&n)
+	err := sc.rdb.QueryRow(`SELECT COUNT(*) FROM events WHERE account=?`, sc.account).Scan(&n)
 	return n, err
 }
 
@@ -62,7 +62,7 @@ func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
-	rows, err := sc.db.Query(q, args...)
+	rows, err := sc.rdb.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

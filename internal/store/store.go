@@ -5,6 +5,8 @@ package store
 
 import (
 	"database/sql"
+	"net/url"
+	"runtime"
 
 	_ "modernc.org/sqlite"
 
@@ -13,45 +15,74 @@ import (
 
 // Store 封装 SQLite 连接。跨账号操作(migrate/accounts/sessions/star 表)挂在此。
 // gd 用于在写入时把身高/体重换算成形态内百分位并落列,支撑跨种族的百分位排序。
+//
+// 读写分两个连接池(见 New):db 只写(单连接串行),rdb 只读(多连接并发)。
+// 约定:Exec/Begin 走 db,Query/QueryRow 走 rdb。
 type Store struct {
-	db *sql.DB
-	gd *gamedata.DB
+	db  *sql.DB
+	rdb *sql.DB
+	gd  *gamedata.DB
 }
 
 // Scoped 是绑定了某个 account 的 Store 视图:所有按账号隔离的读写都经它进行,
 // account 由 For 注入,方法内部不再显式接收 account,避免漏传导致跨账号串数据。
 type Scoped struct {
 	db      *sql.DB
+	rdb     *sql.DB
 	gd      *gamedata.DB
 	account string
 }
 
 // For 返回绑定指定 account 的视图。
-func (s *Store) For(account string) *Scoped { return &Scoped{db: s.db, gd: s.gd, account: account} }
+func (s *Store) For(account string) *Scoped {
+	return &Scoped{db: s.db, rdb: s.rdb, gd: s.gd, account: account}
+}
+
+// maxReadConns 是只读池的连接数上限:读多是 CPU 密集(扫行 + JSON 编解码),开到超过核数
+// 只会徒增争用。网关一类弱机核少,按核数自适应即可。
+func maxReadConns() int {
+	return min(max(runtime.NumCPU(), 2), 8)
+}
+
+// dsn 把库路径拼成带 pragma 的 file: URI。pragma 必须走 DSN 而不能事后 db.Exec:
+// database/sql 的 Exec 只落在池里某一条连接上,多连接的池里其余连接拿不到设置。
+func dsn(path string, pragmas ...string) string {
+	q := url.Values{}
+	for _, p := range pragmas {
+		q.Add("_pragma", p)
+	}
+	// "file:rocom.db" / "file:/var/lib/rocom.db",相对与绝对路径都成立。
+	return "file:" + (&url.URL{Path: path}).EscapedPath() + "?" + q.Encode()
+}
 
 // New 打开(或创建)数据库并建表。gd 供写入时计算身高/体重百分位排序列。
 func New(path string, gd *gamedata.DB) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(1) // SQLite 写入串行化,避免 database is locked
 	// 性能:默认 rollback 日志 + synchronous=FULL 会对每次自动提交 fsync,登录后全量宠物分页
 	// 逐只 UpsertPet(数百次独立提交)时整轮拖到近 10s,处理速度赶不上抓包到达速度而积压。
 	// 改 WAL + synchronous=NORMAL:提交不再逐次 fsync(仅 checkpoint 时落盘),被动抓包库
 	// 即便宕机最多丢尾部若干条、可经下次登录快照重建,该取舍安全。busy_timeout 兜底。
-	for _, pragma := range []string{
-		`PRAGMA journal_mode=WAL`,
-		`PRAGMA synchronous=NORMAL`,
-		`PRAGMA busy_timeout=5000`,
-	} {
-		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
-			return nil, err
-		}
+	pragmas := []string{"busy_timeout(5000)", "journal_mode(WAL)", "synchronous(NORMAL)"}
+	db, err := sql.Open("sqlite", dsn(path, pragmas...))
+	if err != nil {
+		return nil, err
 	}
-	s := &Store{db: db, gd: gd}
+	db.SetMaxOpenConns(1) // SQLite 写入串行化,避免 database is locked
+
+	// 读另开一个池:此前读写共用那一条连接,Web 端同时发来的几个 API 只能排队,墙钟时间成了
+	// 各自耗时之和(实测宠物列表页四个请求 13+50+62+230ms 串成 330ms)。WAL 下读者之间、
+	// 读者与写者之间都不互斥,故读放开并发;写仍只有一条连接,原先的写串行保证不变。
+	// 只读连接始终处于 autocommit,每条语句各取一次 WAL 快照,读得到写者已提交的最新数据。
+	rdb, err := sql.Open("sqlite", dsn(path, pragmas...))
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	rdb.SetMaxOpenConns(maxReadConns())
+
+	s := &Store{db: db, rdb: rdb, gd: gd}
 	if err := s.migrate(); err != nil {
+		db.Close()
+		rdb.Close()
 		return nil, err
 	}
 	return s, nil
@@ -62,7 +93,7 @@ func (s *Store) migrate() error {
 CREATE TABLE IF NOT EXISTS pets (
   account TEXT NOT NULL,
   gid INTEGER,
-  conf_id INTEGER, species TEXT, name TEXT, level INTEGER,
+  conf_id INTEGER, base_conf_id INTEGER, species TEXT, name TEXT, level INTEGER,
   nature_id INTEGER, nature TEXT, gender TEXT, types TEXT,
   height REAL, weight REAL, voice INTEGER,
   talent_rank TEXT, medal TEXT, medal_id INTEGER, partner_mark TEXT,
@@ -163,6 +194,11 @@ CREATE TABLE IF NOT EXISTS paint (
 		s.db.Exec(`ALTER TABLE eggs DROP COLUMN ` + col)
 	}
 	s.db.Exec(`ALTER TABLE eggs ADD COLUMN seq INTEGER`) // 背包里的原始次序(服务器下发顺序)
+	// 当前形态 petbase(= data JSON 里的 baseConfId)。落成列是为了盒子示意图取头像:头像由
+	// (base_conf_id, conf_id, shiny) 经 gamedata 内存查表即得,有了这列就不必为几百只宠物
+	// 逐条解 data blob(见 petHeads)。旧库补列后旧行为 NULL(头像退化成按 conf_id 取,
+	// 进化过的宠物会显示一阶的图),下次登录全量快照重写即自愈,不另做回填。
+	s.db.Exec(`ALTER TABLE pets ADD COLUMN base_conf_id INTEGER`)
 	return nil
 }
 
