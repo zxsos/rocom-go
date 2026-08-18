@@ -20,7 +20,7 @@ ON CONFLICT(account) DO UPDATE SET name=excluded.name, updated_at=excluded.updat
 
 // ListAccounts 返回已知账号(按最近活跃倒序),petCount 含零宠物账号(LEFT JOIN)。
 func (s *Store) ListAccounts() ([]AccountInfo, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.rdb.Query(`
 SELECT a.account, a.name, COUNT(p.gid)
 FROM accounts a LEFT JOIN pets p ON p.account = a.account
 GROUP BY a.account, a.name

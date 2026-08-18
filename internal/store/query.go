@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -161,7 +162,7 @@ func clampPageSize(n int) int {
 // found=false 表示该宠物不在当前筛选结果内(此时 page 退回 1,调用方可据此决定是否清空筛选)。
 func (sc *Scoped) PetPage(gid uint32, f Filter) (page int, found bool) {
 	whereSQL, args := buildWhere(f, sc.account)
-	rows, err := sc.db.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
+	rows, err := sc.rdb.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
 	if err != nil {
 		return 1, false
 	}
@@ -183,7 +184,7 @@ func (sc *Scoped) PetPage(gid uint32, f Filter) (page int, found bool) {
 func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	whereSQL, args := buildWhere(f, sc.account)
 
-	if err = sc.db.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
+	if err = sc.rdb.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -195,7 +196,7 @@ func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 
 	q := "SELECT data FROM pets" + whereSQL + " ORDER BY " + buildOrder(f) + " LIMIT ? OFFSET ?"
 	args = append(args, pageSize, (page-1)*pageSize)
-	rows, err := sc.db.Query(q, args...)
+	rows, err := sc.rdb.Query(q, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -234,7 +235,7 @@ func (sc *Scoped) attachLocations(pets []*pet.Pet) {
 	in := "(" + strings.Join(ph, ",") + ")"
 	argsWith := func() []any { return append([]any{sc.account}, gidArgs...) }
 
-	if rows, err := sc.db.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT gid,box_id,slot,box_name,mark FROM pet_box WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
 		for rows.Next() {
 			var gid uint32
 			var boxID, slot, mark int32
@@ -247,7 +248,7 @@ func (sc *Scoped) attachLocations(pets []*pet.Pet) {
 		}
 		rows.Close()
 	}
-	if rows, err := sc.db.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT gid,team_idx,pos FROM pet_team WHERE account=? AND gid IN `+in, argsWith()...); err == nil {
 		for rows.Next() {
 			var gid uint32
 			var teamIdx, pos int32
@@ -260,7 +261,7 @@ func (sc *Scoped) attachLocations(pets []*pet.Pet) {
 		rows.Close()
 	}
 	// 拥有的奖牌(覆盖 ToPet 里仅佩戴的那枚);先清空有 pet_medal 记录的宠物再填,避免回退。
-	if rows, err := sc.db.Query(`SELECT gid,medal_id FROM pet_medal WHERE account=? AND gid IN `+in+` ORDER BY medal_id`, argsWith()...); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT gid,medal_id FROM pet_medal WHERE account=? AND gid IN `+in+` ORDER BY medal_id`, argsWith()...); err == nil {
 		seen := map[uint32]bool{}
 		for rows.Next() {
 			var gid, mid uint32
@@ -281,13 +282,13 @@ func (sc *Scoped) attachLocations(pets []*pet.Pet) {
 // CountPets 返回本账号宠物总数。
 func (sc *Scoped) CountPets() (int, error) {
 	var n int
-	err := sc.db.QueryRow("SELECT COUNT(*) FROM pets WHERE account=?", sc.account).Scan(&n)
+	err := sc.rdb.QueryRow("SELECT COUNT(*) FROM pets WHERE account=?", sc.account).Scan(&n)
 	return n, err
 }
 
 // OwnedMedalIDs 返回本账号所有宠物拥有过的奖牌 id(去重升序),供服务层映射为名称做筛选下拉。
 func (sc *Scoped) OwnedMedalIDs() []uint32 {
-	rows, err := sc.db.Query(`SELECT DISTINCT medal_id FROM pet_medal WHERE account=? ORDER BY medal_id`, sc.account)
+	rows, err := sc.rdb.Query(`SELECT DISTINCT medal_id FROM pet_medal WHERE account=? ORDER BY medal_id`, sc.account)
 	if err != nil {
 		return nil
 	}
@@ -302,28 +303,54 @@ func (sc *Scoped) OwnedMedalIDs() []uint32 {
 	return out
 }
 
+// filterCols 是筛选下拉的各维度:前端键 → pets 列名。顺序即 SELECT 的列顺序。
+var filterCols = []struct{ key, col string }{
+	{"nature", "nature"},
+	{"talentRank", "talent_rank"},
+	{"speciality", "speciality"},
+	{"partnerMark", "partner_mark"},
+	{"form", "form"},
+}
+
 // FilterOptions 返回本账号各维度的可选值(用于前端筛选下拉)。
+//
+// 五个维度合到一次扫描里,去重与排序放到 Go 侧做:原先每维一条 SELECT DISTINCT,五条各扫一遍
+// 全表(这几列除 form 外都没有索引),同一批页就白读了五遍(本机 5.1ms → 1.3ms)。
+// SQLite 默认 BINARY 排序与 Go 的字符串比较都是按 UTF-8 字节序,换到 Go 侧排结果不变。
 func (sc *Scoped) FilterOptions() map[string][]string {
 	out := map[string][]string{}
-	for key, col := range map[string]string{
-		"nature": "nature", "talentRank": "talent_rank",
-		"speciality": "speciality", "partnerMark": "partner_mark",
-		"form": "form",
-	} {
-		rows, err := sc.db.Query("SELECT DISTINCT "+col+" FROM pets WHERE account=? AND "+col+"!='' ORDER BY "+col, sc.account)
-		if err != nil {
-			continue
+	cols := make([]string, len(filterCols))
+	for i, fc := range filterCols {
+		cols[i] = "COALESCE(" + fc.col + ",'')"
+	}
+	if rows, err := sc.rdb.Query("SELECT "+strings.Join(cols, ",")+" FROM pets WHERE account=?", sc.account); err == nil {
+		seen := make([]map[string]bool, len(filterCols))
+		for i := range seen {
+			seen[i] = map[string]bool{}
+		}
+		vals := make([]string, len(filterCols))
+		ptrs := make([]any, len(filterCols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
 		}
 		for rows.Next() {
-			var v string
-			if rows.Scan(&v) == nil {
-				out[key] = append(out[key], v)
+			if rows.Scan(ptrs...) != nil {
+				continue
+			}
+			for i, v := range vals {
+				if v != "" && !seen[i][v] {
+					seen[i][v] = true
+					out[filterCols[i].key] = append(out[filterCols[i].key], v)
+				}
 			}
 		}
 		rows.Close()
+		for _, fc := range filterCols {
+			sort.Strings(out[fc.key])
+		}
 	}
 	// 宠物盒:取 pet_box 里出现的盒子,形如 "13-性格1"(未命名 → "18-盒18")。
-	if rows, err := sc.db.Query(`SELECT DISTINCT box_id, box_name FROM pet_box WHERE account=? ORDER BY box_id`, sc.account); err == nil {
+	if rows, err := sc.rdb.Query(`SELECT DISTINCT box_id, box_name FROM pet_box WHERE account=? ORDER BY box_id`, sc.account); err == nil {
 		for rows.Next() {
 			var id int
 			var name string

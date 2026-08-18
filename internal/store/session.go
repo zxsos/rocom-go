@@ -23,7 +23,7 @@ ON CONFLICT(conn_id) DO UPDATE SET key=excluded.key, updated_at=excluded.updated
 // 实现 capture.KeyStore,供 Engine 在连接首次出现时预热密钥。
 func (s *Store) LoadKey(connID string) ([]byte, bool) {
 	var key []byte
-	err := s.db.QueryRow(`SELECT key FROM sessions WHERE conn_id=? AND updated_at>=?`,
+	err := s.rdb.QueryRow(`SELECT key FROM sessions WHERE conn_id=? AND updated_at>=?`,
 		connID, time.Now().Add(-SessionTTL).Unix()).Scan(&key)
 	if err != nil || len(key) == 0 {
 		return nil, false
@@ -79,7 +79,7 @@ ON CONFLICT(conn_id) DO UPDATE SET areas=excluded.areas, updated_at=excluded.upd
 
 // LoadSessionScenes 读取近 SessionTTL 内的 conn_id→场景态映射(重启预热用)。
 func (s *Store) LoadSessionScenes() (map[string]SessionScene, error) {
-	rows, err := s.db.Query(`SELECT conn_id,scene_res,COALESCE(home_room,0),COALESCE(areas,'') FROM sessions WHERE scene_res IS NOT NULL AND scene_res<>0 AND updated_at>=?`,
+	rows, err := s.rdb.Query(`SELECT conn_id,scene_res,COALESCE(home_room,0),COALESCE(areas,'') FROM sessions WHERE scene_res IS NOT NULL AND scene_res<>0 AND updated_at>=?`,
 		time.Now().Add(-SessionTTL).Unix())
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (s *Store) LoadSessionScenes() (map[string]SessionScene, error) {
 func (s *Store) LoadSessionAccounts() (map[string]string, error) {
 	cutoff := time.Now().Add(-SessionTTL).Unix()
 	s.db.Exec(`DELETE FROM sessions WHERE updated_at<?`, cutoff)
-	rows, err := s.db.Query(`SELECT conn_id,account FROM sessions WHERE account IS NOT NULL AND account<>''`)
+	rows, err := s.rdb.Query(`SELECT conn_id,account FROM sessions WHERE account IS NOT NULL AND account<>''`)
 	if err != nil {
 		return nil, err
 	}
