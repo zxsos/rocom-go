@@ -162,3 +162,48 @@ func TestFilterOptionsDistinctAndSorted(t *testing.T) {
 		}
 	}
 }
+
+// TestPetHeadsBothBranches 校验 petHeads 走 IN 与走整表扫两条分支结果一致(见 petHeadsInMax):
+// 队伍布局只要十几只走 IN,盒子示意图上百只走扫表,两条路必须给出同一份头像。
+func TestPetHeadsBothBranches(t *testing.T) {
+	st := newTestStore(t)
+	sc := st.For(testAcc)
+	const n = petHeadsInMax * 2 // 足以越过阈值
+	all := make([]uint32, 0, n)
+	for gid := uint32(1); gid <= n; gid++ {
+		p := mkPet(st.gd, gid, 2000672, 3006)
+		if gid%2 == 0 { // 掺一半未进化的,两类头像不同
+			p = mkPet(st.gd, gid, 3001, 3001)
+		}
+		if _, err := sc.UpsertPet(p); err != nil {
+			t.Fatalf("写入 gid=%d: %v", gid, err)
+		}
+		all = append(all, gid)
+	}
+
+	// 走扫表分支(一次要全部 n 只)
+	scan := sc.petHeads(all)
+	if len(scan) != n {
+		t.Fatalf("扫表分支返回 %d 条头像, 期望 %d", len(scan), n)
+	}
+	// 走 IN 分支:每次只问一小撮,凑齐后与扫表结果比对
+	in := map[string]string{}
+	for i := 0; i < len(all); i += petHeadsInMax {
+		chunk := all[i:min(i+petHeadsInMax, len(all))]
+		for k, v := range sc.petHeads(chunk) {
+			in[k] = v
+		}
+	}
+	if len(in) != len(scan) {
+		t.Fatalf("IN 分支 %d 条, 扫表分支 %d 条", len(in), len(scan))
+	}
+	for k, v := range scan {
+		if in[k] != v {
+			t.Errorf("gid=%s: 扫表得 %q, IN 得 %q", k, v, in[k])
+		}
+	}
+	// 别让两类宠物的头像恰好相同,否则用例形同虚设
+	if scan["1"] == scan["2"] {
+		t.Fatalf("两类用例宠物头像相同(%q),分不出取图是否正确", scan["1"])
+	}
+}

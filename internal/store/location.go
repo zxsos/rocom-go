@@ -203,6 +203,14 @@ func occupiedGids(slots []uint32) []uint32 {
 	return out
 }
 
+// petHeadsInMax 是 petHeads 仍用 gid IN (…) 的上限,超过就整账号扫一遍在 Go 侧筛。
+// IN 那条路每个 gid 都要绑一次参数、走一次索引定位(网关实测约 43µs/只),整表扫则是每行
+// 约 22µs 的固定开销——盒子示意图一次就要八百多只,扫表明显更划算(网关 35.2ms → 18.8ms;
+// 顺带试过 JOIN pet_box,27.0ms,因为它照样得往 pet_box 做几百次索引定位,不如直接扫)。
+// 而队伍布局只要 18 只,那时 IN 才是对的。取 64 这个界很安全:宠物非在盒即在队(队伍至多
+// 18 格),故 len(gids) 一旦上百,它本就已接近全表行数,扫表不会多读多少。
+const petHeadsInMax = 64
+
 // petHeads 批量读取本账号一组 gid 的小头像路径(image.head);空集或无图忽略。
 //
 // 头像只查 conf_id/base_conf_id/shiny 三列再经 gamedata 内存查表得出,不碰 data blob:
@@ -213,23 +221,34 @@ func (sc *Scoped) petHeads(gids []uint32) map[string]string {
 	if len(gids) == 0 {
 		return nil
 	}
-	ph := make([]string, len(gids))
-	args := make([]any, 0, len(gids)+1)
-	args = append(args, sc.account)
-	for i, g := range gids {
-		ph[i] = "?"
-		args = append(args, g)
+	where, args := `account=?`, []any{sc.account}
+	var want map[uint32]bool
+	if len(gids) <= petHeadsInMax {
+		ph := make([]string, len(gids))
+		for i, g := range gids {
+			ph[i] = "?"
+			args = append(args, g)
+		}
+		where += ` AND gid IN (` + strings.Join(ph, ",") + `)`
+	} else {
+		want = make(map[uint32]bool, len(gids))
+		for _, g := range gids {
+			want[g] = true
+		}
 	}
-	rows, err := sc.rdb.Query(`SELECT gid,conf_id,COALESCE(base_conf_id,0),shiny FROM pets WHERE account=? AND gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	rows, err := sc.rdb.Query(`SELECT gid,conf_id,COALESCE(base_conf_id,0),shiny FROM pets WHERE `+where, args...)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
-	out := map[string]string{}
+	out := make(map[string]string, len(gids))
 	for rows.Next() {
 		var gid, confID, base uint32
 		var shiny int
 		if rows.Scan(&gid, &confID, &base, &shiny) != nil {
+			continue
+		}
+		if want != nil && !want[gid] {
 			continue
 		}
 		head := sc.gd.PetImage(confID, shiny != 0).Head
