@@ -13,7 +13,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 )
 
-// Store 封装 SQLite 连接。跨账号操作(migrate/accounts/sessions/star 表)挂在此。
+// Store 封装 SQLite 连接。跨账号操作(建表/accounts/sessions/star 表)挂在此。
 // gd 用于在写入时把身高/体重换算成形态内百分位并落列,支撑跨种族的百分位排序。
 //
 // 读写分两个连接池(见 New):db 只写(单连接串行),rdb 只读(多连接并发)。
@@ -80,7 +80,7 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	rdb.SetMaxOpenConns(maxReadConns())
 
 	s := &Store{db: db, rdb: rdb, gd: gd}
-	if err := s.migrate(); err != nil {
+	if err := s.initSchema(); err != nil {
 		db.Close()
 		rdb.Close()
 		return nil, err
@@ -88,14 +88,22 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	return s, nil
 }
 
-func (s *Store) migrate() error {
+// initSchema 建表建索引(幂等,每次启动都跑一遍)。
+// 库结构只有这一处定义:早先散在下面的一串 ALTER 已并回各自的 CREATE TABLE,不再做旧库升级
+// ——版本对不上就删掉 rocom.db 重启,数据在下次登录的全量快照里重建。
+func (s *Store) initSchema() error {
 	_, err := s.db.Exec(`
+-- 宠物当前状态。列大多是 data(整只宠物的 JSON)里挑出来供筛选/排序用的冗余投影。
+-- base_conf_id 是当前形态的 petbase(进化后随之变化):与 conf_id、shiny 一起够经 gamedata
+-- 内存查表得出头像,盒子示意图取几百只头像时便无需逐条解 data(见 petHeads)。
+-- *_pct 是身高/体重在当前形态取值范围内的百分位(0-100),写入时按 gamedata 算,供跨种族按
+-- 「相对自身范围偏大/偏小」排序(见 buildOrder);gamedata 缺该形态范围时为 NULL,排序排末尾。
 CREATE TABLE IF NOT EXISTS pets (
   account TEXT NOT NULL,
   gid INTEGER,
   conf_id INTEGER, base_conf_id INTEGER, species TEXT, name TEXT, level INTEGER,
   nature_id INTEGER, nature TEXT, gender TEXT, types TEXT,
-  height REAL, weight REAL, voice INTEGER,
+  height REAL, weight REAL, height_pct REAL, weight_pct REAL, voice INTEGER,
   talent_rank TEXT, medal TEXT, medal_id INTEGER, partner_mark TEXT,
   speciality TEXT, speciality_id INTEGER,
   catch_time INTEGER, shiny INTEGER, colorful INTEGER,
@@ -108,6 +116,8 @@ CREATE TABLE IF NOT EXISTS pets (
 CREATE INDEX IF NOT EXISTS idx_pets_species ON pets(species);
 CREATE INDEX IF NOT EXISTS idx_pets_level ON pets(level);
 CREATE INDEX IF NOT EXISTS idx_pets_form ON pets(form);
+
+-- 获得宠物的事件历史(失去不入库)。
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account TEXT NOT NULL,
@@ -116,6 +126,9 @@ CREATE TABLE IF NOT EXISTS events (
   data TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_account_time ON events(account, time);
+
+-- 宠物所在位置:pet_box 是「哪只宠物在哪个盒的哪一格」,pet_boxes 是盒子本身的元数据
+-- (含空盒,是盒名/数量的权威来源);在队伍里的宠物不在盒子里,二者互斥。
 CREATE TABLE IF NOT EXISTS pet_box (
   account TEXT NOT NULL, gid INTEGER,
   box_id INTEGER, slot INTEGER, box_name TEXT, mark INTEGER,
@@ -131,21 +144,25 @@ CREATE TABLE IF NOT EXISTS pet_team (
   team_idx INTEGER, pos INTEGER,
   PRIMARY KEY(account, gid)
 );
+-- 宠物拥有过的奖牌(多对多;佩戴中的那枚另存在 pets.medal_id)。
 CREATE TABLE IF NOT EXISTS pet_medal (
   account TEXT NOT NULL, gid INTEGER, medal_id INTEGER,
   PRIMARY KEY(account, gid, medal_id)
 );
+
 CREATE TABLE IF NOT EXISTS accounts (
   account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER
 );
+-- 连接会话:key 是会话密钥(供重启后对存活连接续解,见 docs/architecture.md 3),
+-- 其余几列是实时地图重启回显所需的现场(当前场景 / 家园房屋等级 / 所在区域)。
 CREATE TABLE IF NOT EXISTS sessions (
-  conn_id TEXT PRIMARY KEY, key BLOB, account TEXT, updated_at INTEGER
+  conn_id TEXT PRIMARY KEY, key BLOB, account TEXT, updated_at INTEGER,
+  scene_res INTEGER, home_room INTEGER, areas TEXT
 );
--- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
--- 没有实体——已收集的星星服务器不刷,见 docs/data.md 3.4)。没有行 = 尚未确认(前端照常显示)。
--- 精灵蛋(背包物品 gid 为键)。parents 是收蛋那一刻的双亲快照 JSON:亲本可能被放生/赠送,
--- 蛋上的双亲信息不应随之消失,故存快照而非引用 pets(见 docs/data.md 3.6)。
--- state: 0=在背包 1=已破壳(保留作历史) 2=已不在背包。
+
+-- 精灵蛋(背包物品 gid 为键)。表里只有背包现状,破壳/送人的行直接删。
+-- parents 是收蛋那一刻的双亲快照 JSON:亲本可能被放生/赠送,蛋上的双亲信息不应随之消失,
+-- 故存快照而非引用 pets(见 docs/data.md 3.6)。seq 是背包里的原始次序(服务器下发顺序)。
 CREATE TABLE IF NOT EXISTS eggs (
   account TEXT NOT NULL, gid INTEGER,
   item_id INTEGER, conf_id INTEGER, name TEXT, species TEXT,
@@ -154,6 +171,9 @@ CREATE TABLE IF NOT EXISTS eggs (
   seq INTEGER, parents TEXT, first_seen INTEGER, updated_at INTEGER, data TEXT,
   PRIMARY KEY(account, gid)
 );
+
+-- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
+-- 没有实体——已收集的星星服务器不刷,见 docs/data.md 3.4)。没有行 = 尚未确认(前端照常显示)。
 CREATE TABLE IF NOT EXISTS star_state (
   account TEXT NOT NULL, refresh_id INTEGER,
   state INTEGER, updated_at INTEGER,
@@ -165,6 +185,7 @@ CREATE TABLE IF NOT EXISTS star_zone (
   got INTEGER, total INTEGER, updated_at INTEGER,
   PRIMARY KEY(account, camp, npc_id)
 );
+
 -- 涂地(实时地图页的覆盖图层,见 docs/data.md 3.8):「玩家 ↔ 已下发的野生宠」之间那条走廊
 -- 扫过的格子各记一位,cells 是 w*h 的位图(每字节 8 格,低位在前),按账号 + 场景 + 分层各存一张。
 CREATE TABLE IF NOT EXISTS paint (
@@ -173,33 +194,7 @@ CREATE TABLE IF NOT EXISTS paint (
   PRIMARY KEY(account, res, layer)
 );
 `)
-	if err != nil {
-		return err
-	}
-	// 为早于该列的旧库补列(CREATE TABLE IF NOT EXISTS 不会新增列);已存在则忽略错误。
-	s.db.Exec(`ALTER TABLE sessions ADD COLUMN scene_res INTEGER`) // 实时地图:当前场景 res,供重启恢复
-	s.db.Exec(`ALTER TABLE sessions ADD COLUMN home_room INTEGER`) // 家园室内房屋等级(选分层底图)
-	s.db.Exec(`ALTER TABLE sessions ADD COLUMN areas TEXT`)        // 当前所在区域(area_func→area_id,选洞穴/楼层)
-	s.db.Exec(`ALTER TABLE pets ADD COLUMN egg_groups TEXT`)
-	// 身高/体重在当前形态取值范围内的百分位(0-100),写入时按 gamedata 计算并落列,
-	// 供跨种族按「相对自身范围偏大/偏小」排序(见 buildOrder);范围缺失或旧库未回填时为
-	// NULL(排序排末尾),清库重登后即补齐。
-	s.db.Exec(`ALTER TABLE pets ADD COLUMN weight_pct REAL`)
-	s.db.Exec(`ALTER TABLE pets ADD COLUMN height_pct REAL`)
-	// eggs 表曾留过破壳/送人的历史行(state/hatched_at/pet_gid),页面从不看,已改成
-	// 「表里只有背包现状」:旧库清掉那些行并去掉这三列(索引先删,否则 DROP COLUMN 不让动)。
-	s.db.Exec(`DELETE FROM eggs WHERE state IS NOT NULL AND state!=0`)
-	s.db.Exec(`DROP INDEX IF EXISTS idx_eggs_account_state`)
-	for _, col := range []string{"state", "hatched_at", "pet_gid"} {
-		s.db.Exec(`ALTER TABLE eggs DROP COLUMN ` + col)
-	}
-	s.db.Exec(`ALTER TABLE eggs ADD COLUMN seq INTEGER`) // 背包里的原始次序(服务器下发顺序)
-	// 当前形态 petbase(= data JSON 里的 baseConfId)。落成列是为了盒子示意图取头像:头像由
-	// (base_conf_id, conf_id, shiny) 经 gamedata 内存查表即得,有了这列就不必为几百只宠物
-	// 逐条解 data blob(见 petHeads)。旧库补列后旧行为 NULL(头像退化成按 conf_id 取,
-	// 进化过的宠物会显示一阶的图),下次登录全量快照重写即自愈,不另做回填。
-	s.db.Exec(`ALTER TABLE pets ADD COLUMN base_conf_id INTEGER`)
-	return nil
+	return err
 }
 
 // execBatch 在一个事务里对每组参数执行同一条语句(upsert 批量写入用)。
