@@ -1,6 +1,6 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
-import { WILD_LAYERS } from './useWildPets'
+import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
@@ -52,6 +52,36 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
                   <span className="map-layer-name">{n}</span>
                   <span className="muted">{num}</span>
                 </button>
+              </div>
+            )
+          })}
+          {/* 奖牌四件套:整体收在「奖牌筛选」按钮下,点开才见 4 条。滑块是单值阈值,
+              默认=奖牌边界,只能往更极端拖(范围见 MEDAL_FILTERS),计数随阈值实时变化。 */}
+          <button className="map-medal-toggle" onClick={wilds.toggleOpen} aria-expanded={wilds.open}
+            title="大块头/小不点/婉转声/粗嗓门的判定阈值,默认即奖牌边界,可调更严">
+            <span>奖牌筛选</span>
+            <span className="muted">{wilds.open ? '▾' : '▸'}</span>
+          </button>
+          {wilds.open && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi }) => {
+            const num = wilds.num[k] || 0
+            const gone = wilds.numStale[k] || 0
+            const th = wilds.medals[k]
+            const on = wilds.medalOn.has(k)
+            return (
+              <div className="map-medal-row" key={k}
+                title={gone ? `视野内 ${num - gone} · 已离开视野 ${gone}` : undefined}>
+                {/* 行首开关:关掉该项后图上不再标这类奖牌,阈值保留但滑块置灰 */}
+                <button className={'map-collect-btn map-medal-switch' + (on ? ' on' : '')}
+                  onClick={() => wilds.toggleMedal(k)}
+                  title={on ? `关闭${n}筛选` : `开启${n}筛选`} aria-label={`${n}筛选开关`}
+                  aria-pressed={on}>✓</button>
+                <span className="map-wild-swatch" style={{ borderColor: color }} />
+                <span className="map-layer-name">{n}</span>
+                <span className="map-medal-val">{dir}{th}</span>
+                <input type="range" className="map-medal-range" min={lo} max={hi} step={0.5}
+                  value={th} onChange={(e) => wilds.setThreshold(k, Number(e.target.value))}
+                  disabled={!on} aria-label={`${n}判定阈值`} />
+                <span className="muted">{num}</span>
               </div>
             )
           })}

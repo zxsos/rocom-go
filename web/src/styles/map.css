@@ -115,6 +115,42 @@
 }
 .map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
 
+/* 奖牌筛选:按钮展开/收起整组滑块;滑块是单值阈值,范围=奖牌边界~极端(只严不宽)。 */
+.map-medal-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; margin-top: 2px; padding: 6px 10px;
+  border-radius: 8px; background: none; border: 1px dashed var(--line);
+  color: var(--fg-dim); font-size: 13px; line-height: 1; cursor: pointer; text-align: left;
+}
+.map-medal-toggle:hover { border-color: var(--accent); color: var(--fg); }
+.map-medal-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 13px; }
+.map-medal-row .map-layer-name { flex: none; }
+/* 行首筛选开关(复用收集按钮样式,缩窄以适配行布局);关掉该项后滑块置灰 */
+.map-medal-row .map-collect-btn { width: 24px; }
+.map-medal-range:disabled { opacity: .3; cursor: default; }
+.map-medal-val {
+  flex: none; min-width: 42px; text-align: right;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; color: var(--fg);
+}
+.map-medal-range {
+  flex: 1; min-width: 0; height: 14px;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; cursor: pointer; margin: 0;
+}
+.map-medal-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px; background: var(--line);
+}
+.map-medal-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px;
+  border-radius: 50%; background: var(--accent); border: 2px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+}
+.map-medal-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.map-medal-range::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent); border: 2px solid #fff;
+}
+
 /* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
    图标同样只定高不定宽(见上)。 */
 .map-layer-row { display: flex; align-items: stretch; gap: 6px; }

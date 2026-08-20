@@ -14,10 +14,14 @@ import (
 )
 
 // RunLive 在指定网卡上用 AF_PACKET 被动抓包(无需 libpcap)。阻塞运行。
-func (e *Engine) RunLive(iface string) error {
-	// 单臂网关去重:抓包网卡在做 SNAT 转发时,会把游戏流的一个副本(源改为本机 IP)
-	// 再次从同一网卡发出并被捕获。登记本机 IP 到忽略集,只保留 NAT 前的真实客户端会话。
-	ignoreSelfIPs(e, iface)
+// skipSelf 为 true 时忽略网卡自身 IP(单臂网关去重);socks5/云代理模式下本机进程
+// 出站的游戏流量正是以本机 IP 为源,必须传 false 才抓得到(见 cmd/rocom-capture -skip-self-ip)。
+func (e *Engine) RunLive(iface string, skipSelf bool) error {
+	if skipSelf {
+		// 单臂网关去重:抓包网卡在做 SNAT 转发时,会把游戏流的一个副本(源改为本机 IP)
+		// 再次从同一网卡发出并被捕获。登记本机 IP 到忽略集,只保留 NAT 前的真实客户端会话。
+		ignoreSelfIPs(e, iface)
+	}
 
 	tp, err := afpacket.NewTPacket(
 		afpacket.OptInterface(iface),

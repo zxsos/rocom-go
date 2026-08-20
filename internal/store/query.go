@@ -19,6 +19,12 @@ type Filter struct {
 	Gender        string
 	TalentRank    string
 	MedalIDs      []uint32 // 拥有该奖牌(pet_medal 里含任一 id)即命中;由服务层将奖牌名解析为 id
+	// 奖牌特征:按体重百分位/嗓音的数值判定(与地图奖牌筛选同口径),可多选,多选=同时满足。
+	// 值为 0 表示该项未启用(边界值均为非 0 阈值)。
+	WeightPctMin int // 大块头:体重百分位下限(weight_pct>=?)
+	WeightPctMax int // 小不点:体重百分位上限(weight_pct<=?)
+	VoiceMin     int // 婉转声:嗓音下限(voice>=?)
+	VoiceMax     int // 粗嗓门:嗓音上限(voice<=?)
 	Speciality    string
 	EggGroup      string // 蛋组名(精确匹配组名,含该组即命中)
 	PartnerMark   string
@@ -95,6 +101,24 @@ func buildWhere(f Filter, account string) (string, []any) {
 	if f.LevelMax > 0 {
 		where = append(where, "level<=?")
 		args = append(args, f.LevelMax)
+	}
+	// 奖牌特征:体重百分位/嗓音数值条件(与地图奖牌筛选同口径;多选=同时满足)。
+	// 注意 weight_pct 可空(缺形态范围),NULL 参与比较结果为假,天然不命中,与地图行为一致。
+	if f.WeightPctMin > 0 {
+		where = append(where, "weight_pct>=?")
+		args = append(args, f.WeightPctMin)
+	}
+	if f.WeightPctMax > 0 {
+		where = append(where, "weight_pct<=?")
+		args = append(args, f.WeightPctMax)
+	}
+	if f.VoiceMin > 0 {
+		where = append(where, "voice>=?")
+		args = append(args, f.VoiceMin)
+	}
+	if f.VoiceMax < 0 {
+		where = append(where, "voice<=?")
+		args = append(args, f.VoiceMax)
 	}
 	for _, t := range f.Types { // types 存为 JSON 数组，用 LIKE 匹配带引号的元素
 		where = append(where, "types LIKE ?")

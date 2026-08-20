@@ -46,6 +46,24 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         <Select label="特长" opts={options.speciality} value={filter.speciality} onChange={(v) => set({ speciality: v })} />
         <Select label="蛋组" opts={ALL_EGG_GROUPS} value={filter.eggGroup} onChange={(v) => set({ eggGroup: v })} />
         <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
+        <div className="filter-group">
+          <label>奖牌特征</label>
+          <div className="checks">
+            <label className="check">
+              <input type="checkbox" checked={filter.medalBig === '1'} onChange={(e) => set({ medalBig: e.target.checked ? '1' : '' })} />大块头
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={filter.medalSmall === '1'} onChange={(e) => set({ medalSmall: e.target.checked ? '1' : '' })} />小不点
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={filter.medalHigh === '1'} onChange={(e) => set({ medalHigh: e.target.checked ? '1' : '' })} />婉转声
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={filter.medalLow === '1'} onChange={(e) => set({ medalLow: e.target.checked ? '1' : '' })} />粗嗓门
+            </label>
+          </div>
+          <div className="muted small">按体重百分位/嗓音判定，与地图奖牌筛选同口径；可多选，多选=同时满足（如大块头+婉转声）</div>
+        </div>
         <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
           <label>捕捉时间</label>

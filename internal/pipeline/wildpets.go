@@ -25,7 +25,9 @@ import (
 //   - 炫彩(glass_info.glass_type != GT_NULL,等价于 mutation_type 的 MDT_GLASS 位);
 //   - 异色(mutation_type 的 MDT_SHINING 位);
 //   - 污染(mutation_type 的 MDT_CHAOS 家族);这类丢球即进战斗,打完才解除污染。
-//   - 嗓音拉满(voice == wildVoiceMax):对应「婉转声」奖牌的百分位上限。
+//   - 体型:体重百分位 >= 98「大块头」、<= 2「小不点」(MEDAL_TASK_CONF 的奖牌判定,
+//     与宠物列表/事件页的「W xx%」同一口径,见 pet.SizePercentile)。
+//   - 声音:voice >= 96 婉转声、<= -96 粗嗓门(对应奖牌百分位 [98,100]/[0,2] 的边界)。
 //
 // 炫彩不另按 mutation 位判:两者严格等价(全部 pcap 363 只变异宠物零反例),
 // 用 glass_info 还能顺带说出是哪一种炫彩。MDT_VACANT(空缺态)客户端自己都不出变异标,忽略。
@@ -34,7 +36,10 @@ import (
 // 为假),它在刷新点附近的溜达根本不过网——16 份 pcap 里 server_move 只出现 1 次、client_move
 // 全是玩家 avatar,没有一条属于野生宠。故位置≈刷新点,误差是它自己绕的那几米。
 const (
-	wildVoiceMax = 100 // 嗓音上限(PET_GLOBAL_CONFIG.pet_voice_high)
+	// 声音阈值(PET_GLOBAL_CONFIG.pet_voice_low/high = ±100):voice >= 96 婉转声、
+	// <= -96 粗嗓门(对应奖牌百分位 [98,100]/[0,2] 的边界)。
+	wildVoiceHigh = 96
+	wildVoiceLow  = -96
 	// 出 AOI 后「最后所见」的灰点还留多久(超时由 pushWilds 顺手丢弃)。取 4 小时是为了
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
 	// 多半还在。灰点不会无限堆积——换场景/传送即清空,自己捉走的当场撤。
@@ -73,7 +78,7 @@ func newWildTracker(res int32) *wildTracker {
 //     (实测家园场景的宠物 NPC——幽星光 710346、鸭吉吉 710012 等——同样带身高体重叫声,
 //     只靠第一道闸会把它们也标出来;它们的 NPC_CONF 没有 throwing_interact_type)。
 func (p *Pipeline) wildMatch(a scene.NpcActor) bool {
-	if !a.IsWildPet() || len(wildKinds(a)) == 0 {
+	if !a.IsWildPet() || len(p.wildKinds(a)) == 0 {
 		return false
 	}
 	_, catchable := p.db.NpcPetBase(uint32(a.CfgID))
@@ -82,7 +87,7 @@ func (p *Pipeline) wildMatch(a scene.NpcActor) bool {
 
 // wildKinds 返回该实体命中的类别键;一只可同时命中多类。前端 WILD_LAYERS 的每个开关
 // 覆盖其中一个或多个(异色/炫彩合成一个开关),悬浮提示则仍按这里的细粒度分开说。
-func wildKinds(a scene.NpcActor) []string {
+func (p *Pipeline) wildKinds(a scene.NpcActor) []string {
 	var out []string
 	if a.GlassType != gamedata.GlassNull {
 		out = append(out, "colorful")
@@ -93,8 +98,27 @@ func wildKinds(a scene.NpcActor) []string {
 	if a.IsPolluted() {
 		out = append(out, "pollution")
 	}
-	if a.Voice == wildVoiceMax {
-		out = append(out, "voice")
+	// 体重百分位:>=98 大块头、<=2 小不点(MEDAL_TASK_CONF 的奖牌边界;注意配置那栏
+	// 写的是「身高」,实测按**体重**判,见 docs/data.md 3.5)。形态范围缺失时判不了,跳过。
+	if base, ok := p.db.NpcPetBase(uint32(a.CfgID)); ok {
+		if info, ok := p.db.PetBase(base); ok {
+			if pct := pet.SizePercentile(float64(a.Weight)/1000,
+				float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000); pct != nil {
+				switch {
+				case *pct >= 98:
+					out = append(out, "big")
+				case *pct <= 2:
+					out = append(out, "small")
+				}
+			}
+		}
+	}
+	// 声音:>=96 婉转声、<=-96 粗嗓门(对应奖牌百分位 [98,100]/[0,2] 的边界)。
+	switch {
+	case a.Voice >= wildVoiceHigh:
+		out = append(out, "high")
+	case a.Voice <= wildVoiceLow:
+		out = append(out, "low")
 	}
 	return out
 }
@@ -205,7 +229,7 @@ type wildMark struct {
 	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
 	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
 	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / voice
+	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / big / small / high / low
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`
@@ -247,7 +271,10 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			X: w.pos.X, Y: w.pos.Y, Z: w.pos.Z,
 			Lv: w.lv, Voice: w.voice, Height: w.height, Weight: w.weight,
 			Mutation: w.mutation, Stale: w.left,
-			Kinds: wildKinds(scene.NpcActor{Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType}),
+			Kinds: p.wildKinds(scene.NpcActor{
+				CfgID: w.cfgID, Weight: w.weight,
+				Voice: w.voice, Mutation: w.mutation, GlassType: w.glassType,
+			}),
 		}
 		if w.glassType != gamedata.GlassNull {
 			m.Glass = p.db.GlassDesc(w.glassType, w.glassValue)
