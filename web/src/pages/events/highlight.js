@@ -3,11 +3,15 @@
 // 高亮规则维度。仅「种类」为自由输入(种类繁多且无全表点选),其余点选条目。
 export const FIELDS = [
   { k: 'species', label: '种类' },
+  { k: 'gender', label: '性别' },
   { k: 'nature', label: '性格' },
   { k: 'speciality', label: '特长' },
   { k: 'weight', label: '体重' },
   { k: 'voice', label: '声音' },
 ]
+
+// 性别按符号点选(与宠物列表筛选同一套:♂ 雄、♀ 雌,数据里直接就是这个符号)。
+export const GENDER_OPTS = ['♂', '♀']
 
 // 体重/声音按「在自身范围内的百分位」判定(非奖牌拥有):体重百分位 weightPct(0-100)、
 // 声音 voice(-100~100)。阈值与宠物列表的极值高亮一致。大块头=体型最大、小不点=最小;

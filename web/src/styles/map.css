@@ -99,14 +99,34 @@
   border: 2px solid var(--line); font-size: 16px; line-height: 1;
   user-select: none; -webkit-user-drag: none;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
-  /* 标记不可点,只有悬浮说明:用 help 光标提示「这儿有信息」,别用 pointer 骗点击。 */
-  cursor: help;
+  /* 桌面 hover 看悬浮说明,点一下弹资料卡(见 .map-wild-tip):pointer 提示可点。 */
+  cursor: pointer;
 }
-/* 悬停时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
-.map-wild:hover { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
+/* 悬停或点中时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
+.map-wild:hover, .map-wild.tip { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
 .map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
+
+/* 野生宠物资料卡:点一下标记弹出(触屏没有 hover 时的等价物),悬在该标记正上方。
+   内容比悬浮那行全:名称/Lv、标签、体重/嗓音、坐标;pointer-events:none 免得挡住
+   下面标记的点击。按标记中心点定位,整体上移「自身高度 + 12px」。 */
+.map-wild-tip {
+  position: absolute; z-index: 30;
+  transform: translate(-50%, calc(-100% - 12px));
+  pointer-events: none; user-select: none; white-space: nowrap;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 10px; border-radius: 8px;
+  background: var(--bg-2); color: var(--fg);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .45);
+  font-size: 12px; line-height: 1.5;
+}
+.map-wild-tip .twn { font-weight: 600; }
+.map-wild-tip .twt { color: var(--fg-dim); }
+.map-wild-tip .twr { color: var(--fg-dim); }
+.map-wild-tip .twc { color: var(--fg-dim); opacity: .8; }
+.map-wild-tip .tws { color: var(--red); }
 
 /* 图层侧栏里野生宠物那几行:没有图标,用一个同色小圆点代表标记描边色(色值同样来自 JS)。 */
 .map-wild-swatch {

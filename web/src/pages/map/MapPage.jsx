@@ -39,11 +39,15 @@ export default function MapPage() {
   const layerRef = useRef(null) // 当前叠加层图名(换层仅重试层图,不动缩放)
 
   const [detailGid, setDetailGid] = useState(null) // 点小窝里的宠物 → 宠物详情弹窗
+  const [wildTip, setWildTip] = useState(null) // 点中的野生宠物标记 → 资料卡(点击触发悬浮)
   // 地图内标记的「点一下」由 usePanZoom 判定后回调(平移要捕获指针,标记收不到 click),
-  // 故这里认按下时的元素:落在住了宠物的小窝上就开详情。
+  // 故这里认按下时的元素:落在住了宠物的小窝上就开详情,落在野生宠物上弹资料卡
+  // (再点同一个关掉,点别处也关)。桌面 hover 的 title 照旧,两种触发方式并存。
   const onTap = useCallback((target) => {
     const gid = target.closest?.('.map-nest')?.dataset.gid
-    if (gid) setDetailGid(Number(gid))
+    if (gid) { setDetailGid(Number(gid)); setWildTip(null); return }
+    const wid = target.closest?.('.map-wild')?.dataset.id
+    setWildTip((cur) => (wid ? (wid === cur ? null : wid) : null))
   }, [])
 
   const hasMap = !!(pos && pos.u != null && pos.img && !imgError)
@@ -209,16 +213,30 @@ export default function MapPage() {
                 {n.egg && <img className="map-nest-egg" src={imgURL(n.egg.icon)} alt="" draggable={false} />}
               </div>
             ))}
-            {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、声音),同属 .map-world 一起
-                平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
-                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。 */}
-            {wilds.marks.map((p) => (
-              <div key={p.id} title={wildTitle(p)}
-                className={'map-wild' + (p.stale ? ' stale' : '')}
-                style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p.kinds) }}>
-                {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
-              </div>
-            ))}
+            {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、奖牌四件套),同属 .map-world
+                一起平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
+                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。
+                桌面 hover 有 title 悬浮;触屏没有 hover,点一下弹资料卡(wildTip),点中放大提亮。 */}
+            {wilds.marks.map((p) => {
+              const tip = wildTip === p.id
+              return [
+                <div key={p.id} data-id={p.id} title={wildTitle(p)}
+                  className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
+                  style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p, wilds.on, wilds.medals, wilds.medalOn) }}>
+                  {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+                </div>,
+                tip && (
+                  <div key={p.id + '-tip'} className="map-wild-tip"
+                    style={{ left: p.u * mapPx, top: p.v * mapPx }}>
+                    <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
+                    <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
+                    <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct) + '%' : '-'} · 嗓音 {p.voice}</div>
+                    <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
+                    {p.stale && <div className="tws">已离开视野</div>}
+                  </div>
+                ),
+              ]
+            })}
           </div>
           <div className="map-arrow" ref={arrowRef}>
             <svg viewBox="0 0 24 24" width="30" height="30">

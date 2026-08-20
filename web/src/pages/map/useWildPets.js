@@ -52,13 +52,31 @@ export function wildTags(kinds = []) {
   return out
 }
 
-// wildRing 把一只宠物命中的类别翻成描边样式:最稀有的那层上主描边,次一层再加一圈外环。
-// (一只可以同时命中多类,如炫彩 + 大块头,靠 CSS 类组合会指数爆炸,故按数据算。)
-export function wildRing(kinds = []) {
-  const hit = WILD_LAYERS.filter((l) => l.kinds.some((k) => kinds.includes(k)))
-  if (hit.length === 0) return {}
-  const style = { borderColor: hit[0].color }
-  if (hit.length > 1) style.boxShadow = `0 0 0 2px ${hit[1].color}`
+// medalMatch 判定某奖牌滑块是否命中一只宠物:按标记上的数值字段(weightPct 体重百分位 /
+// voice 嗓音原值)与当前阈值比。形态范围缺失时后端不推 weightPct,无从判,不命中。
+export function medalMatch(m, p, medals) {
+  const v = p[m.dim]
+  if (v == null) return false
+  return m.dir === '>=' ? v >= medals[m.k] : v <= medals[m.k]
+}
+
+// wildRing 把一只宠物当前「开着且命中」的类别翻成描边样式,与 marks 过滤**同一口径**:
+//   - 开关图层(异色/炫彩、污染):看 kinds 标签,且该图层开关开着才描(关了图层就不该标);
+//   - 奖牌四件套:看数值阈值 medalMatch(只看 kinds 标签的话,滑块拖严后边界会对不上:
+//     后端按固定边界打标,前端滑块只严不宽,weightPct 98.5 拖到 99 后不该再标大块头)。
+// 最稀有的类别上主描边,其余依次向外叠外环。一只可同时命中多类(如炫彩 + 大块头 +
+// 婉转声,最多 4 层),靠 CSS 类组合会指数爆炸,故按数据算。返回空对象 = 无圈。
+export function wildRing(p, on, medals, medalOn) {
+  const kinds = p.kinds || []
+  const layers = [
+    ...WILD_LAYERS.filter((l) => on.has(l.k) && l.kinds.some((k) => kinds.includes(k))),
+    ...MEDAL_FILTERS.filter((m) => medalOn.has(m.k) && medalMatch(m, p, medals)),
+  ]
+  if (layers.length === 0) return {}
+  const style = { borderColor: layers[0].color }
+  if (layers.length > 1) {
+    style.boxShadow = layers.slice(1).map((l, i) => `0 0 0 ${2 + i * 3}px ${l.color}`).join(', ')
+  }
   return style
 }
 
@@ -143,11 +161,7 @@ export function useWildPets(account) {
 
   // 开着的开关图层覆盖哪些后端类别;奖牌滑块按数值阈值判(标记上带 weightPct/voice)。
   const shownKinds = new Set(WILD_LAYERS.filter((l) => on.has(l.k)).flatMap((l) => l.kinds))
-  const medalHit = (m, p) => {
-    const v = p[m.dim]
-    if (v == null) return false // 形态范围缺失时后端不推 weightPct,无从判,不画
-    return m.dir === '>=' ? v >= medals[m.k] : v <= medals[m.k]
-  }
+  const medalHit = (m, p) => medalMatch(m, p, medals)
   const marks = pets.filter((p) =>
     (p.kinds || []).some((k) => shownKinds.has(k)) ||
     MEDAL_FILTERS.some((m) => medalOn.has(m.k) && medalHit(m, p)))
