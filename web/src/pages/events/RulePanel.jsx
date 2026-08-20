@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getNameOptions } from '../../api'
 import { HOT_NATURE_NAMES } from '../../constants'
-import { FIELDS, WEIGHT_OPTS, VOICE_OPTS } from './highlight'
+import { FIELDS, WEIGHT_OPTS, VOICE_OPTS, GENDER_OPTS } from './highlight'
 
 // RulePanel 高亮规则侧栏:桌面常驻左栏,移动端为抽屉(collapsed 控制开合)。
 // 规则与 AND/OR 模式由父级持有;「种类」的自由输入草稿是面板内部状态。
@@ -10,10 +10,11 @@ export default function RulePanel({ rules, mode, setMode, addRule, toggleRule, c
   const [speciesDraft, setSpeciesDraft] = useState('') // 「种类」自由输入框内容
   useEffect(() => { getNameOptions().then((o) => setNameOpts(o || { speciality: [] })).catch(() => {}) }, [])
 
-  // 某维度下可点选的条目:性格取宠物列表常用项、特长取全表、体重/声音取两极标签。
+  // 某维度下可点选的条目:性格取宠物列表常用项、特长取全表、性别取雄/雌、体重/声音取两极标签。
   const paletteFor = (field) => {
     if (field === 'nature') return HOT_NATURE_NAMES
     if (field === 'speciality') return (nameOpts.speciality || []).filter((v) => v !== '无') // 「无特长」不作高亮项
+    if (field === 'gender') return GENDER_OPTS
     if (field === 'weight') return WEIGHT_OPTS
     if (field === 'voice') return VOICE_OPTS
     return []
