@@ -43,6 +43,20 @@ func (s *Server) parseFilter(q url.Values) store.Filter {
 	if ne := q.Get("natureExclude"); ne != "" {
 		f.NatureExclude = strings.Split(ne, ",")
 	}
+	// 奖牌特征(数值判定,与地图奖牌筛选同口径):各参数为 "1" 时启用对应条件,多选=同时满足。
+	// 阈值固定为奖牌边界(大块头体重百分位≥98 / 小不点≤2 / 婉转声嗓音≥96 / 粗嗓门≤-96)。
+	if q.Get("medalBig") == "1" {
+		f.WeightPctMin = 98
+	}
+	if q.Get("medalSmall") == "1" {
+		f.WeightPctMax = 2
+	}
+	if q.Get("medalHigh") == "1" {
+		f.VoiceMin = 96
+	}
+	if q.Get("medalLow") == "1" {
+		f.VoiceMax = -96
+	}
 	return f
 }
 
