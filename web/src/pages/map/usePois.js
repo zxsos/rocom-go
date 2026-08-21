@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { getPois, subscribe } from '../../api'
 
 // —— POI 图层(炼金釜/魔力之源/守护地/眠枭庇护所/眠枭之星/不咕钟零件)——
@@ -77,19 +77,25 @@ export function usePois(account, res) {
   }
 
   // 本场景有点位的图层才给开关(如魔法学院只有魔力之源);标记只画开启的图层。
-  const kinds = poi.kinds.filter((k) => k.num > 0)
-  const iconOf = Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon]))
-  // 已收满的区域(服务器口径 got>=tot)。
-  const doneZones = new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp))
-  // 收集模式下隐藏「已收集」的点:逐点确认过的,或候选区域(p.zone 列表)全部收满的。其余一律显示。
-  const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.zone?.length > 0 && p.zone.every((c) => doneZones.has(c)))
-  const marks = poi.pois.filter((p) => {
-    if (!poiOn.has(p.k)) return false
-    if (!p.r || !collectOn.has(p.k)) return true
-    return !collected(p)
-  })
-  // 开着收集模式的图层里「已确认还在」的点(高亮一圈;其余是尚未走到过的候选点)。
-  const isSure = (p) => collectOn.has(p.k) && starSt[p.r] === ST_UNCOLLECTED
+  // 这些都只随 poi 数据走,useMemo 缓存,位置推送不触发重算。
+  const kinds = useMemo(() => poi.kinds.filter((k) => k.num > 0), [poi])
+  const iconOf = useMemo(() => Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon])), [poi])
+  const doneZones = useMemo(
+    () => new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp)),
+    [poi])
+  // marks 顺带把「已确认还在」(收集模式高亮)的布尔算好挂到副本上(sure):渲染层直接读,
+  // 替代每标记每渲染调 isSure。依赖只有 poi/开关/收集状态,位置推送不碰这些。
+  const marks = useMemo(() => {
+    // 收集模式下隐藏「已收集」的点:逐点确认过的,或候选区域(p.zone 列表)全部收满的。其余一律显示。
+    const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.zone?.length > 0 && p.zone.every((c) => doneZones.has(c)))
+    return poi.pois
+      .filter((p) => {
+        if (!poiOn.has(p.k)) return false
+        if (!p.r || !collectOn.has(p.k)) return true
+        return !collected(p)
+      })
+      .map((p) => ({ ...p, icon: iconOf[p.k], sure: collectOn.has(p.k) && starSt[p.r] === ST_UNCOLLECTED }))
+  }, [poi, poiOn, collectOn, starSt, doneZones, iconOf])
 
-  return { kinds, iconOf, marks, isSure, poiOn, togglePoi, collectOn, toggleCollect }
+  return { kinds, iconOf, marks, poiOn, togglePoi, collectOn, toggleCollect }
 }

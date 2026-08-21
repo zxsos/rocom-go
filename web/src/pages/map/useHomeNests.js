@@ -27,15 +27,16 @@ export function useHomeNests(account) {
 }
 
 // nestTitle 组一个小窝标记的悬浮说明,单行「身份 · 个体」:
-//   点点 ♀ Lv.1 · W 90% V -50 急躁
-// W 是体重百分位、V 是嗓音原值,与野生宠物标记/事件页同一口径。
+//   点点 ♀ Lv.1 · W 90.4% V -50 急躁
+// W 是体重百分位(与野生宠物标记同为大世界的十分位显示)、V 是嗓音原值;宠物列表/事件页
+// 仍是整数百分位。
 // 只说住户:窝上有没有蛋看标记右上角那个蛋图标即可,不进这行。
 export function nestTitle(n) {
   if (!n.pet) return `${n.name || '精灵小窝'}(空)`
   const p = n.pet
   const who = [p.name || p.species, p.gender, p.level ? `Lv.${p.level}` : '']
   const stat = []
-  if (p.weightPct != null) stat.push(`W ${Math.round(p.weightPct)}%`)
+  if (p.weightPct != null) stat.push(`W ${Math.round(p.weightPct * 10) / 10}%`)
   stat.push(`V ${p.voice ?? 0}`, p.nature)
   return [who, stat].map((g) => g.filter(Boolean).join(' ')).filter(Boolean).join(' · ')
 }
