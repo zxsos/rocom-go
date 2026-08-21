@@ -127,6 +127,16 @@ func (s *Server) handleEventCount(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"count": n})
 }
 
+// handleEventStats 返回事件统计(总览/稀有/近30天分布/热门形态)。
+func (s *Server) handleEventStats(w http.ResponseWriter, r *http.Request) {
+	st, err := s.store.For(s.acct(r)).StatsEvents()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, st)
+}
+
 // handleClearEvents 清空事件历史。
 func (s *Server) handleClearEvents(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.For(s.acct(r)).ClearEvents(); err != nil {

@@ -99,6 +99,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/pets/{gid}", s.handlePet)
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
 	s.mux.HandleFunc("GET /api/events/count", s.handleEventCount)
+	s.mux.HandleFunc("GET /api/events/stats", s.handleEventStats)
 	s.mux.HandleFunc("DELETE /api/events", s.handleClearEvents)
 	s.mux.HandleFunc("GET /api/filter-options", s.handleFilterOptions)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
