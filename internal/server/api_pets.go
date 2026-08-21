@@ -167,7 +167,8 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"petCount": count})
 }
 
-// handleAccounts 返回已知账号列表(account/name/petCount),供前端账号切换下拉。
+// handleAccounts 返回已知账号列表(account/name/petCount/online),供前端账号切换下拉;
+// online 由 server 内存表实时判定(最近 30s 内有流量,见 AccountOnline),不落库。
 func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 	accs, err := s.store.ListAccounts()
 	if err != nil {
@@ -176,6 +177,9 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	if accs == nil {
 		accs = []store.AccountInfo{}
+	}
+	for i := range accs {
+		accs[i].Online = s.AccountOnline(accs[i].Account)
 	}
 	writeJSON(w, accs)
 }

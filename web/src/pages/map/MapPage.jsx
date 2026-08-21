@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useCallback, useLayoutEffect } from 'react'
 import { subscribe, getPosition } from '../../api'
-import { AccountContext } from '../../context'
+import { AccountContext, IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
@@ -275,27 +275,37 @@ const NestLayer = React.memo(({ marks, mapPx }) => (
 // 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、奖牌四件套),同属 .map-world 一起平移。
 // 与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。描边样式(style)
 // 已在 useWildPets 的 marks 里按命中类别预计算,这里直接展开,不再逐标记调 wildRing。
+// 异色/炫彩头像右上角再叠游戏标记图(兼具用合成的异色炫彩图,与 badges 的 Marks 同口径);
+// 图标取自全局 IconsContext(启动拉一次,引用稳定,不影响本层 memo)。缺图时不叠加。
 // 桌面 hover 有 title 悬浮;触屏没有 hover,点一下弹资料卡(wildTip),点中放大提亮。
 // wildTip 是点选状态:只在它变化时(以及 marks/mapPx 变化时)重渲染这一层。
-const WildLayer = React.memo(({ marks, mapPx, wildTip }) => (
-  <>{marks.map((p) => {
-    const tip = wildTip === p.id
-    return [
-      <div key={p.id} data-id={p.id} title={wildTitle(p)}
-        className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
-        style={{ left: p.u * mapPx, top: p.v * mapPx, ...p.style }}>
-        {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
-      </div>,
-      tip && (
-        <div key={p.id + '-tip'} className="map-wild-tip"
-          style={{ left: p.u * mapPx, top: p.v * mapPx }}>
-          <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
-          <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
-          <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
-          <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
-          {p.stale && <div className="tws">已离开视野</div>}
-        </div>
-      ),
-    ]
-  })}</>
-))
+const WildLayer = React.memo(({ marks, mapPx, wildTip }) => {
+  const icons = React.useContext(IconsContext)
+  return (
+    <>{marks.map((p) => {
+      const tip = wildTip === p.id
+      const kinds = p.kinds || []
+      const mark = (kinds.includes('shiny') && kinds.includes('colorful') && icons.shinyColorful) ||
+        (kinds.includes('shiny') && icons.shiny) ||
+        (kinds.includes('colorful') && icons.colorful)
+      return [
+        <div key={p.id} data-id={p.id} title={wildTitle(p)}
+          className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
+          style={{ left: p.u * mapPx, top: p.v * mapPx, ...p.style }}>
+          {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+          {mark && <img className="map-wild-mark" src={imgURL(mark)} alt="" draggable={false} />}
+        </div>,
+        tip && (
+          <div key={p.id + '-tip'} className="map-wild-tip"
+            style={{ left: p.u * mapPx, top: p.v * mapPx }}>
+            <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
+            <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
+            <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
+            <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
+            {p.stale && <div className="tws">已离开视野</div>}
+          </div>
+        ),
+      ]
+    })}</>
+  )
+})

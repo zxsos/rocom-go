@@ -25,6 +25,9 @@ rocom-key.pem
 # 前端依赖(构建产物 internal/server/web 需提交以便 go build 开箱即用)
 /web/node_modules/
 
+# Go 模块 vendor(本地离线构建缓存,不提交;go mod vendor 可随时重建)
+/vendor/
+
 # 编辑器 / 系统
 .DS_Store
 *.swp

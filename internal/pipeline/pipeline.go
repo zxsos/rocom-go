@@ -71,6 +71,9 @@ type acctState struct {
 	starKnown map[int32]int
 	eggSweep  *eggSweep      // 正在累积的分页背包快照(末页对账,见 eggs.go)
 	lastPos   map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
+	// lastSeen: 最近一条可归属消息的应用层时间戳(秒)。与 server 在线表同步时按秒去重,
+	// 免得移动包 8 条/秒高频刷锁——在线判定只认 30s 窗口,同秒内的更新没有意义。
+	lastSeen int64
 }
 
 // New 创建消费管线并从库中预热连接归属/场景状态(抓包服务重启后无缝续接)。
@@ -151,6 +154,12 @@ func (p *Pipeline) handle(m capture.Message) {
 	})
 	if acc == "" {
 		return // 尚未见到该连接的登录(无法归属 user_id),丢弃
+	}
+	// 账号在线状态:把最近活跃时刻上报 server(供 /api/accounts 标注在线)。用消息自身
+	// 时间戳——实时抓包即当下;离线回放按文件时刻,历史账号如实显示离线。按秒去重再刷锁。
+	if now := m.Time.Unix(); now > p.acct(acc).lastSeen {
+		p.acct(acc).lastSeen = now
+		p.srv.TouchAccount(acc, now)
 	}
 
 	// 去抖中的层变化需要「过一会儿再看一眼」才能采纳,而玩家可能站着不动、迟迟没有下一个移动包。

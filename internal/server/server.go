@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/store"
@@ -34,6 +35,9 @@ type Server struct {
 	lastWild map[string]any            // 账号 -> 最近一次野生宠物标记(同上,免得进页面要等下一条 AOI 通知)
 	lastHome map[string]any            // 账号 -> 最近一次家园小窝图层(同上;不在家园时为空列表)
 
+	onlineMu sync.Mutex           // 保护 lastSeen
+	lastSeen map[string]int64     // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
+
 	paint paintState // 涂地覆盖位图(自带锁,见 paint.go)
 }
 
@@ -55,6 +59,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s.lastPos = map[string]map[string]any{}
 	s.lastWild = map[string]any{}
 	s.lastHome = map[string]any{}
+	s.lastSeen = map[string]int64{}
 	s.medalIDs = map[string][]uint32{}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
@@ -142,6 +147,29 @@ func (s *Server) acct(r *http.Request) string {
 		return accs[0].Account // ListAccounts 按 updated_at 倒序,取最近
 	}
 	return ""
+}
+
+// onlineWindow 是「在线」判定窗口(秒):账号最近这段秒数内有流量即算在线。
+// 游戏客户端保持连接时约 1.6s 一条心跳,断线/关游戏后不再有消息,30s 足够区分。
+const onlineWindow = 30
+
+// TouchAccount 记录账号最近活跃时刻(Unix 秒)。pipeline 对每条可归属消息调用;
+// 离线回放时消息自带历史时间戳,账号如实显示离线。
+func (s *Server) TouchAccount(acc string, ts int64) {
+	s.onlineMu.Lock()
+	if s.lastSeen == nil {
+		s.lastSeen = map[string]int64{}
+	}
+	s.lastSeen[acc] = ts
+	s.onlineMu.Unlock()
+}
+
+// AccountOnline 判定账号是否在线(最近 onlineWindow 秒内有流量),handleAccounts 逐账号合并。
+func (s *Server) AccountOnline(acc string) bool {
+	s.onlineMu.Lock()
+	ts, ok := s.lastSeen[acc]
+	s.onlineMu.Unlock()
+	return ok && time.Now().Unix()-ts <= onlineWindow
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

@@ -3,10 +3,12 @@ package store
 import "time"
 
 // AccountInfo 是一个账号的概要(供前端账号下拉)。
+// Online 由 server 层判定后合并(最近 onlineWindow 秒内有流量),store 不持久化。
 type AccountInfo struct {
 	Account  string `json:"account"`
 	Name     string `json:"name"`
 	PetCount int    `json:"petCount"`
+	Online   bool   `json:"online"`
 }
 
 // UpsertAccount 登记/更新一个账号的展示名与活跃时间。
