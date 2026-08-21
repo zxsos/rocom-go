@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { getWildPets, subscribe } from '../../api'
 
 // —— 野生宠物图层(异色/炫彩 · 污染 · 奖牌四件套:大块头/小不点/婉转声/粗嗓门)——
@@ -54,6 +54,53 @@ export function wildTags(kinds = []) {
   if (has('high')) out.push('婉转声')
   else if (has('low')) out.push('粗嗓门')
   return out
+}
+
+// —— 稀有宠出现提醒 ——
+// 通知开关独立存 localStorage(与图层状态分开,不占图层版本号)。开启后,后端推来的实体
+// 本就全是稀有类别(普通宠不会推,见 internal/pipeline/wildpets.go),故新进入视野即提醒。
+const NOTIFY_KEY = 'map.wildNotify.v1'
+
+// chime 播放一段三连上行「叮咚」提示音(880 → 1174.7 → 1568 Hz),用 Web Audio 合成,
+// 不依赖音频资源文件。AudioContext 需在用户手势后创建,开关点击即手势;失败(无设备/被
+// 拦截)时静默跳过,不影响系统通知。
+function chime() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    const ctx = chime.ctx || (chime.ctx = new AC())
+    if (ctx.state === 'suspended') ctx.resume()
+    const now = ctx.currentTime
+    for (const [f, t] of [[880, 0], [1174.66, 0.12], [1567.98, 0.24]]) {
+      const osc = ctx.createOscillator()
+      const g = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = f
+      g.gain.setValueAtTime(0.001, now + t)
+      g.gain.exponentialRampToValueAtTime(0.28, now + t + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.3)
+      osc.connect(g).connect(ctx.destination)
+      osc.start(now + t)
+      osc.stop(now + t + 0.35)
+    }
+  } catch { /* 音频不可用:只弹系统通知 */ }
+}
+
+// fireWildNotify 弹一条系统通知:标题 = 名字 + 类别标签(与资料卡同口径,见 wildTags),
+// 正文 = 等级 / 体重百分位 / 坐标;tag 用实体 id,浏览器同 id 自动去重。点击通知聚焦页面。
+function fireWildNotify(p) {
+  const tags = wildTags(p.kinds)
+  const title = `${p.n || '野生宠物'}${tags.length ? ' · ' + tags.join(' ') : ''}`
+  const parts = []
+  if (p.lv) parts.push('Lv.' + p.lv)
+  if (p.weightPct != null) parts.push(`体重 ${Math.round(p.weightPct * 10) / 10}%`)
+  parts.push(`X${p.x} Y${p.y} Z${p.z}`)
+  chime()
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  try {
+    const n = new Notification(title, { body: parts.join(' · '), tag: 'wild-' + p.id, renotify: true })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch { /* 个别环境抛异常:音效已响,不再补 */ }
 }
 
 // medalMatch 判定某奖牌滑块是否命中一只宠物:按标记上的数值字段(weightPct 体重百分位 /
@@ -136,6 +183,42 @@ export function useWildPets(account) {
   const [medals, setMedals] = useState(st.medals)
   const [open, setOpen] = useState(st.open)
   const [medalOn, setMedalOn] = useState(st.medalOn)
+  // 稀有宠出现提醒开关:独立键持久化(与图层状态分开)。默认关,不打扰。
+  const [notify, setNotify] = useState(() => {
+    try { return localStorage.getItem(NOTIFY_KEY) === '1' } catch { return false }
+  })
+  const toggleNotify = () => {
+    setNotify((prev) => {
+      const next = !prev
+      try { localStorage.setItem(NOTIFY_KEY, next ? '1' : '0') } catch {}
+      // 开启时若还没要过权限就主动要一次;拒绝/忽略都不影响——没权限时只响音效不弹系统通知。
+      if (next && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {})
+      }
+      return next
+    })
+  }
+  // 新出现提醒:对比相邻两批推送,挑出「刚进视野且非灰点」的实体通知(已通知过的 id 不重复
+  // 弹;它变灰点=离开视野后从集合移除,重新出现可再提醒)。开关关闭时不做对比,但照常同步
+  // 「已见」集合——中途打开开关不会把已在地图上的宠当新出现全弹一遍。首轮(挂载后第一批
+  // 数据)只建基线不通知,否则刚进页面就把当前在场的全弹一遍。
+  const seenIdsRef = useRef(new Set())
+  const initedRef = useRef(false)
+  useEffect(() => {
+    const ids = new Set(pets.map((p) => p.id))
+    for (const id of [...seenIdsRef.current]) if (!ids.has(id)) seenIdsRef.current.delete(id)
+    if (!notify || !initedRef.current) {
+      for (const p of pets) seenIdsRef.current.add(p.id)
+      initedRef.current = true
+      return
+    }
+    for (const p of pets) if (p.stale) seenIdsRef.current.delete(p.id)
+    for (const p of pets) {
+      if (p.stale || seenIdsRef.current.has(p.id)) continue
+      seenIdsRef.current.add(p.id)
+      fireWildNotify(p)
+    }
+  }, [pets, notify])
 
   useEffect(() => {
     let alive = true
@@ -212,5 +295,5 @@ export function useWildPets(account) {
     return [num, numStale]
   }, [pets, on, medals, medalOn])
 
-  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal }
+  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, notify, toggleNotify }
 }

@@ -42,6 +42,15 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
         </div>
         <div className="filter-group">
           <label>野生宠物</label>
+          <div className="map-layer-row">
+            <button className={'map-layer-btn map-notify-btn' + (wilds.notify ? ' on' : '')}
+              onClick={wilds.toggleNotify}
+              title="异色/炫彩/污染/奖牌四件套新出现时弹系统通知并播放提示音(需允许通知权限;仅地图页打开时有效)">
+              <span className="map-notify-ic">🔔</span>
+              <span className="map-layer-name">稀有宠出现提醒</span>
+              <span className="muted">{wilds.notify ? '开' : '关'}</span>
+            </button>
+          </div>
           {WILD_LAYERS.map(({ k, n, color }) => {
             // 计数含灰点(与图上标记一致),悬浮再拆开说明其中多少已离开视野。
             const num = wilds.num[k] || 0

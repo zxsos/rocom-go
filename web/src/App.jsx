@@ -42,6 +42,20 @@ export default function App() {
     }).catch(() => {})
   }, [])
 
+  // 账号在线状态轮询:后端按「最近 30s 内有流量」判定(见 server.AccountOnline),
+  // 下拉里用 ● 在线 / ○ 离线 标注。15s 刷一次足够(状态不会秒变),仅列表非空时轮询;
+  // setAccounts 触发重渲染但 account 未变,<main key={account}> 不会重挂各页。
+  useEffect(() => {
+    if (!accounts.length) return
+    const refresh = () => {
+      getAccounts().then((list) => {
+        if (list && list.length) setAccounts(list)
+      }).catch(() => {})
+    }
+    const timer = setInterval(refresh, 15000)
+    return () => clearInterval(timer)
+  }, [accounts.length])
+
   // 切换账号:更新 api.js 当前账号、清掉与旧账号绑定的盒子筛选,再切 state
   // (下方 <main key={account}> 据此重挂各页,让其以新账号重新拉数据)。
   const switchAccount = (a) => {
@@ -73,7 +87,9 @@ export default function App() {
               title="切换账号(玩家)"
             >
               {accounts.map((a) => (
-                <option key={a.account} value={a.account}>{a.name} (UID:{uidOf(a.account)})</option>
+                <option key={a.account} value={a.account}>
+                  {a.online ? '● ' : '○ '}{a.name} (UID:{uidOf(a.account)})
+                </option>
               ))}
             </select>
           )}

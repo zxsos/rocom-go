@@ -128,6 +128,15 @@
 /* 悬停或点中时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
 .map-wild:hover, .map-wild.tip { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
 .map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 异色/炫彩标记图:叠在头像右上角(框内有 overflow:hidden 裁圆角,不能出框),尺寸约为头像
+   一半,一眼可辨又不遮脸;icons 缺图时组件不渲染该元素。跟随整标记 hover/tip 缩放与 stale 压暗。 */
+.map-wild-mark {
+  position: absolute; top: 0; right: 0;
+  width: 16px !important; height: 16px !important;
+  border-radius: 0 !important; object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
+}
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
 
@@ -157,6 +166,9 @@
   border: 2px solid var(--line); background: var(--bg-1);
 }
 .map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
+/* 稀有宠提醒按钮的铃铛:与图层色点同一行高对齐;关闭态随按钮灰掉。 */
+.map-notify-ic { font-size: 15px; line-height: 1; flex: none; }
+.map-notify-btn:not(.on) .map-notify-ic { opacity: .45; }
 
 /* 奖牌筛选:按钮展开/收起整组滑块;滑块是单值阈值,范围=奖牌边界~极端(只严不宽)。 */
 .map-medal-toggle {
