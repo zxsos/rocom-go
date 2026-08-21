@@ -7,7 +7,7 @@ import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 // 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 家园小窝不在此列:那层始终开着,不给开关也不占图例(见 useHomeNests.js)。
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
-export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
+export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onCollapseSidebar }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   return (
     <>
@@ -15,7 +15,10 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
       <aside className={'filters map-filters' + (collapsed ? ' collapsed' : '')}>
         <div className="filters-bar">
           <span className="filters-title">图层</span>
-          <button className="icon-btn" onClick={onClose} aria-label="关闭图层">✕</button>
+          {/* 桌面:收起按钮把侧栏折进地图(地图全宽),右上角 ☰ 可再展开;移动端:✕ 关抽屉 */}
+          <button className="icon-btn map-sidebar-collapse" onClick={onCollapseSidebar}
+            title="收起图层栏" aria-label="收起图层栏">◀</button>
+          <button className="icon-btn map-sidebar-close" onClick={onClose} aria-label="关闭图层">✕</button>
         </div>
         <div className="filter-group">
           <label>地图图标</label>
@@ -62,7 +65,7 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
             <span>奖牌筛选</span>
             <span className="muted">{wilds.open ? '▾' : '▸'}</span>
           </button>
-          {wilds.open && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi }) => {
+          {wilds.open && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
             const th = wilds.medals[k]
@@ -78,7 +81,7 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
                 <span className="map-wild-swatch" style={{ borderColor: color }} />
                 <span className="map-layer-name">{n}</span>
                 <span className="map-medal-val">{dir}{th}</span>
-                <input type="range" className="map-medal-range" min={lo} max={hi} step={0.5}
+                <input type="range" className="map-medal-range" min={lo} max={hi} step={step ?? 0.5}
                   value={th} onChange={(e) => wilds.setThreshold(k, Number(e.target.value))}
                   disabled={!on} aria-label={`${n}判定阈值`} />
                 <span className="muted">{num}</span>

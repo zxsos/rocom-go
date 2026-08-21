@@ -1,7 +1,7 @@
 // 地图视图与箭头平滑移动的纯计算部分(不含 React 状态)。
 
 export const ZOOM_MIN = 1
-export const ZOOM_MAX = 10
+export const ZOOM_MAX = 16
 // 各场景默认缩放(按细节人工调优):卡洛西亚大陆/魔法学院 5、家园室内 2、种植园 3;
 // 未列出的场景回退 ZOOM_FALLBACK。键为 scene_res_cfg_id。
 const ZOOM_DEFAULTS = { 10003: 5, 10018: 5, 30001: 2, 30002: 3 }

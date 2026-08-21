@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_FALLBACK, clamp } from './motion'
 
 // tapSlop 是「按下到抬起」还算点一下的位移上限(px):超过就当在拖地图。
@@ -50,7 +50,7 @@ export function usePanZoom(active, onTap) {
   const tap = useRef(null) // 本次按下是否还够得上「点一下」(拖过/多指即作废)
   const tapCb = useRef(onTap)
   tapCb.current = onTap
-  const onPointerDown = (e) => {
+  const onPointerDown = useCallback((e) => {
     // 点在缩放/回中控件上:不捕获指针、不启动平移,否则 setPointerCapture 会把 pointerup
     // 重定向到视口,桌面端按钮的 click 事件就不触发(移动端触摸 click 合成方式不同,不受影响)。
     if (e.target.closest?.('.map-ctrl')) return
@@ -59,8 +59,8 @@ export function usePanZoom(active, onTap) {
     // 记下按下那一刻的元素:之后指针被捕获,move/up 的 target 一律是视口。
     tap.current = ptrs.current.size > 1 ? null
       : { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target }
-  }
-  const onPointerMove = (e) => {
+  }, [])
+  const onPointerMove = useCallback((e) => {
     const p = ptrs.current.get(e.pointerId)
     if (!p) return
     const t = tap.current
@@ -88,8 +88,8 @@ export function usePanZoom(active, onTap) {
       setFollow(false)
       focusRef.current = { u: f.u - (e.clientX - prev.x) / (base * z), v: f.v - (e.clientY - prev.y) / (base * z) }
     }
-  }
-  const onPointerUp = (e) => {
+  }, [])
+  const onPointerUp = useCallback((e) => {
     ptrs.current.delete(e.pointerId)
     if (ptrs.current.size < 2) pinch.current = 0
     const t = tap.current
@@ -97,14 +97,21 @@ export function usePanZoom(active, onTap) {
     if (t && t.id === e.pointerId && e.type === 'pointerup') {
       tapCb.current?.(t.target)
     }
-  }
-  const onWheel = (e) => {
+  }, [])
+  const onWheel = useCallback((e) => {
     const rect = vpRef.current.getBoundingClientRect()
     zoomAround(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - rect.left, e.clientY - rect.top)
-  }
+  }, [zoomAround])
+
+  // handlers 整体 useMemo 稳定:MapPage 随位置推送高频重渲染,若每次重建 handlers,.map-vp
+  // 的 props 每次都变;稳定后视口元素本身也跳过无谓的重协调。
+  // 四个回调都只读 refs(stRef/focusRef/vpRef/tapCb/指针表),无闭包过期问题。
+  const handlers = useMemo(() => ({
+    onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onWheel,
+  }), [onPointerDown, onPointerMove, onPointerUp, onWheel])
 
   return {
     vpRef, vp, zoom, setZoom, follow, setFollow, focusRef, stRef, zoomAround,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onWheel },
+    handlers,
   }
 }

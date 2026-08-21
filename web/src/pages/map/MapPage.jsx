@@ -5,21 +5,21 @@ import { imgURL } from '../../components/icons'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
-import { useWildPets, wildTags, wildRing } from './useWildPets'
+import { useWildPets, wildTags } from './useWildPets'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import LayerPanel from './LayerPanel'
 
 // wildTitle 组一条野生宠物标记的悬停说明,格式:
-//   {种类} Lv.44 异色炫彩 W 19% V -55
-// W 是体重在本形态取值范围内的百分位(后端算好,与宠物列表/事件页的「W xx%」同一口径),
-// V 是嗓音原值——与事件页那行保持一致,一眼能对上。
+//   {种类} Lv.44 异色炫彩 W 19.6% V -55
+// W 是体重在本形态取值范围内的百分位(后端算好,大世界地图用十分位显示,与奖牌滑块同精度;
+// 宠物列表/事件页仍显示整数百分位),V 是嗓音原值——与事件页那行保持一致,一眼能对上。
 function wildTitle(p) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(...wildTags(p.kinds))
-  const w = p.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'
+  const w = p.weightPct != null ? `${Math.round(p.weightPct * 10) / 10}%` : '-'
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
   return s
@@ -34,7 +34,8 @@ export default function MapPage() {
   const [pos, setPos] = useState(null) // 最近一个移动包(工具栏文字、底图选择);箭头位置另由 anchor 逐帧算出
   const [imgError, setImgError] = useState(false)
   const [layerError, setLayerError] = useState(false)
-  const [collapsed, setCollapsed] = useState(true)  // 移动端图层抽屉(桌面侧栏常驻,此值不起作用)
+  const [collapsed, setCollapsed] = useState(true)  // 移动端图层抽屉(开合)
+  const [sidebarOpen, setSidebarOpen] = useState(true) // 桌面图层侧栏(可折叠,折叠后地图全宽)
   const sceneRef = useRef(null) // 当前底图名(换底图=换场景/等级才重置缩放/跟随)
   const layerRef = useRef(null) // 当前叠加层图名(换层仅重试层图,不动缩放)
 
@@ -49,6 +50,12 @@ export default function MapPage() {
     const wid = target.closest?.('.map-wild')?.dataset.id
     setWildTip((cur) => (wid ? (wid === cur ? null : wid) : null))
   }, [])
+
+  // 右上角 ☰:窄屏开/关图层抽屉,桌面折叠/展开图层侧栏(折叠后地图全宽)。
+  const toggleLayers = () => {
+    if (window.matchMedia('(max-width: 760px)').matches) setCollapsed((c) => !c)
+    else setSidebarOpen((o) => !o)
+  }
 
   const hasMap = !!(pos && pos.u != null && pos.img && !imgError)
   const view = usePanZoom(hasMap, onTap)
@@ -159,8 +166,9 @@ export default function MapPage() {
     <div className="map-page">
       {/* 无工具栏:地图占满整页(场景名/坐标不再显示,位置看箭头即可);移动端的图层抽屉入口
           作为浮动控件挂在地图左下角。 */}
-      <div className="map-layout">
-        <LayerPanel pois={pois} wilds={wilds} paint={paint} collapsed={collapsed} onClose={() => setCollapsed(true)} />
+      <div className={'map-layout' + (sidebarOpen ? '' : ' closed')}>
+        <LayerPanel pois={pois} wilds={wilds} paint={paint} collapsed={collapsed}
+          onClose={() => setCollapsed(true)} onCollapseSidebar={() => setSidebarOpen(false)} />
 
         {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
 
@@ -191,66 +199,30 @@ export default function MapPage() {
                 <path d={paint.edge} />
               </svg>
             </>)}
-            {/* POI 标记:与底图同属 .map-world(一起平移,不会相对底图抖动);尺寸恒定不随缩放变大,
-                故位置用 left/top + translate(-50%,-50%) 定在锚点上。洞穴层的点也用底图投影,自然
-                落在层图上。 */}
-            {pois.marks.map((p, i) => (
-              <img key={i} alt="" draggable={false}
-                className={'map-poi' + (pois.isSure(p) ? ' sure' : '')}
-                src={imgURL(pois.iconOf[p.k])} title={p.n}
-                style={{ left: p.u * mapPx, top: p.v * mapPx }} />
-            ))}
-            {/* 家园小窝:空窝画个虚线圈,住了宠物画头像;窝上有蛋则右上角挂个蛋图标。
-                悬浮看简要信息(见 nestTitle),点住户看宠物详情。同属 .map-world 一起平移。 */}
-            {home.marks.map((n) => (
-              <div key={n.id} title={nestTitle(n)}
-                className={'map-nest' + (n.pet ? '' : ' empty')}
-                data-gid={n.pet ? n.pet.gid : undefined}
-                style={{ left: n.u * mapPx, top: n.v * mapPx }}>
-                {n.pet
-                  ? (n.pet.img ? <img src={imgURL(n.pet.img)} alt="" draggable={false} /> : <span>🐾</span>)
-                  : <span className="map-nest-empty">空</span>}
-                {n.egg && <img className="map-nest-egg" src={imgURL(n.egg.icon)} alt="" draggable={false} />}
-              </div>
-            ))}
-            {/* 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、奖牌四件套),同属 .map-world
-                一起平移。与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。
-                描边色按命中类别算(见 wildRing),不用 CSS 类组合——组合数太多。
-                桌面 hover 有 title 悬浮;触屏没有 hover,点一下弹资料卡(wildTip),点中放大提亮。 */}
-            {wilds.marks.map((p) => {
-              const tip = wildTip === p.id
-              return [
-                <div key={p.id} data-id={p.id} title={wildTitle(p)}
-                  className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
-                  style={{ left: p.u * mapPx, top: p.v * mapPx, ...wildRing(p, wilds.on, wilds.medals, wilds.medalOn) }}>
-                  {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
-                </div>,
-                tip && (
-                  <div key={p.id + '-tip'} className="map-wild-tip"
-                    style={{ left: p.u * mapPx, top: p.v * mapPx }}>
-                    <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
-                    <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
-                    <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct) + '%' : '-'} · 嗓音 {p.voice}</div>
-                    <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
-                    {p.stale && <div className="tws">已离开视野</div>}
-                  </div>
-                ),
-              ]
-            })}
+            {/* POI / 小窝 / 野生三层标记都拆成 memo 子组件(见文件底部):位置推送不改变任何
+                标记数据(marks 引用不变),三层整层跳过重渲染;marks 变化(开关/阈值/新数据)
+                只重渲染对应那一层。 */}
+            <PoiLayer marks={pois.marks} mapPx={mapPx} />
+            <NestLayer marks={home.marks} mapPx={mapPx} />
+            <WildLayer marks={wilds.marks} mapPx={mapPx} wildTip={wildTip} />
           </div>
           <div className="map-arrow" ref={arrowRef}>
             <svg viewBox="0 0 24 24" width="30" height="30">
               <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="var(--red)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
           </div>
-          {/* 图层入口:仅窄屏显示(桌面侧栏常驻);带 .map-ctrl 类使点它不触发地图拖动。
-              不复用 .filter-toggle——它的 display:none 会被后定义的 .map-btn{display:flex} 盖掉。 */}
+          {/* 图层入口:窄屏显示在地图左下角(抽屉);桌面侧栏折叠后右上角的 ☰ 也可展开。
+              带 .map-ctrl 类使点它不触发地图拖动。不复用 .filter-toggle——它的 display:none
+              会被后定义的 .map-btn{display:flex} 盖掉。 */}
           <button className="map-btn map-ctrl map-layers-btn" title="图层"
             onClick={() => setCollapsed((c) => !c)}>☰</button>
+          {/* 右上角控制组:图层侧栏(桌面)/放大/缩小/回中。跟随打开后,下一帧 applyFrame
+              即把视口对准玩家。 */}
           <div className="map-ctrl">
+            <button className={'map-btn map-layers-toggle' + (sidebarOpen ? ' on' : '')} title="图层栏"
+              onClick={toggleLayers}>☰</button>
             <button className="map-btn" title="放大" onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
             <button className="map-btn" title="缩小" onClick={() => view.zoomAround(1 / 1.4, view.vp.w / 2, view.vp.h / 2)}>－</button>
-            {/* 跟随打开后,下一帧 applyFrame 即把视口对准玩家 */}
             <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置" onClick={() => view.setFollow(true)}>◎</button>
           </div>
         </div>
@@ -266,3 +238,64 @@ export default function MapPage() {
     </div>
   )
 }
+
+// —— 标记层(memo 子组件)——
+// 三层都只依赖「标记数据(引用稳定) + mapPx(缩放/视口)」,与 position 推送无关:
+// 玩家移动逐包推位置 → MapPage 重渲染,但这三层的 props 引用都不变,React.memo 整层跳过,
+// 只有箭头/底图/跟随这些轻量元素参与。mapPx 随缩放/视口变化,那时三层本来就要重排,不亏。
+
+// POI 标记:与底图同属 .map-world(一起平移,不会相对底图抖动);尺寸恒定不随缩放变大,
+// 故位置用 left/top + translate(-50%,-50%) 定在锚点上。洞穴层的点也用底图投影,自然
+// 落在层图上。sure(收集模式「已确认还在」高亮)已由 usePois 预计算好。
+const PoiLayer = React.memo(({ marks, mapPx }) => (
+  <>{marks.map((p, i) => (
+    <img key={i} alt="" draggable={false}
+      className={'map-poi' + (p.sure ? ' sure' : '')}
+      src={imgURL(p.icon)} title={p.n}
+      style={{ left: p.u * mapPx, top: p.v * mapPx }} />
+  ))}</>
+))
+
+// 家园小窝:空窝画个虚线圈,住了宠物画头像;窝上有蛋则右上角挂个蛋图标。
+// 悬浮看简要信息(见 nestTitle),点住户看宠物详情。同属 .map-world 一起平移。
+const NestLayer = React.memo(({ marks, mapPx }) => (
+  <>{marks.map((n) => (
+    <div key={n.id} title={nestTitle(n)}
+      className={'map-nest' + (n.pet ? '' : ' empty')}
+      data-gid={n.pet ? n.pet.gid : undefined}
+      style={{ left: n.u * mapPx, top: n.v * mapPx }}>
+      {n.pet
+        ? (n.pet.img ? <img src={imgURL(n.pet.img)} alt="" draggable={false} /> : <span>🐾</span>)
+        : <span className="map-nest-empty">空</span>}
+      {n.egg && <img className="map-nest-egg" src={imgURL(n.egg.icon)} alt="" draggable={false} />}
+    </div>
+  ))}</>
+))
+
+// 野生宠物标记:圆头像 + 类别描边(异色/炫彩、污染、奖牌四件套),同属 .map-world 一起平移。
+// 与 POI 同样尺寸恒定,故用 left/top + translate(-50%,-50%) 钉在锚点上。描边样式(style)
+// 已在 useWildPets 的 marks 里按命中类别预计算,这里直接展开,不再逐标记调 wildRing。
+// 桌面 hover 有 title 悬浮;触屏没有 hover,点一下弹资料卡(wildTip),点中放大提亮。
+// wildTip 是点选状态:只在它变化时(以及 marks/mapPx 变化时)重渲染这一层。
+const WildLayer = React.memo(({ marks, mapPx, wildTip }) => (
+  <>{marks.map((p) => {
+    const tip = wildTip === p.id
+    return [
+      <div key={p.id} data-id={p.id} title={wildTitle(p)}
+        className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
+        style={{ left: p.u * mapPx, top: p.v * mapPx, ...p.style }}>
+        {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+      </div>,
+      tip && (
+        <div key={p.id + '-tip'} className="map-wild-tip"
+          style={{ left: p.u * mapPx, top: p.v * mapPx }}>
+          <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
+          <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
+          <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
+          <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
+          {p.stale && <div className="tws">已离开视野</div>}
+        </div>
+      ),
+    ]
+  })}</>
+))
