@@ -4,6 +4,28 @@
 .event-head { max-width: 720px; }
 .event-title { font-weight: 700; font-size: 15px; }
 .event-list { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
+/* 事件统计:总览卡 + 近30天柱状图 + 热门形态排行(数据来自 /api/events/stats) */
+.event-stats { display: flex; flex-direction: column; gap: 8px; max-width: 720px; margin-bottom: 10px; }
+.stat-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat-card {
+  flex: 1 1 72px; min-width: 72px; padding: 8px 10px; text-align: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1);
+}
+.stat-num { font-size: 18px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 12px; color: var(--fg-dim); }
+.stat-chart {
+  display: flex; align-items: flex-end; gap: 2px; height: 72px; padding: 8px 8px 4px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1);
+}
+.bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
+.bar-fill { width: 100%; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; opacity: .85; }
+.bar-day { font-size: 10px; color: var(--fg-dim); white-space: nowrap; }
+.stat-top { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1); }
+.top-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.top-name { flex: 0 0 88px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-track { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-3); overflow: hidden; }
+.top-fill { height: 100%; background: var(--accent); border-radius: 999px; opacity: .85; }
+.top-n { flex: none; min-width: 24px; text-align: right; font-variant-numeric: tabular-nums; }
 .event {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
   border-radius: 10px; background: var(--bg-1);

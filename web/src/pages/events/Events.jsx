@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react'
-import { getEvents, getEventCount, clearEvents, subscribe } from '../../api'
+import { getEvents, getEventCount, getEventStats, clearEvents, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredState, useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useWakeLock, wakeLockSupported } from '../../hooks/useWakeLock'
@@ -16,6 +16,7 @@ export default function Events() {
   // total=自上次清空以来累计获得的宠物数(即列表最新一条的序号);列表可能因上限被截断,
   // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
   const [total, setTotal] = useState(0)
+  const [stats, setStats] = useState(null) // 事件统计(总览/稀有/近30天分布/热门形态)
   const [rules, setRules] = useStoredJSON(localStorage, 'hlRules', [], sanitizeRules)
   // 多规则联合逻辑:'and'=需全部命中(默认)、'or'=任一命中
   const [mode, setMode] = useStoredState(localStorage, 'hlMode', (s) => (s === 'or' ? 'or' : 'and'), (v) => v)
@@ -32,11 +33,13 @@ export default function Events() {
     // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
     getEvents({ limit: 100 }).then((e) => setEvents(e || [])).catch(() => {})
     getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
+    getEventStats().then(setStats).catch(() => {})
     return subscribe((m) => {
       if (m.type !== 'event') return
       if (m.account && m.account !== account) return // 只认当前账号的事件
       setEvents((prev) => [m.data, ...prev].slice(0, 300))
       setTotal((n) => n + 1)
+      getEventStats().then(setStats).catch(() => {}) // 新事件入库后刷新统计
     })
   }, [account])
 
@@ -50,7 +53,7 @@ export default function Events() {
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
   const clearAll = () => {
     if (!window.confirm('确定清空所有事件历史?计数将从头开始。')) return
-    clearEvents().then(() => { setEvents([]); setTotal(0) }).catch(() => {})
+    clearEvents().then(() => { setEvents([]); setTotal(0); setStats(null) }).catch(() => {})
   }
 
   return (
@@ -76,6 +79,54 @@ export default function Events() {
             : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
           <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
         </div>
+        {stats && (
+          <div className="event-stats">
+            <div className="stat-cards">
+              <div className="stat-card">
+                <div className="stat-num">{stats.total}</div>
+                <div className="stat-label">累计获得</div>
+              </div>
+              {['捕捉', '孵蛋', '赠送获得', '获得'].map((k) => (stats.bySubKind[k] || 0) > 0 && (
+                <div className="stat-card" key={k}>
+                  <div className="stat-num">{stats.bySubKind[k]}</div>
+                  <div className="stat-label">{k}</div>
+                </div>
+              ))}
+              <div className="stat-card">
+                <div className="stat-num">{stats.shiny}</div>
+                <div className="stat-label">异色</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-num">{stats.colorful}</div>
+                <div className="stat-label">炫彩</div>
+              </div>
+            </div>
+            <div className="stat-chart" title="近30天每天获得数">
+              {(() => {
+                const max = Math.max(1, ...stats.daily.map((d) => d.n))
+                return stats.daily.map((d) => (
+                  <div className="bar" key={d.day} title={`${d.day} · ${d.n} 只`}>
+                    <div className="bar-fill" style={{ height: `${Math.round((d.n / max) * 100)}%` }} />
+                    <span className="bar-day">{d.day.slice(3)}</span>
+                  </div>
+                ))
+              })()}
+            </div>
+            {stats.topSpecies.length > 0 && (
+              <div className="stat-top">
+                {stats.topSpecies.map((t) => (
+                  <div className="top-item" key={t.s}>
+                    <span className="top-name">{t.s}</span>
+                    <div className="top-track">
+                      <div className="top-fill" style={{ width: `${Math.round((t.n / stats.topSpecies[0].n) * 100)}%` }} />
+                    </div>
+                    <span className="top-n">{t.n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="event-list">
           {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
           {events

@@ -51,6 +51,9 @@ export async function clearEvents() {
 // getEventCount 返回事件总数({count}),即自上次清空以来获得的宠物数(失去事件不入库)。
 export const getEventCount = (params) => getJSON('/api/events/count?' + buildQuery(params))
 
+// getEventStats 返回事件统计(总览/稀有/近30天分布/热门形态)。
+export const getEventStats = (params) => getJSON('/api/events/stats?' + buildQuery(params))
+
 export const getFilterOptions = () => getJSON('/api/filter-options?' + buildQuery())
 
 export const getBoxes = () => getJSON('/api/boxes?' + buildQuery())
