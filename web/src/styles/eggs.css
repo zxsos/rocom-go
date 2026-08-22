@@ -15,6 +15,32 @@
 .eggs-col-t { font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .eggs-col-t .muted { font-weight: 400; font-size: 13px; }
 
+/* 孵蛋器标题旁的提示图标:比数字(13px)小;深色主题下黑色 svg 反白显示 */
+.incu-tip { position: relative; display: inline-flex; }
+.incu-tip-ic {
+  width: 11px; height: 11px; cursor: pointer; opacity: .55;
+  filter: invert(.85); transition: opacity .15s;
+}
+.incu-tip-ic:hover { opacity: .9; }
+/* 点击弹出的提示气泡:半透明深底、浅字,浮在图标上方,底部小箭头指向图标 */
+.incu-tip-bubble {
+  position: absolute; left: 50%; bottom: calc(100% + 7px); transform: translateX(-50%);
+  padding: 6px 10px; border-radius: 8px;
+  background: rgba(11, 14, 19, .94); color: #e6edf3;
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+  font-size: 12px; font-weight: 400; line-height: 1.5; white-space: nowrap;
+  z-index: 10; pointer-events: auto;
+}
+.incu-tip-bubble::after {
+  content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: rgba(11, 14, 19, .94);
+}
+/* 窄屏:气泡改在图标下方弹出,避免顶到视口上沿 */
+@media (max-width: 560px) {
+  .incu-tip-bubble { bottom: auto; top: calc(100% + 7px); }
+  .incu-tip-bubble::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(11, 14, 19, .94); }
+}
+
 /* 孵蛋器空格子:虚线框,与卡片同宽,占位说明「这一格还能放一颗」 */
 .egg-slot-empty {
   border: 1px dashed var(--line); border-radius: 12px; color: var(--fg-dim);

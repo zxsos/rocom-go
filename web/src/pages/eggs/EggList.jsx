@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect, useContext, useRef } from 'react'
 import { getEggs, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
@@ -49,7 +49,7 @@ export default function EggList() {
       {/* 两栏的标题都是 eggs-cols 的直接子级(同一网格行),行高一致,两栏的卡片才从同一条
           基线开始;标题若各自塞回栏内,右栏被搜索框撑高就会比左栏低一截(见 eggs.css)。 */}
       <div className="eggs-cols">
-        <div className="eggs-col-t">孵蛋器 <span className="muted">{hatching.length}/{slots}</span></div>
+        <IncuTitle n={hatching.length} slots={slots} />
         <div className="eggs-bar">
           <div className="eggs-col-t">背包 <span className="muted">{bag.length} 颗</span></div>
           <div className="eggs-sorts">
@@ -83,6 +83,29 @@ export default function EggList() {
         </section>
       </div>
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
+    </div>
+  )
+}
+
+// IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
+// 点击弹出半透明气泡,说明计数口径(中途取走的蛋也算)。点气泡外关闭。
+function IncuTitle({ n, slots }) {
+  const ref = useRef(null)
+  const [tip, setTip] = useState(false)
+  useEffect(() => {
+    if (!tip) return
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setTip(false) }
+    document.addEventListener('click', onDoc)
+    return () => document.removeEventListener('click', onDoc)
+  }, [tip])
+  return (
+    <div className="eggs-col-t">
+      孵蛋器 <span className="muted">{n}/{slots}</span>
+      <span ref={ref} className="incu-tip">
+        <img className="incu-tip-ic" src="/ps.svg" alt="?" title="孵化中途取走的蛋也算"
+          onClick={() => setTip((t) => !t)} draggable={false} />
+        {tip && <span className="incu-tip-bubble">孵化中途取走的蛋也算</span>}
+      </span>
     </div>
   )
 }

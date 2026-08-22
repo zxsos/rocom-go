@@ -65,4 +65,21 @@
   .rules-close { display: grid; place-items: center; }
   /* 事件页头部:窄屏收紧按钮间距(按钮本身已是图标,标题「共 N 只」不再被挤到两行) */
   .event-head { gap: 8px; }
+
+  /* 事件卡片:窄屏收紧内边距与间距,给内容留更多横向空间 */
+  .event { padding: 8px 10px; gap: 8px; }
+  /* 摘要行(性格 · 特长 · W · V · 地点)允许折行,避免窄屏溢出或横向滚动 */
+  .pet-sub { word-break: break-word; }
+  /* 名称行:窄屏允许序号/名称/时间换行,时间自然落到下一行右对齐,
+     避免三者挤一行导致名称被过度压缩 */
+  .event-row { flex-wrap: wrap; }
+  .event .event-time { margin-left: auto; }
+}
+
+/* 超窄屏(竖屏手机):进一步收紧,头像略小、统计柱状图日期缩写 */
+@media (max-width: 420px) {
+  .event { padding: 7px 8px; gap: 7px; }
+  .event .pet-avatar { width: 30px; height: 30px; font-size: 14px; }
+  .stat-chart { height: 56px; }
+  .bar-day { font-size: 9px; }
 }
