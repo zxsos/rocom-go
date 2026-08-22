@@ -86,6 +86,10 @@ export function usePanZoom(active, onTap) {
       const base = Math.min(v.w, v.h) || 1
       const f = focusRef.current
       setFollow(false)
+      // 立即同步 stRef.current.follow:setFollow 走 setState 要等下次渲染,
+      // 而 RAF 可能在这之前 tick(拖动中 RAF 保持运行),applyFrame 读到 follow=true
+      // 会把 focus 拉回玩家,画面抖动/拖不动。手动同步后 RAF 立即看到 false。
+      stRef.current.follow = false
       focusRef.current = { u: f.u - (e.clientX - prev.x) / (base * z), v: f.v - (e.clientY - prev.y) / (base * z) }
     }
   }, [])

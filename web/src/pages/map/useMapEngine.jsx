@@ -76,6 +76,10 @@ export function useMapEngine(account, opts = {}) {
   const worldRef = useRef(null)
   const arrowRef = useRef(null)
   const lastFrameRef = useRef(null)
+  // draggingRef:指针是否按住拖动中。静止判定见下:玩家静止时 RAF 会停,
+  // 但拖动期间 focusRef 持续被平移更新,必须保持 RAF 运行才能逐帧消费,否则单指拖不动
+  // (双指缩放因每次 setZoom 都触发重渲染+layoutEffect 画帧,不受影响)。
+  const draggingRef = useRef(false)
   // rafRef 持有「确保 RAF 在跑」的函数:applyPos 写入新锚点后调一次,若 RAF 已因静止停止则重启。
   // tick 静止退出前把 rafRef.current 置为重启函数;applyPos 调用它即恢复循环。
   const rafRef = useRef(null)
@@ -104,8 +108,11 @@ export function useMapEngine(account, opts = {}) {
     const world = `translate3d(${left}px, ${top}px, 0)`
     const arrow = `translate3d(${ax}px, ${ay}px, 0) translate(-50%,-50%) rotate(${heading + 90}deg)`
     const last = lastFrameRef.current
-    if (last && last.world === world && last.arrow === arrow) return
-    lastFrameRef.current = { world, arrow }
+    // DOM 节点变了(浮窗开关后 MapViz 重挂,worldRef/arrowRef 指向新节点)→ 强制重写,
+    // 否则旧 lastFrameRef 的字符串与新算出的相同会跳过写入,新 DOM 没设 transform 停在左上角。
+    if (last && last.world === world && last.arrow === arrow
+      && last.wNode === worldRef.current && last.aNode === arrowRef.current) return
+    lastFrameRef.current = { world, arrow, wNode: worldRef.current, aNode: arrowRef.current }
     worldRef.current.style.transform = world
     if (arrowRef.current) arrowRef.current.style.transform = arrow
   }, [stRef, focusRef])
@@ -125,7 +132,7 @@ export function useMapEngine(account, opts = {}) {
       // 注意:有速度(vu/vv≠0)或轨迹回放(dt<GLIDE)时不能停,否则玩家在动画面会冻住。
       const dt = (performance.now() - a.t0) / 1000
       const moving = (a.vu || 0) !== 0 || (a.vv || 0) !== 0 || (a.cum && dt < 0.45)
-      if (dt >= SMOOTH_CUTOFF && !moving) {
+      if (dt >= SMOOTH_CUTOFF && !moving && !draggingRef.current) {
         raf = 0 // 已停,标记给 ensureRaf 知道下次需重启
         return
       }
@@ -196,6 +203,15 @@ export function useMapEngine(account, opts = {}) {
     pois, wilds, home, paint,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap,
     floating,
+    // canvas PiP 用:暴露当前帧的渲染参数(供 renderToCanvas 画到外部 canvas)
+    // 这些 ref 在 applyFrame 里每帧更新,canvas 渲染循环直接读,不触发 React 重渲染。
+    frameStateRef: dispRef, // { u, v, heading } 当前玩家显示位置
+    stRef, // { zoom, follow, vp } 视图状态
+    focusRef, // { u, v } 视口中心对应的地图坐标
+    sceneRef, layerRef, // 当前场景底图名/层图名
+    // 拖动修复:拖动中置 draggingRef=true 让 RAF 不因静止停止;pokeFrame 重启已停的 RAF。
+    draggingRef,
+    pokeFrame: () => rafRef.current?.(),
   }
 }
 
@@ -204,15 +220,30 @@ export function useMapEngine(account, opts = {}) {
 export function MapViz({ engine, onOpenFloat, floatMode, sidebarOpen, onToggleLayers }) {
   const { pos, hasMap, imgError, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, pois, wilds, home, paint,
-    detailGid, setDetailGid, wildTip, setWildDist, setWildTip, wildDist, onTap } = engine
+    detailGid, setDetailGid, wildTip, setWildDist, setWildTip, wildDist, onTap,
+    draggingRef, pokeFrame } = engine
   const { focusRef, stRef } = view
   const mapPx = (Math.min(view.vp.w, view.vp.h) || 1) * view.zoom
+  // 包装 usePanZoom 的指针 handlers:拖动期间置 draggingRef(RAF 静止判定因此不停),
+  // 按下时 pokeFrame 重启可能已停的 RAF。否则玩家静止时 RAF 停止,单指平移只更新
+  // focusRef 没有帧循环消费,画面不动(双指缩放因 setZoom 每次触发重渲染画帧而不受影响)。
+  const handlers = useMemo(() => {
+    const h = view.handlers
+    return {
+      ...h,
+      onPointerDown: (e) => { draggingRef.current = true; pokeFrame(); h.onPointerDown?.(e) },
+      onPointerMove: (e) => { h.onPointerMove?.(e) },
+      onPointerUp: (e) => { h.onPointerUp?.(e); draggingRef.current = false },
+      onPointerCancel: (e) => { h.onPointerCancel?.(e); draggingRef.current = false },
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.handlers, draggingRef, pokeFrame])
 
   return (
     <>
       {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
       {pos && (hasMap ? (
-        <div className="map-vp" ref={view.vpRef} {...view.handlers}>
+        <div className="map-vp" ref={view.vpRef} {...handlers}>
           <div className="map-world" ref={worldRef} style={{ width: mapPx, height: mapPx }}>
             <img className="map-base" src={imgURL(`bigmap/${pos.img}.webp`)} alt={pos.sceneName}
               draggable={false} onError={() => setImgError(true)} />
