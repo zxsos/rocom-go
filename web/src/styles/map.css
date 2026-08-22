@@ -189,22 +189,31 @@
   animation: map-wild-rare-breathe 2.4s ease-in-out infinite;
 }
 .map-wild.rare .map-wild-face {
+  width: 100%; height: 100%;
   border-radius: 50%;
-  /* 头像撑满整个 40px 容器(无内描边);之前 2px 内描边 + border-box 让可见头像只剩 36px,
-     看起来「框比头像大一圈、空隙多」。改用细外描边靠光环承担主色,头像自身不再加描边。 */
+  overflow: hidden; /* 头像自身裁圆:下面 img 用 scale 放大裁掉资源留白后,靠这里裁回圆形 */
   border: none;
   background: var(--bg-1);
 }
+/* 头像本体放大,裁掉游戏资源 PNG 四周自带的透明留白——object-fit:cover 只裁尺寸不裁透明区,
+   故宠物主体在圆圈里偏小。scale 1.3 把主体撑满内圆,再被 .map-wild-face 的 overflow 裁圆。 */
+.map-wild.rare .map-wild-face img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transform: scale(1.3);
+  transform-origin: center;
+}
 /* 旋转光环:叠在头像外缘、沿边缘旋转的渐变细环,取主描边色(由 JS 的 p.style.borderColor 已
    作用在 .map-wild 上,这里读 currentColor 兜底金色)。用两个伪类叠出「亮-暗」流动感。
-   inset 紧贴头像外缘(-1px),厚度 2px——之前 inset -4px 让光环浮在头像外圈 4px 处,
-   头像看起来明显比外框小一圈、空隙大。 */
+   inset -2px 让环带中心落在头像外缘外一点,厚度 3px,包住已放满的头像(头像 scale 放大后
+   主体贴边,环若还紧贴内缘会与头像叠在一起、显脏);头像与环之间隔出约 1px 空隙,视觉
+   上「饱满头像 + 清晰外框」,不再「圈大像小」。 */
 .map-wild-rare-halo {
-  position: absolute; inset: -1px; border-radius: 50%;
+  position: absolute; inset: -3px; border-radius: 50%;
   pointer-events: none;
   background: conic-gradient(from 0deg, transparent 0 40%, #ffd54a 50%, #fff 55%, transparent 65% 100%);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
   animation: map-wild-rare-spin 3s linear infinite;
   opacity: .9;
   mix-blend-mode: screen;
@@ -216,8 +225,8 @@
 .map-wild-rare-halo::after {
   content: ''; position: absolute; inset: 0; border-radius: 50%;
   background: conic-gradient(from 180deg, transparent 0 55%, rgba(255, 255, 255, .85) 65%, transparent 75% 100%);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
   animation: map-wild-rare-spin 2.2s linear infinite reverse;
 }
 
@@ -370,6 +379,24 @@
   font-size: 13px; line-height: 1; color: #ffc107;
   text-shadow: 0 0 6px rgba(255, 193, 7, .55);
 }
+/* 双牌子滑块行:缩进 + 更小字号,金橙淡底延续双牌组的视觉归属。与上面 4 条单牌滑块
+   视觉区分(单牌用默认底色 + accent 轨道),让用户一眼看出"这是双牌专用阈值"。 */
+.map-medal-dual-sub {
+  margin: 2px 0 2px 24px; padding: 3px 10px 3px 8px;
+  border-radius: 8px; background: rgba(255, 193, 7, .03);
+  font-size: 12px; opacity: .92;
+}
+.map-medal-dual-sub .map-wild-swatch { width: 9px; height: 9px; }
+.map-medal-dual-sub .map-medal-val { color: #ffc107; opacity: .85; }
+/* 双牌轨道用金橙,与单牌的 accent 蓝区分;滑块拇指也金橙。 */
+.map-medal-dual-range { accent-color: #ffc107; }
+.map-medal-dual-range::-webkit-slider-thumb {
+  background: #ffc107; border-color: rgba(255, 193, 7, .4);
+}
+.map-medal-dual-range::-moz-range-thumb {
+  background: #ffc107; border-color: rgba(255, 193, 7, .4);
+}
+.map-medal-dual-sub:has(input:disabled) { opacity: .4; }
 
 /* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
    图标同样只定高不定宽(见上)。 */

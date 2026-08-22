@@ -13,6 +13,10 @@ import { getWildPets, subscribe } from '../../api'
 // 隔离旧选择(旧 v5 没有 all 键,loadState 会按默认补全)。
 // 再之后又加了「双牌」筛选(dual 字段):缺字段时默认关(=旧行为,只显示命中任一张奖牌
 // 的宠),不必再 bump。
+// 之后双牌从纯开关升级为**带独立阈值**的结构 { on, medals }:on 控开关,medals 是 4 条
+// 奖牌各一个**双牌专用阈值**(范围=[单牌当前阈值, 极端值],默认=单牌当前值,只严不宽)。
+// 双牌开后奖牌段改用双牌阈值判 ≥2 张,单牌阈值不再参与该段;旧 bool dual 自动迁移
+// (true→{on:true,medals:默认}, false/缺→{on:false,...}),不必 bump。
 const LS_KEY = 'map.wildLayers.v6'
 
 // 与数值无关的开关图层:一个开关可覆盖后端 kinds 里的**多个**类别(异色与炫彩合成一个);
@@ -45,6 +49,20 @@ const DEFAULT_SWITCHES = WILD_LAYERS.filter((l) => l.on).map((l) => l.k)
 // 奖牌开关:每条默认全开(与无开关时代的旧行为一致),用户可单独关掉某项。
 const MEDAL_KEYS = new Set(MEDAL_FILTERS.map((m) => m.k))
 const DEFAULT_MEDAL_ON = MEDAL_FILTERS.map((m) => m.k)
+
+// 双牌专用阈值的默认值 = 各奖牌单牌默认值(=奖牌边界)。双牌开后,4 条奖牌各有一个独立
+// 阈值,范围=[单牌当前阈值, 极端值](只严不宽,同方向),默认=单牌当前值——即"双牌不额外
+// 收紧",与纯开关时代的擦边双牌行为一致。用户拖严双牌子滑块时,双牌判定比单牌更严,
+// 但单牌阈值不受影响(两者解耦)。
+const DEFAULT_DUAL_MEDALS = { ...DEFAULT_MEDALS }
+
+// clampDual 把双牌阈值钳到合法范围 [单牌当前值, 极端值]内,保证双牌永远不比单牌宽。
+// dir>=': 阈值越大越严,双牌下限=单牌值,上限=hi;dir<=': 阈值越小越严,双牌上限=单牌值,
+// 下限=lo。单牌值变化时(用户拖严单牌),双牌若被越过会自动跟上,维持只严不宽。
+const clampDual = (m, dualVal, singleVal) =>
+  m.dir === '>='
+    ? Math.min(Math.max(dualVal, singleVal), m.hi)
+    : Math.max(Math.min(dualVal, singleVal), m.lo)
 
 // wildTags 把一只宠物命中的类别翻成悬浮提示上的标签(比图层名更细:图层把异色/炫彩合成
 // 一个开关,提示里仍分开说)。异色 + 炫彩兼具时游戏自己有个合称「异色炫彩」
@@ -128,16 +146,21 @@ export function medalMatch(m, p, medals) {
 // wildShown 判定一只宠当前能否在地图上「带环显示」——marks 过滤与稀有宠提醒共用的同一
 // 口径:开关图层(kinds 标签命中且该图层开关开)或奖牌(开关开且滑块数值阈值命中)任一命中
 // 即算。与 wildRing 的描边条件完全一致:能提醒的宠必然画得出环,画不出环的必不提醒。
-// dual 为真时奖牌段要求**同时命中 ≥2 张**(双牌宠):体重族(大块头/小不点)与嗓音族
-// (婉转声/粗嗓门)各自互斥,命中数上限就是 2。双牌只收紧奖牌段,不拦开关图层——异色/
-// 炫彩、污染照常显示,这类宠命中单张奖牌时仍会描边(对用户更有信息量)。
+// dual 是双牌筛选状态 { on, medals }:
+//   - on=false:奖牌段用单牌阈值 medals 判 ≥1 张(旧行为);
+//   - on=true :奖牌段改用双牌阈值 dual.medals 判 ≥2 张,单牌阈值**不参与**该段——双牌阈值
+//     默认=单牌值(擦边双牌),拖严后双牌比单牌更严,但两者解耦,互不影响。
+// 体重族(大块头/小不点)与嗓音族(婉转声/粗嗓门)各自互斥,命中数上限就是 2。双牌只收紧
+// 奖牌段,不拦开关图层——异色/炫彩、污染照常显示。
 export function wildShown(p, on, medals, medalOn, dual) {
   const kinds = p.kinds || []
+  const th = dual && dual.on ? dual.medals : medals
+  const minHits = dual && dual.on ? 2 : 1
   const medalHits = MEDAL_FILTERS.reduce(
-    (n, m) => n + (medalOn.has(m.k) && medalMatch(m, p, medals) ? 1 : 0), 0)
+    (n, m) => n + (medalOn.has(m.k) && medalMatch(m, p, th) ? 1 : 0), 0)
   return (
     WILD_LAYERS.some((l) => on.has(l.k) && l.kinds.some((k) => kinds.includes(k))) ||
-    medalHits >= (dual ? 2 : 1)
+    medalHits >= minHits
   )
 }
 
@@ -150,11 +173,15 @@ export function wildShown(p, on, medals, medalOn, dual) {
 // 可见度:命中奖牌(大块头/小不点/婉转声/粗嗓门)或异色/炫彩(全场最稀有,白色圆环)时
 // 描边加粗到 3px(普通图层仍走 CSS 默认 2px),并在最外圈补一圈主色柔光(0 0 8px 1px),
 // 让它们在深色底图上更跳眼;外环起点也随加粗整体外移一格,各环间距不变。
-export function wildRing(p, on, medals, medalOn) {
+export function wildRing(p, on, medals, medalOn, dual) {
   const kinds = p.kinds || []
+  // 描边阈值与 wildShown 同口径:双牌开时用双牌阈值,否则用单牌阈值。保证"画得出环的必然
+  // 在 marks 里,marks 里的必然画得出环"——双牌开时单牌阈值不参与判定,描边也不该按单牌
+  // 阈值画(否则会出现图上描了圈却被过滤掉的宠)。
+  const th = dual && dual.on ? dual.medals : medals
   const layers = [
     ...WILD_LAYERS.filter((l) => on.has(l.k) && l.kinds.some((k) => kinds.includes(k))),
-    ...MEDAL_FILTERS.filter((m) => medalOn.has(m.k) && medalMatch(m, p, medals)),
+    ...MEDAL_FILTERS.filter((m) => medalOn.has(m.k) && medalMatch(m, p, th)),
   ]
   if (layers.length === 0) return {}
   const medal = layers.some((l) => MEDAL_KEYS.has(l.k))
@@ -184,11 +211,13 @@ export function wildRing(p, on, medals, medalOn) {
 }
 
 // —— 存储:v5 起为一个对象 { on: 开关键数组, medals: {big:…}, open: 奖牌筛选是否展开,
-//   medalOn: 奖牌开关数组, dual: 双牌筛选(默认关) } ——
+//   medalOn: 奖牌开关数组, dual: 双牌筛选 { on, medals }(默认关) } ——
 // null = 用户从没手动选过(或旧格式),按默认值;数组只可能是旧键,同样回默认。
 // medalOn 是后加的字段,旧数据缺失时按默认(全开)处理,与无开关时代的旧行为一致。
+// dual 旧版是 boolean(true=纯开关双牌),现版是 { on, medals };迁移时旧 true→{on:true},
+// 旧 false/缺→{on:false},medals 缺失按 DEFAULT_DUAL_MEDALS 补(=单牌默认=擦边双牌)。
 const loadState = () => {
-  const base = { on: new Set(DEFAULT_SWITCHES), medals: { ...DEFAULT_MEDALS }, open: false, medalOn: new Set(DEFAULT_MEDAL_ON), dual: false }
+  const base = { on: new Set(DEFAULT_SWITCHES), medals: { ...DEFAULT_MEDALS }, open: false, medalOn: new Set(DEFAULT_MEDAL_ON), dual: { on: false, medals: { ...DEFAULT_DUAL_MEDALS } } }
   try {
     const v = JSON.parse(localStorage.getItem(LS_KEY))
     if (!v || typeof v !== 'object' || Array.isArray(v)) return base
@@ -201,13 +230,27 @@ const loadState = () => {
       }
     }
     const medalOn = new Set(Array.isArray(v.medalOn) ? v.medalOn.filter((k) => MEDAL_KEYS.has(k)) : DEFAULT_MEDAL_ON)
-    return { on, medals, open: !!v.open, medalOn, dual: !!v.dual }
+    // dual 迁移:旧 boolean 或缺失 → { on: !!v, medals: 默认 };新 { on, medals } 校验后采用,
+    // 阈值超出 [lo,hi] 的按默认补(单牌值变化后的联动在 setThreshold 里做,这里只做范围校验)。
+    let dual
+    if (v.dual && typeof v.dual === 'object' && !Array.isArray(v.dual)) {
+      const dm = { ...DEFAULT_DUAL_MEDALS }
+      if (v.dual.medals && typeof v.dual.medals === 'object') {
+        for (const m of MEDAL_FILTERS) {
+          const t = v.dual.medals[m.k]
+          if (typeof t === 'number' && t >= m.lo && t <= m.hi) dm[m.k] = t
+        }
+      }
+      dual = { on: !!v.dual.on, medals: dm }
+    } else {
+      dual = { on: !!v.dual, medals: { ...DEFAULT_DUAL_MEDALS } }
+    }
+    return { on, medals, open: !!v.open, medalOn, dual }
   } catch { return base }
 }
 const persist = (on, medals, open, medalOn, dual) => {
   localStorage.setItem(LS_KEY, JSON.stringify({ on: [...on], medals, open, medalOn: [...medalOn], dual }))
 }
-
 // useWildPets 管理野生宠物图层:订阅后端推送、按「开关 + 奖牌阈值」筛出可绘制的标记。
 export function useWildPets(account) {
   const [pets, setPets] = useState([])
@@ -300,7 +343,14 @@ export function useWildPets(account) {
       // range 的 0.1 步进值是 0.1 的浮点倍数(如 99.60000000000001),存前取整到十分位,
       // 保证侧栏显示与判定(medalMatch 内也 round1)拿到的都是干净的一位小数。
       const next = { ...prev, [k]: Math.round(v * 10) / 10 }
-      persist(on, next, open, medalOn, dual)
+      // 联动双牌:单牌拖严后,对应双牌阈值若被越过(双牌比单牌宽了)要自动跟上,维持
+      // T_dual ≥ T_single(只严不宽)。其余 3 条双牌阈值不动。dual 是对象,需新建引用触发更新。
+      const m = MEDAL_FILTERS.find((mm) => mm.k === k)
+      const newDual = m
+        ? { ...dual, medals: { ...dual.medals, [k]: clampDual(m, dual.medals[k], next[k]) } }
+        : dual
+      persist(on, next, open, medalOn, newDual)
+      setDual(newDual)
       return next
     })
   }
@@ -316,7 +366,20 @@ export function useWildPets(account) {
 
   const toggleDual = () => {
     setDual((prev) => {
-      const next = !prev
+      const next = { ...prev, on: !prev.on }
+      persist(on, medals, open, medalOn, next)
+      return next
+    })
+  }
+
+  // setDualThreshold 拖双牌子滑块:只改对应奖牌的双牌阈值,钳到 [单牌当前值, 极端值]内
+  // (保证不比单牌宽)。单牌值是下限/上限(取决于 dir),由 clampDual 处理方向。
+  const setDualThreshold = (k, v) => {
+    setDual((prev) => {
+      const m = MEDAL_FILTERS.find((mm) => mm.k === k)
+      if (!m) return prev
+      const clamped = clampDual(m, Math.round(v * 10) / 10, medals[k])
+      const next = { ...prev, medals: { ...prev.medals, [k]: clamped } }
       persist(on, medals, open, medalOn, next)
       return next
     })
@@ -339,7 +402,7 @@ export function useWildPets(account) {
   const marks = useMemo(() => {
     const rare = pets
       .filter((p) => wildShown(p, on, medals, medalOn, dual))
-      .map((p) => ({ ...p, style: wildRing(p, on, medals, medalOn) }))
+      .map((p) => ({ ...p, style: wildRing(p, on, medals, medalOn, dual) }))
     // 普通野生宠:all 开关打开时才加入,标记上挂 all:true 让渲染层用降级样式。
     const all = on.has('all')
       ? allPets.map((p) => ({ ...p, all: true, style: {} }))
@@ -352,6 +415,8 @@ export function useWildPets(account) {
   // 故也计入——否则侧栏显示 0 而图上还挂着几个,只会让人以为标记出错了。
   // 另单算其中的灰点数,供侧栏悬浮说明拆开「视野内 / 已离开」(见 LayerPanel)。
   // all 行的计数取 allPets 长度(普通宠不参与稀有类别的 kinds/奖牌命中判定)。
+  // 双牌行计数:双牌开时用双牌阈值判 ≥2 张,关时用单牌阈值判 ≥2(供侧栏参考,关时该
+  // 计数仍显示但不影响图上标记——关时图上按 ≥1 张显示)。
   const [num, numStale] = useMemo(() => {
     const hit = (l, p) => l.kinds
       ? (p.kinds || []).some((k) => l.kinds.includes(k))
@@ -359,12 +424,13 @@ export function useWildPets(account) {
     const count = (l, pick) => pets.filter((p) => pick(p) && hit(l, p)).length
     const num = Object.fromEntries([...WILD_LAYERS, ...MEDAL_FILTERS].map((l) => [l.k, l.k === 'all' ? allPets.length : count(l, () => true)]))
     const numStale = Object.fromEntries([...WILD_LAYERS, ...MEDAL_FILTERS].map((l) => [l.k, l.k === 'all' ? allPets.filter((p) => p.stale).length : count(l, (p) => p.stale)]))
-    // 双牌行计数:同一只宠同时命中 ≥2 张(开关开着、阈值命中)的奖牌判定;也单算灰点数。
-    const dualHit = (p) => MEDAL_FILTERS.filter((m) => medalOn.has(m.k) && medalMatch(m, p, medals)).length >= 2
+    // 双牌计数口径与 wildShown 的奖牌段一致:双牌开用双牌阈值,关用单牌阈值,判 ≥2 张。
+    const dualTh = dual && dual.on ? dual.medals : medals
+    const dualHit = (p) => MEDAL_FILTERS.filter((m) => medalOn.has(m.k) && medalMatch(m, p, dualTh)).length >= 2
     num.dual = pets.filter(dualHit).length
     numStale.dual = pets.filter((p) => p.stale && dualHit(p)).length
     return [num, numStale]
   }, [pets, allPets, on, medals, medalOn])
 
-  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, notify, toggleNotify }
+  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, setDualThreshold, notify, toggleNotify }
 }

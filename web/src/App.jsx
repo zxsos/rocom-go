@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
+import { useFullscreen } from './hooks/useFullscreen'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 const NAV = [
@@ -20,11 +21,29 @@ export default function App() {
   const [accounts, setAccounts] = useState([])
   const [account, setAccount] = useState(getCurrentAccount())
   const [icons, setIcons] = useState({ stat: {} })
+  const fullscreen = useFullscreen() // 网页全屏:全局入口,各页面都能用(原先只在宠物列表)
   const location = useLocation()
   // 双击当前激活的导航项:平滑滚动回页面顶部(非激活项照常跳转,不滚动)
   const onNavDoubleClick = (to) => () => {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // 截图防泄:窗口失焦(切到其他应用/截图工具)时给 <html> 打 data-blur,
+  // CSS 据此模糊顶栏里的昵称、UID、品牌副标题;窗口重新聚焦自动恢复。
+  useEffect(() => {
+    const on = () => document.documentElement.setAttribute('data-blur', '')
+    const off = () => document.documentElement.removeAttribute('data-blur')
+    window.addEventListener('blur', on)
+    window.addEventListener('focus', off)
+    // 页面隐藏(切 tab/最小化)也算失焦
+    const onVis = () => document.hidden ? on() : off()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('blur', on)
+      window.removeEventListener('focus', off)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -80,6 +99,13 @@ export default function App() {
         <header className="topbar">
           <div className="brand"><img className="brand-logo" src="/logo.svg" alt="" draggable={false} />小洛克的妙妙工具 <span className="brand-sub">宠物统计</span></div>
           <nav className="topnav">{navLinks('navlink')}</nav>
+          {fullscreen.supported && (
+            <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
+              onClick={fullscreen.toggle}
+              title={fullscreen.isFull ? '退出网页全屏' : '网页全屏'}>
+              {fullscreen.isFull ? '退出全屏' : '全屏'}
+            </button>
+          )}
           {accounts.length > 0 && (() => {
             const cur = accounts.find((a) => a.account === account)
             return (

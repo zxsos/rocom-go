@@ -6,17 +6,30 @@
 .topbar {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 16px; background: var(--bg-1); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; }
 .brand-logo { width: 22px; height: 22px; border-radius: 6px; flex: none; }
 .brand-sub { color: var(--fg-dim); font-weight: 400; font-size: 12px; margin-left: 4px; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
-  display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; color: var(--fg-dim);
+  display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); color: var(--fg-dim);
+  transition: background .15s ease, color .15s ease;
 }
 .navlink.active { background: var(--bg-3); color: var(--fg); }
-.navlink:hover { color: var(--fg); }
+.navlink:hover { color: var(--fg); background: var(--bg-2); }
+/* 顶栏全屏按钮:全局入口(原先只在宠物列表工具栏),随账号下拉一起靠右 */
+.topbar-fs {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--radius); cursor: pointer; font: inherit;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--fg);
+  transition: border-color .15s ease, background .15s ease, transform .08s ease;
+}
+.topbar-fs:hover { border-color: var(--accent); background: var(--accent-soft); }
+.topbar-fs:active { transform: scale(.97); }
+.topbar-fs:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.topbar-fs.on { color: var(--accent); border-color: var(--accent); }
 .account-wrap { margin-left: auto; position: relative; max-width: 240px; }
 .account-state { width: 14px; height: 14px; flex: none; }
 .account-select { max-width: 220px; }
@@ -27,8 +40,10 @@
   display: inline-flex; align-items: center; gap: 6px;
   width: 100%; text-align: left; cursor: pointer; font: inherit; color: var(--fg);
   /* 继承 .select 的背景/边框/圆角/内边距,这里只补 button 该有的重置 */
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px;
+  transition: border-color .15s ease, background .15s ease;
 }
+.account-trigger:hover { border-color: var(--accent); background: var(--accent-soft); }
 .account-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .account-trigger-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
@@ -39,18 +54,35 @@
   position: absolute; top: calc(100% + 4px); right: 0; left: 0; min-width: 100%;
   max-height: min(40vh, 320px); overflow-y: auto;
   list-style: none; margin: 0; padding: 4px; z-index: 50;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 .account-item {
   display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
   cursor: pointer; user-select: none;
+  transition: background .12s ease;
 }
 .account-item-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-item-uid { font-size: 12px; flex: none; }
 .account-item.hi { background: var(--bg-3); }
 .account-item.cur { color: var(--accent); }
 .account-item.cur .account-item-uid { color: var(--accent); opacity: .8; }
+
+/* ---- 截图防泄:窗口失焦时模糊顶栏敏感文字(昵称、UID、品牌副标题) ----
+   html[data-blur] 由 App.jsx 监听 window blur/visibilitychange 打上。
+   account-item-name/uid 也在内,确保展开下拉时同样模糊。 */
+html[data-blur] .brand-sub,
+html[data-blur] .account-trigger-name,
+html[data-blur] .account-item-name,
+html[data-blur] .account-item-uid {
+  filter: blur(5px);
+  transition: filter .12s ease;
+  user-select: none;
+}
+/* 聚焦回窗口时平滑恢复 */
+.brand-sub, .account-trigger-name, .account-item-name, .account-item-uid {
+  transition: filter .12s ease;
+}
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }
@@ -60,10 +92,11 @@
 @media (max-width: 760px) {
   .topnav { display: none; }
   .bottomnav {
-    display: flex; position: sticky; bottom: 0; z-index: 30; background: var(--bg-1);
+    display: flex; position: sticky; bottom: 0; z-index: 30;
+    background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
-  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; color: var(--fg-dim); }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; color: var(--fg-dim); transition: color .15s ease; }
   .tab.active { color: var(--accent); }
   .tab-icon { font-size: 18px; }
   .tab-label { font-size: 11px; }

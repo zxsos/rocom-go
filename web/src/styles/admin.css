@@ -3,7 +3,8 @@
 .admin-page { display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
 .admin-card {
   width: 100%; max-width: 340px; padding: 24px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   display: flex; flex-direction: column; gap: 12px;
 }
 .admin-card h2 { margin: 0; font-size: 18px; }
@@ -26,8 +27,10 @@
 .admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-rule-list li {
   display: flex; align-items: center; gap: 10px;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px;
+  transition: border-color .15s ease;
 }
+.admin-rule-list li:hover { border-color: var(--accent); }
 .rule-badge {
   flex: none; width: 20px; height: 20px; border-radius: 5px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -50,8 +53,10 @@
 .admin-stats-sum { display: flex; gap: 10px; flex-wrap: wrap; }
 .admin-stat-item {
   flex: 1; min-width: 90px; background: var(--bg-2); border: 1px solid var(--line);
-  border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border-radius: var(--radius); padding: 8px 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: border-color .15s ease;
 }
+.admin-stat-item:hover { border-color: var(--accent); }
 .admin-stat-item b { font-size: 20px; color: var(--fg); }
 .admin-stat-item span { font-size: 12px; color: var(--muted); }
 
@@ -109,8 +114,10 @@
 .admin-inject-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-inject-list li {
   display: flex; align-items: center; gap: 10px;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px;
+  transition: border-color .15s ease;
 }
+.admin-inject-list li:hover { border-color: var(--accent); }
 .admin-inject-name { font-size: 13px; color: var(--fg); }
 .admin-inject-kind {
   flex: none; font-size: 11px; color: var(--fg-dim);
