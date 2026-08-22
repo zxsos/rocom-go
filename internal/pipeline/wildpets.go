@@ -63,26 +63,17 @@ type wildPet struct {
 }
 
 // wildTracker 是一个连接在当前场景会话内的野生宠物观测态(换场景/传送即重置)。
+//   - pets:稀有类别(异色/炫彩/污染/奖牌四件套)的个体,前端按图层描边、可点资料卡;
+//   - all:其余普通野生宠,仅作「全部野生」图层的小头像点,不描边、不弹卡、不参与通知。
+// 两者键不重叠:同一 actor_id 若命中 wildKinds 进 pets,否则进 all。
 type wildTracker struct {
 	pets map[uint64]*wildPet
+	all  map[uint64]*wildPet
 	res  int32
 }
 
 func newWildTracker(res int32) *wildTracker {
-	return &wildTracker{pets: map[uint64]*wildPet{}, res: res}
-}
-
-// wildMatch 报告该实体是否是要标出的野生宠物。两道闸各有分工:
-//   - IsWildPet:实体自带身高体重 ⇒ 是一只宠物实体(静态 NPC/采集物/星星都没有这两项);
-//   - NpcPetBase:该 NPC 在**可丢球捕捉**清单里 ⇒ 是野外能抓的,不是家园里摆着的自己的宠物
-//     (实测家园场景的宠物 NPC——幽星光 710346、鸭吉吉 710012 等——同样带身高体重叫声,
-//     只靠第一道闸会把它们也标出来;它们的 NPC_CONF 没有 throwing_interact_type)。
-func (p *Pipeline) wildMatch(a scene.NpcActor) bool {
-	if !a.IsWildPet() || len(p.wildKinds(a)) == 0 {
-		return false
-	}
-	_, catchable := p.db.NpcPetBase(uint32(a.CfgID))
-	return catchable
+	return &wildTracker{pets: map[uint64]*wildPet{}, all: map[uint64]*wildPet{}, res: res}
 }
 
 // wildKinds 返回该实体命中的类别键;一只可同时命中多类。前端 WILD_LAYERS 的每个开关
@@ -145,26 +136,44 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 	}
 	for _, a := range actors {
 		// 涂地跟的是**全部**野生宠实体(见 paintSeen):任何一只下发,都证明玩家到它之间
-		// 这条线上的东西已经到手了,与它稀不稀有无关。下面的 wildMatch 才是地图标记那一套。
+		// 这条线上的东西已经到手了,与它稀不稀有无关。下面的稀有/普通双通道才是地图标记那一套。
 		// **首领除外**:它的下发距离是 150/200m 那两档(普通野生宠 80m,见 docs/data.md 3.7),
 		// 拿它当凭据会把中间那段其实没下发过普通野生宠的地方也涂上。
-		// 同理只认**可丢球捕捉**的(同 wildMatch 的第二道闸):家园宠、剧情/活动 NPC 也带身高体重,
+		// 同理只认**可丢球捕捉**的(同稀有通道的第二道闸):家园宠、剧情/活动 NPC 也带身高体重,
 		// 但它们不是野外刷出来的,下发规则未知,不该拿来当「这条线扫过了」的凭据。
-		if _, catchable := p.db.NpcPetBase(uint32(a.CfgID)); a.IsWildPet() && catchable && !p.db.IsNpcBoss(uint32(a.CfgID)) {
+		catchable := false
+		if _, ok := p.db.NpcPetBase(uint32(a.CfgID)); ok {
+			catchable = true
+		}
+		boss := p.db.IsNpcBoss(uint32(a.CfgID))
+		// 涂地凭据:可捕捉且非首领(首领下发距离不同,见上注)。
+		if a.IsWildPet() && catchable && !boss {
 			if cs.wildSeen == nil {
 				cs.wildSeen = map[uint64]scene.Position{}
 			}
 			cs.wildSeen[a.ActorID] = a.Pos
 		}
-		if !p.wildMatch(a) {
+		// 地图标记分两通道(与涂地凭据不同:稀有通道不排除首领——首领若是稀有个体照样标,
+		// 见 IsNpcBoss 注释「地图标记不受影响」):
+		//   - pets(稀有):IsWildPet && catchable && wildKinds 非空;描边/资料卡/通知。
+		//   - all(普通):上一条不成立、但 IsWildPet && catchable && !boss;只作小头像点。
+		// 首领若不是稀有(无 wildKinds)则两通道都不进——它不是「周围野生精灵」该列的。
+		rare := a.IsWildPet() && catchable && len(p.wildKinds(a)) > 0
+		var bucket map[uint64]*wildPet
+		switch {
+		case rare:
+			bucket = ts.pets
+		case a.IsWildPet() && catchable && !boss:
+			bucket = ts.all
+		default:
 			continue
 		}
-		if old, ok := ts.pets[a.ActorID]; ok { // 重新进入 AOI:复活标记
+		if old, ok := bucket[a.ActorID]; ok { // 重新进入 AOI:复活标记
 			old.pos, old.seenAt, old.left = a.Pos, now, false
 			changed = true
 			continue
 		}
-		ts.pets[a.ActorID] = &wildPet{
+		bucket[a.ActorID] = &wildPet{
 			actorID: a.ActorID, cfgID: a.CfgID, lv: a.Lv,
 			height: a.Height, weight: a.Weight, voice: a.Voice,
 			mutation: a.Mutation, glassType: a.GlassType, glassValue: a.GlassValue,
@@ -181,6 +190,10 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 			w.left = true
 			changed = true
 		}
+		if w, ok := ts.all[id]; ok && !w.left {
+			w.left = true
+			changed = true
+		}
 	}
 
 	// 自己丢球捉走的:实体不是「走远了」而是真没了,标记当场撤掉,不留灰点。
@@ -189,6 +202,10 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 		delete(cs.wildSeen, id)
 		if _, ok := ts.pets[id]; ok {
 			delete(ts.pets, id)
+			changed = true
+		}
+		if _, ok := ts.all[id]; ok {
+			delete(ts.all, id)
 			changed = true
 		}
 	}
@@ -213,6 +230,10 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 	for _, id := range scene.ParseBattleGoneNpcs(body) {
 		if _, ok := cs.wilds.pets[id]; ok {
 			delete(cs.wilds.pets, id)
+			changed = true
+		}
+		if _, ok := cs.wilds.all[id]; ok {
+			delete(cs.wilds.all, id)
 			changed = true
 		}
 	}
@@ -245,6 +266,18 @@ type wildMark struct {
 	Glass     string   `json:"glass,omitempty"`    // 炫彩外观描述(暗夜拾光 / 四角星·亮X暗 - 浅紫橙);空=非炫彩
 	Mutation  int32    `json:"mutation,omitempty"` // 原始 mutation_type 位标志(排查用)
 	Stale     bool     `json:"stale,omitempty"`    // 已离开 AOI:位置是最后所见,前端置灰
+}
+
+// wildAllMark 是「全部野生」图层的普通野生宠标记(稀有的走 wildMark,见上)。
+// 字段精简:普通宠在地图上只画小头像点,不描边、不弹资料卡、不参与通知,故不带 lv/weight/
+// voice/mutation/kinds/weightPct/glass——那些只对稀有筛选有意义,普通宠查了也白查。
+type wildAllMark struct {
+	ID    string  `json:"id"`
+	Name  string  `json:"n,omitempty"`  // 形态名(查表失败为空)
+	Img   string  `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
+	U     float64 `json:"u"`
+	V     float64 `json:"v"`
+	Stale bool    `json:"stale,omitempty"`
 }
 
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
@@ -297,7 +330,32 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 	// 顺序稳定(前端按 id 作 key,免得每次推送都重排 DOM)。
 	sort.Slice(marks, func(i, j int) bool { return marks[i].ID < marks[j].ID })
 
-	payload := map[string]any{"account": acc, "sceneResId": ts.res, "pets": marks}
+	// 「全部野生」图层:普通野生宠(未命中稀有类别的可捕捉个体)。与稀有通道同一次推送,
+	// 前端一个订阅即收齐两组。普通宠只查名/头像/投影,不带稀有的全量字段。
+	allMarks := []wildAllMark{}
+	for id, w := range ts.all {
+		if w.left && now.Sub(w.seenAt) > wildStaleTTL {
+			delete(ts.all, id)
+			continue
+		}
+		u, v, ok := p.db.Project(uint32(ts.res), w.pos.X, w.pos.Y)
+		if !ok {
+			continue
+		}
+		m := wildAllMark{
+			ID: strconv.FormatUint(w.actorID, 10), U: u, V: v, Stale: w.left,
+		}
+		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
+			if info, ok := p.db.PetBase(base); ok {
+				m.Name = info.Name
+			}
+			m.Img = p.db.PetImageByBase(base, false).Head
+		}
+		allMarks = append(allMarks, m)
+	}
+	sort.Slice(allMarks, func(i, j int) bool { return allMarks[i].ID < allMarks[j].ID })
+
+	payload := map[string]any{"account": acc, "sceneResId": ts.res, "pets": marks, "allPets": allMarks}
 	p.srv.SetLastWildPets(acc, payload)
 	p.srv.Hub().Broadcast("wildpets", acc, payload)
 }
