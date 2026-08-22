@@ -269,3 +269,44 @@ export const adminListInjects = () => adminFetch('/api/admin/injects').then(asyn
   if (!r.ok) throw new Error('拉取注入列表失败(' + r.status + ')')
   return r.json()
 })
+
+// —— 账号 PIN 保护 + 账号删除 ——
+
+// verifyAccountPin 校验账号 PIN;无 PIN 时返回 {ok,hasPin:false}。
+export async function verifyAccountPin(account, pin) {
+  const r = await fetch('/api/account/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account, pin }),
+  })
+  if (!r.ok) {
+    let msg = r.status === 401 ? 'PIN 错误' : r.status === 429 ? '尝试过于频繁,请稍后再试' : '校验失败(' + r.status + ')'
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+// setAccountPin 设置/修改/清除账号 PIN。
+// newPin 为空串=清除;非管理员需提供 oldPin(已设 PIN 时)。
+// 管理员操作自动带 X-Admin-Token(经 postJSON)。
+export function setAccountPin(account, oldPin, newPin) {
+  return postJSON('/api/account/pin', { account, oldPin, newPin })
+}
+
+// deleteAccount 删除账号及其全部数据;非管理员需提供 PIN。
+export function deleteAccount(account, pin) {
+  // 非管理员请求不走 adminFetch,单独 fetch
+  return fetch('/api/account', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...(getAdminToken() ? { 'X-Admin-Token': getAdminToken() } : {}) },
+    body: JSON.stringify({ account, pin }),
+  }).then(async (r) => {
+    if (!r.ok) {
+      let msg = r.status === 401 ? 'PIN 错误' : r.status === 403 ? '该账号未设 PIN,需管理员删除' : r.status === 429 ? '尝试过于频繁,请稍后再试' : '删除失败(' + r.status + ')'
+      try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+    return r.json()
+  })
+}

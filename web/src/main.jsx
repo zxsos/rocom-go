@@ -21,6 +21,7 @@ import './styles/detail.css'
 import './styles/map.css'
 import './styles/debug.css'
 import './styles/admin.css'
+import './styles/pin.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

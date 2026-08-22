@@ -1,0 +1,23 @@
+/* 账号 PIN 保护弹窗:校验/管理/删除账号三种模式复用。 */
+
+.pin-backdrop {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.pin-dialog {
+  width: 100%; max-width: 320px; padding: 20px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px;
+}
+.pin-title { font-weight: 700; font-size: 16px; }
+.pin-acct { font-size: 13px; color: var(--fg-dim); }
+.pin-err { color: var(--red); font-size: 13px; min-height: 18px; }
+.pin-warn { color: var(--red); font-size: 13px; line-height: 1.5; background: rgba(248, 81, 73, .1);
+  border-radius: var(--radius); padding: 8px 10px; }
+.pin-input { text-align: center; font-size: 18px; letter-spacing: .3em; }
+.pin-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.pin-submit { flex: 1; }
+.pin-clear-btn { color: var(--fg-dim); }
+.pin-danger-btn { background: var(--red); border-color: var(--red); color: #fff; flex: 1; }
+.pin-danger-btn:hover { background: #ff625a; border-color: #ff625a; background: var(--red); }

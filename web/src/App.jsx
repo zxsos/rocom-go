@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
+import { PinDialog } from './components/PinDialog'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 const NAV = [
@@ -23,6 +24,9 @@ export default function App() {
   const [icons, setIcons] = useState({ stat: {} })
   const fullscreen = useFullscreen() // 网页全屏:全局入口,各页面都能用(原先只在宠物列表)
   const location = useLocation()
+  // PIN 保护:切到有 PIN 的账号需先校验;pendingAccount=待切换账号,pinDialog=当前弹窗模式
+  const [pendingAccount, setPendingAccount] = useState(null)
+  const [pinDialog, setPinDialog] = useState(null) // null | { mode, account, name, hasPin }
   // 双击当前激活的导航项:平滑滚动回页面顶部(非激活项照常跳转,不滚动)
   const onNavDoubleClick = (to) => () => {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -49,14 +53,24 @@ export default function App() {
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
 
   // 拉账号列表;当前无选中(或选中的已不存在)时默认选最近活跃的第一个。
+  // 默认账号若设了 PIN 且未解锁,弹 PIN 框(首屏即拦截)。
   useEffect(() => {
     getAccounts().then((list) => {
       list = list || []
       setAccounts(list)
       const cur = getCurrentAccount()
-      if ((!cur || !list.some((a) => a.account === cur)) && list.length) {
-        setCurrentAccount(list[0].account)
-        setAccount(list[0].account)
+      const target = (cur && list.some((a) => a.account === cur)) ? cur
+        : (list.length ? list[0].account : '')
+      if (!cur || !list.some((a) => a.account === cur)) {
+        if (target) { setCurrentAccount(target); setAccount(target) }
+      }
+      // 首屏 PIN 拦截:默认账号有 PIN 且本会话未解锁
+      if (target) {
+        const acc = list.find((a) => a.account === target)
+        if (acc?.hasPin && sessionStorage.getItem('pin:' + target) !== '1') {
+          setPendingAccount(target)
+          setPinDialog({ mode: 'verify', account: target, name: acc.name, hasPin: true })
+        }
       }
     }).catch(() => {})
   }, [])
@@ -75,10 +89,26 @@ export default function App() {
     return () => clearInterval(timer)
   }, [accounts.length])
 
-  // 切换账号:更新 api.js 当前账号、清掉与旧账号绑定的盒子筛选,再切 state
+  // 刷新账号列表(PIN 变更/账号删除后调用)
+  const refreshAccounts = () => {
+    getAccounts().then((list) => { if (list) setAccounts(list) }).catch(() => {})
+  }
+
+  // 切换账号:若目标账号设了 PIN 且本会话未解锁,弹 PIN 框;否则直接切。
   // (下方 <main key={account}> 据此重挂各页,让其以新账号重新拉数据)。
   const switchAccount = (a) => {
     if (!a || a === account) return
+    const target = accounts.find((x) => x.account === a)
+    const hasPin = target?.hasPin
+    const unlocked = sessionStorage.getItem('pin:' + a) === '1'
+    if (hasPin && !unlocked) {
+      setPendingAccount(a)
+      setPinDialog({ mode: 'verify', account: a, name: target?.name, hasPin: true })
+      return
+    }
+    doSwitch(a)
+  }
+  const doSwitch = (a) => {
     setCurrentAccount(a)
     dropBoxFilter()
     setAccount(a)
@@ -114,6 +144,8 @@ export default function App() {
                 current={cur}
                 onChange={switchAccount}
                 uidOf={uidOf}
+                onManagePin={(acc) => setPinDialog({ mode: 'manage', account: acc.account, name: acc.name, hasPin: acc.hasPin })}
+                onDeleteAccount={(acc) => setPinDialog({ mode: 'delete', account: acc.account, name: acc.name, hasPin: acc.hasPin })}
               />
             )
           })()}
@@ -125,6 +157,32 @@ export default function App() {
 
         <nav className="bottomnav">{navLinks('tab')}</nav>
       </div>
+      {pinDialog && (
+        <PinDialog
+          mode={pinDialog.mode}
+          account={pinDialog.account}
+          name={pinDialog.name}
+          hasPin={pinDialog.hasPin}
+          onClose={() => { setPinDialog(null); setPendingAccount(null) }}
+          onVerified={() => {
+            // PIN 校验通过,执行待切换
+            setPinDialog(null)
+            if (pendingAccount) { doSwitch(pendingAccount); setPendingAccount(null) }
+            refreshAccounts()
+          }}
+          onDeleted={() => {
+            // 账号已删除:若删的是当前账号,切到列表第一个;刷新列表
+            setPinDialog(null)
+            setPendingAccount(null)
+            if (pinDialog.account === account) {
+              const remaining = accounts.filter((a) => a.account !== pinDialog.account)
+              if (remaining.length) { doSwitch(remaining[0].account) }
+              else { setCurrentAccount(''); setAccount('') }
+            }
+            refreshAccounts()
+          }}
+        />
+      )}
       </IconsContext.Provider>
     </AccountContext.Provider>
   )
@@ -134,7 +192,7 @@ export default function App() {
 // login.svg/logout.svg 状态图标——故用 div 模拟 dropdown。键鼠/触屏均可操作:
 // 鼠标点击展开/选条;键盘 ↑↓ 切换、Enter 选择、Esc 关闭。点外部自动收起。
 // 仍复用 .account-wrap/.account-state/.account-select 容器样式,只是下拉浮层是自绘。
-function AccountSelect({ accounts, current, onChange, uidOf }) {
+function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDeleteAccount }) {
   const [open, setOpen] = useState(false)
   const [hi, setHi] = useState(0) // 高亮项索引(键盘 ↑↓ 移动)
   const rootRef = useRef(null)
@@ -217,6 +275,7 @@ function AccountSelect({ accounts, current, onChange, uidOf }) {
         <span className="account-trigger-name">
           {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
         </span>
+        {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护">🔒</span>}
         <span className="account-caret">▾</span>
       </button>
       {open && (
@@ -237,9 +296,23 @@ function AccountSelect({ accounts, current, onChange, uidOf }) {
               <img className="account-state" src={a.online ? '/login.svg' : '/logout.svg'}
                 alt="" draggable={false} title={a.online ? '在线' : '离线'} />
               <span className="account-item-name">{a.name}</span>
+              {a.hasPin && <span className="account-item-pin" title="已设 PIN">🔒</span>}
               <span className="muted account-item-uid">UID:{uidOf(a.account)}</span>
             </li>
           ))}
+          {/* 当前账号的 PIN 管理 + 删除入口 */}
+          {current && (
+            <li className="account-item account-actions" onMouseEnter={() => setHi(-1)}>
+              <button className="btn small account-action-btn" onClick={(e) => {
+                e.stopPropagation(); setOpen(false)
+                onManagePin?.(current)
+              }}>管理 PIN</button>
+              <button className="btn small account-action-btn account-del-btn" onClick={(e) => {
+                e.stopPropagation(); setOpen(false)
+                onDeleteAccount?.(current)
+              }}>删除账号</button>
+            </li>
+          )}
         </ul>
       )}
     </div>

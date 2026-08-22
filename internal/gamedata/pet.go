@@ -145,6 +145,8 @@ type WildPetOption struct {
 
 // WildPetOptions 返回全部可投放的野生宠物形态(去重后按图鉴号升序)。数据源是
 // npc_pets(NPC_CONF→petbase),同一 petbase 可能有多个野生 NPC 映射,故按 petbase 去重。
+// 过滤掉没有可用普通小头像的形态:投放(异色/炫彩)前端地图标记都要靠小头像显示,
+// 列出无头像的精灵会让管理员注入后标记显示不出图,观感像「投放失败」。
 func (db *DB) WildPetOptions() []WildPetOption {
 	seen := map[uint32]bool{}
 	var out []WildPetOption
@@ -155,6 +157,9 @@ func (db *DB) WildPetOptions() []WildPetOption {
 		seen[base] = true
 		info, ok := db.petbase[base]
 		if !ok {
+			continue
+		}
+		if !db.HasHeadImage(base) {
 			continue
 		}
 		out = append(out, WildPetOption{Base: base, Name: info.Name, Book: info.Book, Shiny: db.HasShinyImage(base)})
@@ -176,6 +181,17 @@ func (db *DB) HasShinyImage(petbaseID uint32) bool {
 		return false
 	}
 	return e.SH != "" && db.imgFiles["HeadIcon/"+e.SH+".webp"]
+}
+
+// HasHeadImage 报告该 petbase 形态是否有可用的普通小头像(e.H 非空且对应 HeadIcon webp
+// 确已 embed)。投放炫彩只取普通小头像,管理员面板下拉据此过滤掉无头像的精灵,避免注入后
+// 前端地图标记因 img 为空而显示不出头像。
+func (db *DB) HasHeadImage(petbaseID uint32) bool {
+	e, ok := db.images[key(petbaseID)]
+	if !ok {
+		return false
+	}
+	return e.H != "" && db.imgFiles["HeadIcon/"+e.H+".webp"]
 }
 
 // IsNpcBoss 报告该 NPC(NPC_CONF.id)是不是野外首领(throwing_interact_type=4:祭礼巨像/

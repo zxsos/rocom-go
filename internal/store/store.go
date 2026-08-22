@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS pet_medal (
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
-  account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER
+  account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER, pin_hash TEXT
 );
 -- 连接会话:key 是会话密钥(供重启后对存活连接续解,见 docs/architecture.md 3),
 -- 其余几列是实时地图重启回显所需的现场(当前场景 / 家园房屋等级 / 所在区域)。
