@@ -228,7 +228,7 @@ export default function Admin() {
             <option value="">选择目标玩家</option>
             {accounts.map((a) => (
               <option key={a.account} value={a.account}>
-                {a.online ? '● ' : '○ '}{a.name} (UID:{(a.account || '').replace(/^UID:/, '')})
+                {a.online ? '🟢 ' : '🟥 '}{a.name} (UID:{(a.account || '').replace(/^UID:/, '')})
               </option>
             ))}
           </select>

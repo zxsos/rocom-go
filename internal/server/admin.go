@@ -422,8 +422,8 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	}
 	// 嗓音/身高/体重用合法范围内的随机个体值,模拟真实野生精灵的个体差异
 	// (固定取 0 或中值会让每只假精灵都一样,一眼假)。
-	weight := randRange(info.WeightLow, info.WeightHigh)
-	height := randRange(info.HeightLow, info.HeightHigh)
+	weight := randRange(int32(info.WeightLow), int32(info.WeightHigh))
+	height := randRange(int32(info.HeightLow), int32(info.HeightHigh))
 	voice := randRange(-100, 100)
 
 	id := "admin-inject-" + strconv.FormatInt(time.Now().UnixNano(), 36)

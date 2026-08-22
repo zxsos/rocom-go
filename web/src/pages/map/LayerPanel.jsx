@@ -14,7 +14,9 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
       <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={onClose} />
       <aside className={'filters map-filters' + (collapsed ? ' collapsed' : '')}>
         <div className="filters-bar">
-          <span className="filters-title">图层</span>
+          <span className="filters-title">
+            <span className="filters-title-ic">🗺️</span>图层
+          </span>
           {/* 桌面:收起按钮把侧栏折进地图(地图全宽),右上角 ☰ 可再展开;移动端:✕ 关抽屉 */}
           <button className="icon-btn map-sidebar-collapse" onClick={onCollapseSidebar}
             title="收起图层栏" aria-label="收起图层栏">◀</button>
@@ -72,7 +74,7 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
           <button className="map-medal-toggle" onClick={wilds.toggleOpen} aria-expanded={wilds.open}
             title="大块头/小不点/婉转声/粗嗓门的判定阈值,默认即奖牌边界,可调更严">
             <span>奖牌筛选</span>
-            <span className="muted">{wilds.open ? '▾' : '▸'}</span>
+            <span className="muted">▾</span>
           </button>
           {wilds.open && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
             const num = wilds.num[k] || 0

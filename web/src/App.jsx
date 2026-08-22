@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
@@ -78,21 +78,19 @@ export default function App() {
       <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar">
-          <div className="brand">洛克助手 <span className="brand-sub">宠物统计</span></div>
+          <div className="brand"><img className="brand-logo" src="/logo.svg" alt="" draggable={false} />小洛克的妙妙工具 <span className="brand-sub">宠物统计</span></div>
           <nav className="topnav">{navLinks('navlink')}</nav>
-          {accounts.length > 0 && (
-            <select
-              className="select account-select"
-              value={account} onChange={(e) => switchAccount(e.target.value)}
-              title="切换账号(玩家)"
-            >
-              {accounts.map((a) => (
-                <option key={a.account} value={a.account}>
-                  {a.online ? '● ' : '○ '}{a.name} (UID:{uidOf(a.account)})
-                </option>
-              ))}
-            </select>
-          )}
+          {accounts.length > 0 && (() => {
+            const cur = accounts.find((a) => a.account === account)
+            return (
+              <AccountSelect
+                accounts={accounts}
+                current={cur}
+                onChange={switchAccount}
+                uidOf={uidOf}
+              />
+            )
+          })()}
         </header>
 
         <main className="content" key={account}>
@@ -103,5 +101,121 @@ export default function App() {
       </div>
       </IconsContext.Provider>
     </AccountContext.Provider>
+  )
+}
+
+// AccountSelect 自定义账号下拉:原生 <option> 不支持内嵌 <img>,无法显示用户上传的
+// login.svg/logout.svg 状态图标——故用 div 模拟 dropdown。键鼠/触屏均可操作:
+// 鼠标点击展开/选条;键盘 ↑↓ 切换、Enter 选择、Esc 关闭。点外部自动收起。
+// 仍复用 .account-wrap/.account-state/.account-select 容器样式,只是下拉浮层是自绘。
+function AccountSelect({ accounts, current, onChange, uidOf }) {
+  const [open, setOpen] = useState(false)
+  const [hi, setHi] = useState(0) // 高亮项索引(键盘 ↑↓ 移动)
+  const rootRef = useRef(null)
+  const listRef = useRef(null)
+
+  // 点外部关闭
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  // 打开时把高亮重置为当前选中项,方便直接 ↑↓ 移动
+  useEffect(() => {
+    if (open) {
+      const idx = current ? accounts.findIndex((a) => a.account === current.account) : 0
+      setHi(idx < 0 ? 0 : idx)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 高亮项变化时滚动到可见(键盘 ↑↓ 时不至于飘出可见区)
+  useEffect(() => {
+    if (!open || !listRef.current) return
+    const el = listRef.current.children[hi]
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  }, [hi, open])
+
+  const choose = (a) => {
+    setOpen(false)
+    if (a.account !== current?.account) onChange(a.account)
+  }
+
+  const onKey = (e) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        setOpen(true)
+      }
+      return
+    }
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHi((i) => (i + 1) % accounts.length)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHi((i) => (i - 1 + accounts.length) % accounts.length)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (accounts[hi]) choose(accounts[hi])
+        break
+      case 'Escape':
+        e.preventDefault()
+        setOpen(false)
+        break
+      case 'Tab':
+        setOpen(false)
+        break
+    }
+  }
+
+  return (
+    <div className="account-wrap" ref={rootRef} onKeyDown={onKey}>
+      <button
+        type="button"
+        className={'select account-select account-trigger' + (open ? ' open' : '')}
+        onClick={() => setOpen((o) => !o)}
+        title="切换账号(玩家)"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {current && (
+          <img className="account-state" src={current.online ? '/login.svg' : '/logout.svg'}
+            alt="" draggable={false} title={current.online ? '在线' : '离线'} />
+        )}
+        <span className="account-trigger-name">
+          {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
+        </span>
+        <span className="account-caret">▾</span>
+      </button>
+      {open && (
+        <ul className="account-dropdown" ref={listRef} role="listbox">
+          {accounts.map((a, i) => (
+            <li
+              key={a.account}
+              role="option"
+              aria-selected={current && a.account === current.account}
+              className={
+                'account-item' +
+                (current && a.account === current.account ? ' cur' : '') +
+                (i === hi ? ' hi' : '')
+              }
+              onMouseDown={(e) => { e.preventDefault(); choose(a) }}
+              onMouseEnter={() => setHi(i)}
+            >
+              <img className="account-state" src={a.online ? '/login.svg' : '/logout.svg'}
+                alt="" draggable={false} title={a.online ? '在线' : '离线'} />
+              <span className="account-item-name">{a.name}</span>
+              <span className="muted account-item-uid">UID:{uidOf(a.account)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
