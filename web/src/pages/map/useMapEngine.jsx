@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from
 import { subscribe, getPosition } from '../../api'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
-import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, snap, posAt, makeAnchor } from './motion'
+import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, SMOOTH_CUTOFF, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
 import { useWildPets, wildTags } from './useWildPets'
@@ -76,13 +76,18 @@ export function useMapEngine(account, opts = {}) {
   const worldRef = useRef(null)
   const arrowRef = useRef(null)
   const lastFrameRef = useRef(null)
+  // rafRef 持有「确保 RAF 在跑」的函数:applyPos 写入新锚点后调一次,若 RAF 已因静止停止则重启。
+  // tick 静止退出前把 rafRef.current 置为重启函数;applyPos 调用它即恢复循环。
+  const rafRef = useRef(null)
 
   const applyFrame = useCallback(() => {
     const a = anchorRef.current
     const { zoom: z, follow: fl, vp: v } = stRef.current
     if (!a || !worldRef.current) return
     const dt = (performance.now() - a.t0) / 1000
-    const decay = Math.exp(-dt / SMOOTH_TAU)
+    // decay 在 dt 超过 SMOOTH_CUTOFF 后直接归零(不再用 e^(-dt/τ) 的亚像素小数):
+    // 否则玩家静止时 cu/cv 的极小残差经 snap 的 Math.round 在整数边界反复跳,箭头/地图每帧抖 1px。
+    const decay = dt >= SMOOTH_CUTOFF ? 0 : Math.exp(-dt / SMOOTH_TAU)
     const p = posAt(a, dt)
     const u = p.u + a.cu * decay
     const w = p.v + a.cv * decay
@@ -107,9 +112,31 @@ export function useMapEngine(account, opts = {}) {
 
   useEffect(() => {
     let raf = 0
-    const tick = () => { applyFrame(); raf = requestAnimationFrame(tick) }
+    const tick = () => {
+      applyFrame()
+      const a = anchorRef.current
+      // 锚点尚未就绪(尚未收到位置包):applyFrame 已判空 return,这里同样跳过静止判定,
+      // 续跑 RAF 等 applyPos 写入锚点。否则 const dt = ... - a.t0 直接抛 TypeError,RAF 链断掉,
+      // 之后 rafRef.current?.() 重启 tick 又抛——整个 RAF 永远起不来,地图不渲染,页面黑屏。
+      if (!a) { raf = requestAnimationFrame(tick); return }
+      // 静止判定:decay 已饱和(误差收敛完毕,dt 超过 SMOOTH_CUTOFF)、且锚点无速度也无轨迹回放。
+      // 满足这三条后画面值不再随 dt 变化,继续跑 RAF 只是无谓计算 + 字符串比较,且亚像素边界
+      // 抖动可能被放大。此时停 RAF,等 applyPos 写新锚点后经 rafRef 重启。
+      // 注意:有速度(vu/vv≠0)或轨迹回放(dt<GLIDE)时不能停,否则玩家在动画面会冻住。
+      const dt = (performance.now() - a.t0) / 1000
+      const moving = (a.vu || 0) !== 0 || (a.vv || 0) !== 0 || (a.cum && dt < 0.45)
+      if (dt >= SMOOTH_CUTOFF && !moving) {
+        raf = 0 // 已停,标记给 ensureRaf 知道下次需重启
+        return
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    // ensureRaf:若 RAF 没在跑则启动一帧。applyPos 写新锚点后调用——新锚点要么有速度(移动中)、
+    // 要么 dt 从 0 起算,都不满足静止条件,故 tick 会自然续跑。
+    const ensureRaf = () => { if (!raf) raf = requestAnimationFrame(tick) }
+    rafRef.current = ensureRaf
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => { if (raf) cancelAnimationFrame(raf); rafRef.current = null }
   }, [applyFrame])
   useLayoutEffect(applyFrame)
 
@@ -144,6 +171,9 @@ export function useMapEngine(account, opts = {}) {
     }
     anchorRef.current = makeAnchor(p, sceneChanged ? null : dispRef.current, sceneChanged)
     if (sceneChanged || !dispRef.current) focusRef.current = { u: p.u, v: p.v }
+    // 新锚点已写入:若 RAF 因上一段静止而停了,这里重启一帧;tick 检测到新锚点(dt 重置、
+    // 或有速度)不满足静止条件会自然续跑。layerOnly 分支不动锚点,故无需重启。
+    rafRef.current?.()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

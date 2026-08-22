@@ -42,17 +42,7 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .map-filters .filters-title-ic { font-size: 16px; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
-  /* 收起按钮的 .icon-btn 基础样式只在移动端块里定义(panel.css),桌面补一份 */
-  .map-filters .icon-btn {
-    width: 30px; height: 30px; display: grid; place-items: center; font-size: 14px;
-    background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; color: var(--fg);
-    transition: transform .2s ease, border-color .2s ease, color .2s ease, background-color .2s ease;
-  }
-  .map-filters .icon-btn:hover {
-    border-color: var(--accent); color: var(--accent);
-    background: rgba(76, 141, 255, .12);
-  }
-  /* 收起按钮:鼠标悬停向左滑出一点,提示「折叠」语义 */
+  /* 收起/关闭按钮的 hover 动效(基础样式由 base.css 全局 .icon-btn 提供) */
   .map-sidebar-collapse:hover { transform: translateX(-2px); }
   .map-sidebar-close:hover { transform: rotate(90deg); }
   .map-sidebar-close { display: none; }
