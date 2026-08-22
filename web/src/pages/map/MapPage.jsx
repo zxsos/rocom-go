@@ -41,14 +41,37 @@ export default function MapPage() {
 
   const [detailGid, setDetailGid] = useState(null) // 点小窝里的宠物 → 宠物详情弹窗
   const [wildTip, setWildTip] = useState(null) // 点中的野生宠物标记 → 资料卡(点击触发悬浮)
+  const [wildDist, setWildDist] = useState(null) // 点中时刻玩家↔宠物的直线距离(米;点击时的快照)
+  // onTap 是 [] 闭包,读不到最新的 pos / marks,用 ref 每次渲染同步,点击时才取值。
+  const posRef = useRef(null)
+  const wildsRef = useRef(null)
   // 地图内标记的「点一下」由 usePanZoom 判定后回调(平移要捕获指针,标记收不到 click),
   // 故这里认按下时的元素:落在住了宠物的小窝上就开详情,落在野生宠物上弹资料卡
   // (再点同一个关掉,点别处也关)。桌面 hover 的 title 照旧,两种触发方式并存。
   const onTap = useCallback((target) => {
     const gid = target.closest?.('.map-nest')?.dataset.gid
-    if (gid) { setDetailGid(Number(gid)); setWildTip(null); return }
-    const wid = target.closest?.('.map-wild')?.dataset.id
+    if (gid) { setDetailGid(Number(gid)); setWildTip(null); setWildDist(null); return }
+    // 普通野生宠(.map-wild-all):不弹资料卡、不算距离,点它只当点地图(拖动/关资料卡)。
+    const wildEl = target.closest?.('.map-wild')
+    if (wildEl?.classList.contains('map-wild-all')) {
+      setWildTip(null); setWildDist(null); return
+    }
+    const wid = wildEl?.dataset.id
     setWildTip((cur) => (wid ? (wid === cur ? null : wid) : null))
+    // 距离:点中时刻玩家↔宠物世界坐标(厘米)的直线距离,÷100 取整米。资料卡是点击时
+    // 的快照,不随玩家移动实时刷——否则位置推送会让 WildLayer 整层重渲染,得不偿失。
+    if (wid) {
+      const w = (wildsRef.current || []).find((x) => x.id === wid)
+      const p0 = posRef.current
+      if (w && p0 && w.x != null && p0.x != null) {
+        const dx = w.x - p0.x, dy = w.y - p0.y, dz = (w.z || 0) - (p0.z || 0)
+        setWildDist(Math.round(Math.hypot(dx, dy, dz) / 100))
+      } else {
+        setWildDist(null)
+      }
+    } else {
+      setWildDist(null)
+    }
   }, [])
 
   // 右上角 ☰:窄屏开/关图层抽屉,桌面折叠/展开图层侧栏(折叠后地图全宽)。
@@ -58,10 +81,12 @@ export default function MapPage() {
   }
 
   const hasMap = !!(pos && pos.u != null && pos.img && !imgError)
+  posRef.current = pos // 渲染时同步最新位置/标记,onTap(空依赖闭包)点击时经 ref 取值
   const view = usePanZoom(hasMap, onTap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
+  wildsRef.current = wilds.marks
   const home = useHomeNests(account)
   // 涂地:把「见到过野生宠物」的方向涂上色(玩家 ↔ 宠物之间那条带子),遍历找稀有个体时
   // 看哪片还没扫。分层地图与地表各涂各的,故要把当前层 id 一并给它。
@@ -204,7 +229,7 @@ export default function MapPage() {
                 只重渲染对应那一层。 */}
             <PoiLayer marks={pois.marks} mapPx={mapPx} />
             <NestLayer marks={home.marks} mapPx={mapPx} />
-            <WildLayer marks={wilds.marks} mapPx={mapPx} wildTip={wildTip} />
+            <WildLayer marks={wilds.marks} mapPx={mapPx} wildTip={wildTip} dist={wildDist} />
           </div>
           <div className="map-arrow" ref={arrowRef}>
             <svg viewBox="0 0 24 24" width="30" height="30">
@@ -278,11 +303,22 @@ const NestLayer = React.memo(({ marks, mapPx }) => (
 // 异色/炫彩头像右上角再叠游戏标记图(兼具用合成的异色炫彩图,与 badges 的 Marks 同口径);
 // 图标取自全局 IconsContext(启动拉一次,引用稳定,不影响本层 memo)。缺图时不叠加。
 // 桌面 hover 有 title 悬浮;触屏没有 hover,点一下弹资料卡(wildTip),点中放大提亮。
-// wildTip 是点选状态:只在它变化时(以及 marks/mapPx 变化时)重渲染这一层。
-const WildLayer = React.memo(({ marks, mapPx, wildTip }) => {
+// wildTip 是点选状态:只在它变化时(以及 marks/mapPx/dist 变化时)重渲染这一层。
+// dist 是点击时算好的距离快照(标量),位置推送不改它,故本层仍不受高频位置推送打扰。
+const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
   const icons = React.useContext(IconsContext)
   return (
     <>{marks.map((p) => {
+      // 普通野生宠(「全部野生」图层):只画小头像点,无描边/标记图/资料卡;title 只给名字。
+      if (p.all) {
+        return (
+          <div key={p.id} data-id={p.id} title={p.n || '野生宠物'}
+            className={'map-wild map-wild-all' + (p.stale ? ' stale' : '')}
+            style={{ left: p.u * mapPx, top: p.v * mapPx }}>
+            {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+          </div>
+        )
+      }
       const tip = wildTip === p.id
       const kinds = p.kinds || []
       const mark = (kinds.includes('shiny') && kinds.includes('colorful') && icons.shinyColorful) ||
@@ -302,6 +338,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip }) => {
             <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
             <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
             <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
+            <div className="twd">距离 {dist != null ? dist : '-'} 米</div>
             {p.stale && <div className="tws">已离开视野</div>}
           </div>
         ),

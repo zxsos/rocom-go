@@ -140,6 +140,17 @@
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
 
+/* 「全部野生」图层的普通野生宠:尺寸缩小(22px vs 稀有 30px)、压暗降饱和,不抢稀有层视觉;
+   不放大提亮、不可点资料卡——普通宠满地都是,只作「周围有什么」的概览,细节一律不给。
+   pointer 退回 default,让点它等于点地图(拖动/关资料卡)。仍保留 data-id 以便调试。 */
+.map-wild-all {
+  width: 22px; height: 22px;
+  opacity: .55; filter: grayscale(.4);
+  cursor: default;
+}
+.map-wild-all:hover { transform: translate(-50%, -50%); filter: grayscale(.4); }
+.map-wild-all.stale { opacity: .25; }
+
 /* 野生宠物资料卡:点一下标记弹出(触屏没有 hover 时的等价物),悬在该标记正上方。
    内容比悬浮那行全:名称/Lv、标签、体重/嗓音、坐标;pointer-events:none 免得挡住
    下面标记的点击。按标记中心点定位,整体上移「自身高度 + 12px」。 */
@@ -158,6 +169,8 @@
 .map-wild-tip .twt { color: var(--fg-dim); }
 .map-wild-tip .twr { color: var(--fg-dim); }
 .map-wild-tip .twc { color: var(--fg-dim); opacity: .8; }
+/* 距离行:玩家↔宠物直线距离(米)。比坐标行亮一档,是点资料卡时最关心的信息。 */
+.map-wild-tip .twd { color: var(--fg); opacity: .9; }
 .map-wild-tip .tws { color: var(--red); }
 
 /* 图层侧栏里野生宠物那几行:没有图标,用一个同色小圆点代表标记描边色(色值同样来自 JS)。 */

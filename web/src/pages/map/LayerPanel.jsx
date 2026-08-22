@@ -45,7 +45,7 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
           <div className="map-layer-row">
             <button className={'map-layer-btn map-notify-btn' + (wilds.notify ? ' on' : '')}
               onClick={wilds.toggleNotify}
-              title="异色/炫彩/污染/奖牌四件套新出现时弹系统通知并播放提示音(需允许通知权限;仅地图页打开时有效)">
+              title="只有能在地图上带环显示(当前开着且命中的图层/奖牌筛选)的稀有宠新出现才提醒;画不出环的不提醒(需允许通知权限;仅地图页打开时有效)">
               <span className="map-notify-ic">🔔</span>
               <span className="map-layer-name">稀有宠出现提醒</span>
               <span className="muted">{wilds.notify ? '开' : '关'}</span>
