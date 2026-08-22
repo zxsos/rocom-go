@@ -4,7 +4,6 @@ import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './a
 import { AccountContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
 import { PinDialog } from './components/PinDialog'
-import FloatingHost from './components/FloatingHost'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 const NAV = [
@@ -33,40 +32,40 @@ export default function App() {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // 截图防泄:窗口失焦/鼠标移出窗口/页面隐藏时给 <html> 打 data-blur,
-  // CSS 据此模糊顶栏里的昵称、UID、品牌副标题;窗口重新聚焦/鼠标进入时恢复。
-  // 另提供手动「隐私」开关:点击锁定模糊态(截图时主动开启),再点解锁;锁定期间不受
-  // focus/mouseenter 影响。window.blur 在很多截图工具下不触发(截图工具多以 overlay 覆盖
-  // 而非抢焦点),故同时用 mouseleave 兜底,并保留手动开关作为最可靠的兜底。
-  const [blurLocked, setBlurLocked] = useState(false) // 手动锁定的模糊态
+  // 截图防泄(反向):默认隐藏(打 data-blur),只有窗口真正聚焦 + 鼠标在窗口内 + 页面
+  // 可见,三者都满足时才显示。窗口失焦/鼠标移出/切 tab 任一发生即恢复隐藏。
+  // 平时看不到 UID/昵称,只有用户主动盯着页面看时才显示——窗口焦点本身就是显示开关。
+  const inWindowRef = useRef(true) // 鼠标是否在窗口内(必须在组件顶层声明,不能在 effect 里调 hook)
   useEffect(() => {
     const root = document.documentElement
     const apply = () => root.setAttribute('data-blur', '')
-    const clear = () => { if (!blurLocked) root.removeAttribute('data-blur') }
-    const on = () => apply()
-    const off = () => clear()
-    // 鼠标离开窗口区域:截图框选前鼠标常先移出,比 window.blur 更可靠
-    const onLeave = (e) => { if (e.relatedTarget === null) apply() }
-    const onEnter = () => clear()
-    window.addEventListener('blur', on)
-    window.addEventListener('focus', off)
+    const clear = () => root.removeAttribute('data-blur')
+    // 三重判定的"显示"条件:窗口聚焦 + 鼠标在窗口内 + 页面可见
+    const hasFocus = () => document.hasFocus() && !document.hidden
+    const recheck = () => {
+      if (hasFocus() && inWindowRef.current) clear()
+      else apply()
+    }
+    const onBlur = () => recheck()
+    const onFocus = () => recheck()
+    const onLeave = (e) => { if (e.relatedTarget === null) { inWindowRef.current = false; recheck() } }
+    const onEnter = () => { inWindowRef.current = true; recheck() }
+    const onVis = () => recheck()
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
     document.addEventListener('mouseleave', onLeave)
     document.addEventListener('mouseenter', onEnter)
-    // 页面隐藏(切 tab/最小化)也算失焦
-    const onVis = () => document.hidden ? on() : off()
     document.addEventListener('visibilitychange', onVis)
-    // 手动锁定时强制打上;解锁时立即移除(否则解锁后若窗口一直处于焦点,
-    // 没有新的 focus/鼠标进入事件触发移除,表现为"只能打开不能关闭")
-    if (blurLocked) apply()
-    else root.removeAttribute('data-blur')
+    // 初次挂载:默认隐藏
+    apply()
     return () => {
-      window.removeEventListener('blur', on)
-      window.removeEventListener('focus', off)
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
       document.removeEventListener('mouseleave', onLeave)
       document.removeEventListener('mouseenter', onEnter)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [blurLocked])
+  }, [])
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -155,11 +154,6 @@ export default function App() {
               {fullscreen.isFull ? '退出全屏' : '全屏'}
             </button>
           )}
-          <button type="button" className={'topbar-fs' + (blurLocked ? ' on' : '')}
-            onClick={() => setBlurLocked((v) => !v)}
-            title={blurLocked ? '取消隐私遮罩(恢复显示昵称/UID)' : '隐私遮罩(模糊昵称/UID,截图前开启)'}>
-            {blurLocked ? '遮罩中' : '隐私'}
-          </button>
           {accounts.length > 0 && (() => {
             const cur = accounts.find((a) => a.account === account)
             return (
@@ -180,9 +174,6 @@ export default function App() {
         </main>
 
         <nav className="bottomnav">{navLinks('tab')}</nav>
-
-        {/* 全局浮窗挂载点:不走路由,切页面不卸载;位于两个 Provider 内部拿到 account/icons */}
-        <FloatingHost />
       </div>
       {pinDialog && (
         <PinDialog
