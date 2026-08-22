@@ -355,6 +355,21 @@
   width: 10px; height: 10px; border-radius: 50%;
   background: var(--accent); border: 2px solid #fff;
 }
+/* 双牌行:奖牌筛选的「元筛选」,没有自己的阈值滑块——要求同一只宠同时命中 ≥2 张奖牌判定
+   (体重族+嗓音族各一,上限就是 2,见 useWildPets 的 wildShown)。金橙高亮与 4 条单值滑块
+   区分,✧ 为组合徽标。 */
+.map-medal-dual {
+  margin-top: 5px; padding: 5px 10px;
+  border-radius: 10px; background: rgba(255, 193, 7, .06);
+  border: 1px dashed rgba(255, 193, 7, .3);
+}
+.map-medal-dual .map-layer-name { color: var(--fg); }
+.map-medal-dual .map-collect-btn { width: 24px; }
+.map-medal-dual-ic {
+  flex: none; width: 14px; text-align: center;
+  font-size: 13px; line-height: 1; color: #ffc107;
+  text-shadow: 0 0 6px rgba(255, 193, 7, .55);
+}
 
 /* 图层开关(左侧栏内):整行一个,图标 + 名称 + 点数;可收集图层的行右侧再挂一个收集模式小开关。
    图标同样只定高不定宽(见上)。 */
