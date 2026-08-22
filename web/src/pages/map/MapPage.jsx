@@ -34,7 +34,7 @@ export default function MapPage() {
         <div className="map-float-host-card">
           <div className="map-float-host-ic">🗺️</div>
           <div className="map-float-host-text">地图已开浮窗</div>
-          <div className="muted">浮窗在屏幕上(可拖动/置顶),此页暂停以省性能</div>
+          <div className="muted">浮窗已悬浮在屏幕上(桌面可拖出浏览器,手机可进系统画中画)</div>
           <button className="btn primary" onClick={() => setFloatState({ open: false, mode: null })}>
             关闭浮窗
           </button>

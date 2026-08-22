@@ -2,49 +2,51 @@ import React, { useState, useEffect, useRef, useCallback, useContext } from 'rea
 import { createPortal } from 'react-dom'
 import { AccountContext, IconsContext } from '../context'
 import { useMapEngine, MapViz } from '../pages/map/useMapEngine.jsx'
+import { imgURL } from './icons'
 import LayerPanel from '../pages/map/LayerPanel'
 import { pipSupported, setFloatState } from '../pages/map/floatState'
 
-// FloatingMap 浮窗:运行时检测 documentPictureInPicture,
-//   - 支持(桌面 Chrome/Edge):把地图 DOM 搬进浏览器原生画中画窗口,可拖出浏览器/跨屏/OS 置顶;
-//   - 不支持(手机/旧浏览器):在页面内挂一个 fixed 可拖拽缩放的 Web 浮窗。
+// FloatingMap 浮窗:两档,按设备能力自动选。
+//   1. documentPictureInPicture(桌面 Chrome/Edge/Firefox 151+):任意 DOM 进 OS 级浮窗,可移出浏览器;
+//   2. video PiP(Android Chrome 8.0+ 等):地图 canvas → captureStream → video → requestPictureInPicture,
+//      系统级浮窗(可移出浏览器、置顶),但只读(不能点标记/拖地图,只能看)。
+// 不支持以上两者的环境(如 iOS Safari)不弹浮窗:点"开浮窗"会提示当前浏览器不支持。
 // 浮窗与主页面互斥:开启时主页面 MapPage 渲染占位(见 MapPage 的 floatOpen 检测)。
 // 复用同一条 SSE 连接(全局单例),复用同套图层数据 hook(各自 useMapEngine 实例)。
 
-const WEB_FLOAT_KEY = 'map.webFloatBox' // { x, y, w, h, collapsed }
+// videoPiPSupported:检测 video requestPictureInPicture 是否可用(Android Chrome 等)。
+// 注意:PiP API 仅在安全上下文(HTTPS/localhost)真正可用。非安全上下文下
+//   pictureInPictureEnabled 仍可能是 true(feature detection 不拦),但实际调
+//   requestPictureInPicture() 会 reject 或进 PiP 后黑屏。所以这里加 isSecureContext 判断。
+const videoPiPSupported = typeof document !== 'undefined'
+  && 'pictureInPictureEnabled' in document
+  && document.pictureInPictureEnabled
+  && (typeof window !== 'undefined' ? window.isSecureContext : true)
 
-// loadBox 读本地保存的 Web 浮窗位置/尺寸(无记录给默认)。
-function loadBox() {
-  try {
-    const v = JSON.parse(localStorage.getItem(WEB_FLOAT_KEY))
-    if (v && typeof v === 'object' && !Array.isArray(v)) {
-      return {
-        x: typeof v.x === 'number' ? v.x : 40,
-        y: typeof v.y === 'number' ? v.y : 80,
-        w: typeof v.w === 'number' ? Math.max(280, v.w) : 380,
-        h: typeof v.h === 'number' ? Math.max(280, v.h) : 380,
-      }
-    }
-  } catch { /* ignore */ }
-  return { x: 40, y: 80, w: 380, h: 380 }
-}
+// PIP_AUTO_KEY:记录用户是否偏好"开浮窗即自动进入系统画中画"(video-pip 模式)。
+// Android 上每次都要用户手势触发 requestPictureInPicture,但首次授权后,之后可自动进。
+// 默认 false(避免首次就自动调被拦截);用户成功进过一次后改为 true。
+const PIP_AUTO_KEY = 'map.pipAuto'
 
-// PiP 模式:用 documentPictureInPicture 开一个独立窗口,把浮窗内容渲染进去。
-// React 18 的 createPortal 可以目标到外部 document 的节点。
 export default function FloatingMap() {
-  const [mode, setMode] = useState(() => (pipSupported ? 'pip' : 'web'))
-  // PiP 窗口:持有 window 对象;关闭时 null。
+  // 模式选择:documentPiP(桌面) > videoPiP(Android) > none(不支持)
+  const [mode, setMode] = useState(() => {
+    if (pipSupported) return 'pip'
+    if (videoPiPSupported) return 'video-pip'
+    return 'none'
+  })
   const [pipWin, setPipWin] = useState(null)
-  // Web 浮窗容器节点(PiP 不可用时用)。
-  const webRootRef = useRef(null)
 
-  // 关闭浮窗:PiP 先关窗口,Web 直接卸载。
   const close = useCallback(() => {
     if (mode === 'pip' && pipWin) { try { pipWin.close() } catch { /* ignore */ } }
+    // video-pip 退出 PiP:document.exitPictureInPicture() 在卸载时由 effect 清理
+    if (mode === 'video-pip' && document.pictureInPictureElement) {
+      try { document.exitPictureInPicture() } catch { /* ignore */ }
+    }
     setFloatState({ open: false, mode: null })
   }, [mode, pipWin])
 
-  // PiP 模式:开窗口。请求失败(权限/不支持)时回退到 Web 浮窗。
+  // documentPiP 模式:开窗口。请求失败回退到 none。
   useEffect(() => {
     if (mode !== 'pip') return
     let cancelled = false
@@ -52,11 +54,8 @@ export default function FloatingMap() {
     container.style.cssText = 'width:100vw;height:100vh;margin:0;padding:0;'
     ;(async () => {
       try {
-        const w = await window.documentPictureInPicture.requestWindow({
-          width: 420, height: 420,
-        })
-        if (cancelled) { try { w.close() } catch { /* ignore */ } return }
-        // 复制基础样式:让浮窗内主题色/字体与主页一致。
+        const w = await window.documentPictureInPicture.requestWindow({ width: 420, height: 420 })
+        if (cancelled) { try { w.close() } catch {} return }
         copyStylesInto(w.document)
         w.document.body.style.cssText = 'margin:0;padding:0;background:#0b0e13;overflow:hidden;font-family:inherit;'
         w.document.body.appendChild(container)
@@ -66,141 +65,158 @@ export default function FloatingMap() {
         })
         setPipWin(w)
       } catch {
-        // 请求失败:回退 Web 浮窗。
-        setMode('web')
+        setMode('none')
       }
     })()
     return () => { cancelled = true }
   }, [mode])
 
-  // Web 浮窗模式:渲染到 body 下的一个 fixed 容器。
   if (mode === 'pip') {
-    if (!pipWin) return null // 等待窗口开启
+    if (!pipWin) return null
     return createPortal(
       <FloatingContent onClose={close} floatMode="pip" />,
       pipWin.document.body.firstChild || pipWin.document.body,
     )
   }
-  // Web 浮窗
+  if (mode === 'video-pip') {
+    return createPortal(
+      <FloatingContent onClose={close} floatMode="video-pip" />,
+      document.body,
+    )
+  }
+  // 不支持任何 PiP:给个提示卡,用户可关闭浮窗回到主页面地图。
   return createPortal(
-    <FloatingContent onClose={close} floatMode="web" />,
+    <div className="map-float-unsupported">
+      <div className="map-float-unsupported-card">
+        <div className="map-float-unsupported-ic">🚫</div>
+        <div className="map-float-unsupported-text">当前环境不支持地图浮窗</div>
+        <div className="muted">
+          系统画中画要求 HTTPS 或 localhost 访问
+          (当前 {typeof location !== 'undefined' ? location.protocol + '//' + location.host : '—'} 不是安全上下文)。
+          桌面 Chrome/Edge/Firefox 或 Android Chrome 走 HTTPS 即可启用;iOS 暂不支持。
+        </div>
+        <button className="btn primary" onClick={close}>关闭</button>
+      </div>
+    </div>,
     document.body,
   )
 }
 
 // copyStylesInto 把主页的 <style> 与 <link> 复制到 PiP 窗口,让浮窗内样式一致。
-// embed 的 CSS 经 Vite 打包成 <style> 或 <link>,逐一克隆即可。
 function copyStylesInto(targetDoc) {
   try {
     document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-      try {
-        const clone = node.cloneNode(true)
-        targetDoc.head.appendChild(clone)
-      } catch { /* 个别节点跨 document 克隆失败,忽略 */ }
+      try { targetDoc.head.appendChild(node.cloneNode(true)) } catch {}
     })
-  } catch { /* ignore */ }
+  } catch {}
 }
 
-// FloatingContent 浮窗内容本体:自带 useMapEngine(独立 RAF,主页面已卸载,无冗余),
-// 渲染 MapViz + 简化版图层入口(PiP 模式下窗口很小,图层栏放折叠按钮,点开浮层)。
+// FloatingContent 浮窗内容本体:自带 useMapEngine(独立 RAF,主页面已卸载)。
+// - pip 模式:渲染 MapViz(DOM)到 documentPiP 窗口。
+// - video-pip 模式:渲染 MapCanvasViz(canvas)到页内底部小窗 + 隐藏 video,用户点按钮进系统 PiP。
 function FloatingContent({ onClose, floatMode }) {
   const account = useContext(AccountContext)
   const engine = useMapEngine(account, { floating: true })
-  // Web 浮窗的位置/尺寸/折叠态
-  const [box, setBox] = useState(() => loadBox())
-  const [collapsed, setCollapsed] = useState(false) // 收起成小条(只留标题栏)
-  const [layersOpen, setLayersOpen] = useState(false) // 图层浮层(移动抽屉式)
-  const dragRef = useRef(null) // 拖拽中:{ startX, startY, boxX, boxY, mode }
+  const [layersOpen, setLayersOpen] = useState(false)
+  // video-pip 专属
+  const canvasRef = useRef(null)
+  const videoRef = useRef(null)
+  const [pipActive, setPipActive] = useState(false)
+  const [pipError, setPipError] = useState('')
 
-  // 持久化 Web 浮窗位置/尺寸。
+  // video-pip:canvas → captureStream → video.srcObject → play。
+  // 非安全上下文(非 HTTPS/非 localhost)下不创建 video 元素,此 effect 提前返回。
   useEffect(() => {
-    if (floatMode !== 'web') return
-    const t = setTimeout(() => {
-      try { localStorage.setItem(WEB_FLOAT_KEY, JSON.stringify(box)) } catch { /* ignore */ }
-    }, 400)
-    return () => clearTimeout(t)
-  }, [box, floatMode])
+    if (floatMode !== 'video-pip') return
+    if (typeof window !== 'undefined' && !window.isSecureContext) return
+    const cv = canvasRef.current, vd = videoRef.current
+    if (!cv || !vd) return
+    cv.width = 480; cv.height = 480
+    let stream
+    try { stream = cv.captureStream(15) } catch { setPipError('captureStream 不可用'); return }
+    vd.srcObject = stream
+    vd.muted = true
+    vd.play().catch(() => setPipError('video 播放被拦截(需用户手势)'))
+    const onLeave = () => setPipActive(false)
+    vd.addEventListener('leavepictureinpicture', onLeave)
+    // 若用户之前成功进过 PiP 且偏好自动,则尝试自动进入(仍需 video 已 play,失败静默)
+    const auto = localStorage.getItem(PIP_AUTO_KEY) === '1'
+    if (auto) {
+      vd.play().then(() => vd.requestPictureInPicture()
+        .then(() => { setPipActive(true); setPipError('') })
+        .catch(() => {})).catch(() => {})
+    }
+    return () => {
+      vd.removeEventListener('leavepictureinpicture', onLeave)
+      try { vd.pause() } catch {}
+      if (document.pictureInPictureElement) { try { document.exitPictureInPicture() } catch {} }
+    }
+  }, [floatMode])
 
-  // 拖拽手柄(标题栏):按下后移动整个浮窗。Web 浮窗专属;PiP 窗口由 OS 拖。
-  const onHandleDown = useCallback((e) => {
-    if (floatMode !== 'web') return
-    if (e.button != null && e.button !== 0) return
-    const startX = e.clientX, startY = e.clientY
-    const { x, y } = box
-    dragRef.current = { startX, startY, x, y, mode: 'move' }
-    const onMove = (ev) => {
-      const d = dragRef.current
-      if (!d || d.mode !== 'move') return
-      const nx = Math.max(0, Math.min(window.innerWidth - 80, d.x + (ev.clientX - d.startX)))
-      const ny = Math.max(0, Math.min(window.innerHeight - 40, d.y + (ev.clientY - d.startY)))
-      setBox((b) => ({ ...b, x: nx, y: ny }))
-    }
-    const onUp = () => {
-      dragRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    e.preventDefault()
-  }, [box, floatMode])
-
-  // 缩放手柄(右下角):拖动改变尺寸。
-  const onResizeDown = useCallback((e) => {
-    if (floatMode !== 'web') return
-    if (e.button != null && e.button !== 0) return
-    e.preventDefault()
-    e.stopPropagation()
-    const startX = e.clientX, startY = e.clientY
-    const { w, h } = box
-    dragRef.current = { startX, startY, w, h, mode: 'resize' }
-    const onMove = (ev) => {
-      const d = dragRef.current
-      if (!d || d.mode !== 'resize') return
-      const nw = Math.max(280, d.w + (ev.clientX - d.startX))
-      const nh = Math.max(280, d.h + (ev.clientY - d.startY))
-      setBox((b) => ({ ...b, w: nw, h: nh }))
-    }
-    const onUp = () => {
-      dragRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [box, floatMode])
-
-  // PiP 模式:容器撑满 PiP 窗口;Web 模式:按 box 定位。
-  const containerStyle = floatMode === 'pip'
-    ? { position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column' }
-    : {
-        position: 'fixed', left: box.x, top: box.y, width: box.w,
-        height: collapsed ? 40 : box.h,
-        display: 'flex', flexDirection: 'column',
-        zIndex: 99998,
-        transition: collapsed ? 'height .18s ease' : 'none',
+  // enterPiP:用户手势触发进入系统画中画(移动端必须手势)。
+  // 黑屏根因修复:Android Chrome 的 PiP 取 video 渲染区域作为初始帧,
+  //   1) video 必须有真实可见尺寸(不能 display:none / 1px);
+  //   2) video 必须真正 playing 且 readyState>=2;
+  //   3) canvas 必须已画过有效帧(captureStream 才有非空流)。
+  //   所以这里:先等 readyState,再 requestFrame 一帧,最后才 requestPictureInPicture。
+  const enterPiP = useCallback(async () => {
+    const vd = videoRef.current
+    const cv = canvasRef.current
+    if (!vd) return
+    try {
+      vd.muted = true
+      await vd.play()
+      // 等 video 拿到首帧数据(HAVE_CURRENT_DATA 及以上)
+      if (vd.readyState < 2) {
+        await new Promise((res) => {
+          const t = setTimeout(res, 2000)
+          vd.addEventListener('loadeddata', () => { clearTimeout(t); res() }, { once: true })
+        })
       }
+      // 强制 canvas 立刻画一帧并让 captureStream 取帧,避免 PiP 初始黑屏
+      if (cv && typeof cv.captureStream === 'function') {
+        try {
+          const track = vd.srcObject && vd.srcObject.getVideoTracks()[0]
+          if (track && typeof track.requestFrame === 'function') track.requestFrame()
+        } catch {}
+      }
+      await vd.requestPictureInPicture()
+      setPipActive(true)
+      setPipError('')
+      try { localStorage.setItem(PIP_AUTO_KEY, '1') } catch {}
+    } catch (e) {
+      setPipActive(false)
+      setPipError(e?.message || '进入画中画失败')
+    }
+  }, [])
 
   return (
-    <div className={'map-float' + (floatMode === 'web' ? ' map-float-web' : ' map-float-pip')} style={containerStyle}>
-      <div className="map-float-title" onMouseDown={onHandleDown} onDoubleClick={() => setCollapsed((c) => !c)}>
+    <div className={'map-float map-float-' + floatMode}>
+      <div className="map-float-title">
         <span className="map-float-title-ic">🗺️</span>
         <span className="map-float-title-text">实时地图浮窗</span>
-        <button className="map-float-btn" title="图层" onClick={(e) => { e.stopPropagation(); setLayersOpen((o) => !o) }}>☰</button>
-        <button className="map-float-btn" title={collapsed ? '展开' : '收起'} onClick={(e) => { e.stopPropagation(); setCollapsed((c) => !c) }}>{collapsed ? '▢' : '▬'}</button>
-        <button className="map-float-btn map-float-close" title="关闭浮窗" onClick={(e) => { e.stopPropagation(); onClose() }}>✕</button>
+        {floatMode === 'video-pip' && window.isSecureContext && (
+          <button className={'map-float-btn map-float-pip-btn' + (pipActive ? ' on' : '')}
+            title={pipActive ? '已在系统画中画(点此恢复页内预览)' : '进入系统画中画(可移出浏览器、置顶)'}
+            onClick={(e) => { e.stopPropagation(); pipActive ? document.exitPictureInPicture?.() : enterPiP() }}>
+            {pipActive ? '▣' : '⊞'}
+          </button>
+        )}
+        <button className="map-float-btn" title="图层"
+          onClick={(e) => { e.stopPropagation(); setLayersOpen((o) => !o) }}>☰</button>
+        <button className="map-float-btn map-float-close" title="关闭浮窗"
+          onClick={(e) => { e.stopPropagation(); onClose() }}>✕</button>
       </div>
-      {!collapsed && (
-        <div className="map-float-body">
+      <div className="map-float-body">
+        {floatMode === 'video-pip' ? (
+          <MapCanvasViz engine={engine} canvasRef={canvasRef} videoRef={videoRef}
+            pipActive={pipActive} pipError={pipError} onEnterPip={enterPiP} />
+        ) : (
           <MapViz engine={engine} floatMode={floatMode}
             sidebarOpen={false} onToggleLayers={() => setLayersOpen((o) => !o)} />
-        </div>
-      )}
-      {floatMode === 'web' && !collapsed && (
-        <div className="map-float-resize" onMouseDown={onResizeDown} />
-      )}
-      {/* 图层浮层:点击 ☰ 弹出,占满浮窗或贴合一边 */}
-      {layersOpen && !collapsed && (
+        )}
+      </div>
+      {layersOpen && (
         <div className="map-float-layers-backdrop" onClick={() => setLayersOpen(false)}>
           <div className="map-float-layers" onClick={(e) => e.stopPropagation()}>
             <LayerPanel
@@ -214,4 +230,147 @@ function FloatingContent({ onClose, floatMode }) {
       )}
     </div>
   )
+}
+
+// MapCanvasViz:纯 canvas 2D 渲染地图,供 video PiP 用(captureStream → video → 系统画中画)。
+// 画的内容:底图 + 层图(洞穴) + 标记层(简化为点) + 箭头(玩家位置)。
+// 不复用 MapViz 的 DOM 渲染——DOM 无法被 captureStream,必须画到 canvas 上。
+// 渲染参数从 engine 的 refs 读取,与 applyFrame 同源,保证与主画面一致。
+function MapCanvasViz({ engine, canvasRef, videoRef, pipActive, pipError, onEnterPip }) {
+  const { pos, hasMap, frameStateRef, stRef, focusRef, view, pois, wilds, home } = engine
+  const imgCacheRef = useRef({})
+  // 容器 ref:测实际尺寸写入 stRef.vp(video-pip 不走 MapViz,vpRef 没挂,vp 是 {0,0},
+  // 导致 applyFrame 的 px=0、地图画在左上角而非居中)。这里自己测容器,同步给 engine。
+  const vpRef = useRef(null)
+
+  // 测容器尺寸 → 写入 stRef.vp + view.setVp(触发 applyFrame 重算);同时强制 follow=true(只读模式必跟随)。
+  useEffect(() => {
+    const el = vpRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth, h = el.clientHeight
+      if (w > 0 && h > 0) {
+        view.setVp({ w, h })
+        if (!stRef.current.follow) view.setFollow(true)
+      }
+    })
+    ro.observe(el)
+    // 立即测一次(ResizeObserver 首次回调可能延迟一帧)
+    const w = el.clientWidth, h = el.clientHeight
+    if (w > 0 && h > 0) { view.setVp({ w, h }); view.setFollow(true) }
+    return () => ro.disconnect()
+  }, [view, stRef])
+
+  // canvas 尺寸跟随容器最小边,保证地图正方形且与视口一致。
+  useEffect(() => {
+    const cv = canvasRef.current
+    if (!cv) return
+    const { vp } = stRef.current
+    const size = Math.min(vp.w, vp.h) || 480
+    if (cv.width !== size) cv.width = size
+    if (cv.height !== size) cv.height = size
+  })
+
+  // RAF 渲染循环:每帧把地图画到 canvas。
+  useEffect(() => {
+    let raf = 0
+    const draw = () => {
+      renderCanvasFrame(canvasRef.current, engine, imgCacheRef.current)
+      raf = requestAnimationFrame(draw)
+    }
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [engine, canvasRef])
+
+  if (!pos) return <div className="map-canvas-vp" ref={vpRef}><div className="empty">等待位置数据…</div></div>
+  if (!hasMap) return <div className="map-canvas-vp" ref={vpRef}><div className="empty">该场景无底图</div></div>
+
+  return (
+    <div className="map-canvas-vp" ref={vpRef}>
+      <canvas ref={canvasRef} className="map-canvas-el" />
+      {window.isSecureContext && (
+        <video ref={videoRef} playsInline muted autoPlay className="map-canvas-video" />
+      )}
+      {!pipActive && window.isSecureContext && (
+        <div className="map-canvas-pip-hint">
+          <div className="map-canvas-pip-hint-text">点下方按钮把地图悬浮到系统顶层</div>
+          <button className="btn primary map-canvas-pip-btn" onClick={onEnterPip}>
+            ⊞ 进入系统画中画
+          </button>
+          {pipError && <div className="map-canvas-pip-err">{pipError}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// renderCanvasFrame:把当前帧的地图画到 canvas。纯函数。
+function renderCanvasFrame(cv, engine, imgCache) {
+  if (!cv) return
+  const ctx = cv.getContext('2d')
+  if (!ctx) return
+  const { pos, frameStateRef, stRef, focusRef, pois, wilds, home } = engine
+  if (!pos || !pos.img) { ctx.clearRect(0, 0, cv.width, cv.height); return }
+
+  const { zoom: z } = stRef.current
+  const size = Math.min(cv.width, cv.height)
+  const mapPx = size * z
+  const f = focusRef.current
+  const left = (cv.width / 2 - f.u * mapPx) | 0
+  const top = (cv.height / 2 - f.v * mapPx) | 0
+
+  ctx.fillStyle = '#0b0e13'
+  ctx.fillRect(0, 0, cv.width, cv.height)
+
+  // 底图
+  const baseImg = getImg(imgURL('bigmap/' + pos.img + '.webp'), imgCache)
+  if (baseImg && baseImg.complete && baseImg.naturalWidth) {
+    ctx.drawImage(baseImg, left, top, mapPx, mapPx)
+  }
+  // 层图(洞穴)
+  if (pos.layer) {
+    const li = getImg(imgURL('bigmap/' + pos.layer.img + '.webp'), imgCache)
+    if (li && li.complete && li.naturalWidth) {
+      ctx.drawImage(li,
+        left + pos.layer.u0 * mapPx, top + pos.layer.v0 * mapPx,
+        (pos.layer.u1 - pos.layer.u0) * mapPx, (pos.layer.v1 - pos.layer.v0) * mapPx)
+    }
+  }
+  // 标记层:简化为点
+  drawMarks(ctx, pois.marks, left, top, mapPx, '#5fd0ff')
+  drawMarks(ctx, wilds.marks, left, top, mapPx, '#fff', true)
+  drawMarks(ctx, (home?.marks) || [], left, top, mapPx, '#ff9100')
+
+  // 玩家箭头
+  const disp = frameStateRef.current
+  if (disp) {
+    ctx.save()
+    ctx.translate((left + disp.u * mapPx) | 0, (top + disp.v * mapPx) | 0)
+    ctx.rotate((disp.heading + 90) * Math.PI / 180)
+    ctx.fillStyle = '#f5365c'
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(0, -10); ctx.lineTo(7, 8); ctx.lineTo(0, 4); ctx.lineTo(-7, 8)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+    ctx.restore()
+  }
+}
+
+function getImg(src, cache) {
+  if (!cache[src]) { const img = new Image(); img.src = src; cache[src] = img }
+  return cache[src]
+}
+
+function drawMarks(ctx, marks, left, top, mapPx, color, rare) {
+  if (!marks || !marks.length) return
+  ctx.fillStyle = color
+  ctx.strokeStyle = 'rgba(0,0,0,.5)'
+  ctx.lineWidth = 1
+  for (const m of marks) {
+    if (m.u == null) continue
+    ctx.beginPath()
+    ctx.arc((left + m.u * mapPx) | 0, (top + m.v * mapPx) | 0, rare ? 4 : 3, 0, Math.PI * 2)
+    ctx.fill(); ctx.stroke()
+  }
 }
