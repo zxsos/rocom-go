@@ -7,7 +7,16 @@
   border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
 }
 .filter-group { display: flex; flex-direction: column; gap: 7px; }
-.filter-group > label { font-size: 12px; color: var(--fg-dim); }
+/* 分组标题:左侧装饰竖条 + 字间距,更轻盈更分组化 */
+.filter-group > label {
+  font-size: 11px; color: var(--fg-dim); letter-spacing: .04em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px;
+}
+.filter-group > label::before {
+  content: ''; width: 3px; height: 12px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), transparent);
+  flex: none;
+}
 /* 筛选抽屉的标题栏/底部条/遮罩:仅移动端显示,桌面隐藏 */
 .filters-bar, .filters-foot, .filters-backdrop { display: none; }
 
