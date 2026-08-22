@@ -52,10 +52,17 @@ func (h *Hub) unsubscribe(ch chan streamMsg) {
 // 传 "" 表示全局消息(所有连接都收);订阅端按 account/type 决定是否转发(见 handleStream)。
 // 无订阅者(没有页面连着)时直接返回,省去 json.Marshal——实时抓包对每条消息都发 debug 广播、
 // 页同步时每只宠物再发一次,常态下无人订阅,这层早退把该开销清零。
+// 序列化(json.Marshal)放在锁外:移动包 8 条/秒、每只宠物/每条消息都要 marshal,若在全局锁内
+// 做,所有广播会串行排队——一个慢订阅/大 payload 的 marshal 会拖住后续所有广播,进而拖住
+// 消费循环(见 pipeline)。故只在锁内取订阅者快照与判空,marshal 在锁外,投递时再短暂加锁。
 func (h *Hub) Broadcast(typ, account string, data any) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	if len(h.subs) == 0 {
+	subs := make([]chan streamMsg, 0, len(h.subs))
+	for ch := range h.subs {
+		subs = append(subs, ch)
+	}
+	h.mu.Unlock()
+	if len(subs) == 0 {
 		return
 	}
 	msg, err := json.Marshal(envelope{Type: typ, Account: account, Data: data})
@@ -63,7 +70,7 @@ func (h *Hub) Broadcast(typ, account string, data any) {
 		return
 	}
 	m := streamMsg{typ: typ, account: account, data: msg}
-	for ch := range h.subs {
+	for _, ch := range subs {
 		select {
 		case ch <- m:
 		default:

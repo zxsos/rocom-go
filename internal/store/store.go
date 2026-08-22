@@ -5,8 +5,10 @@ package store
 
 import (
 	"database/sql"
+	"log"
 	"net/url"
 	"runtime"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -63,7 +65,10 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	// 逐只 UpsertPet(数百次独立提交)时整轮拖到近 10s,处理速度赶不上抓包到达速度而积压。
 	// 改 WAL + synchronous=NORMAL:提交不再逐次 fsync(仅 checkpoint 时落盘),被动抓包库
 	// 即便宕机最多丢尾部若干条、可经下次登录快照重建,该取舍安全。busy_timeout 兜底。
-	pragmas := []string{"busy_timeout(5000)", "journal_mode(WAL)", "synchronous(NORMAL)"}
+	// wal_autocheckpoint 调大:默认 1000 页(约 4MB)时 SQLite 自动 checkpoint,在弱机/慢磁盘上
+	// 一次性刷几 MB 是秒级停顿,且恰好落在高频抓包时段。调大后自动 checkpoint 基本不再触发,
+	// 改由后台 goroutine(checkpointLoop)主动错峰执行 PASSIVE checkpoint,摊薄落盘停顿。
+	pragmas := []string{"busy_timeout(5000)", "journal_mode(WAL)", "synchronous(NORMAL)", "wal_autocheckpoint(65536)"}
 	db, err := sql.Open("sqlite", dsn(path, pragmas...))
 	if err != nil {
 		return nil, err
@@ -88,7 +93,27 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 		return nil, err
 	}
 	s.loadRules()
+	go s.checkpointLoop()
 	return s, nil
+}
+
+// checkpointInterval 是主动 checkpoint 的间隔。PASSIVE checkpoint 不阻塞读者/写者,只是把已
+// 提交的 WAL 帧刷回主库并 fsync;频繁执行单次开销小,还能避免 WAL 无界增长、也避免攒满后
+// 一次性大 fsync 的秒级尖峰(见上 wal_autocheckpoint 说明)。30s 在「及时落盘」与「少打扰」间折中。
+const checkpointInterval = 30 * time.Second
+
+// checkpointLoop 定期做 PASSIVE checkpoint,把落盘停顿摊薄到每次几毫秒、错开高频抓包时段。
+// 用 rdb(只读池)执行:checkpoint 操作共享 WAL 文件,任意连接都能触发;不占用唯一的写连接 db,
+// 也就不会和正常的宠物入库/快照替换抢写锁。进程常驻运行,随进程退出自然终止。
+func (s *Store) checkpointLoop() {
+	t := time.NewTicker(checkpointInterval)
+	defer t.Stop()
+	for range t.C {
+		if _, err := s.rdb.Exec(`PRAGMA wal_checkpoint(PASSIVE)`); err != nil {
+			// checkpoint 失败无害(WAL 仍在,下轮重试),不打扰日志刷屏;仅在连接级错误时提示。
+			log.Printf("wal_checkpoint(PASSIVE) 失败: %v", err)
+		}
+	}
 }
 
 // initSchema 建表建索引(幂等,每次启动都跑一遍)。

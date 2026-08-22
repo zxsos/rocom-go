@@ -9,6 +9,8 @@ import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 // 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
 export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onCollapseSidebar }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
+  const dualNum = wilds.num.dual || 0
+  const dualGone = wilds.numStale.dual || 0
   return (
     <>
       <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={onClose} />
@@ -99,6 +101,19 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
               </div>
             )
           })}
+          {/* 双牌:奖牌组的「元筛选」,没有自己的阈值滑块。同一只宠同时命中 ≥2 张奖牌判定
+              (体重族+嗓音族各一,命中数上限就是 2,见 useWildPets 的 wildShown)才显示;
+              开关图层(异色/炫彩、污染)不受影响。开启后计数实时对应图上标记。 */}
+          <div className="map-medal-row map-medal-dual"
+            title={dualGone ? `视野内 ${dualNum - dualGone} · 已离开视野 ${dualGone}` : undefined}>
+            <button className={'map-collect-btn map-medal-switch' + (wilds.dual ? ' on' : '')}
+              onClick={wilds.toggleDual}
+              title="只显示同时命中 2 张奖牌判定的宠(如 大块头+婉转声);需至少开启 2 条奖牌筛选"
+              aria-label="双牌筛选开关" aria-pressed={wilds.dual}>✓</button>
+            <span className="map-medal-dual-ic">✧</span>
+            <span className="map-layer-name">双牌</span>
+            <span className="muted">{dualNum}</span>
+          </div>
         </div>
         <div className="filter-group">
           <label>涂色模式</label>

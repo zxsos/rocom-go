@@ -40,7 +40,7 @@
 | `pet` | `ParsePetListRsp` 解析宠物列表；`ToPet` 转中文化业务模型；`ParseLoginAccount` 取登录 user_id/昵称 |
 | `scene` | 场景移动/切换/区域/星星实体消息解析(实时地图页) |
 | `gamedata` | embed 的 id→中文名 查找库 |
-| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3) |
+| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3);后台 `checkpointLoop` 错峰做 WAL checkpoint(见 §6) |
 | `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/data.md 3.8) |
 
@@ -130,6 +130,13 @@
   (网关实测 13+50+62+230ms 串成 330ms)。WAL 下读者互不阻塞、也不阻塞写者,放开即可。
   约定:`Exec`/`Begin` 走写池,`Query`/`QueryRow` 走读池;pragma 必须写在 DSN 里
   (`db.Exec("PRAGMA …")` 只作用于池中某一条连接)。
+- **WAL checkpoint 错峰(避免周期性秒级延迟尖峰)**:`journal_mode=WAL + synchronous=NORMAL`
+  意味着平时提交不 fsync,只在 checkpoint 时一次性落盘。SQLite 默认 `wal_autocheckpoint=1000`
+  (约 4MB)时自动 checkpoint,在弱机/慢磁盘上一次性刷几 MB 是秒级停顿,且恰落在高频抓包时段
+  ——表现为「隔一段时间延迟暴涨几秒」。故把自动阈值调大到 `65536`,改由 `Store` 的后台
+  `checkpointLoop` 每 30s 用**读池**执行一次 `PRAGMA wal_checkpoint(PASSIVE)`(不阻塞读写、
+  单次毫秒级),把「攒满一次性大 fsync」摊成「每 30s 一次小 fsync」并错开高频时段。用读池而非
+  写池触发,是为了不占用唯一的写连接、避免与宠物入库/快照替换抢锁。
 - **盒子头像不解 blob**:`/api/boxes` 要给盒内每只宠物配头像,满盒账号八百多只。头像由
   `(base_conf_id, conf_id, shiny)` 经 `gamedata` 内存查表即得,故这三项都落成 `pets` 的列,
   不再逐只解 `data` JSON(本机 803 只:读列 2.4ms,读 blob 2.9ms,加 `json.Unmarshal` 23.9ms)。
