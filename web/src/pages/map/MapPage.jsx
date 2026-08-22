@@ -326,7 +326,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
         (kinds.includes('colorful') && icons.colorful)
       return [
         <div key={p.id} data-id={p.id} title={wildTitle(p)}
-          className={'map-wild' + (p.stale ? ' stale' : '') + (tip ? ' tip' : '')}
+          className={'map-wild' + (p.stale ? ' stale' : '') + (p.inject ? ' inject' : '') + (tip ? ' tip' : '')}
           style={{ left: p.u * mapPx, top: p.v * mapPx, ...p.style }}>
           {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
           {mark && <img className="map-wild-mark" src={imgURL(mark)} alt="" draggable={false} />}

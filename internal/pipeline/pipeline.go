@@ -143,6 +143,12 @@ func (p *Pipeline) handle(m capture.Message) {
 	}
 	acc := p.connAccount[m.Session]
 
+	// 黑白名单拦截:黑名单账号、或白名单非空且不在白名单内的账号,一律丢弃(不广播、不统计、
+	// 不更新在线状态)。规则在管理面板维护,store 内存缓存实时生效。
+	if acc != "" && !p.allowed(acc) {
+		return
+	}
+
 	// debug 页面:广播所有应用层消息,按来源账号归属(登录前无法归属的连接消息 acc="" 作全局)。
 	// 订阅端据此只推当前账号的调试流;账号也放进 data 供页面列展示。
 	p.srv.Hub().Broadcast("debug", acc, map[string]any{
@@ -176,6 +182,18 @@ func (p *Pipeline) handle(m capture.Message) {
 		return
 	}
 	p.handlePet(m, acc)
+}
+
+// allowed 判断账号是否允许处理:黑名单优先拒绝;白名单非空时仅白名单内账号放行;无规则时
+// 只要白名单非空就拒绝(白名单为开关,不为空即只统计白名单账号),否则放行。
+func (p *Pipeline) allowed(acc string) bool {
+	switch p.st.RuleMode(acc) {
+	case "black":
+		return false
+	case "white":
+		return true
+	}
+	return !p.st.WhiteListNonEmpty()
 }
 
 // registerLogin 从登录回包解析 user_id/昵称,登记连接归属并落盘。

@@ -155,3 +155,117 @@ export function subscribe(onMsg, opts = {}) {
     syncStream()
   }
 }
+
+// —— 管理员(隐式面板 #/admin,导航不显示)——
+// 会话令牌存 localStorage,服务重启后失效需重新登录;所有管理请求带 X-Admin-Token 头。
+
+let adminToken = localStorage.getItem('adminToken') || ''
+export function getAdminToken() { return adminToken }
+
+async function adminFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) }
+  if (adminToken) headers['X-Admin-Token'] = adminToken
+  return fetch(url, { ...options, headers })
+}
+
+export async function postJSON(url, body) {
+  const r = await adminFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) {
+    let msg = r.status === 401 ? '密码错误或会话已失效' : '请求失败(' + r.status + ')'
+    try {
+      const e = await r.json()
+      if (e && e.error) msg = e.error
+    } catch {
+      // 后端 http.Error 返回 text/plain(非 JSON),兜底读文本显示具体原因
+      try {
+        const t = (await r.text()).trim()
+        if (t) msg = t
+      } catch { /* ignore */ }
+    }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+// getAdminStatus 返回 {configured: 是否已设密码, authed: 当前是否已登录}。
+export const getAdminStatus = () => adminFetch('/api/admin/status').then((r) => r.json())
+
+// adminSetup 首次设置管理员密码,成功即登录并返回 token。
+export const adminSetup = (password) => postJSON('/api/admin/setup', { password })
+
+// adminLogin 密码登录,返回 token。
+export const adminLogin = (password) => postJSON('/api/admin/login', { password })
+
+// setAdminToken 保存/清除登录令牌。
+export function setAdminToken(t) {
+  adminToken = t || ''
+  if (adminToken) localStorage.setItem('adminToken', adminToken)
+  else localStorage.removeItem('adminToken')
+}
+
+// adminLogout 注销并清除本地令牌。
+export async function adminLogout() {
+  try { await adminFetch('/api/admin/logout', { method: 'POST' }) } catch { /* ignore */ }
+  setAdminToken('')
+}
+
+// adminPlaceholder 管理员面板占位接口(其余功能待实现)。
+export const adminPlaceholder = () => adminFetch('/api/admin/placeholder').then((r) => r.json())
+
+// adminRules 黑白名单:列表 {rules:[{account,mode,note}]}。
+export const adminRules = () => adminFetch('/api/admin/rules').then(async (r) => {
+  if (!r.ok) throw new Error('拉取规则失败(' + r.status + ')')
+  return r.json()
+})
+
+// adminSetRule 新增/更新规则(account, mode: black|white, note)。
+export const adminSetRule = (account, mode, note) =>
+  postJSON('/api/admin/rules', { account, mode, note })
+
+// adminDeleteRule 删除规则。
+export const adminDeleteRule = (account) =>
+  adminFetch('/api/admin/rules?account=' + encodeURIComponent(account), { method: 'DELETE' })
+    .then(async (r) => {
+      if (!r.ok) throw new Error('删除失败(' + r.status + ')')
+      return r.json()
+    })
+
+// adminStats 全部成员抓捕情况:{members:[{account,name,total,shiny,colorful,daily}], days, daily}。
+export const adminStats = () => adminFetch('/api/admin/stats').then(async (r) => {
+  if (!r.ok) throw new Error('拉取统计失败(' + r.status + ')')
+  return r.json()
+})
+
+// adminWildPetOptions 可投放的野生宠物形态:{options:[{base,name,book}]}。
+export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then(async (r) => {
+  if (!r.ok) throw new Error('拉取形态列表失败(' + r.status + ')')
+  return r.json()
+})
+
+// adminInjectWild 向指定成员投放稀有野生精灵。
+// {account, base: petbase id, kind: 'shiny'|'colorful', offsetMeters}
+export const adminInjectWild = (account, base, kind, offsetMeters = 30) =>
+  postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters })
+
+// adminRevokeInject 撤销某账号的一只注入精灵(?account=&id=)。
+export function adminRevokeInject(account, id) {
+  return adminFetch(
+    '/api/admin/inject-wild?account=' + encodeURIComponent(account) +
+    '&id=' + encodeURIComponent(id),
+    { method: 'DELETE' },
+  ).then(async (r) => {
+    if (!r.ok) throw new Error('撤销失败(' + r.status + ')')
+    return r.json()
+  })
+}
+
+// adminListInjects 列出当前全部注入中的精灵(管理面板撤销用)。
+// 返回 {injects:[{account,id,name,kinds,sceneRes,created}]};玩家换场景或靠近 10 米 10 秒后自动消失,列表随之减少。
+export const adminListInjects = () => adminFetch('/api/admin/injects').then(async (r) => {
+  if (!r.ok) throw new Error('拉取注入列表失败(' + r.status + ')')
+  return r.json()
+})

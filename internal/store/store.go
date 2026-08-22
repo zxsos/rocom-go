@@ -22,6 +22,8 @@ type Store struct {
 	db  *sql.DB
 	rdb *sql.DB
 	gd  *gamedata.DB
+
+	rules *ruleCache // 账号黑白名单内存缓存(见 rule.go),读写并发安全
 }
 
 // Scoped 是绑定了某个 account 的 Store 视图:所有按账号隔离的读写都经它进行,
@@ -79,12 +81,13 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	}
 	rdb.SetMaxOpenConns(maxReadConns())
 
-	s := &Store{db: db, rdb: rdb, gd: gd}
+	s := &Store{db: db, rdb: rdb, gd: gd, rules: newRuleCache()}
 	if err := s.initSchema(); err != nil {
 		db.Close()
 		rdb.Close()
 		return nil, err
 	}
+	s.loadRules()
 	return s, nil
 }
 
@@ -192,6 +195,19 @@ CREATE TABLE IF NOT EXISTS paint (
   account TEXT NOT NULL, res INTEGER, layer INTEGER,
   w INTEGER, h INTEGER, cells BLOB, updated_at INTEGER,
   PRIMARY KEY(account, res, layer)
+);
+
+-- 管理员(隐式管理面板,手动输入 #/admin 进入):pass_hash 存 PBKDF2-SHA256 哈希,首启设置后凭密码登录。
+CREATE TABLE IF NOT EXISTS admin (
+  id INTEGER PRIMARY KEY,
+  pass_hash TEXT NOT NULL,
+  created_at INTEGER
+);
+
+-- 账号级黑白名单(管理面板配置,见 rule.go):mode=black 丢弃该账号全部流量,mode=white 属白名单。
+-- 白名单非空时只处理白名单内账号(黑名单优先),白名单为空时仅黑名单生效。规则少,全量载入内存。
+CREATE TABLE IF NOT EXISTS account_rule (
+  account TEXT PRIMARY KEY, mode TEXT, note TEXT, updated_at INTEGER
 );
 `)
 	return err

@@ -38,6 +38,12 @@ type Server struct {
 	onlineMu sync.Mutex           // 保护 lastSeen
 	lastSeen map[string]int64     // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
 
+	adminMu    sync.Mutex
+	adminToken string // 管理员会话令牌;服务重启后失效需重新登录
+
+	injectMu sync.Mutex
+	injects  map[string][]*injectEntry // 账号 -> 已注入精灵(管理员投放,有生命周期,见 admin.go)
+
 	paint paintState // 涂地覆盖位图(自带锁,见 paint.go)
 }
 
@@ -61,6 +67,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s.lastHome = map[string]any{}
 	s.lastSeen = map[string]int64{}
 	s.medalIDs = map[string][]uint32{}
+	s.injects = map[string][]*injectEntry{}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
 	}
@@ -82,6 +89,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 		PartnerFrame:  db.StaticIcon("partner_frame"),
 	}
 	s.routes()
+	go s.sweepInjects() // 注入精灵生命周期:玩家靠近 10 秒后自动消失
 	return s
 }
 
@@ -116,6 +124,20 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/evolution", s.handleEvolution)
 	s.mux.HandleFunc("GET /api/pet-page", s.handlePetPage)
 	s.mux.HandleFunc("GET /api/accounts", s.handleAccounts)
+	// 管理员(隐式面板,前端导航不显示):首启设置密码 → 登录签发内存令牌 → 校验后使用。
+	s.mux.HandleFunc("GET /api/admin/status", s.handleAdminStatus)
+	s.mux.HandleFunc("POST /api/admin/setup", s.handleAdminSetup)
+	s.mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
+	s.mux.HandleFunc("POST /api/admin/logout", s.handleAdminLogout)
+	s.mux.HandleFunc("GET /api/admin/rules", s.handleAdminRules)
+	s.mux.HandleFunc("POST /api/admin/rules", s.handleAdminRuleSet)
+	s.mux.HandleFunc("DELETE /api/admin/rules", s.handleAdminRuleDelete)
+	s.mux.HandleFunc("GET /api/admin/stats", s.handleAdminStats)
+	s.mux.HandleFunc("GET /api/admin/wild-pets", s.handleAdminWildPetOptions)
+	s.mux.HandleFunc("GET /api/admin/injects", s.handleAdminListInjects)
+	s.mux.HandleFunc("POST /api/admin/inject-wild", s.handleAdminInjectWild)
+	s.mux.HandleFunc("DELETE /api/admin/inject-wild", s.handleAdminRevokeInject)
+	s.mux.HandleFunc("GET /api/admin/placeholder", s.handleAdminPlaceholder)
 	s.mux.HandleFunc("GET /api/position", s.handlePosition)
 	s.mux.HandleFunc("GET /api/pois", s.handlePois)
 	s.mux.HandleFunc("GET /api/wildpets", s.handleWildPets)
