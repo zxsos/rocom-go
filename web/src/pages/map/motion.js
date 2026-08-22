@@ -24,6 +24,10 @@ export const defaultZoom = (p) => ZOOM_DEFAULTS[p && p.sceneResId] || ZOOM_FALLB
 const MAX_EXTRAP = 3.5 // 外推上限(秒):超过心跳间隔仍无新包(抓包中断/掉线)就停住,免得一路飘走
 const GLIDE = 0.45 // 沿真实轨迹追平的时长(秒):这段轨迹本是过去几秒走的,快放一遍即可
 export const SMOOTH_TAU = 0.12 // 误差收敛时间常数(秒):新包与外推位置的落差按 e^(-Δt/τ) 抹平,而非硬跳
+// decay 衰减阈值:dt 超过此值后 decay 直接归零。原因——e^(-dt/τ) 永不为 0,亚像素小数经 snap 的
+// Math.round 在整数边界(如 0.4999↔0.5001)反复跳,玩家静止时箭头/地图每帧抖 1px,即典型抽搐。
+// 8τ ≈ 0.96s,此时残差已 < 0.034%,肉眼与像素吸附都无感;此后置零,画面就锁死在收敛值上,稳定不抖。
+export const SMOOTH_CUTOFF = SMOOTH_TAU * 8
 const SNAP_DIST = 0.005 // 落差超过底图边长的 0.5%(几十米)判为传送/换场景:直接跳过去,不做平滑
 const angleDiff = (a, b) => (((a - b) % 360) + 540) % 360 - 180 // a-b 折算到 (-180,180]
 const easeOut = (x) => 1 - (1 - x) * (1 - x)

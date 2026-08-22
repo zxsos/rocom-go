@@ -32,17 +32,30 @@ body {
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; color: inherit; }
 
+/* 按钮体系统一:所有可点控件共享同一套 hover/active/focus-visible 反馈与触控基线 */
 .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 7px 12px; cursor: pointer;
-  transition: border-color .15s ease, background .15s ease, transform .08s ease;
+  padding: 7px 12px; cursor: pointer; white-space: nowrap; user-select: none;
+  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
 }
 .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
 .btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { background: #5c9aff; border-color: #5c9aff; }
-/* 单图标按钮:桌面/移动统一,方形观感,含义见 title */
-.btn-icon { font-size: 15px; line-height: 1; padding: 7px 11px; }
+/* 单图标按钮:固定正方形,与 .icon-btn 视觉统一 */
+.btn-icon { width: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1; }
+/* 通用方形图标按钮(抽屉关闭/侧栏收起等):全局可用,桌面移动同尺寸 */
+.icon-btn {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; color: var(--fg);
+  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(76, 141, 255, .12); }
+.icon-btn:active { transform: scale(.94); }
+.icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .input, .select {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px; width: 100%;
   transition: border-color .15s ease, box-shadow .15s ease;
@@ -53,11 +66,13 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .chip {
-  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
-  background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim);
-  transition: border-color .15s ease, background .15s ease, color .15s ease;
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim); white-space: nowrap; user-select: none;
+  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
 }
 .chip:hover { border-color: var(--accent); color: var(--fg); }
+.chip:active { transform: scale(.97); }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .chip.on:hover { background: #5c9aff; border-color: #5c9aff; }
 .pill { padding: 2px 8px; border-radius: 6px; background: #6c6c6c; font-size: 12px; }
@@ -87,3 +102,13 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .type[data-t="虫"]{background:#86a832}.type[data-t="武"]{background:#c2452f}.type[data-t="翼"]{background:#5bc0c9}
 .type[data-t="萌"]{background:#e58fb8;color:#222}.type[data-t="幽"]{background:#5a4a7a}.type[data-t="恶"]{background:#3a3f4a}
 .type[data-t="机械"]{background:#7a8794}.type[data-t="幻"]{background:#b46fd6}.type[data-t="普"]{background:#6b7280}
+
+/* ---- 移动端触控基线:按钮/图标按钮/胶囊统一最小可点高度,避免误触 ---- */
+@media (max-width: 760px) {
+  .btn { min-height: 36px; }
+  .btn.small { min-height: 30px; }
+  .btn-icon { width: 34px; height: 34px; min-height: 34px; }
+  .icon-btn { width: 36px; height: 36px; min-height: 36px; }
+  .chip { padding: 5px 11px; }
+  .boxmap-btn { width: 32px; height: 32px; }
+}

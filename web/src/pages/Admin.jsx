@@ -14,7 +14,7 @@ export default function Admin() {
   const [configured, setConfigured] = useState(false)
   const [authed, setAuthed] = useState(getAdminToken() !== '')
   const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
   const [error, setError] = useState('')
   const [rules, setRules] = useState(null)      // 黑白名单规则列表
   const [ruleErr, setRuleErr] = useState('')
@@ -141,7 +141,7 @@ export default function Admin() {
   // 管理员删账号(免 PIN)
   const adminDelete = async (account) => {
     setPinErr(''); setPinMsg('')
-    if (!confirm('确认删除账号 ' + account + ' 的全部数据?此操作不可恢复。')) return
+    if (!window.confirm('确认删除账号 ' + account + ' 的全部数据?此操作不可恢复。')) return
     try {
       await deleteAccount(account)
       setPinMsg(account + ' 已删除')
@@ -177,7 +177,7 @@ export default function Admin() {
   const submit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!configured && password !== confirm) {
+    if (!configured && password !== confirmPw) {
       setError('两次输入的密码不一致')
       return
     }
@@ -185,7 +185,7 @@ export default function Admin() {
       const res = configured ? await adminLogin(password) : await adminSetup(password)
       setAdminToken(res.token)
       setPassword('')
-      setConfirm('')
+      setConfirmPw('')
       setAuthed(true)
     } catch (err) {
       setError(err.message || '操作失败')
@@ -222,8 +222,8 @@ export default function Admin() {
             />
             {!configured && (
               <input
-                className="input" type="password" placeholder="确认密码" value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                className="input" type="password" placeholder="确认密码" value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
               />
             )}
             {error && <p className="admin-error">{error}</p>}

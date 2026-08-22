@@ -103,16 +103,20 @@ html[data-blur] .account-item-uid {
 
 @media (max-width: 760px) {
   .topnav { display: none; }
+  /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/隐私按钮缩成纯图标 */
+  .topbar { gap: 10px; padding: 8px 12px; }
+  .brand { font-size: 15px; }
+  .topbar-fs { padding: 6px 9px; }
   .bottomnav {
     display: flex; position: sticky; bottom: 0; z-index: 30;
     background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
-  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; color: var(--fg-dim); transition: color .15s ease; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; color: var(--fg-dim); transition: color .15s ease; }
   .tab.active { color: var(--accent); }
-  .tab-icon { font-size: 18px; }
+  .tab-icon { font-size: 19px; }
   .tab-label { font-size: 11px; }
-  .content { padding: 12px; padding-bottom: 70px; }
+  .content { padding: 12px; padding-bottom: 72px; }
   /* 地图页占满高度:底部导航为 sticky(在流内),content 的 flex:1 已停在其上方,
      故去掉为滚动页预留的额外 70px 底距,只留与两侧一致的 12px。 */
   .content:has(.map-page) { padding-bottom: 12px; }

@@ -67,7 +67,7 @@
     position: sticky; top: 0; z-index: 1; background: var(--bg-1);
     padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
   }
-  .rules-close { display: grid; place-items: center; }
+  .rules-close { display: inline-flex; }
   /* 事件页头部:窄屏收紧按钮间距(按钮本身已是图标,标题「共 N 只」不再被挤到两行) */
   .event-head { gap: 8px; }
 
