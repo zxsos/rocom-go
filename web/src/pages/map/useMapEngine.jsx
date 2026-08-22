@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react'
 import { subscribe, getPosition } from '../../api'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
@@ -23,9 +23,7 @@ export function wildTitle(p) {
 
 // useMapEngine 抽离自 MapPage:地图引擎内核——位置/外推/RAF/视图状态 + 图层数据订阅。
 // 浮窗与主页面共用此 hook,各自渲染外壳(MapViz),省一份逻辑拷贝。
-// floating 标记当前是否运行在浮窗模式(预留:PiP 关闭回调、视口尺寸取自浮窗容器等)。
-export function useMapEngine(account, opts = {}) {
-  const { floating = false } = opts
+export function useMapEngine(account) {
   const [pos, setPos] = useState(null)
   const [imgError, setImgError] = useState(false)
   const [layerError, setLayerError] = useState(false)
@@ -202,7 +200,6 @@ export function useMapEngine(account, opts = {}) {
     view, worldRef, arrowRef, applyFrame,
     pois, wilds, home, paint,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap,
-    floating,
     // canvas PiP 用:暴露当前帧的渲染参数(供 renderToCanvas 画到外部 canvas)
     // 这些 ref 在 applyFrame 里每帧更新,canvas 渲染循环直接读,不触发 React 重渲染。
     frameStateRef: dispRef, // { u, v, heading } 当前玩家显示位置
@@ -215,9 +212,9 @@ export function useMapEngine(account, opts = {}) {
   }
 }
 
-// MapViz 地图本体渲染:从 .map-vp 到标记层、控制按钮,主页面与浮窗共用。
+// MapViz 地图本体渲染:从 .map-vp 到标记层、控制按钮。
 // engine 由 useMapEngine 产出(内部持有 sceneRef/layerRef/anchorRef 等,这里只读 pos)。
-export function MapViz({ engine, onOpenFloat, floatMode, sidebarOpen, onToggleLayers }) {
+export function MapViz({ engine, sidebarOpen, onToggleLayers }) {
   const { pos, hasMap, imgError, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, pois, wilds, home, paint,
     detailGid, setDetailGid, wildTip, setWildDist, setWildTip, wildDist, onTap,
@@ -273,24 +270,13 @@ export function MapViz({ engine, onOpenFloat, floatMode, sidebarOpen, onToggleLa
               <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="var(--red)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
           </div>
-          {!floatMode && (
-            <div className="map-ctrl">
-              <button className="map-btn map-float-open" title="开浮窗(置顶小窗)"
-                onClick={onOpenFloat}>◰</button>
-              <button className={'map-btn map-layers-toggle' + (sidebarOpen ? ' on' : '')} title="图层栏"
-                onClick={onToggleLayers}>☰</button>
-              <button className="map-btn" title="放大" onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
-              <button className="map-btn" title="缩小" onClick={() => view.zoomAround(1 / 1.4, view.vp.w / 2, view.vp.h / 2)}>－</button>
-              <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置" onClick={() => view.setFollow(true)}>◎</button>
-            </div>
-          )}
-          {floatMode && (
-            <div className="map-ctrl">
-              <button className="map-btn" title="放大" onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
-              <button className="map-btn" title="缩小" onClick={() => view.zoomAround(1 / 1.4, view.vp.w / 2, view.vp.h / 2)}>－</button>
-              <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置" onClick={() => view.setFollow(true)}>◎</button>
-            </div>
-          )}
+          <div className="map-ctrl">
+            <button className={'map-btn map-layers-toggle' + (sidebarOpen ? ' on' : '')} title="图层栏"
+              onClick={onToggleLayers}>☰</button>
+            <button className="map-btn" title="放大" onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
+            <button className="map-btn" title="缩小" onClick={() => view.zoomAround(1 / 1.4, view.vp.w / 2, view.vp.h / 2)}>－</button>
+            <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置" onClick={() => view.setFollow(true)}>◎</button>
+          </div>
         </div>
       ) : (
         <div className="map-nomap">
