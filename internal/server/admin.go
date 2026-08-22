@@ -9,11 +9,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
+	mathrand "math/rand"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/whoisnian/rocom-capture/internal/pet"
 )
 
 // 管理员认证:隐式面板(前端导航不显示,需手动输入 #/admin)。
@@ -311,6 +315,15 @@ type injectEntry struct {
 	nearSec  int            // 距离玩家 <10 米累计的秒数(连续靠近 10 秒触发自动撤销)
 }
 
+// randRange 返回 [lo, hi] 闭区间的随机整数。注入精灵的个体值(嗓音/身高/体重)用它取
+// 合法范围内的随机值,模拟真实野生精灵的个体差异;hi <= lo 时返回 lo(配置异常兜底)。
+func randRange(lo, hi int32) int32 {
+	if hi <= lo {
+		return lo
+	}
+	return lo + int32(mathrand.Int63n(int64(hi)-int64(lo)+1))
+}
+
 // 靠近判定阈值:玩家距注入精灵 < nearMeters 米且持续 nearTotalSec 秒即自动消失。
 const (
 	injectNearMeters  = 10.0
@@ -371,8 +384,15 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	}
 	x, _ := pos["x"].(int32)
 	y, _ := pos["y"].(int32)
-	off := req.OffsetMeters * 100
-	wx, wy := x+off, y+off
+	z, _ := pos["z"].(int32)
+	// 投放点取玩家位置为球心、半径=设定距离的球面上随机一点:xyz 三轴随机加减偏移,
+	// 与玩家的距离恰为设定值,而非固定往右下角飘。
+	off := float64(req.OffsetMeters) * 100 // 厘米
+	theta := mathrand.Float64() * 2 * math.Pi
+	phi := math.Acos(2*mathrand.Float64() - 1)
+	wx := x + int32(math.Round(off*math.Sin(phi)*math.Cos(theta)))
+	wy := y + int32(math.Round(off*math.Sin(phi)*math.Sin(theta)))
+	wz := z + int32(math.Round(off*math.Cos(phi)))
 	u, v, ok := s.db.Project(uint32(sceneRes), wx, wy)
 	if !ok {
 		http.Error(w, "当前场景无底图,无法投放(地图页没有可投影的坐标)", 400)
@@ -400,8 +420,11 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		glassType = 1 // GlassCommon
 		glassValue = 1
 	}
-	weight := int32((info.WeightLow + info.WeightHigh) / 2)
-	height := int32((info.HeightLow + info.HeightHigh) / 2)
+	// 嗓音/身高/体重用合法范围内的随机个体值,模拟真实野生精灵的个体差异
+	// (固定取 0 或中值会让每只假精灵都一样,一眼假)。
+	weight := randRange(info.WeightLow, info.WeightHigh)
+	height := randRange(info.HeightLow, info.HeightHigh)
+	voice := randRange(-100, 100)
 
 	id := "admin-inject-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	mark := map[string]any{
@@ -413,13 +436,20 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		"v":        v,
 		"x":        wx,
 		"y":        wy,
-		"z":        int32(0),
+		"z":        wz,
 		"lv":       int32(1),
-		"voice":    int32(0),
+		"voice":    voice,
 		"height":   height,
 		"weight":   weight,
 		"mutation": mutation,
 		"inject":   true, // 前端据此显示撤销按钮与视觉提示
+	}
+	// 体重百分位与真实野生宠同一口径(pet.SizePercentile),前端资料卡才能显示「体重 xx%」。
+	if info.WeightHigh > info.WeightLow {
+		if pct := pet.SizePercentile(float64(weight)/1000,
+			float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000); pct != nil {
+			mark["weightPct"] = *pct
+		}
 	}
 	if req.Kind == "colorful" {
 		glassDesc := s.db.GlassDesc(glassType, glassValue)

@@ -28,13 +28,17 @@ const SNAP_DIST = 0.005 // 落差超过底图边长的 0.5%(几十米)判为传�
 const angleDiff = (a, b) => (((a - b) % 360) + 540) % 360 - 180 // a-b 折算到 (-180,180]
 const easeOut = (x) => 1 - (1 - x) * (1 - x)
 
-const dpr = window.devicePixelRatio || 1
 // snap 把平移量对齐整设备像素。底图与洞穴层图是两个元素,浏览器绘制时各自把位置吸附到整像素;
 // 若容器按小数像素逐帧平移,两者的吸附时机会错开,看起来就是层图与底图错位抖动(Firefox 实测
 // 相对位移抖 1px;Chromium 把整个地图合成为一张纹理、平移不重绘,故几乎看不出——但不能指望)。
 // 平移量落在设备像素网格上后,两者每帧的吸附结果恒定,相对位置就锁死了。代价是地图以 1 设备像素
 // 为步进移动:跟随时地图本就只有几 px/s,肉眼无感。
-export const snap = (n) => Math.round(n * dpr) / dpr
+// dpr 运行时读取(而非模块加载时固化):窗口跨到不同 dpr 的屏幕、或系统缩放变化时,吸附网格
+// 仍与实际设备像素一致,否则箭头会相对地图抖半个像素。
+export const snap = (n) => {
+  const dpr = window.devicePixelRatio || 1
+  return Math.round(n * dpr) / dpr
+}
 
 // pathAt 取折线上按弧长比例 r∈[0,1] 的点(cum 为累计弧长,末点即上报位置)。
 const pathAt = (path, cum, r) => {
