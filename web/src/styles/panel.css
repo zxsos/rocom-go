@@ -4,7 +4,8 @@
 .list-layout { display: grid; grid-template-columns: 312px 1fr; gap: 16px; align-items: start; }
 .filters {
   position: sticky; top: 64px; background: var(--bg-1); border: 1px solid var(--line);
-  border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
+  border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
+  box-shadow: var(--shadow-sm);
 }
 .filter-group { display: flex; flex-direction: column; gap: 7px; }
 /* 分组标题:左侧装饰竖条 + 字间距,更轻盈更分组化 */

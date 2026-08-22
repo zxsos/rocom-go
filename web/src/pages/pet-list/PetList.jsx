@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } 
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
-import { useFullscreen } from '../../hooks/useFullscreen'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter } from './filters'
 import FilterPanel from './FilterPanel'
@@ -24,7 +23,6 @@ export default function PetList() {
   const [boxes, setBoxes] = useState([])          // 各盒子槽位布局
   const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
   const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
-  const fullscreen = useFullscreen()
   const reloadRef = useRef(null)
   const filterRef = useRef(filter)      // 供 SSE 回调读取最新筛选(避免闭包旧值)
   const containersRef = useRef([])       // 供 SSE 回调按盒号查容器名(避免闭包旧值)
@@ -207,9 +205,6 @@ export default function PetList() {
           </select>
           <button className="btn" onClick={() => set({ order: filter.order === 'asc' ? 'desc' : 'asc' })}>{filter.order === 'asc' ? '升序' : '降序'}</button>
           <button className={'btn' + (sync ? ' primary' : '')} title="开启后,游戏内捕捉/移动宠物会自动跳转并选中该宠物;关闭可避免打断当前筛选" onClick={() => setSync((v) => !v)}>同步</button>
-          {fullscreen.supported && (
-            <button className={'btn' + (fullscreen.isFull ? ' primary' : '')} title={fullscreen.isFull ? '退出网页全屏' : '网页全屏'} onClick={fullscreen.toggle}>全屏</button>
-          )}
           <div className="spacer" />
           <span className="muted">共 {data.total} 只</span>
         </div>

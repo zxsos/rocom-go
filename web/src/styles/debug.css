@@ -1,11 +1,12 @@
 /* 调试页:游戏事件流表格 + 忽略列表。 */
 
 .debug-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }
-.debug-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); }
+.debug-table td { padding: 4px 10px; border-bottom: 1px solid var(--line-soft); transition: background .1s ease; }
+.debug-table tr:hover td { background: var(--bg-2); }
 .dir-c2s { color: var(--accent); } .dir-s2c { color: var(--gold); }
 .debug-table td:last-child { width: 1%; text-align: right; padding-right: 6px; }
-.btn-ignore { background: none; border: 0; cursor: pointer; padding: 0 4px; opacity: 0.35; font-size: 12px; }
-.btn-ignore:hover { opacity: 1; }
+.btn-ignore { background: none; border: 0; cursor: pointer; padding: 0 4px; opacity: 0.35; font-size: 12px; transition: opacity .15s ease; }
+.btn-ignore:hover { opacity: 1; color: var(--red); }
 
 /* 已忽略 opcode 的可点击胶囊(点击取消) */
 .ignore-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; }

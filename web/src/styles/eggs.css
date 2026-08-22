@@ -43,7 +43,7 @@
 
 /* 孵蛋器空格子:虚线框,与卡片同宽,占位说明「这一格还能放一颗」 */
 .egg-slot-empty {
-  border: 1px dashed var(--line); border-radius: 12px; color: var(--fg-dim);
+  border: 1px dashed var(--line); border-radius: var(--radius-lg); color: var(--fg-dim);
   min-height: 96px; display: flex; align-items: center; justify-content: center; font-size: 13px;
 }
 
@@ -82,9 +82,11 @@
 }
 
 .egg-card {
-  border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1);
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1);
   padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
 }
+.egg-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(76, 141, 255, .12); }
 
 /* 头部:蛋图 | 名称+奖牌标签 | 品类角标+孵出物种头像 */
 .egg-head { display: flex; align-items: flex-start; gap: 8px; }
