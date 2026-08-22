@@ -135,6 +135,49 @@ func (db *DB) NpcPetBase(npcCfgID uint32) (uint32, bool) {
 	return v, ok
 }
 
+// WildPetOption 是管理员面板「向指定成员投放稀有精灵」可选的野生宠物形态。
+type WildPetOption struct {
+	Base  uint32 `json:"base"`  // petbase 形态 id(投放时据此取名称/头像/身高体重区间)
+	Name  string `json:"name"`  // 形态名(珀尔鼬…)
+	Book  uint32 `json:"book"`  // 图鉴编号(排序用)
+	Shiny bool   `json:"shiny"` // 是否有可用的异色小头像(投放异色时只列这些)
+}
+
+// WildPetOptions 返回全部可投放的野生宠物形态(去重后按图鉴号升序)。数据源是
+// npc_pets(NPC_CONF→petbase),同一 petbase 可能有多个野生 NPC 映射,故按 petbase 去重。
+func (db *DB) WildPetOptions() []WildPetOption {
+	seen := map[uint32]bool{}
+	var out []WildPetOption
+	for _, base := range db.npcPets {
+		if seen[base] {
+			continue
+		}
+		seen[base] = true
+		info, ok := db.petbase[base]
+		if !ok {
+			continue
+		}
+		out = append(out, WildPetOption{Base: base, Name: info.Name, Book: info.Book, Shiny: db.HasShinyImage(base)})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Book != out[j].Book {
+			return out[i].Book < out[j].Book
+		}
+		return out[i].Base < out[j].Base
+	})
+	return out
+}
+
+// HasShinyImage 报告该 petbase 形态是否有可用的异色小头像(与 imageOf 的 shiny 分支同一套
+// 判定:e.SH 非空且对应 HeadIcon webp 确已 embed)。投放异色只取小头像,故只看 e.SH。
+func (db *DB) HasShinyImage(petbaseID uint32) bool {
+	e, ok := db.images[key(petbaseID)]
+	if !ok {
+		return false
+	}
+	return e.SH != "" && db.imgFiles["HeadIcon/"+e.SH+".webp"]
+}
+
 // IsNpcBoss 报告该 NPC(NPC_CONF.id)是不是野外首领(throwing_interact_type=4:祭礼巨像/
 // 女王蜂/钻石蜗…)。它们的 AOI 下发距离远得多(实测 128-176m,普通野生宠 80m,见 docs/data.md 3.7),
 // 故涂地不能拿它们当「这条线扫过了」的凭据(见 docs/data.md 3.8);地图标记不受影响。

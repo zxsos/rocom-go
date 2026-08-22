@@ -139,6 +139,12 @@
 }
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
+/* 管理员注入的稀有精灵:轻微闪烁提示其可撤销;区别于真实野生宠。 */
+@keyframes map-wild-inject-pulse {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, .6)); }
+  50% { filter: drop-shadow(0 0 6px rgba(255, 215, 0, .9)); }
+}
+.map-wild.inject { animation: map-wild-inject-pulse 1.8s ease-in-out infinite; }
 
 /* 「全部野生」图层的普通野生宠:尺寸缩小(22px vs 稀有 30px)、压暗降饱和,不抢稀有层视觉;
    不放大提亮、不可点资料卡——普通宠满地都是,只作「周围有什么」的概览,细节一律不给。

@@ -1,0 +1,120 @@
+/* 管理员面板:隐式入口(#/admin,导航不显示),首次设置密码后凭密码登录。 */
+
+.admin-page { display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+.admin-card {
+  width: 100%; max-width: 340px; padding: 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.admin-card h2 { margin: 0; font-size: 18px; }
+.admin-hint { color: var(--muted); font-size: 13px; margin: 0; }
+.admin-error { color: var(--danger, #e05656); font-size: 13px; margin: 0; }
+.admin-card form { display: flex; flex-direction: column; gap: 10px; }
+.admin-card .btn { width: 100%; }
+.admin-head {
+  width: 100%; max-width: 640px; display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 12px;
+}
+.admin-head h2 { margin: 0; font-size: 20px; }
+.admin-placeholder { opacity: 0.8; }
+
+/* —— 黑白名单 —— */
+.admin-card h3 { margin: 0; font-size: 15px; }
+.admin-rules { max-width: 640px; }
+.admin-rule-form { display: grid; grid-template-columns: 1fr 120px 1fr auto; gap: 8px; }
+.admin-rule-form .btn { white-space: nowrap; }
+.admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.admin-rule-list li {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.rule-badge {
+  flex: none; width: 20px; height: 20px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff;
+}
+.rule-badge.black { background: #b04a4a; }
+.rule-badge.white { background: #3d7ab8; }
+.rule-account { font-size: 12px; color: var(--fg); }
+.rule-note { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-rule-list .btn.ghost { margin-left: auto; }
+.btn.ghost {
+  background: transparent; border: 1px solid var(--line); color: var(--fg-dim);
+  padding: 4px 10px; font-size: 12px;
+}
+.btn.ghost:hover { color: var(--danger, #e05656); border-color: var(--danger, #e05656); }
+
+/* —— 成员抓捕图表 —— */
+.admin-stats { display: flex; flex-direction: column; gap: 14px; }
+.admin-stats h4 { margin: 8px 0 0; font-size: 13px; color: var(--fg-dim); }
+.admin-stats-sum { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-stat-item {
+  flex: 1; min-width: 90px; background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.admin-stat-item b { font-size: 20px; color: var(--fg); }
+.admin-stat-item span { font-size: 12px; color: var(--muted); }
+
+/* 成员横向条形图 */
+.admin-bars { display: flex; flex-direction: column; gap: 8px; }
+.admin-bar-row { display: flex; align-items: center; gap: 10px; }
+.admin-bar-name {
+  flex: none; width: 96px; font-size: 12px; color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-bar-track {
+  flex: 1; height: 16px; background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden;
+}
+.admin-bar-fill {
+  height: 100%; background: linear-gradient(90deg, #3d7ab8, #5aa9e6);
+  border-radius: 8px 0 0 8px; min-width: 2px;
+}
+.admin-bar-n { flex: none; width: 40px; text-align: right; font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+
+/* 每日柱状图 */
+.admin-daily { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding: 4px 2px 0; }
+.admin-daily-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.admin-daily-track {
+  flex: 1; width: 100%; display: flex; align-items: flex-end;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+}
+.admin-daily-fill {
+  width: 100%; background: linear-gradient(180deg, #5aa9e6, #3d7ab8);
+  border-radius: 6px 6px 0 0; min-height: 2px;
+}
+.admin-daily-day { font-size: 10px; color: var(--muted); }
+
+/* 成员明细表 */
+.admin-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-table th, .admin-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.admin-table th { color: var(--muted); font-weight: 500; }
+.admin-table td.mono { font-family: ui-monospace, monospace; font-size: 11px; color: var(--fg-dim); }
+.stat-hot { color: var(--danger, #e05656); font-weight: 600; }
+.admin-stats .admin-card h3 { margin: 0; font-size: 15px; }
+
+/* —— 投放稀有野生精灵 —— */
+.admin-inject-form {
+  display: grid; grid-template-columns: 1fr 1.2fr 100px 100px auto; gap: 8px; align-items: end;
+}
+.admin-inject-form .btn { white-space: nowrap; }
+@media (max-width: 760px) {
+  .admin-inject-form { grid-template-columns: 1fr 1fr; }
+  .admin-inject-form .btn { grid-column: span 2; }
+}
+
+/* —— 当前注入列表(管理面板撤销) —— */
+.admin-inject-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.admin-inject-list h4 { margin: 4px 0 0; font-size: 13px; color: var(--fg-dim); }
+.admin-inject-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.admin-inject-list li {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.admin-inject-name { font-size: 13px; color: var(--fg); }
+.admin-inject-kind {
+  flex: none; font-size: 11px; color: var(--fg-dim);
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+}
+.admin-inject-scene { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-inject-list .btn.ghost { margin-left: auto; }
