@@ -4,6 +4,7 @@
 package socks5
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -123,6 +125,83 @@ func allowed(addr net.Addr, allow []netip.Prefix) bool {
 	return false
 }
 
+// dialer 复用，拨号超时与 keep-alive 在此统一控制。
+var dialer = func() *net.Dialer {
+	d := &net.Dialer{
+		Timeout: 10 * time.Second,
+		// 保持 TCP keepalive，游戏长连接空闲断开更早被发现。
+		KeepAlive: 30 * time.Second,
+	}
+	return d
+}()
+
+// dnsCache 带 TTL 缓存的域名→IP 解析:游戏反复连接同一批域名(登录服/网关/
+// 大区服),跨地域云服务器上每次 DNS 解析可能增加几十~几百毫秒延迟。
+// 缓存解析结果,TTL 内直连 IP,消除重复 DNS 往返。
+type dnsCache struct {
+	mu  sync.Mutex
+	ttl time.Duration
+	m   map[string][]netip.Addr
+	t   map[string]time.Time
+}
+
+var dns = &dnsCache{ttl: 5 * time.Minute, m: map[string][]netip.Addr{}, t: map[string]time.Time{}}
+
+// lookup 返回 host 的解析结果:缓存命中且未过期直接返回,否则走系统解析并写缓存。
+func (dc *dnsCache) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return []netip.Addr{ip}, nil // 已是 IP,无需解析
+	}
+	dc.mu.Lock()
+	if until, ok := dc.t[host]; ok && time.Now().Before(until) {
+		addrs := dc.m[host]
+		dc.mu.Unlock()
+		return addrs, nil
+	}
+	dc.mu.Unlock()
+
+	// 未命中/过期:系统解析。用默认 Resolver(PreferGo=false 走系统 libc,
+	// 兼顾 /etc/hosts 与 mDNS),结果缓存到 TTL。
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return nil, err
+	}
+	dc.mu.Lock()
+	dc.m[host] = ips
+	dc.t[host] = time.Now().Add(dc.ttl)
+	dc.mu.Unlock()
+	return ips, nil
+}
+
+// dialTarget 拨号到 target("host:port"),域名经 dns 缓存解析后逐个 IP 尝试,
+// 首个连通的 IP 返回连接。相比 net.Dialer 默认"解析→连第一个 IP 失败即报错",
+// 逐个尝试可避免单 IP 不可达时直接失败,也更抗跨地域抖动。
+func dialTarget(ctx context.Context, target string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(target)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := dns.lookup(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	var lastErr error
+	for _, a := range addrs {
+		conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(a.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("无可连接地址")
+	}
+	return nil, lastErr
+}
+
 // handle 处理单个客户端连接:握手(含可选认证) → 拨号上游 → 双向转发。
 func handle(c net.Conn, user, pass string) {
 	defer c.Close()
@@ -131,13 +210,31 @@ func handle(c net.Conn, user, pass string) {
 		log.Printf("socks5: %s 握手失败: %v", c.RemoteAddr(), err)
 		return
 	}
-	up, err := net.DialTimeout("tcp", target, 10*time.Second)
+	// 先写成功回复再拨号会让客户端空等一个 RTT；这里先拨号，成功后才回复。
+	// 拨号用 context 以便后续可扩展取消。
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	up, err := dialTarget(ctx, target)
 	if err != nil {
 		writeReply(c, repConnRefused) // 回复失败,客户端据此断开
 		log.Printf("socks5: 连接 %s 失败: %v", target, err)
 		return
 	}
 	defer up.Close()
+
+	// 禁用 Nagle 算法:游戏流量多为小包(指令/心跳),Nagle 会攒包增加延迟。
+	// 同时增大 socket 缓冲区,减少 syscall 次数。
+	if tc, ok := up.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
+		_ = tc.SetReadBuffer(64 * 1024)
+		_ = tc.SetWriteBuffer(64 * 1024)
+	}
+	if tc, ok := c.(*net.TCPConn); ok {
+		_ = tc.SetNoDelay(true)
+		_ = tc.SetReadBuffer(64 * 1024)
+		_ = tc.SetWriteBuffer(64 * 1024)
+	}
+
 	if err := writeReply(c, repSuccess); err != nil {
 		return
 	}
@@ -268,12 +365,34 @@ func writeReply(c net.Conn, rep byte) error {
 	return err
 }
 
+// bufPool 复用转发缓冲区:每个方向的 io.Copy 各需一块 32KB 缓冲,
+// 高并发连接下复用可避免频繁分配/GC,降低转发路径上的停顿。
+var bufPool = sync.Pool{
+	New: func() any { b := make([]byte, 32*1024); return &b },
+}
+
 // relay 双向转发,任一端结束即关闭双方连接。
+// 用 sync.WaitGroup 确保两个 goroutine 都退出后再返回;
+// 任一方向 io.Copy 返回立即 Close 对端,触发其 io.Copy 也立即返回,
+// 避免一端已断开另一端仍阻塞在读上增加尾延迟。
 func relay(a, b net.Conn) {
-	done := make(chan struct{}, 1)
-	go func() { io.Copy(b, a); done <- struct{}{} }()
-	go func() { io.Copy(a, b); done <- struct{}{} }()
-	<-done
-	a.Close()
-	b.Close()
+	// 只关闭一次,且先关闭写端再读端:关闭 a 让「b→a」方向立即 EOF,
+	// 关闭 b 让「a→b」方向立即 EOF,两个 io.Copy 随即返回,无额外等待。
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		buf := bufPool.Get().(*[]byte)
+		defer bufPool.Put(buf)
+		io.CopyBuffer(b, a, *buf)
+		b.Close()
+	}()
+	go func() {
+		defer wg.Done()
+		buf := bufPool.Get().(*[]byte)
+		defer bufPool.Put(buf)
+		io.CopyBuffer(a, b, *buf)
+		a.Close()
+	}()
+	wg.Wait()
 }
