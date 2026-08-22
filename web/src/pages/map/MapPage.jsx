@@ -100,6 +100,9 @@ export default function MapPage() {
 
   // applyFrame 按当前时刻把锚点外推成画面位置,并直接写 transform(不经 React,免每帧重渲染)。
   // 平移量与箭头位置都对齐整设备像素(见 motion.js snap),否则箭头会相对地图晃半个像素。
+  // 用 lastFrameRef 缓存上一帧写下的 transform:玩家静止(外推量 0、落差已收敛)时算出的
+  // left/top/箭头完全相同,跳过这次 DOM 写——静止或极低速巡航时省掉每帧无谓的合成器重排。
+  const lastFrameRef = useRef(null)
   const applyFrame = useCallback(() => {
     const a = anchorRef.current
     const { zoom: z, follow: fl, vp: v } = stRef.current
@@ -117,12 +120,16 @@ export default function MapPage() {
     const px = (Math.min(v.w, v.h) || 1) * z
     const left = snap(v.w / 2 - f.u * px)
     const top = snap(v.h / 2 - f.v * px)
-    worldRef.current.style.transform = `translate3d(${left}px, ${top}px, 0)`
-    if (arrowRef.current) {
-      // 世界 yaw(0=东/右,逆时针+)→ 默认朝上的箭头旋转 heading+90(CSS 顺时针,屏幕Y向下)。
-      arrowRef.current.style.transform =
-        `translate3d(${snap(left + u * px)}px, ${snap(top + w * px)}px, 0) translate(-50%,-50%) rotate(${heading + 90}deg)`
-    }
+    const ax = snap(left + u * px)
+    const ay = snap(top + w * px)
+    const world = `translate3d(${left}px, ${top}px, 0)`
+    // 世界 yaw(0=东/右,逆时针+)→ 默认朝上的箭头旋转 heading+90(CSS 顺时针,屏幕Y向下)。
+    const arrow = `translate3d(${ax}px, ${ay}px, 0) translate(-50%,-50%) rotate(${heading + 90}deg)`
+    const last = lastFrameRef.current
+    if (last && last.world === world && last.arrow === arrow) return // 与上一帧一致,无需重写
+    lastFrameRef.current = { world, arrow }
+    worldRef.current.style.transform = world
+    if (arrowRef.current) arrowRef.current.style.transform = arrow
   }, [stRef, focusRef])
 
   // 逐帧循环:即使没有新包也要跑——外推、落差收敛、跟随都是随时间连续变化的。
@@ -155,6 +162,7 @@ export default function MapPage() {
       setImgError(false)
       view.setZoom(defaultZoom(p))
       view.setFollow(true)
+      lastFrameRef.current = null // 换底图,清掉上一帧缓存,避免首帧被误判为「无变化」
     }
     // 叠加层变化(进/出/换洞穴层)只重试层图,不动缩放/跟随——与外层保持一致。
     const li = p.layer ? p.layer.img : ''
@@ -177,6 +185,7 @@ export default function MapPage() {
     layerRef.current = null
     anchorRef.current = null
     dispRef.current = null
+    lastFrameRef.current = null
     setPos(null); setImgError(false); setLayerError(false); view.setFollow(true); view.setZoom(ZOOM_FALLBACK)
     getPosition().then((p) => { if (alive && p) applyPos(p) }).catch(() => {})
     return () => { alive = false }
@@ -315,21 +324,32 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
           <div key={p.id} data-id={p.id} title={p.n || '野生宠物'}
             className={'map-wild map-wild-all' + (p.stale ? ' stale' : '')}
             style={{ left: p.u * mapPx, top: p.v * mapPx }}>
-            {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
+            {p.img ? <img className="map-wild-face" src={imgURL(p.img)} alt="" draggable={false} /> : <span className="map-wild-face-fallback">🐾</span>}
           </div>
         )
       }
       const tip = wildTip === p.id
       const kinds = p.kinds || []
+      // 异色/炫彩是全场最稀有的类别,单独走「稀有特效」视觉(放大 + 光环 + 角标徽章)。
+      const rare = kinds.includes('shiny') || kinds.includes('colorful')
       const mark = (kinds.includes('shiny') && kinds.includes('colorful') && icons.shinyColorful) ||
         (kinds.includes('shiny') && icons.shiny) ||
         (kinds.includes('colorful') && icons.colorful)
+      const markKind = kinds.includes('shiny') && kinds.includes('colorful') ? 'shinyColorful'
+        : kinds.includes('shiny') ? 'shiny'
+        : kinds.includes('colorful') ? 'colorful'
+        : ''
       return [
         <div key={p.id} data-id={p.id} title={wildTitle(p)}
-          className={'map-wild' + (p.stale ? ' stale' : '') + (p.inject ? ' inject' : '') + (tip ? ' tip' : '')}
+          className={'map-wild' + (p.stale ? ' stale' : '') + (p.inject ? ' inject' : '') + (tip ? ' tip' : '') + (rare ? ' rare' : '')}
           style={{ left: p.u * mapPx, top: p.v * mapPx, ...p.style }}>
-          {p.img ? <img src={imgURL(p.img)} alt="" draggable={false} /> : <span>🐾</span>}
-          {mark && <img className="map-wild-mark" src={imgURL(mark)} alt="" draggable={false} />}
+          <span className="map-wild-rare-halo" />
+          {p.img ? <img className="map-wild-face" src={imgURL(p.img)} alt="" draggable={false} /> : <span className="map-wild-face-fallback">🐾</span>}
+          {rare && mark && (
+            <span className={'map-wild-mark map-wild-mark-' + markKind}>
+              <img src={imgURL(mark)} alt="" draggable={false} />
+            </span>
+          )}
         </div>,
         tip && (
           <div key={p.id + '-tip'} className="map-wild-tip"

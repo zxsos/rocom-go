@@ -153,16 +153,24 @@ export function wildRing(p, on, medals, medalOn) {
   const medal = layers.some((l) => MEDAL_KEYS.has(l.k))
   // 异色/炫彩在 WILD_LAYERS 首位、且图层先于奖牌拼入 layers,命中时必是主描边层。
   const shiny = layers[0].k === 'mutation'
-  const style = { borderColor: layers[0].color }
+  const style = {}
+  if (!shiny) {
+    // 异色/炫彩走专属「稀有光环」视觉(见 map.css .map-wild.rare),不再画白色主描边,
+    // 否则白圈会与旋转光环打架;普通类别仍走 borderColor 主描边。
+    style.borderColor = layers[0].color
+  }
   const rings = []
   let spread = medal || shiny ? 3 : 2 // 描边宽度,兼作外环起点,保持环间距均匀
   for (const l of layers.slice(1)) {
     rings.push(`0 0 0 ${spread}px ${l.color}`)
     spread += 3
   }
-  if (medal || shiny) {
+  if (medal) {
     style.borderWidth = '3px'
     rings.push(`0 0 8px 1px ${layers[0].color}`)
+  } else if (shiny) {
+    // 纯异色/炫彩(无奖牌叠加):不需要描边与柔光,光环已足够突出。
+    style.borderWidth = '0'
   }
   if (rings.length) style.boxShadow = rings.join(', ')
   return style

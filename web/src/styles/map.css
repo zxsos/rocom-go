@@ -127,15 +127,86 @@
 }
 /* 悬停或点中时放大一点并提亮描边,进一步确认指到了哪一只(标记只有 30px,挨得近时有用)。 */
 .map-wild:hover, .map-wild.tip { transform: translate(-50%, -50%) scale(1.15); filter: drop-shadow(0 0 4px rgba(255, 255, 255, .5)); }
-.map-wild img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* 异色/炫彩标记图:叠在头像右上角(框内有 overflow:hidden 裁圆角,不能出框),尺寸约为头像
-   一半,一眼可辨又不遮脸;icons 缺图时组件不渲染该元素。跟随整标记 hover/tip 缩放与 stale 压暗。 */
-.map-wild-mark {
-  position: absolute; top: 0; right: 0;
-  width: 16px !important; height: 16px !important;
-  border-radius: 0 !important; object-fit: contain;
+.map-wild-face { width: 100%; height: 100%; object-fit: cover; display: block; }
+.map-wild-face-fallback { font-size: 16px; line-height: 1; }
+
+/* —— 异色/炫彩稀有标记:放大头像 + 渐变旋转光环 + 发光脉动 + 角标徽章 ——
+   这两种是全场最稀有的类别,普通野生宠 22px、普通稀有 30px,异色/炫彩放大到 40px,
+   再套一圈沿边缘旋转的渐变光环(conic-gradient 遮罩出细环)与呼吸式发光,一眼跳出来。
+   光环用 ::before 做旋转环(在 .rare-halo 上),主体仍保持圆形裁切。 */
+.map-wild.rare {
+  width: 40px; height: 40px;
+  border-width: 0; /* 去掉默认细描边,改由光环承接主色 */
+  background: transparent;
+  overflow: visible; /* 光环与角标徽章都要出框,不能裁 */
+  animation: map-wild-rare-breathe 2.4s ease-in-out infinite;
+}
+.map-wild.rare .map-wild-face {
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--bg-1);
+}
+/* 旋转光环:叠在头像外围、沿边缘旋转的渐变细环,取主描边色(由 JS 的 p.style.borderColor 已
+   作用在 .map-wild 上,这里读 currentColor 兜底金色)。用两个伪类叠出「亮-暗」流动感。 */
+.map-wild-rare-halo {
+  position: absolute; inset: -4px; border-radius: 50%;
   pointer-events: none;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
+  background: conic-gradient(from 0deg, transparent 0 40%, #ffd54a 50%, #fff 55%, transparent 65% 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation: map-wild-rare-spin 3s linear infinite;
+  opacity: .9;
+  mix-blend-mode: screen;
+}
+/* 第二道反向光环,制造交错的流光感。 */
+.map-wild.rare .map-wild-rare-halo {
+  box-shadow: 0 0 12px 2px rgba(255, 213, 74, .55), 0 0 24px 4px rgba(255, 213, 74, .25);
+}
+.map-wild-rare-halo::after {
+  content: ''; position: absolute; inset: 1px; border-radius: 50%;
+  background: conic-gradient(from 180deg, transparent 0 55%, rgba(255, 255, 255, .85) 65%, transparent 75% 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation: map-wild-rare-spin 2.2s linear infinite reverse;
+}
+
+/* 角标徽章:不再把图标硬贴头像右上角,而是做一个带底色圆盘 + 描边 + 光晕的徽章,
+   悬浮在头像右上方(略出框),图标居中留白,精致不遮脸。 */
+.map-wild-mark {
+  position: absolute; top: -6px; right: -8px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #4a3f8a, #241d47 70%);
+  border: 1.5px solid #c9b6ff;
+  box-shadow: 0 0 6px rgba(201, 182, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
+  pointer-events: none;
+}
+.map-wild-mark img { width: 13px; height: 13px; object-fit: contain; filter: drop-shadow(0 0 2px rgba(255,255,255,.6)); }
+.map-wild-mark-shiny {
+  background: radial-gradient(circle at 35% 30%, #4a3f8a, #241d47 70%);
+  border-color: #c9b6ff;
+  box-shadow: 0 0 6px rgba(201, 182, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
+}
+.map-wild-mark-colorful {
+  background: radial-gradient(circle at 35% 30%, #6b2f50, #3a1a2c 70%);
+  border-color: #ffb6e0;
+  box-shadow: 0 0 6px rgba(255, 182, 224, .9), 0 1px 3px rgba(0, 0, 0, .6);
+}
+.map-wild-mark-shinyColorful {
+  background: conic-gradient(from 210deg, #4a3f8a, #c9b6ff, #6b2f50, #ffb6e0, #4a3f8a);
+  border-color: #fff;
+  box-shadow: 0 0 7px rgba(255, 255, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
+}
+
+/* 稀有标记的呼吸发光 + 光环旋转。 */
+@keyframes map-wild-rare-breathe {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 213, 74, .45)); }
+  50% { filter: drop-shadow(0 0 10px rgba(255, 213, 74, .8)); }
+}
+@keyframes map-wild-rare-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 /* 已离开 AOI:位置只是最后所见,压暗以示不可信。 */
 .map-wild.stale { opacity: .4; filter: grayscale(.6); }
