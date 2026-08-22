@@ -68,6 +68,16 @@
 .account-item.cur { color: var(--accent); }
 .account-item.cur .account-item-uid { color: var(--accent); opacity: .8; }
 
+/* PIN 保护标记:触发按钮 + 下拉项里的 🔒 */
+.account-pin-mark { flex: none; font-size: 12px; opacity: .7; }
+.account-item-pin { flex: none; font-size: 12px; opacity: .7; }
+/* 下拉底部操作行:管理 PIN + 删除账号 */
+.account-actions { gap: 8px; justify-content: center; padding-top: 8px; border-top: 1px solid var(--line); margin-top: 4px; }
+.account-actions:hover { background: none; }
+.account-action-btn { font-size: 12px; padding: 5px 10px; }
+.account-del-btn { color: var(--fg-dim); }
+.account-del-btn:hover { color: var(--red); border-color: var(--red); }
+
 /* ---- 截图防泄:窗口失焦时模糊顶栏敏感文字(昵称、UID、品牌副标题) ----
    html[data-blur] 由 App.jsx 监听 window blur/visibilitychange 打上。
    account-item-name/uid 也在内,确保展开下拉时同样模糊。 */

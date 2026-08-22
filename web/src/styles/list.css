@@ -20,10 +20,22 @@
 .boxmap-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .boxmap-cell.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
-/* 桌面表格(.table-wrap 调试页亦复用;移动端隐藏,调试页用内联 display:block 盖回) */
+/* 桌面表格(.table-wrap 调试页亦复用;移动端隐藏,调试页用内联 display:block 盖回)
+   table-layout: fixed + 预设列宽:列宽不再随每页内容动态重算,切换分页/筛选时不会出现
+   「先按内容撑开再矫正」的抖动(平板横屏走此表格分支时尤为明显)。未显式设宽的列由 fixed
+   算法均分剩余空间;white-space: nowrap 配合 overflow 防止内容撑破预设宽度。 */
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); }
-table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; }
+table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; table-layout: fixed; }
 table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+/* 列宽分配:宠物(头像+名+副标)最宽,六维固定 262px(84×3+gap),其余按内容给最小可用宽度。
+   预留约 2 列弹性给未设宽的列(性格/特长/奖牌/声音)均分,合计 <100% 时 fixed 会自动填满。 */
+table.pets th:nth-child(1), table.pets td:nth-child(1) { width: 220px; }
+table.pets th:nth-child(2), table.pets td:nth-child(2) { width: 70px; }   /* 系别 */
+table.pets th:nth-child(6), table.pets td:nth-child(6) { width: 56px; }   /* 声音 */
+table.pets th:nth-child(7), table.pets td:nth-child(7) { width: 96px; }   /* 体重 */
+table.pets th:nth-child(8), table.pets td:nth-child(8) { width: 96px; }   /* 身高 */
+table.pets th:nth-child(9), table.pets td:nth-child(9) { width: 262px; }  /* 六维 */
+table.pets th:nth-child(10), table.pets td:nth-child(10) { width: 130px; } /* 捕捉时间 */
 table.pets tr:last-child td { border-bottom: none; }
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
 table.pets tr:hover td { background: var(--bg-2); }

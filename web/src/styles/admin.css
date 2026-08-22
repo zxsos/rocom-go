@@ -125,3 +125,6 @@
 }
 .admin-inject-scene { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-inject-list .btn.ghost { margin-left: auto; }
+
+/* 账号 PIN 管理区:每行的 PIN 输入框窄一些 */
+.admin-pin-input { width: 100px; flex: none; padding: 5px 8px; font-size: 13px; }

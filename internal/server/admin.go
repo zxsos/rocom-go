@@ -410,6 +410,11 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "该形态没有异色形态,无法投放异色", 400)
 		return
 	}
+	// 炫彩投放取普通小头像,要求该形态确有可用的普通小头像,否则注入后地图标记显示不出图。
+	if req.Kind == "colorful" && !s.db.HasHeadImage(req.Base) {
+		http.Error(w, "该形态没有可用的头像,无法投放", 400)
+		return
+	}
 	mutation := int32(0)
 	if req.Kind == "shiny" {
 		mutation = 1 // scene.MutationShiny

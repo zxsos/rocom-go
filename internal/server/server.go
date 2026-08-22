@@ -124,6 +124,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/evolution", s.handleEvolution)
 	s.mux.HandleFunc("GET /api/pet-page", s.handlePetPage)
 	s.mux.HandleFunc("GET /api/accounts", s.handleAccounts)
+	// 账号 PIN 保护 + 账号删除(隐私:切账号需 PIN,删账号需 PIN 或管理员)
+	s.mux.HandleFunc("POST /api/account/verify", s.handleAccountVerify)
+	s.mux.HandleFunc("POST /api/account/pin", s.handleAccountPin)
+	s.mux.HandleFunc("DELETE /api/account", s.handleAccountDelete)
 	// 管理员(隐式面板,前端导航不显示):首启设置密码 → 登录签发内存令牌 → 校验后使用。
 	s.mux.HandleFunc("GET /api/admin/status", s.handleAdminStatus)
 	s.mux.HandleFunc("POST /api/admin/setup", s.handleAdminSetup)
