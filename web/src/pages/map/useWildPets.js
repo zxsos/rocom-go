@@ -399,6 +399,17 @@ export function useWildPets(account) {
       return next
     })
   }
+  // 双牌开关变化时联动「仅双牌时提醒」:开 → 自动勾选(一步到位「只看双牌 + 只提醒双牌」);
+  // 关时不自动取消(保留用户选择;关后 isDualMedal 退回单牌阈值判 ≥2,仍能工作)。
+  useEffect(() => {
+    if (dual.on) {
+      setNotifyDualOnly((prev) => {
+        if (prev) return prev
+        try { localStorage.setItem(NOTIFY_DUAL_ONLY_KEY, '1') } catch {}
+        return true
+      })
+    }
+  }, [dual.on])
 
   // setDualThreshold 拖双牌子滑块:只改对应奖牌的双牌阈值,钳到 [单牌当前值, 极端值]内
   // (保证不比单牌宽)。单牌值是下限/上限(取决于 dir),由 clampDual 处理方向。

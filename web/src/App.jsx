@@ -4,6 +4,7 @@ import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './a
 import { AccountContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
 import { PinDialog } from './components/PinDialog'
+import FloatingHost from './components/FloatingHost'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 const NAV = [
@@ -54,8 +55,10 @@ export default function App() {
     // 页面隐藏(切 tab/最小化)也算失焦
     const onVis = () => document.hidden ? on() : off()
     document.addEventListener('visibilitychange', onVis)
-    // 手动锁定时强制打上
+    // 手动锁定时强制打上;解锁时立即移除(否则解锁后若窗口一直处于焦点,
+    // 没有新的 focus/鼠标进入事件触发移除,表现为"只能打开不能关闭")
     if (blurLocked) apply()
+    else root.removeAttribute('data-blur')
     return () => {
       window.removeEventListener('blur', on)
       window.removeEventListener('focus', off)
@@ -143,7 +146,7 @@ export default function App() {
       <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar">
-          <div className="brand"><img className="brand-logo" src="/logo.svg" alt="" draggable={false} />洛克妙妙屋 <span className="brand-sub">宠物统计</span></div>
+          <div className="brand"><img className="brand-logo" src="/logo.svg" alt="" draggable={false} />洛克妙妙屋</div>
           <nav className="topnav">{navLinks('navlink')}</nav>
           {fullscreen.supported && (
             <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
@@ -177,6 +180,9 @@ export default function App() {
         </main>
 
         <nav className="bottomnav">{navLinks('tab')}</nav>
+
+        {/* 全局浮窗挂载点:不走路由,切页面不卸载;位于两个 Provider 内部拿到 account/icons */}
+        <FloatingHost />
       </div>
       {pinDialog && (
         <PinDialog

@@ -502,3 +502,80 @@
   width: 20px !important; height: 20px !important; border-radius: 0 !important;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
 }
+
+/* ── 浮窗模式 ── */
+/* 浮窗独占占位:主页面 /map 在浮窗开着时渲染的提示卡 */
+.map-page-float-host {
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.map-float-host-card {
+  max-width: 360px; width: 100%; padding: 28px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: map-empty-in .35s ease-out;
+}
+.map-float-host-ic { font-size: 42px; line-height: 1; }
+.map-float-host-text { font-size: 17px; font-weight: 600; }
+
+/* Web 浮窗本体(浏览器 PiP 模式直接撑满 OS 窗口,样式同样适用) */
+.map-float {
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .35);
+  overflow: hidden;
+  font-family: inherit;
+}
+.map-float-pip { border-radius: 0; border: none; box-shadow: none; }
+/* 标题栏:拖拽手柄(PiP 由 OS 拖,Web 在此拖) */
+.map-float-title {
+  display: flex; align-items: center; gap: 6px;
+  height: 40px; flex: none; padding: 0 6px 0 12px;
+  background: linear-gradient(180deg, rgba(28, 34, 48, .95), rgba(22, 27, 34, .95));
+  border-bottom: 1px solid var(--line);
+  cursor: move; user-select: none;
+}
+.map-float-pip .map-float-title { cursor: default; }
+.map-float-title-ic { font-size: 15px; }
+.map-float-title-text {
+  flex: 1; font-size: 13px; font-weight: 600; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.map-float-btn {
+  width: 28px; height: 28px; flex: none;
+  display: grid; place-items: center; font-size: 14px;
+  background: transparent; border: 1px solid transparent; border-radius: 7px;
+  color: var(--fg-dim); cursor: pointer;
+  transition: background-color .16s ease, color .16s ease, border-color .16s ease;
+}
+.map-float-btn:hover { color: var(--fg); background: rgba(255, 255, 255, .06); border-color: var(--line); }
+.map-float-close:hover { color: var(--red); border-color: var(--red); background: rgba(248, 81, 73, .12); }
+
+/* 浮窗主体:撑满剩余高度,内含 MapViz 的 .map-vp */
+.map-float-body { flex: 1; min-height: 0; position: relative; display: flex; }
+.map-float-body .map-vp { border: none; border-radius: 0; box-shadow: none; flex: 1; }
+.map-float-body .empty { display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 16px; text-align: center; color: var(--fg-dim); font-size: 13px; }
+
+/* 缩放手柄:右下角 */
+.map-float-resize {
+  position: absolute; right: 0; bottom: 0; width: 16px; height: 16px;
+  cursor: nwse-resize; z-index: 5;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--fg-dim) 50%, var(--fg-dim) 60%, transparent 60%, transparent 70%, var(--fg-dim) 70%, var(--fg-dim) 80%, transparent 80%);
+  opacity: .5;
+}
+.map-float-resize:hover { opacity: .9; }
+
+/* 图层浮层:点 ☰ 弹出,占满浮窗,点击外部关闭 */
+.map-float-layers-backdrop {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(0, 0, 0, .35);
+  display: flex; align-items: stretch; justify-content: flex-start;
+}
+.map-float-layers { max-width: 280px; width: 60%; height: 100%; overflow: auto;
+  background: var(--bg-2); box-shadow: var(--shadow); }
+.map-float-layers .map-filters { position: static; max-height: none; height: 100%; border-radius: 0; }
+
+/* 右上角浮窗入口按钮(主页面 .map-ctrl 内的 ◰):复用 .map-btn,加一点偏移避免与 ☰ 重叠 */
+.map-float-open { display: flex; }

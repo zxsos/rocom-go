@@ -1,7 +1,12 @@
 /* 侧栏面板与页面工具条:宠物列表筛选/事件规则/地图图层共用同一套
    「桌面常驻左列 + 移动端侧滑抽屉」结构(.list-layout / .filters / .filter-group)。 */
 
-.list-layout { display: grid; grid-template-columns: 312px 1fr; gap: 16px; align-items: start; }
+.list-layout { display: grid; grid-template-columns: 312px 1fr; gap: 16px; align-items: start; min-width: 0; }
+/* grid 项默认 min-width: auto,会被内部宽内容(1160px 的宠物表格)撑破,
+   导致 1fr 列实际宽到 1160px、整个 .list-layout 超出 .content/视口,
+   顶栏账号栏被挤出屏幕、.table-wrap 的 overflow-x:auto 也因父级无固定宽而失效。
+   显式 min-width:0 让 1fr 列可缩,overflow 才能落在 .table-wrap 自身上(单组件横向滚动)。 */
+.list-layout > section { min-width: 0; }
 .filters {
   position: sticky; top: 64px; background: var(--bg-1); border: 1px solid var(--line);
   border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
