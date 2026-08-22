@@ -319,6 +319,11 @@
 /* 稀有宠提醒按钮的铃铛:与图层色点同一行高对齐;关闭态随按钮灰掉。 */
 .map-notify-ic { font-size: 15px; line-height: 1; flex: none; }
 .map-notify-btn:not(.on) .map-notify-ic { opacity: .45; }
+/* 「仅双牌时提醒」子开关:缩进表示从属提醒开关;禁用(提醒关时)变灰不可点。 */
+.map-notify-dual-row { padding-left: 20px; }
+.map-notify-dual-btn { font-size: 13px; opacity: 1; }
+.map-notify-dual-btn:disabled { opacity: .4; cursor: not-allowed; }
+.map-notify-dual-btn .map-collect-ic { width: 14px; flex: none; color: var(--accent); font-size: 12px; }
 
 /* 奖牌筛选:按钮展开/收起整组滑块;滑块是单值阈值,范围=奖牌边界~极端(只严不宽)。 */
 .map-medal-toggle {

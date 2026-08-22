@@ -87,6 +87,9 @@ export function wildTags(kinds = []) {
 // 带环显示(当前开着且命中的图层/奖牌筛选,见 wildShown)的新宠才提醒**——与 marks 过滤
 // 同一口径:画得出环的才算稀有宠,画不出环的(开关关掉/奖牌拖严后不再命中)再出现不打扰。
 const NOTIFY_KEY = 'map.wildNotify.v1'
+// 「仅双牌时提醒」子开关:勾选后只有双牌(命中≥2张奖牌)的新出现稀有宠才响提醒,
+// 单牌/异色/炫彩等不响。独立持久化,默认关(=所有带环稀有宠都提醒,保持原行为)。
+const NOTIFY_DUAL_ONLY_KEY = 'map.wildNotifyDualOnly.v1'
 
 // chime 播放一段三连上行「叮咚」提示音(880 → 1174.7 → 1568 Hz),用 Web Audio 合成,
 // 不依赖音频资源文件。AudioContext 需在用户手势后创建,开关点击即手势;失败(无设备/被
@@ -162,6 +165,17 @@ export function wildShown(p, on, medals, medalOn, dual) {
     WILD_LAYERS.some((l) => on.has(l.k) && l.kinds.some((k) => kinds.includes(k))) ||
     medalHits >= minHits
   )
+}
+
+// isDualMedal 判定一只宠是否「双牌」:用双牌阈值口径(dual.on 时用 dual.medals,否则用单牌
+// 阈值)判奖牌命中数 ≥2。与 wildShown 双牌开启时的奖牌段判定同口径,供「仅双牌时提醒」用:
+// 用户拖严双牌滑块后,提醒也按同样阈值判,不会图上不画双牌环却还提醒。体重族与嗓音族各一,
+// 命中数上限就是 2。
+export function isDualMedal(p, medals, medalOn, dual) {
+  const th = dual && dual.on ? dual.medals : medals
+  const medalHits = MEDAL_FILTERS.reduce(
+    (n, m) => n + (medalOn.has(m.k) && medalMatch(m, p, th) ? 1 : 0), 0)
+  return medalHits >= 2
 }
 
 // wildRing 把一只宠物当前「开着且命中」的类别翻成描边样式,与 marks 过滤**同一口径**:
@@ -276,6 +290,17 @@ export function useWildPets(account) {
       return next
     })
   }
+  // 「仅双牌时提醒」子开关:勾选后只有双牌(命中≥2张奖牌)的新出现稀有宠才响提醒。
+  const [notifyDualOnly, setNotifyDualOnly] = useState(() => {
+    try { return localStorage.getItem(NOTIFY_DUAL_ONLY_KEY) === '1' } catch { return false }
+  })
+  const toggleNotifyDualOnly = () => {
+    setNotifyDualOnly((prev) => {
+      const next = !prev
+      try { localStorage.setItem(NOTIFY_DUAL_ONLY_KEY, next ? '1' : '0') } catch {}
+      return next
+    })
+  }
   // 新出现提醒:对比相邻两批推送,挑出「刚进视野、非灰点、且能在地图上带环显示」的实体
   // 通知(已通知过的 id 不重复弹;它变灰点=离开视野后从集合移除,重新出现可再提醒)。
   // 「带环显示」用 wildShown 判定,与 marks 过滤同一口径:只有地图上画得出环的才算稀有
@@ -298,9 +323,12 @@ export function useWildPets(account) {
     for (const p of pets) {
       if (p.stale || seenIdsRef.current.has(p.id)) continue
       seenIdsRef.current.add(p.id)
-      if (wildShown(p, on, medals, medalOn, dual)) fireWildNotify(p)
+      // 先过 wildShown(地图上画得出环的才算稀有宠),再过「仅双牌」(勾选时只响双牌)。
+      if (!wildShown(p, on, medals, medalOn, dual)) continue
+      if (notifyDualOnly && !isDualMedal(p, medals, medalOn, dual)) continue
+      fireWildNotify(p)
     }
-  }, [pets, notify, on, medals, medalOn, dual])
+  }, [pets, notify, notifyDualOnly, on, medals, medalOn, dual])
 
   useEffect(() => {
     let alive = true
@@ -432,5 +460,5 @@ export function useWildPets(account) {
     return [num, numStale]
   }, [pets, allPets, on, medals, medalOn])
 
-  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, setDualThreshold, notify, toggleNotify }
+  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, setDualThreshold, notify, toggleNotify, notifyDualOnly, toggleNotifyDualOnly }
 }
