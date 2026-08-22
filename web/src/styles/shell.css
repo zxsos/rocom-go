@@ -11,7 +11,6 @@
 }
 .brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; }
 .brand-logo { width: 22px; height: 22px; border-radius: 6px; flex: none; }
-.brand-sub { color: var(--fg-dim); font-weight: 400; font-size: 12px; margin-left: 4px; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
   display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); color: var(--fg-dim);
@@ -19,17 +18,21 @@
 }
 .navlink.active { background: var(--bg-3); color: var(--fg); }
 .navlink:hover { color: var(--fg); background: var(--bg-2); }
-/* 顶栏全屏按钮:全局入口(原先只在宠物列表工具栏),随账号下拉一起靠右 */
+/* 顶栏全屏按钮:全局入口(原先只在宠物列表工具栏),随账号下拉一起靠右。
+   按钮默认透明融入半透明磨砂顶栏,悬停/激活才给反馈,避免实色块与背景割裂 */
 .topbar-fs {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 12px; border-radius: var(--radius); cursor: pointer; font: inherit;
-  background: var(--bg-2); border: 1px solid var(--line); color: var(--fg);
-  transition: border-color .15s ease, background .15s ease, transform .08s ease;
+  background: transparent; border: 1px solid transparent; color: var(--fg-dim);
+  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
 }
-.topbar-fs:hover { border-color: var(--accent); background: var(--accent-soft); }
+.topbar-fs:hover {
+  border-color: var(--line); background: rgba(255, 255, 255, .05); color: var(--fg);
+}
 .topbar-fs:active { transform: scale(.97); }
 .topbar-fs:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.topbar-fs.on { color: var(--accent); border-color: var(--accent); }
+.topbar-fs.on { color: var(--accent); }
+.topbar-fs.on:hover { border-color: var(--accent); background: var(--accent-soft); }
 .account-wrap { margin-left: auto; position: relative; max-width: 240px; }
 .account-state { width: 14px; height: 14px; flex: none; }
 .account-select { max-width: 220px; }
@@ -78,10 +81,9 @@
 .account-del-btn { color: var(--fg-dim); }
 .account-del-btn:hover { color: var(--red); border-color: var(--red); }
 
-/* ---- 截图防泄:窗口失焦时模糊顶栏敏感文字(昵称、UID、品牌副标题) ----
+/* ---- 截图防泄:窗口失焦时模糊顶栏敏感文字(昵称、UID) ----
    html[data-blur] 由 App.jsx 监听 window blur/visibilitychange 打上。
    account-item-name/uid 也在内,确保展开下拉时同样模糊。 */
-html[data-blur] .brand-sub,
 html[data-blur] .account-trigger-name,
 html[data-blur] .account-item-name,
 html[data-blur] .account-item-uid {
@@ -90,14 +92,14 @@ html[data-blur] .account-item-uid {
   user-select: none;
 }
 /* 聚焦回窗口时平滑恢复 */
-.brand-sub, .account-trigger-name, .account-item-name, .account-item-uid {
+.account-trigger-name, .account-item-name, .account-item-uid {
   transition: filter .12s ease;
 }
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }
 
-.content { flex: 1; padding: 16px; }
+.content { flex: 1; padding: 16px; min-width: 0; }
 
 @media (max-width: 760px) {
   .topnav { display: none; }

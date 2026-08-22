@@ -1,5 +1,4 @@
-import React from 'react'
-import { createRoot } from 'react-dom/client'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import App from './App'
 import PetList from './pages/pet-list/PetList'

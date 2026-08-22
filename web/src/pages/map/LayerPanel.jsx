@@ -88,7 +88,7 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
             <span>奖牌筛选</span>
             <span className="muted">▾</span>
           </button>
-          {wilds.open && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
+          {wilds.open && !wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
             const th = wilds.medals[k]
