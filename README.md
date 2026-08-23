@@ -158,3 +158,40 @@ sudo ./rocom-capture -iface eth0 -socks5-addr :1080 -skip-self-ip=false \
 > 然后在游戏中打开宠物仓库以触发宠物列表下发。
 > 密钥会随连接落库缓存,抓包服务异常重启后可对仍在线的连接自动恢复密钥继续解析(有效期 24h),
 > 无需重登游戏重新协商。
+
+## 部署(数据持久化 / 更新不丢历史)
+
+直接命令行运行时,数据库默认落在工作目录(`rocom.db`),和二进制放一起——删程序目录就会连带删掉
+积累的宠物/事件/涂地等历史数据。生产部署应**把数据放到程序目录之外**,用 systemd 管理进程:
+
+`scripts/deploy.sh` 自动完成「程序装 `/opt/rocom/`、数据放 `/var/lib/rocom/`、systemd 托管」:
+
+```bash
+# 服务器上已装 go 时的标准流程(首次和更新都用这一条):
+#    git pull + go build + 部署,数据不动
+sudo ./scripts/deploy.sh --build
+
+# 首次跑完后编辑配置填入 socks5 等参数,然后启动
+sudo vim /etc/rocom.env          # 填 ROCOM_SOCKS5_ADDR / USER / PASS 等
+sudo systemctl restart rocom
+sudo systemctl status rocom
+journalctl -u rocom -f           # 看日志
+
+# 从手动部署迁移(已有旧库在跑,想切到 systemd 管理)
+#    自动停旧进程、搬库与证书到 /var/lib/rocom、从旧启动参数生成 env
+sudo ./scripts/deploy.sh --migrate /root/roco
+
+# 备份数据库(热备,不锁库)
+sudo ./scripts/deploy.sh --backup
+
+# 从 tar 包安装(而非本地 dist/)
+sudo ./scripts/deploy.sh --archive rocom-capture.tar
+
+# 卸载(默认保留数据,加 --purge 才连数据一起删)
+sudo ./scripts/deploy.sh --uninstall
+```
+
+更新流程只替换 `/opt/rocom/rocom-capture` 并 `systemctl restart`,数据库 `/var/lib/rocom/rocom.db`
+不受影响。重启后自动从 `sessions` 表预热会话密钥、连接归属、场景定位(有效期 24h),对仍存活的
+游戏连接从中段继续解密,历史统计原样保留。仅当库 schema 变化(新版加了字段/表)时才需删库重建——
+`CREATE TABLE IF NOT EXISTS` 是幂等的,schema 没变就直接打开旧库即可。
