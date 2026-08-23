@@ -97,21 +97,30 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	return s, nil
 }
 
-// checkpointInterval 是主动 checkpoint 的间隔。PASSIVE checkpoint 不阻塞读者/写者,只是把已
-// 提交的 WAL 帧刷回主库并 fsync;频繁执行单次开销小,还能避免 WAL 无界增长、也避免攒满后
-// 一次性大 fsync 的秒级尖峰(见上 wal_autocheckpoint 说明)。30s 在「及时落盘」与「少打扰」间折中。
-const checkpointInterval = 30 * time.Second
+// checkpointInterval 是主动 checkpoint 的间隔。
+//
+// 早期实现每 30s 跑一次 PRAGMA wal_checkpoint(PASSIVE):每次都含一次 fsync,在慢磁盘
+// (SD卡/eMMC 网关)上可达几十~上百 ms,期间整个进程的 I/O 调度受影响、Web 请求延迟飙升,
+// 表现为「隔 30s 延迟上涨几百 ms、持续几秒」的周期性抖动。
+//
+// 现改为:间隔放宽到 5 分钟,减少 fsync 频次;wal_autocheckpoint 已设为 65536(约 256MB),
+// 常态下被动抓包的写入量远达不到该阈值,故自动 checkpoint 基本不会触发;
+// 主动 checkpoint 用 RESTART 模式:无活跃事务时把 WAL 文件重置为初始大小(避免 WAL 越长
+// 单次 fsync 越久),有活跃事务时退化为 PASSIVE 行为(不阻塞)。
+const checkpointInterval = 5 * time.Minute
 
-// checkpointLoop 定期做 PASSIVE checkpoint,把落盘停顿摊薄到每次几毫秒、错开高频抓包时段。
-// 用 rdb(只读池)执行:checkpoint 操作共享 WAL 文件,任意连接都能触发;不占用唯一的写连接 db,
-// 也就不会和正常的宠物入库/快照替换抢写锁。进程常驻运行,随进程退出自然终止。
+// checkpointLoop 定期把 WAL 刷回主库。用 rdb(只读池)执行:checkpoint 操作共享 WAL 文件,
+// 任意连接都能触发;不占用唯一的写连接 db,也就不会和正常的宠物入库/快照替换抢写锁。
+// 进程常驻运行,随进程退出自然终止。
 func (s *Store) checkpointLoop() {
 	t := time.NewTicker(checkpointInterval)
 	defer t.Stop()
 	for range t.C {
-		if _, err := s.rdb.Exec(`PRAGMA wal_checkpoint(PASSIVE)`); err != nil {
+		// RESTART:尽可能把 WAL 全部刷回主库并重置 WAL 文件大小;有活跃读者/写者时
+		// 退化为 PASSIVE(只刷可刷部分,不阻塞)。比固定 PASSIVE 更能抑制 WAL 增长。
+		if _, err := s.rdb.Exec(`PRAGMA wal_checkpoint(RESTART)`); err != nil {
 			// checkpoint 失败无害(WAL 仍在,下轮重试),不打扰日志刷屏;仅在连接级错误时提示。
-			log.Printf("wal_checkpoint(PASSIVE) 失败: %v", err)
+			log.Printf("wal_checkpoint(RESTART) 失败: %v", err)
 		}
 	}
 }
@@ -181,6 +190,7 @@ CREATE TABLE IF NOT EXISTS pet_medal (
 CREATE TABLE IF NOT EXISTS accounts (
   account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER, pin_hash TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON accounts(updated_at DESC);
 -- 连接会话:key 是会话密钥(供重启后对存活连接续解,见 docs/architecture.md 3),
 -- 其余几列是实时地图重启回显所需的现场(当前场景 / 家园房屋等级 / 所在区域)。
 CREATE TABLE IF NOT EXISTS sessions (

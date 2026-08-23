@@ -38,6 +38,14 @@ type Server struct {
 	onlineMu sync.Mutex           // 保护 lastSeen
 	lastSeen map[string]int64     // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
 
+	// acctCache 缓存最近活跃账号,避免 acct() 每次请求都跑 ListAccounts 全表 JOIN。
+	// 前端首次加载(currentAccount 为空)时并行发多个 API,每个都调 acct() → ListAccounts(),
+	// 该查询 LEFT JOIN pets + GROUP BY + ORDER BY,多账号时是全表扫描,N 个并发请求 = N 次全表扫。
+	// 用 lastSeen 推导最近活跃账号,5 秒内复用,避免重复查库。
+	acctCacheMu   sync.Mutex
+	acctCacheVal  string
+	acctCacheTime time.Time
+
 	adminMu    sync.Mutex
 	adminToken string // 管理员会话令牌;服务重启后失效需重新登录
 
@@ -166,11 +174,49 @@ func cacheControl(h http.Handler, v string) http.Handler {
 }
 
 // acct 返回请求指向的账号:优先 ?account=,缺省回退最近活跃账号(库空则空串)。
+//
+// 回退路径优化:原来每次都调 ListAccounts()(LEFT JOIN pets + GROUP BY + ORDER BY 全表扫),
+// 前端首次加载时并行发 5-8 个 API、每个都触发一次,多账号场景下是明显的延迟来源。
+// 现改为优先从 lastSeen 内存表推导最近活跃账号(5s 缓存),仅在 lastSeen 为空(无流量/刚启动)
+// 时才回退到 ListAccounts() 查库。
 func (s *Server) acct(r *http.Request) string {
 	if a := r.URL.Query().Get("account"); a != "" {
 		return a
 	}
+	// 快路径:5s 内复用缓存结果,避免并发请求重复推导
+	s.acctCacheMu.Lock()
+	if s.acctCacheVal != "" && time.Since(s.acctCacheTime) < 5*time.Second {
+		v := s.acctCacheVal
+		s.acctCacheMu.Unlock()
+		return v
+	}
+	s.acctCacheMu.Unlock()
+
+	// 从 lastSeen 找最近活跃账号(内存,无查库)
+	s.onlineMu.Lock()
+	var bestAcc string
+	var bestTs int64
+	for acc, ts := range s.lastSeen {
+		if ts > bestTs {
+			bestTs = ts
+			bestAcc = acc
+		}
+	}
+	s.onlineMu.Unlock()
+	if bestAcc != "" {
+		s.acctCacheMu.Lock()
+		s.acctCacheVal = bestAcc
+		s.acctCacheTime = time.Now()
+		s.acctCacheMu.Unlock()
+		return bestAcc
+	}
+
+	// lastSeen 为空(刚启动/纯离线回放):回退到查库
 	if accs, err := s.store.ListAccounts(); err == nil && len(accs) > 0 {
+		s.acctCacheMu.Lock()
+		s.acctCacheVal = accs[0].Account
+		s.acctCacheTime = time.Now()
+		s.acctCacheMu.Unlock()
 		return accs[0].Account // ListAccounts 按 updated_at 倒序,取最近
 	}
 	return ""

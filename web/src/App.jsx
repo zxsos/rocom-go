@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
@@ -32,40 +32,15 @@ export default function App() {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // 截图防泄(反向):默认隐藏(打 data-blur),只有窗口真正聚焦 + 鼠标在窗口内 + 页面
-  // 可见,三者都满足时才显示。窗口失焦/鼠标移出/切 tab 任一发生即恢复隐藏。
-  // 平时看不到 UID/昵称,只有用户主动盯着页面看时才显示——窗口焦点本身就是显示开关。
-  const inWindowRef = useRef(true) // 鼠标是否在窗口内(必须在组件顶层声明,不能在 effect 里调 hook)
+  // 截图防泄(全局开关):点击顶栏品牌名「洛克妙妙屋」切换。默认开启——敏感文字
+  // (昵称/UID)常驻模糊,点击品牌名解除全部,再点恢复。不依赖任何窗口焦点/鼠标/触屏事件,
+  // 手机电脑行为一致,截图/录屏/投屏都不触发 DOM 事件故默认即保护最可靠。
+  // 状态打在 <html data-privacy> 上,CSS 据此模糊 .privacy 元素;品牌名本身遮罩开启时变暗。
+  const [privacyOn, setPrivacyOn] = useState(true)
   useEffect(() => {
-    const root = document.documentElement
-    const apply = () => root.setAttribute('data-blur', '')
-    const clear = () => root.removeAttribute('data-blur')
-    // 三重判定的"显示"条件:窗口聚焦 + 鼠标在窗口内 + 页面可见
-    const hasFocus = () => document.hasFocus() && !document.hidden
-    const recheck = () => {
-      if (hasFocus() && inWindowRef.current) clear()
-      else apply()
-    }
-    const onBlur = () => recheck()
-    const onFocus = () => recheck()
-    const onLeave = (e) => { if (e.relatedTarget === null) { inWindowRef.current = false; recheck() } }
-    const onEnter = () => { inWindowRef.current = true; recheck() }
-    const onVis = () => recheck()
-    window.addEventListener('blur', onBlur)
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('mouseleave', onLeave)
-    document.addEventListener('mouseenter', onEnter)
-    document.addEventListener('visibilitychange', onVis)
-    // 初次挂载:默认隐藏
-    apply()
-    return () => {
-      window.removeEventListener('blur', onBlur)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('mouseleave', onLeave)
-      document.removeEventListener('mouseenter', onEnter)
-      document.removeEventListener('visibilitychange', onVis)
-    }
-  }, [])
+    document.documentElement.toggleAttribute('data-privacy', privacyOn)
+  }, [privacyOn])
+  const togglePrivacy = () => setPrivacyOn((v) => !v)
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -145,7 +120,10 @@ export default function App() {
       <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar">
-          <div className="brand"><img className="brand-logo" src="/logo.svg" alt="" draggable={false} />洛克妙妙屋</div>
+          <button type="button" className={'brand' + (privacyOn ? ' privacy-on' : '')}
+            onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
+            <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">洛克妙妙屋</span>
+          </button>
           <nav className="topnav">{navLinks('navlink')}</nav>
           {fullscreen.supported && (
             <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
@@ -290,7 +268,7 @@ function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDele
           <img className="account-state" src={current.online ? '/login.svg' : '/logout.svg'}
             alt="" draggable={false} title={current.online ? '在线' : '离线'} />
         )}
-        <span className="account-trigger-name">
+        <span className="privacy account-trigger-name">
           {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
         </span>
         {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护">🔒</span>}
@@ -299,24 +277,15 @@ function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDele
       {open && (
         <ul className="account-dropdown" ref={listRef} role="listbox">
           {accounts.map((a, i) => (
-            <li
+            <AccountItem
               key={a.account}
-              role="option"
-              aria-selected={current && a.account === current.account}
-              className={
-                'account-item' +
-                (current && a.account === current.account ? ' cur' : '') +
-                (i === hi ? ' hi' : '')
-              }
-              onMouseDown={(e) => { e.preventDefault(); choose(a) }}
-              onMouseEnter={() => setHi(i)}
-            >
-              <img className="account-state" src={a.online ? '/login.svg' : '/logout.svg'}
-                alt="" draggable={false} title={a.online ? '在线' : '离线'} />
-              <span className="account-item-name">{a.name}</span>
-              {a.hasPin && <span className="account-item-pin" title="已设 PIN">🔒</span>}
-              <span className="muted account-item-uid">UID:{uidOf(a.account)}</span>
-            </li>
+              account={a}
+              cur={current && a.account === current.account}
+              hi={i === hi}
+              uidOf={uidOf}
+              onChoose={() => choose(a)}
+              onHover={() => setHi(i)}
+            />
           ))}
           {/* 当前账号的 PIN 管理 + 删除入口 */}
           {current && (
@@ -334,5 +303,24 @@ function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDele
         </ul>
       )}
     </div>
+  )
+}
+
+// AccountItem 下拉里的单条账号。
+function AccountItem({ account, cur, hi, uidOf, onChoose, onHover }) {
+  return (
+    <li
+      role="option"
+      aria-selected={cur}
+      className={'account-item' + (cur ? ' cur' : '') + (hi ? ' hi' : '')}
+      onMouseDown={(e) => { e.preventDefault(); onChoose() }}
+      onMouseEnter={onHover}
+    >
+      <img className="account-state" src={account.online ? '/login.svg' : '/logout.svg'}
+        alt="" draggable={false} title={account.online ? '在线' : '离线'} />
+      <span className="privacy account-item-name">{account.name}</span>
+      {account.hasPin && <span className="account-item-pin" title="已设 PIN">🔒</span>}
+      <span className="muted privacy account-item-uid">UID:{uidOf(account.account)}</span>
+    </li>
   )
 }

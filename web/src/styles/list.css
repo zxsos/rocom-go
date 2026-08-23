@@ -33,8 +33,8 @@ table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(-
 /* 列宽分配:全部 10 列显式设宽,table-layout:fixed 严格按此分配,不再有未设宽的列
    去挤已设宽的列(原先漏掉性格/特长/奖牌 3 列,窄屏时这 3 列把第 1 列压瘪导致名称折行)。
    合计 >100% 时表格整体在 .table-wrap 内横向滚动,而非压缩任一列。 */
-table.pets th:nth-child(1), table.pets td:nth-child(1) { width: 220px; min-width: 220px; } /* 宠物 */
-table.pets th:nth-child(2), table.pets td:nth-child(2) { width: 70px; }   /* 系别 */
+table.pets th:nth-child(1), table.pets td:nth-child(1) { width: 240px; min-width: 240px; } /* 宠物 */
+table.pets th:nth-child(2), table.pets td:nth-child(2) { width: 76px; min-width: 76px; }   /* 系别 */
 table.pets th:nth-child(3), table.pets td:nth-child(3) { width: 70px; }   /* 性格 */
 table.pets th:nth-child(4), table.pets td:nth-child(4) { width: 70px; }   /* 特长 */
 table.pets th:nth-child(5), table.pets td:nth-child(5) { width: 90px; }   /* 佩戴奖牌 */
@@ -43,8 +43,11 @@ table.pets th:nth-child(7), table.pets td:nth-child(7) { width: 96px; }   /* 体
 table.pets th:nth-child(8), table.pets td:nth-child(8) { width: 96px; }   /* 身高 */
 table.pets th:nth-child(9), table.pets td:nth-child(9) { width: 262px; }  /* 六维 */
 table.pets th:nth-child(10), table.pets td:nth-child(10) { width: 130px; } /* 捕捉时间 */
-/* 第 1 列内:名称/副标极窄时省略号兜底,不折行占位导致视觉错乱 */
+/* 第 1 列内:名称/副标极窄时省略号兜底,不折行占位导致视觉错乱。
+   .pet-cell 是 flex(头像 + 文字区),文字区必须 min-width:0 + overflow:hidden 才能在
+   flex 下正确收缩并触发省略号;否则徽标多的名称行会横向溢出压进相邻的「系别」列。 */
 table.pets .pet-cell { min-width: 0; }
+table.pets .pet-cell > div { min-width: 0; overflow: hidden; }
 table.pets .pet-name, table.pets .pet-sub {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }

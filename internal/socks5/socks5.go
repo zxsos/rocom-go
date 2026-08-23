@@ -138,30 +138,74 @@ var dialer = func() *net.Dialer {
 // dnsCache 带 TTL 缓存的域名→IP 解析:游戏反复连接同一批域名(登录服/网关/
 // 大区服),跨地域云服务器上每次 DNS 解析可能增加几十~几百毫秒延迟。
 // 缓存解析结果,TTL 内直连 IP,消除重复 DNS 往返。
+//
+// 关键设计:滑动 TTL + 后台异步刷新(singleflight 去重)。
+// 早期实现用固定 5 分钟硬过期,多域名在同一时间窗建立后会在几乎同一时刻集体过期,
+// 下一次请求命中过期缓存时触发批量同步 DNS 解析,在跨地域云服务器上表现为
+// 「隔几分钟延迟飙升到几百 ms、持续数秒」的周期性抖动。
+// 现在改为:TTL 到期后不立即同步重解析,而是返回旧值(最多容忍 staleTTL 时长),
+// 同时用 singleflight 在后台异步刷新——首个触发的请求发起一次解析,
+// 后续并发请求直接复用旧值,解析完成后更新缓存并重置 TTL。
 type dnsCache struct {
-	mu  sync.Mutex
-	ttl time.Duration
-	m   map[string][]netip.Addr
-	t   map[string]time.Time
+	mu      sync.Mutex
+	ttl     time.Duration
+	stale   time.Duration // 过期后仍可容忍返回旧值的时长(滑动窗口)
+	m       map[string][]netip.Addr
+	t       map[string]time.Time
+	refresh map[string]struct{} // 正在后台刷新的 host(去重,避免惊群)
 }
 
-var dns = &dnsCache{ttl: 5 * time.Minute, m: map[string][]netip.Addr{}, t: map[string]time.Time{}}
+var dns = &dnsCache{
+	ttl:     5 * time.Minute,
+	stale:   30 * time.Second, // 过期后 30s 内仍返回旧值,后台异步刷新
+	m:       map[string][]netip.Addr{},
+	t:       map[string]time.Time{},
+	refresh: map[string]struct{}{},
+}
 
-// lookup 返回 host 的解析结果:缓存命中且未过期直接返回,否则走系统解析并写缓存。
+// lookup 返回 host 的解析结果。缓存命中(含 stale 期内)直接返回;
+// 过期且超出 stale 窗口时同步解析;过期但在 stale 窗口内时返回旧值并触发后台异步刷新。
 func (dc *dnsCache) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
 	if ip, err := netip.ParseAddr(host); err == nil {
 		return []netip.Addr{ip}, nil // 已是 IP,无需解析
 	}
+
 	dc.mu.Lock()
-	if until, ok := dc.t[host]; ok && time.Now().Before(until) {
+	until, ok := dc.t[host]
+	now := time.Now()
+	if ok {
 		addrs := dc.m[host]
-		dc.mu.Unlock()
-		return addrs, nil
+		if now.Before(until) {
+			// 未过期,直接返回
+			dc.mu.Unlock()
+			return addrs, nil
+		}
+		staleUntil := until.Add(dc.stale)
+		if now.Before(staleUntil) && len(addrs) > 0 {
+			// 过期但在 stale 窗口内:返回旧值,后台异步刷新(去重)
+			if _, refreshing := dc.refresh[host]; !refreshing {
+				dc.refresh[host] = struct{}{}
+				dc.mu.Unlock()
+				go dc.refreshHost(host)
+			} else {
+				dc.mu.Unlock()
+			}
+			return addrs, nil
+		}
 	}
 	dc.mu.Unlock()
 
-	// 未命中/过期:系统解析。用默认 Resolver(PreferGo=false 走系统 libc,
-	// 兼顾 /etc/hosts 与 mDNS),结果缓存到 TTL。
+	// 未命中或超出 stale 窗口:同步解析
+	ips, err := dc.resolve(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	return ips, nil
+}
+
+// resolve 执行实际 DNS 解析并更新缓存。用默认 Resolver(PreferGo=false 走系统 libc,
+// 兼顾 /etc/hosts 与 mDNS),结果缓存到 TTL。
+func (dc *dnsCache) resolve(ctx context.Context, host string) ([]netip.Addr, error) {
 	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 	if err != nil {
 		return nil, err
@@ -171,6 +215,23 @@ func (dc *dnsCache) lookup(ctx context.Context, host string) ([]netip.Addr, erro
 	dc.t[host] = time.Now().Add(dc.ttl)
 	dc.mu.Unlock()
 	return ips, nil
+}
+
+// refreshHost 在后台异步刷新单个 host 的 DNS 记录。
+// 使用独立 context(不受请求生命周期影响),解析失败时保留旧值不动,
+// 避免短暂 DNS 故障导致缓存被清空。
+func (dc *dnsCache) refreshHost(host string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	dc.mu.Lock()
+	delete(dc.refresh, host)
+	if err == nil && len(ips) > 0 {
+		dc.m[host] = ips
+		dc.t[host] = time.Now().Add(dc.ttl)
+	}
+	// 解析失败:保留旧值,等下次 stale 窗口再重试
+	dc.mu.Unlock()
 }
 
 // dialTarget 拨号到 target("host:port"),域名经 dns 缓存解析后逐个 IP 尝试,
@@ -224,15 +285,22 @@ func handle(c net.Conn, user, pass string) {
 
 	// 禁用 Nagle 算法:游戏流量多为小包(指令/心跳),Nagle 会攒包增加延迟。
 	// 同时增大 socket 缓冲区,减少 syscall 次数。
+	// 客户端连接(Accept 来的)默认不带 keepalive,手机 WiFi 抖动/休眠会导致半开连接,
+	// relay 中 io.Copy 永久阻塞、goroutine 与信号量 slot 泄露,表现为周期性延迟飙升。
+	// 显式开启 keepalive + 较短探测间隔,让半开连接在 ~75s 内被发现并回收。
 	if tc, ok := up.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
 		_ = tc.SetReadBuffer(64 * 1024)
 		_ = tc.SetWriteBuffer(64 * 1024)
+		_ = tc.SetKeepAlive(true)
+		_ = tc.SetKeepAlivePeriod(30 * time.Second) // dialer 已设 30s,这里显式兜底
 	}
 	if tc, ok := c.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
 		_ = tc.SetReadBuffer(64 * 1024)
 		_ = tc.SetWriteBuffer(64 * 1024)
+		_ = tc.SetKeepAlive(true)
+		_ = tc.SetKeepAlivePeriod(30 * time.Second)
 	}
 
 	if err := writeReply(c, repSuccess); err != nil {
@@ -371,10 +439,39 @@ var bufPool = sync.Pool{
 	New: func() any { b := make([]byte, 32*1024); return &b },
 }
 
+// relayIdleTimeout 是中继方向的最大空闲时长:若某方向在此期间无数据可读,
+// 则认为连接已半开/死掉,主动关闭双方连接。
+// 游戏心跳间隔通常远小于此值,正常流量不会触发;仅用于清理静默断开的连接,
+// 防止 io.Copy 永久阻塞 → goroutine 与信号量泄露 → 周期性延迟飙升。
+const relayIdleTimeout = 2 * time.Minute
+
+// idleReader 在读取前设置滚动 ReadDeadline:每次读成功后顺延 deadline,
+// 若 relayIdleTimeout 内无数据则读返回超时错误,relay 据此关闭连接。
+type idleReader struct {
+	r net.Conn
+	d time.Duration
+}
+
+func (ir *idleReader) Read(p []byte) (int, error) {
+	// 每次读之前刷新 deadline,实现「空闲计时器」效果
+	_ = ir.r.SetReadDeadline(time.Now().Add(ir.d))
+	return ir.r.Read(p)
+}
+
+// copyWithIdle 带空闲超时的双向拷贝。
+// 任一方向结束(含 idle 超时)立即关闭对端,触发其 io.Copy 也立即返回。
+func copyWithIdle(dst, src net.Conn, buf []byte) {
+	ir := &idleReader{r: src, d: relayIdleTimeout}
+	io.CopyBuffer(dst, ir, buf)
+	// 读结束后清除 deadline,避免影响后续可能的 close 逻辑
+	_ = src.SetReadDeadline(time.Time{})
+}
+
 // relay 双向转发,任一端结束即关闭双方连接。
 // 用 sync.WaitGroup 确保两个 goroutine 都退出后再返回;
 // 任一方向 io.Copy 返回立即 Close 对端,触发其 io.Copy 也立即返回,
 // 避免一端已断开另一端仍阻塞在读上增加尾延迟。
+// 每个方向带 relayIdleTimeout 空闲超时,清理静默断开的半开连接。
 func relay(a, b net.Conn) {
 	// 只关闭一次,且先关闭写端再读端:关闭 a 让「b→a」方向立即 EOF,
 	// 关闭 b 让「a→b」方向立即 EOF,两个 io.Copy 随即返回,无额外等待。
@@ -384,14 +481,14 @@ func relay(a, b net.Conn) {
 		defer wg.Done()
 		buf := bufPool.Get().(*[]byte)
 		defer bufPool.Put(buf)
-		io.CopyBuffer(b, a, *buf)
+		copyWithIdle(b, a, buf)
 		b.Close()
 	}()
 	go func() {
 		defer wg.Done()
 		buf := bufPool.Get().(*[]byte)
 		defer bufPool.Put(buf)
-		io.CopyBuffer(a, b, *buf)
+		copyWithIdle(a, b, buf)
 		a.Close()
 	}()
 	wg.Wait()

@@ -370,6 +370,7 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		Base         uint32 `json:"base"`
 		Kind         string `json:"kind"`         // shiny | colorful
 		OffsetMeters int32  `json:"offsetMeters"` // 投放点距玩家位置的米数(默认 30)
+		Level        int32  `json:"level"`        // 注入精灵等级(0=随机,取 30-60)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", 400)
@@ -456,6 +457,14 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	weight := randRange(int32(info.WeightLow), int32(info.WeightHigh))
 	height := randRange(int32(info.HeightLow), int32(info.HeightHigh))
 	voice := randRange(-100, 100)
+	// 等级同样随机化:管理员未指定(0)时在 30-60 常见野生等级内随机,
+	// 避免所有注入精灵都固定同级(一眼假)。显式指定则校验 1-100。
+	if req.Level == 0 {
+		req.Level = randRange(30, 60)
+	} else if req.Level < 1 || req.Level > 100 {
+		http.Error(w, "level out of range (1-100)", 400)
+		return
+	}
 
 	id := "admin-inject-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	mark := map[string]any{
@@ -468,7 +477,7 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		"x":        wx,
 		"y":        wy,
 		"z":        wz,
-		"lv":       int32(1),
+		"lv":       req.Level,
 		"voice":    voice,
 		"height":   height,
 		"weight":   weight,
