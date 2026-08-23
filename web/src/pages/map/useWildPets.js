@@ -86,9 +86,12 @@ export function wildTags(kinds = []) {
 // 本就全是稀有类别(普通宠不会推,见 internal/pipeline/wildpets.go),但**只有能在地图上
 // 带环显示(当前开着且命中的图层/奖牌筛选,见 wildShown)的新宠才提醒**——与 marks 过滤
 // 同一口径:画得出环的才算稀有宠,画不出环的(开关关掉/奖牌拖严后不再命中)再出现不打扰。
+// **例外:异色/炫彩属于最高优先级**,无论是否开关双牌模式、无论图层开关开关,只要有提醒
+// 开关就一定响——它太稀有,不能被任何子筛选拦住(见提醒循环中的短路 continue)。
 const NOTIFY_KEY = 'map.wildNotify.v1'
 // 「仅双牌时提醒」子开关:勾选后只有双牌(命中≥2张奖牌)的新出现稀有宠才响提醒,
-// 单牌/异色/炫彩等不响。独立持久化,默认关(=所有带环稀有宠都提醒,保持原行为)。
+// 单牌/污染等不响。异色/炫彩因最高优先级不受此限——勾选后仍照常提醒。独立持久化,默认关
+// (=所有带环稀有宠都提醒,保持原行为)。
 const NOTIFY_DUAL_ONLY_KEY = 'map.wildNotifyDualOnly.v1'
 
 // chime 播放一段三连上行「叮咚」提示音(880 → 1174.7 → 1568 Hz),用 Web Audio 合成,
@@ -301,14 +304,16 @@ export function useWildPets(account) {
       return next
     })
   }
-  // 新出现提醒:对比相邻两批推送,挑出「刚进视野、非灰点、且能在地图上带环显示」的实体
-  // 通知(已通知过的 id 不重复弹;它变灰点=离开视野后从集合移除,重新出现可再提醒)。
-  // 「带环显示」用 wildShown 判定,与 marks 过滤同一口径:只有地图上画得出环的才算稀有
-  // 宠——开关图层(kinds 命中且开关开)或奖牌(开关开且滑块阈值命中)任一命中即提醒,与
-  // 描边(wildRing)条件完全一致,画不出环的再出现不打扰。未命中的宠也照常记入「已见」
-  // 集合——中途把某类开关打开时,已在地图上的旧宠不会被当新出现补弹一遍,只有之后新出现
-  // 的才提醒。notify 关闭时不做对比,但照常同步「已见」集合,同理防补弹。首轮(挂载后
-  // 第一批数据)只建基线不通知,否则刚进页面就把当前在场的全弹一遍。
+  // 新出现提醒:对比相邻两批推送,挑出「刚进视野、非灰点」的实体通知(已通知过的 id 不重复
+  // 弹;它变灰点=离开视野后从集合移除,重新出现可再提醒)。判定口径:
+  //   - 异色/炫彩:**最高优先级**,短路提醒——不经过 wildShown(图层开关关掉也响)、不被
+  //     「仅双牌」拦截,只要有提醒开关就一定响。
+  //   - 其余类别(污染/奖牌四件套):用 wildShown 判定,与 marks 过滤同一口径——只有地图上
+  //     画得出环的才算稀有宠(开关图层 kinds 命中且开关开,或奖牌开关开且滑块阈值命中),
+  //     画不出环的再出现不打扰;勾选「仅双牌」后只响双牌(命中≥2张奖牌)。
+  // 未命中的宠也照常记入「已见」集合——中途把某类开关打开时,已在地图上的旧宠不会被当新
+  // 出现补弹一遍,只有之后新出现的才提醒。notify 关闭时不做对比,但照常同步「已见」集合,
+  // 同理防补弹。首轮(挂载后第一批数据)只建基线不通知,否则刚进页面就把当前在场的全弹一遍。
   const seenIdsRef = useRef(new Set())
   const initedRef = useRef(false)
   useEffect(() => {
@@ -323,7 +328,14 @@ export function useWildPets(account) {
     for (const p of pets) {
       if (p.stale || seenIdsRef.current.has(p.id)) continue
       seenIdsRef.current.add(p.id)
-      // 先过 wildShown(地图上画得出环的才算稀有宠),再过「仅双牌」(勾选时只响双牌)。
+      // 异色/炫彩是全场最高优先级:无论是否开关双牌模式(甚至图层开关关掉),
+      // 只要有提醒开关就一定响——它太稀有,不能被任何子筛选拦住。
+      const ks = p.kinds || []
+      if (ks.includes('shiny') || ks.includes('colorful')) {
+        fireWildNotify(p)
+        continue
+      }
+      // 其余类别:先过 wildShown(地图上画得出环的才算稀有宠),再过「仅双牌」(勾选时只响双牌)。
       if (!wildShown(p, on, medals, medalOn, dual)) continue
       if (notifyDualOnly && !isDualMedal(p, medals, medalOn, dual)) continue
       fireWildNotify(p)

@@ -77,6 +77,9 @@ type Engine struct {
 	Port int
 	Out  chan Message
 	Keys KeyStore // 可选:会话密钥持久化(见 KeyStore)
+	// CloseCh 通知连接断开(connID):TCP 结束或空闲超时触发,供 pipeline 结束该连接的
+	// 游玩会话、记录下线时间。非阻塞发送,缓冲满(如回放批量断开)时丢弃,下游有兜底扫描。
+	CloseCh chan string
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -94,6 +97,7 @@ func NewEngine(port int) *Engine {
 	return &Engine{
 		Port:     port,
 		Out:      make(chan Message, 4096),
+		CloseCh:  make(chan string, 128),
 		sessions: make(map[string]*session),
 		skipIPs:  make(map[netip.Addr]bool),
 	}
@@ -150,8 +154,8 @@ func (e *Engine) RunOffline(pcapPath string) error {
 // flush 参数:阈值一律用抓包时钟(最新包时间戳)而非墙钟——实时流里墙钟永远追不上
 // "活跃连接"的数据时间,会导致中段接入时被缓冲等待缺失分段的起始数据一直不下推。
 const (
-	flushEvery = 200             // 每处理这么多包尝试一次 flush
-	flushLag   = time.Second     // 跨间隙滞留数据超过此时长即下推(不再等缺失分段),近实时
+	flushEvery = 64              // 每处理这么多包尝试一次 flush(从 200 调低:更早下推待 flush 数据)
+	flushLag   = 300 * time.Millisecond // 跨间隙滞留数据超过此时长即下推(从 1s 调低:稀有宠提醒更近实时)
 	closeIdle  = 2 * time.Minute // 连接空闲超过此时长才关闭,不误关活跃连接
 )
 
@@ -313,5 +317,11 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Assemb
 
 func (s *stream) ReassemblyComplete(_ reassembly.AssemblerContext) bool {
 	log.Printf("连接断开 [%s]", s.connID)
+	// 非阻塞通知下游(pipeline):连接断开是明确的「下线」信号。缓冲满(如离线回放批量
+	// 断开)时丢弃——pipeline 的兜底扫描会按长时间无消息补记下线,不丢记录。
+	select {
+	case s.e.CloseCh <- s.connID:
+	default:
+	}
 	return false
 }

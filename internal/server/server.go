@@ -137,6 +137,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/admin/rules", s.handleAdminRuleSet)
 	s.mux.HandleFunc("DELETE /api/admin/rules", s.handleAdminRuleDelete)
 	s.mux.HandleFunc("GET /api/admin/stats", s.handleAdminStats)
+	s.mux.HandleFunc("GET /api/admin/play-sessions", s.handleAdminPlaySessions)
 	s.mux.HandleFunc("GET /api/admin/wild-pets", s.handleAdminWildPetOptions)
 	s.mux.HandleFunc("GET /api/admin/injects", s.handleAdminListInjects)
 	s.mux.HandleFunc("POST /api/admin/inject-wild", s.handleAdminInjectWild)

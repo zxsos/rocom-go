@@ -60,7 +60,10 @@ export function useMapEngine(account) {
   }, [])
 
   const hasMap = !!(pos && pos.u != null && pos.img && !imgError)
-  posRef.current = pos
+  // posRef 同步最新位置数据:setPos 路径(场景/层图变化)由下面的 applyPos 中赋;
+  // 不 setPos 的纯位置推送也由 applyPos 中手动赋(见 needRender 判断)。
+  // 不在此行赋值 posRef.current = pos——否则其它重渲染(如 wilds 刷新)会覆盖 applyPos
+  // 中赋的最新位置,导致 onTap 距离计算用到旧坐标。
   const view = usePanZoom(hasMap, onTap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
@@ -152,11 +155,25 @@ export function useMapEngine(account) {
         layerRef.current = li
         setLayerError(false)
       }
+      // 同步 posRef 的 layer/sceneName(位置坐标不变)
+      if (posRef.current) posRef.current = { ...posRef.current, layer: p.layer || null, sceneName: p.sceneName || posRef.current.sceneName }
       setPos((prev) => (prev ? { ...prev, layer: p.layer || null, sceneName: p.sceneName || prev.sceneName } : prev))
       return
     }
-    setPos(p)
     const sceneChanged = p.img !== sceneRef.current
+    const li = p.layer ? p.layer.img : ''
+    const layerChanged = li !== layerRef.current
+    // 性能优化:位置推送约 8 条/秒,绝大多数 p 与上一包同场景、同层。此时底图/层图/控件都不需要
+    // 重渲染——它们只随场景或层图变化而变。位置坐标走锚点 ref + RAF 逐帧外推(见 applyFrame),
+    // 不进 React state。只在场景切换、层图切换、或从 null/无底图状态变化时才 setPos 触发重渲染,
+    // 省去每秒 8 次的 MapViz 整树 JSX 构造与 React reconciliation(WildLayer/PoiLayer/NestLayer 虽
+    // 被 memo 跳过,但父函数体 + 各 memo 比较函数的开销在高频位置推送下仍可观)。
+    const noMap = p.u == null
+    // 无底图场景(noMap)下 pos.x/y/z 是唯一的可见信息,必须每次更新;
+    // 有底图时位置走锚点 ref+RAF,只在场景/层图/有底图状态变化时才 setPos。
+    const needRender = noMap || sceneChanged || layerChanged || !posRef.current || (posRef.current && posRef.current.u == null) !== !noMap
+    posRef.current = p // 始终同步:无论是否 setPos,onTap 距离计算都需最新坐标
+    if (needRender) setPos(p)
     if (sceneChanged) {
       sceneRef.current = p.img
       setImgError(false)
@@ -164,12 +181,11 @@ export function useMapEngine(account) {
       view.setFollow(true)
       lastFrameRef.current = null
     }
-    const li = p.layer ? p.layer.img : ''
-    if (li !== layerRef.current) {
+    if (layerChanged) {
       layerRef.current = li
       setLayerError(false)
     }
-    if (p.u == null) {
+    if (noMap) {
       anchorRef.current = null
       dispRef.current = null
       return
@@ -270,6 +286,8 @@ export function MapViz({ engine, sidebarOpen, onToggleLayers }) {
               <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="var(--red)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
           </div>
+          <button className="map-btn map-ctrl map-layers-btn" title="图层"
+            onClick={onToggleLayers}>☰</button>
           <div className="map-ctrl">
             <button className={'map-btn map-layers-toggle' + (sidebarOpen ? ' on' : '')} title="图层栏"
               onClick={onToggleLayers}>☰</button>
