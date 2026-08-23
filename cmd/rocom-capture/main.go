@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
@@ -112,7 +113,17 @@ func serveWeb(addr string, h http.Handler, useTLS bool, certPath, keyPath string
 		return
 	}
 	log.Printf("Web 界面: http://localhost%s", addr)
-	if err := http.ListenAndServe(addr, h); err != nil {
+	// ReadHeaderTimeout: 防慢速 header 攻击(Slowloris),不影响正常请求。
+	// IdleTimeout: 空闲连接最大存活时间,清理断开未检测的残留连接,避免 goroutine 堆积。
+	// 注意:不设 WriteTimeout/ReadTimeout —— SSE 长连接(/api/stream)需要无写超时,
+	// 设了会中断流式推送。ReadHeaderTimeout 只影响 header 读取阶段,不影响 body/SSE。
+	hs := &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	if err := hs.ListenAndServe(); err != nil {
 		log.Fatalf("HTTP 服务失败: %v", err)
 	}
 }

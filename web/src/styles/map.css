@@ -2,7 +2,7 @@
 /* 地图页占满 .content 剩余高度:纯 flex 逐层撑满(不用百分比高度,避免 flex 项高度对百分比
    子元素不算「确定高度」导致塌陷)。仅地图页把 .content 变 flex 列(:has 作用域,不影响他页)。 */
 .content:has(.map-page) { display: flex; flex-direction: column; }
-.map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 /* 左侧图层栏 + 地图(栏宽同宠物列表的筛选栏);两列一起撑满 .map-page 的剩余高度。
    .closed(桌面侧栏收起):网格收成单列,地图全宽全屏展示。
    网格列宽过渡:侧栏展开/收起时平滑变宽,不再瞬间跳变。 */
@@ -128,14 +128,10 @@
 }
 .map-btn:active { transform: translateY(0) scale(.94); }
 .map-btn.on { color: var(--accent); border-color: var(--accent); background: rgba(76, 141, 255, .14); }
-/* 图层抽屉入口(移动端):浮在地图左下角,与右上角控制组分开。必须写在 .map-btn 之后,否则被其
-   display:flex 盖掉;top:auto 抵消 .map-ctrl 的 top,钉在底部。 */
-.map-layers-btn { display: none; left: 10px; bottom: 10px; right: auto; top: auto; }
-/* 右上角控制组里的 ☰(图层侧栏开关):移动端隐藏——抽屉入口已在左下角,避免重复 */
+.map-btn:disabled { opacity: .4; cursor: default; }
+.map-btn:disabled:hover { transform: none; border-color: var(--line); color: var(--fg-dim); background: rgba(28, 34, 48, .82); box-shadow: none; }
+/* 右上角控制组里的 ☰(图层侧栏开关):桌面折叠/展开侧栏,移动端开/关图层抽屉 */
 .map-layers-toggle { display: flex; }
-@media (max-width: 760px) {
-  .map-layers-toggle { display: none; }
-}
 
 /* POI 标记(炼金釜/魔力之源/…):在 .map-world 内按底图归一化坐标定位,尺寸恒定不随缩放变大,
    故用 translate(-50%,-50%) 把图标中心对准锚点。
@@ -434,10 +430,9 @@
 }
 .map-layer-btn.on > .muted { background: rgba(76, 141, 255, .22); color: var(--accent); }
 
-/* 窄屏:图层栏收进侧滑抽屉(同宠物列表的筛选),地图占满整宽,左下角浮出图层入口。 */
+/* 窄屏:图层栏收进侧滑抽屉(同宠物列表的筛选),地图占满整宽。 */
 @media (max-width: 760px) {
   .map-layout { grid-template-columns: 1fr; }
-  .map-layers-btn { display: flex; }
 }
 
 /* 「等待位置数据」空状态:配合地图整页布局,给一个柔和的渐入与轻微呼吸。 */

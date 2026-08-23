@@ -53,6 +53,7 @@ export default function Admin() {
   const [injBase, setInjBase] = useState('')
   const [injKind, setInjKind] = useState('shiny')
   const [injOffset, setInjOffset] = useState(30)
+  const [injLevel, setInjLevel] = useState(0) // 0=随机 30-60;指定 1-100 固定等级
   const [injErr, setInjErr] = useState('')
   const [injMsg, setInjMsg] = useState('')
   const [injects, setInjects] = useState(null)  // 当前注入中的精灵列表(管理面板撤销)
@@ -124,7 +125,7 @@ export default function Admin() {
     if (!account || !injBase) return
     setInjErr(''); setInjMsg('')
     try {
-      const res = await adminInjectWild(account, Number(injBase), injKind, Number(injOffset) || 30)
+      const res = await adminInjectWild(account, Number(injBase), injKind, Number(injOffset) || 30, Number(injLevel) || 0)
       setInjMsg('已投放:' + (res.id || '') + '(u=' + (res.u != null ? res.u.toFixed(3) : '') + ')')
       loadInjects()
     } catch (err) {
@@ -400,6 +401,11 @@ export default function Admin() {
           <input
             className="input" type="number" min="1" max="200" value={injOffset}
             onChange={(e) => setInjOffset(e.target.value)} title="距玩家位置米数"
+          />
+          <input
+            className="input" type="number" min="0" max="100" value={injLevel}
+            onChange={(e) => setInjLevel(e.target.value)}
+            title="等级(0=随机 30-60,指定 1-100 固定该等级)" placeholder="Lv(0=随机)"
           />
           <button className="btn primary" type="submit" disabled={!injAccount.trim() || !injBase}>
             投放

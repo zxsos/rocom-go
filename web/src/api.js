@@ -262,9 +262,10 @@ export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then
 })
 
 // adminInjectWild 向指定成员投放稀有野生精灵。
-// {account, base: petbase id, kind: 'shiny'|'colorful', offsetMeters}
-export const adminInjectWild = (account, base, kind, offsetMeters = 30) =>
-  postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters })
+// {account, base: petbase id, kind: 'shiny'|'colorful', offsetMeters, level}
+// level: 0 或缺省=后端随机 30-60;指定 1-100 则固定该等级。
+export const adminInjectWild = (account, base, kind, offsetMeters = 30, level = 0) =>
+  postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters, level })
 
 // adminRevokeInject 撤销某账号的一只注入精灵(?account=&id=)。
 export function adminRevokeInject(account, id) {

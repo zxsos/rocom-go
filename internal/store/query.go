@@ -184,33 +184,51 @@ func clampPageSize(n int) int {
 
 // PetPage 返回 gid 在本账号当前筛选+排序下所处的页码(1 起)及是否命中筛选。
 // found=false 表示该宠物不在当前筛选结果内(此时 page 退回 1,调用方可据此决定是否清空筛选)。
+//
+// 优化:原来查出全部匹配 gid 再在 Go 侧遍历计数,宠物多时是全表扫描 + 全量传输。
+// 现改为用子查询直接 COUNT 出该 gid 之前(含自身)有多少行,除以 pageSize 得页码,
+// 单条 SQL 完成,无需传输全部 gid。
 func (sc *Scoped) PetPage(gid uint32, f Filter) (page int, found bool) {
 	whereSQL, args := buildWhere(f, sc.account)
-	rows, err := sc.rdb.Query("SELECT gid FROM pets"+whereSQL+" ORDER BY "+buildOrder(f), args...)
+	order := buildOrder(f)
+	pageSize := clampPageSize(f.PageSize)
+
+	// COUNT 该 gid 之前(含自身)的行数:用子查询统计排序后排在 <= 该 gid 位置的行数。
+	// 主查询的 WHERE + ORDER BY 完全复用 ListPets,保证页码口径一致。
+	// 排序键可能含多列(如 "level DESC, gid"),子查询条件需对齐排序方向。
+	// 简化实现:先查该 gid 是否命中筛选(存在性),再查其排序位置。
+	existArgs := append(append([]any{}, args...), gid)
+	var exists int
+	err := sc.rdb.QueryRow("SELECT 1 FROM pets"+whereSQL+" AND gid=?", existArgs...).Scan(&exists)
 	if err != nil {
+		return 1, false // 不命中筛选或查询失败
+	}
+
+	// 查该 gid 在当前排序下的行号(1 起):构造一个与主查询同 WHERE + ORDER BY 的子查询,
+	// 统计排在目标行前面(不含自身)的行数。排序表达式复用 buildOrder,但去掉末尾的 ", gid"
+	// (gid 兜底保证稳定顺序,行号计数时整条 ORDER BY 都参与,故直接用完整 order)。
+	// 行号 = 排在前面的行数 + 1;页码 = ceil(行号 / pageSize)。
+	// 用 ROW_NUMBER() 窗口函数(SQLite 3.25+ 支持)一次查出。
+	rankArgs := append(append([]any{}, args...), gid)
+	var rank int
+	err = sc.rdb.QueryRow(`
+SELECT rn FROM (
+  SELECT gid, ROW_NUMBER() OVER (ORDER BY `+order+`) AS rn
+  FROM pets`+whereSQL+`
+) WHERE gid=?`, rankArgs...).Scan(&rank)
+	if err != nil || rank == 0 {
 		return 1, false
 	}
-	defer rows.Close()
-	idx := 0
-	for rows.Next() {
-		var g uint32
-		if rows.Scan(&g) == nil {
-			if g == gid {
-				return idx/clampPageSize(f.PageSize) + 1, true
-			}
-			idx++
-		}
-	}
-	return 1, false
+	return (rank-1)/pageSize + 1, true
 }
 
 // ListPets 按筛选条件返回本账号宠物列表与命中总数。
+//
+// 优化:原来先 COUNT(*) 再 SELECT data,两条查询各扫一遍匹配行。
+// 现改为用 COUNT(*) OVER() 窗口函数在分页查询里同时拿到总数,单条 SQL 完成。
+// SQLite 3.25+ 支持窗口函数,modernc.org/sqlite 内置的 SQLite 版本远高于此。
 func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	whereSQL, args := buildWhere(f, sc.account)
-
-	if err = sc.rdb.QueryRow("SELECT COUNT(*) FROM pets"+whereSQL, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
 
 	pageSize := clampPageSize(f.PageSize)
 	page := f.Page
@@ -218,7 +236,7 @@ func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 		page = 1
 	}
 
-	q := "SELECT data FROM pets" + whereSQL + " ORDER BY " + buildOrder(f) + " LIMIT ? OFFSET ?"
+	q := "SELECT data, COUNT(*) OVER() FROM pets" + whereSQL + " ORDER BY " + buildOrder(f) + " LIMIT ? OFFSET ?"
 	args = append(args, pageSize, (page-1)*pageSize)
 	rows, err := sc.rdb.Query(q, args...)
 	if err != nil {
@@ -227,9 +245,11 @@ func (sc *Scoped) ListPets(f Filter) (pets []*pet.Pet, total int, err error) {
 	defer rows.Close()
 	for rows.Next() {
 		var data string
-		if err := rows.Scan(&data); err != nil {
+		var cnt int
+		if err := rows.Scan(&data, &cnt); err != nil {
 			return nil, 0, err
 		}
+		total = cnt // 每行都带同样的 total,取最后一次即可
 		var p pet.Pet
 		if json.Unmarshal([]byte(data), &p) == nil {
 			pets = append(pets, &p)

@@ -9,7 +9,7 @@
   padding: 10px 16px; background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; }
+.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; font: inherit; cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
 .brand-logo { width: 22px; height: 22px; border-radius: 6px; flex: none; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
@@ -81,20 +81,17 @@
 .account-del-btn { color: var(--fg-dim); }
 .account-del-btn:hover { color: var(--red); border-color: var(--red); }
 
-/* ---- 截图防泄:窗口失焦时模糊顶栏敏感文字(昵称、UID) ----
-   html[data-blur] 由 App.jsx 监听 window blur/visibilitychange 打上。
-   account-item-name/uid 也在内,确保展开下拉时同样模糊。 */
-html[data-blur] .account-trigger-name,
-html[data-blur] .account-item-name,
-html[data-blur] .account-item-uid {
+/* ---- 截图防泄(全局开关)----
+   点击顶栏品牌名「洛克妙妙屋」切换:默认开启(html 有 data-privacy 属性),
+   敏感文字(.privacy:昵称/UID)常驻模糊;点击品牌名解除全部,再点恢复。
+   不依赖任何窗口焦点/鼠标/触屏事件——截图/录屏/投屏不触发 DOM 事件,默认即保护最可靠。
+   品牌名遮罩开启时变暗,作为当前模式的视觉提示。 */
+html[data-privacy] .privacy {
   filter: blur(5px);
   transition: filter .12s ease;
   user-select: none;
 }
-/* 聚焦回窗口时平滑恢复 */
-.account-trigger-name, .account-item-name, .account-item-uid {
-  transition: filter .12s ease;
-}
+html[data-privacy] .brand { color: var(--fg-dim); }
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }

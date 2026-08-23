@@ -100,7 +100,7 @@
 
 /* —— 投放稀有野生精灵 —— */
 .admin-inject-form {
-  display: grid; grid-template-columns: 1fr 1.2fr 100px 100px auto; gap: 8px; align-items: end;
+  display: grid; grid-template-columns: 1fr 1.2fr 100px 100px 100px auto; gap: 8px; align-items: end;
 }
 .admin-inject-form .btn { white-space: nowrap; }
 @media (max-width: 760px) {
