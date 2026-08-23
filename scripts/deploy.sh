@@ -31,6 +31,7 @@ set -euo pipefail
 
 # ---- 目录约定 ----
 INSTALL_DIR="/opt/rocom"
+RUN_SCRIPT="$INSTALL_DIR/run.sh"
 DATA_DIR="/var/lib/rocom"
 BACKUP_DIR="$DATA_DIR/backup"
 SERVICE_NAME="rocom"
@@ -114,7 +115,38 @@ find_binary() {
 
 # ---- 生成 systemd service 文件 ----
 write_service() {
-    cat > "$SERVICE_FILE" <<'EOF'
+    # 启动脚本:systemd 的 ExecStart 不支持 ${VAR:+...} 条件展开,
+    # 参数组装放在 bash 脚本里做(通过 systemctl edit 或改 /etc/rocom.env 调整参数)。
+    cat > "$RUN_SCRIPT" <<'EOF'
+#!/usr/bin/env bash
+# 由 deploy.sh 生成,勿手改;参数调整请编辑 /etc/rocom.env
+BIN=/opt/rocom/rocom-capture
+args=(
+  -db /var/lib/rocom/rocom.db
+  -cert /var/lib/rocom/rocom-cert.pem
+  -key /var/lib/rocom/rocom-key.pem
+)
+[[ -n "${ROCOM_IFACE:-}" ]] && args+=(-iface "$ROCOM_IFACE")
+[[ -n "${ROCOM_PORT:-}" ]] && args+=(-port "$ROCOM_PORT")
+[[ -n "${ROCOM_ADDR:-}" ]] && args+=(-addr "$ROCOM_ADDR")
+[[ -n "${ROCOM_TLS:-}" ]] && args+=(-tls)
+if [[ -n "${ROCOM_SOCKS5_ADDR:-}" ]]; then
+  args+=(-socks5-addr "$ROCOM_SOCKS5_ADDR")
+  # Go flag.Bool 不接受空格分开的 true/false,必须用 =false 形式
+  args+=(-skip-self-ip="${ROCOM_SKIP_SELF_IP:-false}")
+fi
+[[ -n "${ROCOM_SOCKS5_ALLOW:-}" ]] && args+=(-socks5-allow "$ROCOM_SOCKS5_ALLOW")
+if [[ -n "${ROCOM_SOCKS5_USER:-}" ]]; then
+  args+=(-socks5-user "$ROCOM_SOCKS5_USER")
+  [[ -n "${ROCOM_SOCKS5_PASS:-}" ]] && args+=(-socks5-pass "$ROCOM_SOCKS5_PASS")
+fi
+# ROCOM_EXTRA 按空格拆分透传(可含多个 flag)
+read -r -a extra <<< "${ROCOM_EXTRA:-}"
+args+=("${extra[@]}")
+exec "$BIN" "${args[@]}"
+EOF
+    chmod +x "$RUN_SCRIPT"
+    cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=rocom-capture (游戏流量抓包与统计)
 After=network-online.target
@@ -125,18 +157,7 @@ Type=simple
 # 环境变量从 /etc/rocom.env 读取(IFACE / SOCKS5 等,见 deploy.sh 注释)
 EnvironmentFile=-/etc/rocom.env
 # 数据库与证书放在 /var/lib/rocom 下,更新二进制不动数据
-ExecStart=/opt/rocom/rocom-capture \
-    -db /var/lib/rocom/rocom.db \
-    -cert /var/lib/rocom/rocom-cert.pem \
-    -key /var/lib/rocom/rocom-key.pem \
-    -iface ${ROCOM_IFACE} \
-    -port ${ROCOM_PORT:-8195} \
-    -addr ${ROCOM_ADDR:-:4939} \
-    ${ROCOM_TLS:+-tls} \
-    ${ROCOM_SOCKS5_ADDR:+-socks5-addr ${ROCOM_SOCKS5_ADDR} -skip-self-ip=${ROCOM_SKIP_SELF_IP:-false}} \
-    ${ROCOM_SOCKS5_ALLOW:+-socks5-allow ${ROCOM_SOCKS5_ALLOW}} \
-    ${ROCOM_SOCKS5_USER:+-socks5-user ${ROCOM_SOCKS5_USER} -socks5-pass ${ROCOM_SOCKS5_PASS}} \
-    ${ROCOM_EXTRA}
+ExecStart=$RUN_SCRIPT
 # 抓包需要 root(afpacket);如用 pcap 模式可改为专用用户
 User=root
 # 崩溃自动重启
@@ -152,7 +173,7 @@ SyslogIdentifier=rocom
 [Install]
 WantedBy=multi-user.target
 EOF
-    echo "已写入 $SERVICE_FILE"
+    echo "已写入 $SERVICE_FILE 与 $RUN_SCRIPT"
 }
 
 # ---- 生成环境变量文件 ----
@@ -188,21 +209,81 @@ EOF
 case "$ACTION" in
     build)
         # 在服务器上 git pull + go build + 部署一条龙。
-        # 前端产物(internal/server/web)已提交在仓库里,go build 时 embed 进二进制,
-        # 服务器上不需要 npm/node。
+        # 前端产物(internal/server/web)已提交在仓库里,go build 时 embed 进二进制。
+        # 若 web/ 源码比产物新(改了前端但忘 build),会自动调 npm run build 刷新产物
+        # (需服务器装 node/npm;未装则报错提示本机 build)。
         # 依赖:go(已装)、git(拉代码)。不需要 zig(那是交叉编译用的)。
         REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
         echo "==> 拉取最新代码 ($REPO_DIR)"
         cd "$REPO_DIR"
         git pull --ff-only
 
-        # 确认 go 可用
+        # 确认 go 可用:sudo 的 secure_path 可能不含 go 的安装路径,
+        # 从常见位置(/usr/local/go/bin、$HOME/go/bin、原用户 PATH)自动补找。
+        if ! command -v go >/dev/null 2>&1; then
+            for d in /usr/local/go/bin /usr/lib/go/bin "$HOME/go/bin" "${SUDO_USER:+$(getent passwd "$SUDO_USER" | cut -d: -f6)/go/bin}"; do
+                if [[ -x "$d/go" ]]; then
+                    export PATH="$PATH:$d"
+                    break
+                fi
+            done
+        fi
         if ! command -v go >/dev/null 2>&1; then
             echo "错误: 未找到 go,请先安装 Go。" >&2
             exit 1
         fi
 
-        echo "==> 编译 (go build,前端已 embed)"
+        # 前端构建:对比 web/ 与 internal/server/web/ 两个目录的最近改动提交,
+        # 若 web/ 的提交晚于产物目录,说明前端源码改了但产物没同步,自动 npm run build。
+        # (用 git log 比对提交而非 mtime——git pull 后所有文件 mtime 都被刷新,mtime 不可靠)
+        FRONTEND_OUT="$REPO_DIR/internal/server/web"
+        NEED_FRONTEND=0
+        if [[ -d "$REPO_DIR/web" && -f "$FRONTEND_OUT/index.html" ]]; then
+            WEB_COMMIT="$(git -C "$REPO_DIR" log -1 --format=%H -- web/ 2>/dev/null || true)"
+            OUT_COMMIT="$(git -C "$REPO_DIR" log -1 --format=%H -- internal/server/web/ 2>/dev/null || true)"
+            if [[ -n "$WEB_COMMIT" && -n "$OUT_COMMIT" && "$WEB_COMMIT" != "$OUT_COMMIT" ]]; then
+                # web/ 提交是否晚于产物提交(是 web/ 的祖先吗?是则产物已包含此次前端改动)
+                if ! git -C "$REPO_DIR" merge-base --is-ancestor "$WEB_COMMIT" "$OUT_COMMIT" 2>/dev/null; then
+                    NEED_FRONTEND=1
+                fi
+            fi
+        fi
+        if [[ "$NEED_FRONTEND" -eq 1 ]]; then
+            echo "==> 检测到前端源码比产物新,构建前端..."
+            # 找 npm/node(sudo 同样可能不在 secure_path 里)
+            if ! command -v npm >/dev/null 2>&1; then
+                NPM_DIRS=(/usr/local/bin /usr/bin "$HOME/.local/bin")
+                # 官方二进制包常装在 /usr/local/node-v*/bin(版本号目录)
+                for d in /usr/local/node-*/bin; do
+                    [[ -d "$d" ]] && NPM_DIRS+=("$d")
+                done
+                if [[ -n "${SUDO_USER:-}" ]]; then
+                    SUDO_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+                    NPM_DIRS+=("$SUDO_HOME/.local/bin")
+                    for d in "$SUDO_HOME"/.local/node-*/bin "$SUDO_HOME"/node-*/bin; do
+                        [[ -d "$d" ]] && NPM_DIRS+=("$d")
+                    done
+                    # nvm: ~/.nvm/versions/node/<ver>/bin
+                    if [[ -d "$SUDO_HOME/.nvm/versions/node" ]]; then
+                        NVM_NODE="$(ls "$SUDO_HOME/.nvm/versions/node" 2>/dev/null | tail -1)"
+                        [[ -n "$NVM_NODE" ]] && NPM_DIRS+=("$SUDO_HOME/.nvm/versions/node/$NVM_NODE/bin")
+                    fi
+                fi
+                for d in "${NPM_DIRS[@]}"; do
+                    if [[ -x "$d/npm" ]]; then export PATH="$PATH:$d"; break; fi
+                done
+            fi
+            if ! command -v npm >/dev/null 2>&1; then
+                echo "错误: 检测到前端源码有更新但服务器未装 node/npm。" >&2
+                echo "       请在本机执行 npm run build 提交产物,或服务器装 node 后重试。" >&2
+                exit 1
+            fi
+            (cd "$REPO_DIR/web" && npm install && npm run build)
+        else
+            echo "==> 前端产物已最新(源码无更新),跳过构建"
+        fi
+
+        echo "==> 编译 (go build,前端 embed)"
         CGO_ENABLED=1 go build -trimpath -o "$BIN_NAME" ./cmd/rocom-capture
         echo "    产物: $REPO_DIR/$BIN_NAME ($(du -h "$BIN_NAME" | cut -f1))"
 
