@@ -56,11 +56,11 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
             </button>
           </div>
           {/* 仅双牌:勾选后只有双牌(同时命中≥2张奖牌)的新出现稀有宠才响提醒,
-              单牌/异色/炫彩等不响。只在提醒开着时可用。 */}
+              单牌/污染等不响;异色/炫彩属最高优先级,勾选后仍照常提醒。只在提醒开着时可用。 */}
           <div className="map-layer-row map-notify-dual-row">
             <button className={'map-layer-btn map-notify-dual-btn' + (wilds.notifyDualOnly ? ' on' : '')}
               onClick={wilds.toggleNotifyDualOnly} disabled={!wilds.notify}
-              title="勾选后只有双牌(同时命中≥2张奖牌)的新出现稀有宠才响提醒,其余不响">
+              title="勾选后只有双牌(同时命中≥2张奖牌)的新出现稀有宠才响提醒,其余不响;异色/炫彩为最高优先级,不受此限">
               <span className="map-collect-ic">{wilds.notifyDualOnly ? '✓' : ''}</span>
               <span className="map-layer-name">仅双牌</span>
             </button>

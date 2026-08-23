@@ -168,26 +168,31 @@ async function adminFetch(url, options = {}) {
   return fetch(url, { ...options, headers })
 }
 
+// adminError 把失败响应转成带 status 的错误(401 表示会话失效,调用方据此决定是否踢回登录页)。
+async function adminError(r, fallback) {
+  let msg = r.status === 401 ? '密码错误或会话已失效' : (fallback || '请求失败(' + r.status + ')')
+  try {
+    const e = await r.json()
+    if (e && e.error) msg = e.error
+  } catch {
+    // 后端 http.Error 返回 text/plain(非 JSON),兜底读文本显示具体原因
+    try {
+      const t = (await r.text()).trim()
+      if (t) msg = t
+    } catch { /* ignore */ }
+  }
+  const err = new Error(msg)
+  err.status = r.status
+  return err
+}
+
 export async function postJSON(url, body) {
   const r = await adminFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!r.ok) {
-    let msg = r.status === 401 ? '密码错误或会话已失效' : '请求失败(' + r.status + ')'
-    try {
-      const e = await r.json()
-      if (e && e.error) msg = e.error
-    } catch {
-      // 后端 http.Error 返回 text/plain(非 JSON),兜底读文本显示具体原因
-      try {
-        const t = (await r.text()).trim()
-        if (t) msg = t
-      } catch { /* ignore */ }
-    }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await adminError(r)
   return r.json()
 }
 
@@ -218,7 +223,7 @@ export const adminPlaceholder = () => adminFetch('/api/admin/placeholder').then(
 
 // adminRules 黑白名单:列表 {rules:[{account,mode,note}]}。
 export const adminRules = () => adminFetch('/api/admin/rules').then(async (r) => {
-  if (!r.ok) throw new Error('拉取规则失败(' + r.status + ')')
+  if (!r.ok) throw await adminError(r, '拉取规则失败')
   return r.json()
 })
 
@@ -236,9 +241,19 @@ export const adminDeleteRule = (account) =>
 
 // adminStats 全部成员抓捕情况:{members:[{account,name,total,shiny,colorful,daily}], days, daily}。
 export const adminStats = () => adminFetch('/api/admin/stats').then(async (r) => {
-  if (!r.ok) throw new Error('拉取统计失败(' + r.status + ')')
+  if (!r.ok) throw await adminError(r, '拉取统计失败')
   return r.json()
 })
+
+// adminPlaySessions 游玩记录:{sessions:[{account,name,loginTime,logoutTime,duration,online}],
+// summary:{online,todaySessions,todayDuration,daily:[{day,sessions,duration}]}}。
+// account=账号过滤(空=全部);limit=明细条数(默认200)。
+export const adminPlaySessions = (account = '', limit = 200) =>
+  adminFetch('/api/admin/play-sessions?account=' + encodeURIComponent(account) + '&limit=' + limit)
+    .then(async (r) => {
+      if (!r.ok) throw await adminError(r, '拉取游玩记录失败')
+      return r.json()
+    })
 
 // adminWildPetOptions 可投放的野生宠物形态:{options:[{base,name,book}]}。
 export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then(async (r) => {

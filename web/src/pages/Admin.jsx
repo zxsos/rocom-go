@@ -2,10 +2,29 @@ import React, { useEffect, useState } from 'react'
 import {
   getAdminStatus, adminSetup, adminLogin, adminLogout,
   getAdminToken, setAdminToken, adminRules, adminSetRule, adminDeleteRule,
-  adminStats, adminWildPetOptions, adminInjectWild, adminListInjects, adminRevokeInject,
+  adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminListInjects, adminRevokeInject,
   getAccounts, setAccountPin, deleteAccount,
 } from '../api'
 import AdminCharts from './AdminCharts'
+
+// fmtDur 把秒格式化为「X小时Y分 / Y分Z秒 / Z秒」。
+const fmtDur = (s) => {
+  if (s == null || s < 0) return '-'
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}小时${m}分`
+  if (m > 0) return `${m}分${sec}秒`
+  return `${sec}秒`
+}
+
+// fmtTime 把 Unix 秒格式化为「MM-DD HH:mm」。
+const fmtTime = (ts) => {
+  if (ts == null) return '-'
+  const d = new Date(ts * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
 
 // 管理员面板(隐式入口:导航不显示,需手动输入 #/admin 进入)。
 // 首次进入引导设置密码,之后凭密码登录;面板内其余功能留空待实现。
@@ -23,6 +42,10 @@ export default function Admin() {
   const [rNote, setRNote] = useState('')
   const [stats, setStats] = useState(null)      // 成员抓捕图表数据
   const [statsErr, setStatsErr] = useState('')
+  // 游玩记录:玩家上/下线时间与游玩时长
+  const [plays, setPlays] = useState(null)      // {sessions:[], summary:{}}
+  const [playErr, setPlayErr] = useState('')
+  const [playAccount, setPlayAccount] = useState('') // 明细账号筛选(空=全部)
   // 投放稀有野生精灵
   const [wildOptions, setWildOptions] = useState(null)
   const [accounts, setAccounts] = useState([])
@@ -52,22 +75,32 @@ export default function Admin() {
     if (!authed) return
     loadRules()
     loadStats()
+    loadPlaySessions()
     loadWildOptions()
     loadAccounts()
     loadInjects()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed])
 
+  // 仅 401(令牌失效/未登录)才视为会话失效踢回登录页;其余错误(404/500/网络)只展示,不打断面板。
+  const kickIfUnauthed = (err) => { if (err.status === 401) setAuthed(false) }
+
   const loadRules = () => {
     setRuleErr('')
     adminRules().then((d) => setRules(d.rules || []))
-      .catch((err) => { setRuleErr(err.message); setAuthed(false) })
+      .catch((err) => { setRuleErr(err.message); kickIfUnauthed(err) })
   }
 
   const loadStats = () => {
     setStatsErr('')
     adminStats().then(setStats)
-      .catch((err) => { setStatsErr(err.message); setAuthed(false) })
+      .catch((err) => { setStatsErr(err.message); kickIfUnauthed(err) })
+  }
+
+  const loadPlaySessions = () => {
+    setPlayErr('')
+    adminPlaySessions(playAccount).then(setPlays)
+      .catch((err) => { setPlayErr(err.message); kickIfUnauthed(err) })
   }
 
   const loadWildOptions = () => {
@@ -197,6 +230,8 @@ export default function Admin() {
     setAuthed(false)
     setRules(null)
     setStats(null)
+    setPlays(null)
+    setPlayAccount('')
     setWildOptions(null)
     setAccounts([])
     setInjAccount('')
@@ -249,6 +284,79 @@ export default function Admin() {
         <p className="admin-hint">所有成员累计抓捕精灵情况(来源:获得宠物事件,近30天时间轴)。</p>
         {statsErr && <p className="admin-error">{statsErr}</p>}
         <AdminCharts data={stats} />
+      </div>
+
+      <div className="admin-card admin-rules">
+        <h3>游玩记录</h3>
+        <p className="admin-hint">
+          自动记录玩家每次上线的起止时间与游玩时长(来源:连接登录/断开与心跳活跃,近14天每日聚合)。
+          挂后台或断线超过 90 秒无流量判定一次下线,再次活跃自动续记新会话。
+        </p>
+        <div className="admin-play-summary">
+          <div className="admin-play-stat">
+            <b>{plays && plays.summary ? plays.summary.online : '-'}</b>
+            <span>当前在线</span>
+          </div>
+          <div className="admin-play-stat">
+            <b>{plays && plays.summary ? plays.summary.todaySessions : '-'}</b>
+            <span>今日会话</span>
+          </div>
+          <div className="admin-play-stat">
+            <b>{plays && plays.summary ? fmtDur(plays.summary.todayDuration) : '-'}</b>
+            <span>今日游玩时长</span>
+          </div>
+        </div>
+        {plays && plays.summary && plays.summary.daily && plays.summary.daily.length > 0 && (
+          <div className="admin-play-daily">
+            {plays.summary.daily.map((d) => {
+              const max = Math.max(...plays.summary.daily.map((x) => x.duration), 1)
+              const pct = Math.max(2, Math.round((d.duration / max) * 100))
+              return (
+                <div className="admin-play-day" key={d.day} title={`${d.day}:${d.sessions} 次会话,共 ${fmtDur(d.duration)}`}>
+                  <div className="admin-play-bar" style={{ height: pct + '%' }} />
+                  <span className="admin-play-day-label">{d.day.slice(5)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div className="admin-play-toolbar">
+          <select className="select" value={playAccount} onChange={(e) => { setPlayAccount(e.target.value); loadPlaySessions() }}
+            title="按账号筛选游玩记录(空=全部)">
+            <option value="">全部账号</option>
+            {accounts.map((a) => (
+              <option key={a.account} value={a.account}>{a.name || a.account} (UID:{(a.account || '').replace(/^UID:/, '')})</option>
+            ))}
+          </select>
+          <button className="btn" onClick={loadPlaySessions}>刷新</button>
+        </div>
+        {playErr && <p className="admin-error">{playErr}</p>}
+        {plays === null
+          ? <p className="admin-hint">加载中…</p>
+          : plays.sessions.length === 0
+            ? <p className="admin-hint">暂无游玩记录(登录游戏并产生流量后自动生成)。</p>
+            : (
+              <table className="admin-play-table">
+                <thead>
+                  <tr>
+                    <th>玩家</th>
+                    <th>上线时间</th>
+                    <th>下线时间</th>
+                    <th>游玩时长</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plays.sessions.map((s) => (
+                    <tr key={s.account + ':' + s.loginTime}>
+                      <td>{s.name || s.account} <span className="muted">{(s.account || '').replace(/^UID:/, '')}</span></td>
+                      <td>{fmtTime(s.loginTime)}</td>
+                      <td>{s.online ? <span className="play-online">在线中</span> : fmtTime(s.logoutTime)}</td>
+                      <td>{s.online ? '—' : fmtDur(s.duration)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
       </div>
 
       <div className="admin-card admin-rules">

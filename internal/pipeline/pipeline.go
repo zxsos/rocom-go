@@ -59,6 +59,11 @@ type connState struct {
 	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
 	home       *homeState                // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
 	crackEgg   uint32                    // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
+	// 游玩会话跟踪(管理后台「游玩记录」,见 playsession.go):last 是该连接最后一条可归属
+	// 消息的墙钟时刻,兜底扫描据此判定下线(长时间无流量);sessionOpen 表示已有进行中会话,
+	// handle 里用它避免每条消息都查库(状态翻转才读写 store)。
+	last        time.Time
+	sessionOpen bool
 }
 
 // acctState 是单个账号的消费状态。
@@ -91,6 +96,9 @@ func New(st *store.Store, db *gamedata.DB, srv *server.Server) *Pipeline {
 	if saved, err := st.LoadSessionScenes(); err == nil {
 		for id, s := range saved {
 			cs := p.conn(id)
+			// 预热的连接把「最后活跃」置为当下:游戏仍在线时消息会持续刷新它(不误杀),
+			// 已下线/已关闭的则被兜底扫描按超时补记下线(见 sweepOnce)。
+			cs.last = time.Now()
 			cs.res, cs.room = s.Res, s.Room
 			for fn, ids := range s.Areas {
 				set := map[uint32]bool{}
@@ -129,10 +137,64 @@ func (p *Pipeline) acct(acc string) *acctState {
 	return as
 }
 
-// Run 消费 eng.Out 直到通道关闭(离线回放结束时)。
+// sessionIdleTimeout 是游玩会话的「无流量判定下线」阈值:游戏心跳约 1.6s 一条,超过该时长
+// 完全没有可归属消息(切后台/关游戏/断网)即视为下线,结束会话。比 capture 的 closeIdle
+// (2min,空闲关流)更早兜底;结束后该连接再有消息(回前台/重连)会自动重开新会话,不丢游玩时间。
+const sessionIdleTimeout = 90 * time.Second
+
+// sweepInterval 是兜底扫描周期。
+const sweepInterval = 30 * time.Second
+
+// Run 消费 eng.Out 与连接断开通知,直到消息通道关闭(离线回放结束时)。期间定期兜底扫描
+// 游玩会话。所有状态只在当前 goroutine 内读写,故无并发问题。
 func (p *Pipeline) Run(eng *capture.Engine) {
-	for m := range eng.Out {
-		p.handle(m)
+	sweep := time.NewTicker(sweepInterval)
+	defer sweep.Stop()
+	for {
+		select {
+		case m, ok := <-eng.Out:
+			if !ok {
+				// 离线回放结束:把剩余连接断开通知处理完(正常退出,不留悬挂会话)。
+				for cid := range eng.CloseCh {
+					p.onConnClose(cid)
+				}
+				return
+			}
+			p.handle(m)
+		case cid := <-eng.CloseCh:
+			p.onConnClose(cid)
+		case <-sweep.C:
+			p.sweepOnce(time.Now())
+		}
+	}
+}
+
+// onConnClose 处理一条连接断开(capture 检测到 TCP 结束或空闲超时):结束该连接的游玩会话、
+// 记录下线时间。其余连接状态保留——断线重连/挂后台回前台后,该连接再有消息会在 handle 里
+// 自动重开新会话,游玩时间不丢。
+func (p *Pipeline) onConnClose(connID string) {
+	if err := p.st.EndPlaySession(connID, time.Now().Unix()); err != nil {
+		log.Printf("EndPlaySession 失败: %v", err)
+	}
+	if cs := p.conns[connID]; cs != nil {
+		cs.sessionOpen = false
+	}
+}
+
+// sweepOnce 兜底扫描游玩会话:内存里超过 sessionIdleTimeout 无消息的连接补记下线,并对库中
+// 悬挂的进行中会话(登录已超 24h)强制结束,避免管理后台永远显示「在线中」。
+func (p *Pipeline) sweepOnce(now time.Time) {
+	for id, cs := range p.conns {
+		if cs.sessionOpen && !cs.last.IsZero() && now.Sub(cs.last) > sessionIdleTimeout {
+			if err := p.st.EndPlaySession(id, now.Unix()); err != nil {
+				log.Printf("EndPlaySession 失败: %v", err)
+			}
+			cs.sessionOpen = false
+		}
+	}
+	nowTS := now.Unix()
+	if err := p.st.ForceEndStaleSessions(nowTS-24*3600, nowTS); err != nil {
+		log.Printf("ForceEndStaleSessions 失败: %v", err)
 	}
 }
 
@@ -166,6 +228,18 @@ func (p *Pipeline) handle(m capture.Message) {
 	if now := m.Time.Unix(); now > p.acct(acc).lastSeen {
 		p.acct(acc).lastSeen = now
 		p.srv.TouchAccount(acc, now)
+	}
+
+	// 游玩会话跟踪(管理后台「游玩记录」):连接一旦有可归属消息且尚无进行中会话就开一条,
+	// 并记录最后活跃时刻(墙钟)。登录后首条消息自动开;连接断开/长时间无流量(兜底)结束会话
+	// 后,该连接再有消息(挂后台回前台、断线重连、重启预热续接)会重新开一条,游玩时间不丢。
+	cs := p.conn(m.Session)
+	cs.last = time.Now()
+	if !cs.sessionOpen {
+		cs.sessionOpen = true
+		if err := p.st.StartPlaySession(m.Session, acc, time.Now().Unix()); err != nil {
+			log.Printf("StartPlaySession 失败: %v", err)
+		}
 	}
 
 	// 去抖中的层变化需要「过一会儿再看一眼」才能采纳,而玩家可能站着不动、迟迟没有下一个移动包。
@@ -210,6 +284,14 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 	if p.connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志并落盘映射
 		log.Printf("用户 %s (%s) 登录成功 [%s]", acc, nick, m.Session)
 		p.st.SaveSessionAccount(m.Session, acc)
+		// 同一连接切换账号(退出登录换号):结束旧账号的进行中会话,并把 sessionOpen 置 false,
+		// 本消息后续流程(handle 的游玩会话跟踪)会为新账号重新开一条。
+		if err := p.st.EndPlaySession(m.Session, time.Now().Unix()); err != nil {
+			log.Printf("EndPlaySession 失败: %v", err)
+		}
+		if cs := p.conns[m.Session]; cs != nil {
+			cs.sessionOpen = false
+		}
 	}
 	p.connAccount[m.Session] = acc
 	if name == "" {

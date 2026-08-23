@@ -234,6 +234,20 @@ CREATE TABLE IF NOT EXISTS admin (
 CREATE TABLE IF NOT EXISTS account_rule (
   account TEXT PRIMARY KEY, mode TEXT, note TEXT, updated_at INTEGER
 );
+
+-- 游玩会话(管理后台「游玩记录」,见 playsession.go):conn_id 对应 sessions 的连接标识,
+-- 记录玩家每次上线的起止时间与游玩时长。logout_time 为 NULL 表示会话进行中(玩家在线),
+-- duration 在下线时写入;进行中的时长按「现在-登录时刻」折算,不入库。
+CREATE TABLE IF NOT EXISTS play_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conn_id TEXT NOT NULL,
+  account TEXT NOT NULL,
+  login_time INTEGER NOT NULL,
+  logout_time INTEGER,
+  duration INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_play_sessions_account ON play_sessions(account, login_time);
+CREATE INDEX IF NOT EXISTS idx_play_sessions_login ON play_sessions(login_time);
 `)
 	return err
 }

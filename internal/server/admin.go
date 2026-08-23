@@ -189,6 +189,32 @@ func (s *Server) handleAdminStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, st)
 }
 
+// handleAdminPlaySessions 返回游玩记录(管理后台「游玩记录」):会话明细列表 + 汇总
+// (当前在线/今日/近14天每日)。查询参数:account=账号过滤、limit=条数(默认200,上限1000)。
+func (s *Server) handleAdminPlaySessions(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	acc := strings.TrimSpace(r.URL.Query().Get("account"))
+	limit := 200
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	sessions, err := s.store.ListPlaySessions(acc, limit)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	summary, err := s.store.PlaySessionSummary()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"sessions": sessions, "summary": summary})
+}
+
 // requireAdmin 校验管理员会话,未登录则回 401 并返回 false。
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if !s.authed(r) {
