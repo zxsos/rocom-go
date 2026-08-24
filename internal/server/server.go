@@ -159,6 +159,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
+	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
 	imgFS := http.FileServerFS(gamedata.ImageFS())
 	s.mux.Handle("GET /img/", http.StripPrefix("/img/", cacheControl(imgFS, "public, max-age=86400")))

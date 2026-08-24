@@ -32,7 +32,7 @@ export default function App() {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // 截图防泄(全局开关):点击顶栏品牌名「洛克妙妙屋」切换。默认开启——敏感文字
+  // 截图防泄(全局开关):点击顶栏品牌名「测试妙妙屋」切换。默认开启——敏感文字
   // (昵称/UID)常驻模糊,点击品牌名解除全部,再点恢复。不依赖任何窗口焦点/鼠标/触屏事件,
   // 手机电脑行为一致,截图/录屏/投屏都不触发 DOM 事件故默认即保护最可靠。
   // 状态打在 <html data-privacy> 上,CSS 据此模糊 .privacy 元素;品牌名本身遮罩开启时变暗。
@@ -122,7 +122,7 @@ export default function App() {
         <header className="topbar">
           <button type="button" className={'brand' + (privacyOn ? ' privacy-on' : '')}
             onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
-            <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">洛克妙妙屋</span>
+            <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">测试妙妙屋</span>
           </button>
           <nav className="topnav">{navLinks('navlink')}</nav>
           {fullscreen.supported && (

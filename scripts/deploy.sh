@@ -216,7 +216,13 @@ case "$ACTION" in
         REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
         echo "==> 拉取最新代码 ($REPO_DIR)"
         cd "$REPO_DIR"
-        git pull --ff-only
+        # 显式从 github 拉取:服务器仓库的 origin 可能指向别的托管(如 cnb.cool),
+        # 那里没有最新提交,默认 git pull 会拉空。这里确保 github remote 存在并从它拉。
+        GITHUB_URL="git@github.com:zxsos/roco-go.git"
+        if ! git remote get-url github >/dev/null 2>&1; then
+            git remote add github "$GITHUB_URL"
+        fi
+        git pull --ff-only github master
 
         # 确认 go 可用:sudo 的 secure_path 可能不含 go 的安装路径,
         # 从常见位置(/usr/local/go/bin、$HOME/go/bin、原用户 PATH)自动补找。

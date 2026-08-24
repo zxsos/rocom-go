@@ -12,6 +12,18 @@
 .ignore-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; }
 .ignore-bar .chip { font-family: ui-monospace, monospace; }
 
+/* 展开的数据详情:解析树 + 原始 hex */
+.btn-ignore:disabled { opacity: 0.15; cursor: default; }
+.btn-ignore:disabled:hover { color: inherit; }
+.dbg-detail td { background: var(--bg-1); border-bottom: 1px solid var(--line-soft); padding: 6px 10px 10px; }
+.dbg-detail-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+.dbg-tree { margin: 0; padding: 8px 10px; background: var(--bg-2); border: 1px solid var(--line-soft);
+  border-radius: 6px; max-height: 300px; overflow: auto; font-size: 12px; line-height: 1.55; white-space: pre; }
+.dbg-hex { margin-top: 6px; font-size: 12px; }
+.dbg-hex summary { cursor: pointer; user-select: none; }
+.dbg-hex code { display: block; margin-top: 4px; word-break: break-all; white-space: pre-wrap;
+  color: var(--muted); font-size: 11px; }
+
 @media (max-width: 760px) {
   /* 移动端精简为「时间/方向/名称」:隐藏说明文字、账号列与冗长的 opcode 列,
      名称长词换行,避免横向溢出 */
