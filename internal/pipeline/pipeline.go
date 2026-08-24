@@ -77,8 +77,8 @@ type acctState struct {
 	starKnown map[int32]int
 	eggSweep  *eggSweep      // 正在累积的分页背包快照(末页对账,见 eggs.go)
 	lastPos   map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
-	// lastFlowerLogicID: 最近一次选中进入战斗的花种 npc_logic_id(c2s 0x0846)。
-	// 捕捉成功(0x0160 catch_way=4)时据此清掉该花的 0x0338 详情,需重新点击查看。
+	// lastFlowerLogicID: 最近一次选中进入战斗的花种 npc_logic_id(c2s 0x034E)。
+	// 捕捉成功(0x132c 内嵌 goods_reward 的新宠物 catch_way=4)时据此清掉该花的 0x0338 详情,需重新点击查看。
 	lastFlowerLogicID uint64
 	// lastSeen: 最近一条可归属消息的应用层时间戳(秒)。与 server 在线表同步时按秒去重,
 	// 免得移动包 8 条/秒高频刷锁——在线判定只认 30s 窗口,同秒内的更新没有意义。
@@ -258,6 +258,13 @@ func (p *Pipeline) handle(m capture.Message) {
 	p.handleEgg(m, acc)
 
 	if p.handleScene(m, acc) {
+		// 0x132c 战斗结束通知同时是「场景」与「宠物」两路消息:场景侧清野怪标记
+		// (onBattleFinish),宠物侧解析内嵌 goods_reward 的新宠物入库/清花种详情
+		// (applyNewPet,实测花种捕捉 catch_way=4 与传说精灵 catch_way=5 都经此下发)。
+		// handleScene 命中即返回,故这里对 0x132c 放行到 handlePet。
+		if m.Direction == gcp.S2C && m.Opcode == pet.OpBattleFinishNotify {
+			p.handlePet(m, acc)
+		}
 		return
 	}
 	p.handlePet(m, acc)

@@ -8,19 +8,19 @@ import (
 
 // 花种(花灵)活动 BOSS 信息(见 docs/data.md 花种页)。
 //
-// 花种界面依赖 s2c 0x0375(883) ZONE_SCENE_QUERY_BOSS_NPC_INFO_RSP:客户端打开花种面板时
+// 花种界面依赖 s2c 0x0375(885) ZONE_SCENE_QUERY_BOSS_NPC_INFO_RSP:客户端打开花种面板时
 // 服务器一次性下发全部 BOSS 分组,其中 flower_npcs 是花种(花灵)活动 BOSS——每颗花种对应一只
 // 守护宠物(battle_petbase_id),带星级/血脉/活动结束时间;另有 spec_flower_seed_id 的非零的
 // 3 只 7 星特殊花种。world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)与花种无关,不解析。
 const (
-	OpQueryBossNpcInfoRsp           = 0x0375 // ZONE_SCENE_QUERY_BOSS_NPC_INFO_RSP(883), s2c,花种等 BOSS 分组信息
+	OpQueryBossNpcInfoRsp           = 0x0375 // ZONE_SCENE_QUERY_BOSS_NPC_INFO_RSP(885), s2c,花种等 BOSS 分组信息
 	OpTeamBattleInfoQueryRsp        = 0x0338 // ZONE_SCENE_TEAM_BATTLE_INFO_QUERY_RSP(824), s2c,单只花种详情(点击地图花种触发)
-	OpSelectTeamBattleFlowerSeedReq = 0x0846 // ZONE_SELECT_TEAM_BATTLE_FLOWER_SEED_BOSS_REQ(2118), c2s,选中某朵花种进入战斗
+	OpSelectTeamBattleFlowerSeedReq = 0x034E // ZONE_SELECT_TEAM_BATTLE_FLOWER_SEED_BOSS_REQ(846), c2s,选中某朵花种进入战斗
 )
 
-// ParseSelectFlowerSeedBossReq 解析 c2s ZoneSelectTeamBattleFlowerSeedBossReq(0x0846):
+// ParseSelectFlowerSeedBossReq 解析 c2s ZoneSelectTeamBattleFlowerSeedBossReq(0x034E):
 // 取 npc_logic_id(field 2,uint64)。玩家在花种页点某朵花进战斗时发出,
-// 用于把「最近挑战的花种」关联到捕捉成功(0x0160 catch_way=4)后的清理。
+// 用于把「最近挑战的花种」关联到捕捉成功(0x132c catch_way=4)后的清理。
 func ParseSelectFlowerSeedBossReq(body []byte) uint64 {
 	var logicID uint64
 	wire.ScanFields(body, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {

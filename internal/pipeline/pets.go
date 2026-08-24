@@ -42,9 +42,10 @@ func (p *Pipeline) handlePet(m capture.Message, acc string) {
 			p.srv.Hub().Broadcast("pet", acc, pp)
 		}
 
-	// 获得新宠物:孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉(经玩家同步)、
-	// 传说精灵战后捕捉(catch_way=5,仅经战斗结束通知下发)都把新宠物嵌在子消息里。同一宠物可能
-	// 经多个 opcode 下发(普通捕捉的 BATTLE_FINISH 与 GOODS_REWARD 重复),用 isNew 去重;获得方式由 catch_way 区分。
+	// 获得新宠物:孵蛋、战斗外捕捉、普通战斗内捕捉(经奖励通知)、花种战斗内捕捉与传说精灵
+	// 战后捕捉(均经战斗结束通知 0x132c 内嵌 goods_reward 下发,catch_way 分别为 4/5)都把新宠物
+	// 嵌在子消息里。同一宠物可能经多个 opcode 下发(普通捕捉的 BATTLE_FINISH 与 GOODS_REWARD
+	// 重复),用 isNew 去重;获得方式由 catch_way 区分。
 	case m.Direction == gcp.S2C &&
 		(m.Opcode == pet.OpCrackEggRsp || m.Opcode == pet.OpPetCatchRsp ||
 			m.Opcode == pet.OpGoodsRewardNotify || m.Opcode == pet.OpPlayerSyncNotify ||
@@ -175,7 +176,7 @@ func (p *Pipeline) applyNewPet(m capture.Message, sc *store.Scoped, acc string) 
 	}
 	p.srv.Hub().Broadcast("pet", acc, pp)
 	if isNew {
-		// 花种(稀兽)战斗内捕捉(catch_way=4,仅经 PLAYER_SYNC_NOTIFY 下发):
+		// 花种(稀兽)战斗内捕捉(catch_way=4,实测内嵌于 BATTLE_FINISH_NOTIFY 的 goods_reward 下发):
 		// 捕捉后该花种重生为新个体,清掉其 0x0338 详情,需玩家重新点击查看。
 		if pd.GetCatchWay() == 4 {
 			p.clearFlowerDetail(acc)
