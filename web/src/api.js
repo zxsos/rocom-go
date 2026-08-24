@@ -103,6 +103,11 @@ export async function resetPaint(res, layer) {
 // 之后由 SSE home 覆盖;从未进过家园时返回 null。
 export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
 
+// getFlowers 返回当前账号最近一次花种(花灵)BOSS 分组(花种页加载即时回显):
+//   {flowers:[{id,name,img,star,blood,endTs,specSeedId,activityId,ownerUserId}]}
+// 之后由 SSE flowers 覆盖;从未收到过 0x0375(游戏内未打开过花种面板)时返回 null。
+export const getFlowers = () => getJSON('/api/flowers?' + buildQuery(), null)
+
 // getEggs 返回背包里的精灵蛋(库里存的就是背包现状,破壳/送人的行已删):
 //   {eggs:[{gid,name,species,icon,typeName,medals,heightM,weightKg,heightPct,weightPct,
 //           obtainedAt,hatching,parents,…}]}

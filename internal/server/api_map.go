@@ -80,6 +80,36 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+// SetLastFlowers 缓存某账号最近一次花种(花灵)BOSS 分组(由消费管线在广播 flowers 时调用),
+// 供花种页加载时经 GET /api/flowers 即时回显。字段定义见 pipeline/boss.go 的 flowerItem。
+func (s *Server) SetLastFlowers(account string, payload any) {
+	if account == "" {
+		return
+	}
+	s.posMu.Lock()
+	s.lastFlowers[account] = payload
+	s.posMu.Unlock()
+}
+
+// GetLastFlowers 返回某账号最近一次花种分组(与 SetLastFlowers 对应);无记录返回 nil。
+// 供管线在收到 0x0338 详情时读取当前分组以合并字段。
+func (s *Server) GetLastFlowers(account string) any {
+	if account == "" {
+		return nil
+	}
+	s.posMu.Lock()
+	defer s.posMu.Unlock()
+	return s.lastFlowers[account]
+}
+
+// handleFlowers 返回当前账号最近一次花种(花灵)BOSS 分组;无记录(尚未收到 0x0375)返回 null。
+func (s *Server) handleFlowers(w http.ResponseWriter, r *http.Request) {
+	s.posMu.Lock()
+	v := s.lastFlowers[s.acct(r)]
+	s.posMu.Unlock()
+	writeJSON(w, v)
+}
+
 // poiKind 是一个 POI 图层(前端的一个开关):图层键、中文名、图标路径、是否默认开启。
 type poiKind struct {
 	K       string `json:"k"`

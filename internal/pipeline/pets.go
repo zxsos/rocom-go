@@ -175,6 +175,11 @@ func (p *Pipeline) applyNewPet(m capture.Message, sc *store.Scoped, acc string) 
 	}
 	p.srv.Hub().Broadcast("pet", acc, pp)
 	if isNew {
+		// 花种(稀兽)战斗内捕捉(catch_way=4,仅经 PLAYER_SYNC_NOTIFY 下发):
+		// 捕捉后该花种重生为新个体,清掉其 0x0338 详情,需玩家重新点击查看。
+		if pd.GetCatchWay() == 4 {
+			p.clearFlowerDetail(acc)
+		}
 		ev := &store.Event{Time: m.Time.Unix(), SubKind: catchWayName(pd, acc), Gid: pp.Gid, Pet: pp}
 		if sc.AddEvent(ev) == nil {
 			logEvent(acc, ev)
