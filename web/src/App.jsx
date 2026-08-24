@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
 import { AccountContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
+import { useStoredJSON } from './hooks/useStoredState'
 import { PinDialog } from './components/PinDialog'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
@@ -11,7 +12,7 @@ const NAV = [
   { to: '/events', label: '捕获事件', icon: '🔔' },
   { to: '/eggs', label: '精灵蛋', icon: '🥚' },
   { to: '/map', label: '实时地图', icon: '🗺️' },
-  { to: '/debug', label: '调试', icon: '🐞' },
+  { to: '/flowers', label: '花种', icon: '🌱' },
 ]
 
 // uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
@@ -32,7 +33,7 @@ export default function App() {
     if (location.pathname === to) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // 截图防泄(全局开关):点击顶栏品牌名「测试妙妙屋」切换。默认开启——敏感文字
+  // 截图防泄(全局开关):点击顶栏品牌名「妙妙屋」切换。默认开启——敏感文字
   // (昵称/UID)常驻模糊,点击品牌名解除全部,再点恢复。不依赖任何窗口焦点/鼠标/触屏事件,
   // 手机电脑行为一致,截图/录屏/投屏都不触发 DOM 事件故默认即保护最可靠。
   // 状态打在 <html data-privacy> 上,CSS 据此模糊 .privacy 元素;品牌名本身遮罩开启时变暗。
@@ -41,6 +42,27 @@ export default function App() {
     document.documentElement.toggleAttribute('data-privacy', privacyOn)
   }, [privacyOn])
   const togglePrivacy = () => setPrivacyOn((v) => !v)
+
+  // 主题模式:auto(跟随浏览器 prefers-color-scheme,默认)/ light / dark。
+  // 持久化到 localStorage('theme'),三态循环切换:auto → light → dark → auto。
+  // <html data-theme="light|dark"> 上挂实际生效的主题:auto 时由 matchMedia 决定并监听变化。
+  const themeSanitize = (v) => (v === 'light' || v === 'dark' || v === 'auto' ? v : 'auto')
+  const [theme, setTheme] = useStoredJSON(localStorage, 'theme', 'auto', themeSanitize)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    // 算出实际生效主题:auto 时看浏览器,否则用户手选
+    const effective = theme === 'auto' ? (mq.matches ? 'dark' : 'light') : theme
+    document.documentElement.setAttribute('data-theme', effective)
+    // auto 模式下监听浏览器主题变化,实时跟随(切到固定 light/dark 后不再监听)
+    if (theme !== 'auto') return
+    const onChange = (e) => document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light')
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [theme])
+  // 三态循环:auto → light → dark → auto
+  const cycleTheme = () => setTheme((t) => (t === 'auto' ? 'light' : t === 'light' ? 'dark' : 'auto'))
+  const themeLabel = theme === 'auto' ? '跟随系统' : theme === 'light' ? '白天' : '夜间'
+  const themeIcon = theme === 'auto' ? '🌗' : theme === 'light' ? '☀️' : '🌙'
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -122,16 +144,22 @@ export default function App() {
         <header className="topbar">
           <button type="button" className={'brand' + (privacyOn ? ' privacy-on' : '')}
             onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
-            <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">测试妙妙屋</span>
+            <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">妙妙屋</span>
           </button>
           <nav className="topnav">{navLinks('navlink')}</nav>
           {fullscreen.supported && (
             <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
               onClick={fullscreen.toggle}
               title={fullscreen.isFull ? '退出网页全屏' : '网页全屏'}>
-              {fullscreen.isFull ? '退出全屏' : '全屏'}
+              <span className="topbar-fs-icon">{fullscreen.isFull ? '⤢' : '⛶'}</span>
+              <span className="topbar-fs-text">{fullscreen.isFull ? '退出全屏' : '全屏'}</span>
             </button>
           )}
+          <button type="button" className="topbar-fs"
+            onClick={cycleTheme}
+            title={'主题:' + themeLabel + '(点击切换)'}>
+            <span>{themeIcon}</span>
+          </button>
           {accounts.length > 0 && (() => {
             const cur = accounts.find((a) => a.account === account)
             return (
