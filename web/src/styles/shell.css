@@ -6,7 +6,7 @@
 .topbar {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 16px; background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
+  padding: 10px 16px; background: var(--bar-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; font: inherit; cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
@@ -27,7 +27,7 @@
   transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
 }
 .topbar-fs:hover {
-  border-color: var(--line); background: rgba(255, 255, 255, .05); color: var(--fg);
+  border-color: var(--line); background: var(--bar-hover); color: var(--fg);
 }
 .topbar-fs:active { transform: scale(.97); }
 .topbar-fs:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -82,7 +82,7 @@
 .account-del-btn:hover { color: var(--red); border-color: var(--red); }
 
 /* ---- 截图防泄(全局开关)----
-   点击顶栏品牌名「测试妙妙屋」切换:默认开启(html 有 data-privacy 属性),
+   点击顶栏品牌名「妙妙屋」切换:默认开启(html 有 data-privacy 属性),
    敏感文字(.privacy:昵称/UID)常驻模糊;点击品牌名解除全部,再点恢复。
    不依赖任何窗口焦点/鼠标/触屏事件——截图/录屏/投屏不触发 DOM 事件,默认即保护最可靠。
    品牌名遮罩开启时变暗,作为当前模式的视觉提示。 */
@@ -100,13 +100,14 @@ html[data-privacy] .brand { color: var(--fg-dim); }
 
 @media (max-width: 760px) {
   .topnav { display: none; }
-  /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/隐私按钮缩成纯图标 */
-  .topbar { gap: 10px; padding: 8px 12px; }
-  .brand { font-size: 15px; }
-  .topbar-fs { padding: 6px 9px; }
+  /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/主题按钮缩成纯图标(隐藏文字) */
+  .topbar { gap: 8px; padding: 8px 12px; }
+  .brand { font-size: 15px; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-fs { padding: 6px 8px; }
+  .topbar-fs-text { display: none; }
   .bottomnav {
     display: flex; position: sticky; bottom: 0; z-index: 30;
-    background: rgba(22, 27, 34, .92); backdrop-filter: blur(10px);
+    background: var(--bar-bg); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
   .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; color: var(--fg-dim); transition: color .15s ease; }

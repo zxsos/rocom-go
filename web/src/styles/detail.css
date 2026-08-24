@@ -9,7 +9,7 @@
 }
 .detail-wrap { width: 100%; max-width: 460px; margin: auto; }
 .detail-card {
-  background: linear-gradient(180deg, #2b3346, #161b22); border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1)); border: 1px solid var(--line);
   border-radius: 18px; box-shadow: var(--shadow), 0 0 0 1px rgba(255, 255, 255, .03) inset; /* 不裁剪子元素,让奖牌 tooltip 可溢出卡片 */
 }
 .detail-head { padding: 16px; display: flex; justify-content: space-between; align-items: baseline; }

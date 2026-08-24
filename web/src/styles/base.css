@@ -18,6 +18,33 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, .25);
   --radius: 10px;
   --radius-lg: 14px;
+  /* 磨砂顶栏/底栏背景:暗色下深、亮色下浅(见 [data-theme="light"] 覆写)。
+     各处半透明工具栏引用此变量,主题切换时一并跟随。 */
+  --bar-bg: rgba(22, 27, 34, .92);
+  --bar-hover: rgba(255, 255, 255, .05);
+}
+
+/* 亮色主题:html[data-theme="light"] 时覆写变量。默认(auto)跟随浏览器,由 App.jsx
+   据 prefers-color-scheme 在 <html> 上挂 data-theme。亮色取柔和的浅灰底 + 深灰字,
+   强调色稍加深以保证白底对比度。 */
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-1: #ffffff;
+  --bg-2: #eef1f4;
+  --bg-3: #e3e8ed;
+  --line: #d4dae0;
+  --line-soft: #e3e8ed;
+  --fg: #1f2328;
+  --fg-dim: #656d76;
+  --accent: #2f6fdb;
+  --accent-soft: rgba(47, 111, 219, .12);
+  --gold: #b88200;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --shadow: 0 4px 16px rgba(0, 0, 0, .12);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, .08);
+  --bar-bg: rgba(255, 255, 255, .9);
+  --bar-hover: rgba(0, 0, 0, .05);
 }
 
 * { box-sizing: border-box; }
