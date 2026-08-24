@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
@@ -219,6 +220,7 @@ func (p *Pipeline) handle(m capture.Message) {
 		"opcode":  fmt.Sprintf("0x%04x", m.Opcode),
 		"name":    p.srv.OpcodeName(m.Opcode),
 		"account": acc,
+		"hex":     hex.EncodeToString(m.AppBody), // 调试页点开行时按需解析(见 api_debug.go)
 	})
 	if acc == "" {
 		return // 尚未见到该连接的登录(无法归属 user_id),丢弃

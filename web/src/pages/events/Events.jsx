@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect, useContext, useRef } from 'react'
 import { getEvents, getEventCount, getEventStats, clearEvents, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredState, useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
@@ -7,6 +7,7 @@ import { Avatar } from '../../components/avatar'
 import { Marks, Blood, Gender } from '../../components/badges'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
+import { chime, rareChime } from '../../utils/audio'
 import { sanitizeRules, isHighlight, NOTABLE_BLOODS } from './highlight'
 import RulePanel from './RulePanel'
 
@@ -26,8 +27,13 @@ export default function Events() {
   const [onlyHl, setOnlyHl] = useStoredFlag(localStorage, 'onlyHl', false)
   // 屏幕常亮开关(Screen Wake Lock)
   const [keepAwake, setKeepAwake] = useStoredFlag(localStorage, 'keepAwake', false)
+  // 规则命中提示音开关:新捕获事件命中高亮规则时响铃(异色/炫彩响升级音)。默认关,不打扰。
+  const [soundOn, setSoundOn] = useStoredFlag(localStorage, 'ev.hlSound.v1', false)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   useWakeLock(keepAwake)
+  // subscribe 的 effect 只依赖 account,回调里读 rules/mode/soundOn 需走 ref 拿最新值
+  const soundRef = useRef({ rules, mode, soundOn })
+  useEffect(() => { soundRef.current = { rules, mode, soundOn } })
 
   useEffect(() => {
     // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
@@ -37,6 +43,12 @@ export default function Events() {
     return subscribe((m) => {
       if (m.type !== 'event') return
       if (m.account && m.account !== account) return // 只认当前账号的事件
+      // 规则命中提示音:命中高亮规则的新捕获响铃,异色/炫彩(最高优先级)响升级音
+      const { rules: rs, mode: md, soundOn: so } = soundRef.current
+      const pet = m.data && m.data.pet
+      if (so && isHighlight(pet, rs, md)) {
+        pet.shiny || pet.colorful ? rareChime() : chime()
+      }
       setEvents((prev) => [m.data, ...prev].slice(0, 300))
       setTotal((n) => n + 1)
       getEventStats().then(setStats).catch(() => {}) // 新事件入库后刷新统计
@@ -77,6 +89,8 @@ export default function Events() {
             ? <button className={'btn btn-icon' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
                 title="阻止屏幕熄灭,方便盯着高亮提醒">☀</button>
             : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
+          <button className={'btn btn-icon' + (soundOn ? ' primary' : '')} onClick={() => setSoundOn((v) => !v)}
+            title="规则命中提示音,新捕获命中高亮规则时响铃(异色/炫彩响升级音)">{soundOn ? '🔊' : '🔈'}</button>
           <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
         </div>
         {stats && (
