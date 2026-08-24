@@ -1,15 +1,169 @@
-import React from 'react'
+import React, { useState, useEffect, useContext, useMemo } from 'react'
+import { getFlowers, subscribe } from '../api'
+import { AccountContext, IconsContext } from '../context'
+import { fmtTime } from '../utils/format'
+import { ImgAvatar, imgURL } from '../components/icons'
 
-// 花种页面(占位):家园花种的种植与收获统计,后续按协议解析补充实现。
+// 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
+// 只显示花种;world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)在解析层就丢弃了。
+// 数据源:进页面先 GET /api/flowers 回显最近一次分组,之后订阅 SSE flowers 实时覆盖
+// (游戏内每打开一次花种面板,服务器就会整组重发 0x0375)。
+// 游戏内点击地图上的花种时,服务器会额外下发 0x0338 单只详情(等级/炫彩/绑定宠物/奖牌),
+// 由后端合并进对应卡片后经同一 SSE 刷新;未点过的花种这些字段为空。
 export default function Flowers() {
+  const account = useContext(AccountContext)
+  const [data, setData] = useState(null) // null = 尚未收到任何 0x0375
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    getFlowers().then((v) => { if (v) setData(v) }).catch(() => {})
+  }, [account])
+
+  useEffect(() => {
+    return subscribe((m) => {
+      if (m.type !== 'flowers') return
+      if (m.account && m.account !== account) return
+      setData(m.data)
+    })
+  }, [account])
+
+  // 活动结束倒计时随时间走:秒级刷新(卡片量少,重渲染开销可忽略)。
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const flowers = useMemo(() => (data && data.flowers) || [], [data])
+  const specials = flowers.filter((f) => f.specSeedId > 0)
+  const normals = flowers.filter((f) => !(f.specSeedId > 0))
+
   return (
     <div className="flowers-page">
       <div className="toolbar">
         <h3 style={{ margin: 0 }}>花种</h3>
-        <span className="muted toolbar-hint">家园花种功能建设中</span>
+        <span className="muted toolbar-hint">打开面板自动更新,点地图花种看详情</span>
         <div className="spacer" />
+        {data && <span className="muted">共 {flowers.length} 只花灵</span>}
       </div>
-      <div className="empty">花种功能建设中,敬请期待…</div>
+      {!data ? (
+        <div className="empty">尚未收到花种数据:游戏内打开一次花种面板后自动显示…</div>
+      ) : (
+        <>
+          {specials.length > 0 && (
+            <section className="flowers-group">
+              <h4 className="flowers-group-t">特殊花种(7 星)</h4>
+              <div className="flower-grid">
+                {specials.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
+              </div>
+            </section>
+          )}
+          <section className="flowers-group">
+            <h4 className="flowers-group-t">普通花种</h4>
+            <div className="flower-grid">
+              {normals.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  )
+}
+
+// flowerKey 生成卡片稳定唯一 key:优先 npcLogicId(每只花种唯一,服务器重发面板时不变),
+// 无则退回 id-blood(旧数据兼容)。
+function flowerKey(f) {
+  return f.npcLogicId ? `log-${f.npcLogicId}` : `${f.id}-${f.blood}`
+}
+
+// fmtLeft 把活动结束时间渲染为剩余倒计时;未设置返回 null,已结束返回 ended 标记。
+function fmtLeft(endTs, nowMs) {
+  if (!endTs) return null
+  const s = Math.floor(endTs - nowMs / 1000)
+  if (s <= 0) return { ended: true, text: '已结束' }
+  const d = Math.floor(s / 86400)
+  const hh = String(Math.floor((s % 86400) / 3600)).padStart(2, '0')
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+  const ss = String(s % 60).padStart(2, '0')
+  return { ended: false, text: d > 0 ? `剩 ${d} 天 ${hh}:${mm}:${ss}` : `剩 ${hh}:${mm}:${ss}` }
+}
+
+function FlowerCard({ f, now }) {
+  const icons = useContext(IconsContext)
+  const stars = (f.star || 0) > 0 ? '★'.repeat(f.star) : ''
+  const left = fmtLeft(f.endTs, now)
+  // 详情字段:点过地图花种后由 0x0338 合并进来;未点过全空(普通花种绑定/奖牌恒为空)。
+  const hasDetail = f.detail || f.lv > 0 || f.glass || f.bindName || f.medalName
+  // 查看状态:已点过(=有 0x0338 详情)的花种——
+  // 有炫彩(普通/隐藏)高亮;无炫彩置灰表示已查看;捕捉后(详情被清)恢复默认。
+  const colorful = f.detail && (f.glassType === 1 || f.glassType === 2)
+  return (
+    <div
+      className={
+        'flower-card' +
+        (f.specSeedId > 0 ? ' flower-special' : '') +
+        (colorful ? ' flower-card-colorful' : f.detail ? ' flower-card-viewed' : '')
+      }
+    >
+      {/* 右上角标记:已点过(=有 0x0338 详情)才显示——
+          炫彩用游戏图标,普通炫彩粉紫 / 隐藏炫彩金色;无炫彩标「普通」 */}
+      {f.detail && (
+        <span
+          className={
+            'flower-corner' +
+            (f.glassType === 1 ? ' flower-corner-colorful'
+              : f.glassType === 2 ? ' flower-corner-hidden'
+                : ' flower-corner-plain')
+          }
+          title={
+            f.glassType === 2 ? `隐藏炫彩 · ${f.glass}` :
+            f.glassType === 1 ? `炫彩 · ${f.glass}` : '普通(无炫彩)'
+          }
+        >
+          {(f.glassType === 1 || f.glassType === 2) && icons.colorful
+            ? <img src={imgURL(icons.colorful)} alt="炫彩" />
+            : '普通'}
+        </span>
+      )}
+      <ImgAvatar src={f.img} alt={f.name} className="flower-img" />
+      <div className="flower-info">
+        <div className="flower-name" title={f.name}>{f.name || '未知花灵'}</div>
+        <div className="flower-meta">
+          {stars && <span className="flower-star" title={`${f.star} 星`}>{stars}</span>}
+          <span className="flower-blood" title={'血脉 ' + (f.bloodName || f.blood)}>
+            {f.bloodIcon && <ImgAvatar src={f.bloodIcon} alt={f.bloodName || ''} className="flower-blood-ic" />}
+            {f.bloodName || f.blood || '-'}
+          </span>
+        </div>
+        <div className="flower-meta">
+          {left ? (
+            <span className={'flower-left' + (left.ended ? ' ended' : '')} title={`结束 ${fmtTime(f.endTs)}`}>
+              {left.text}
+            </span>
+          ) : (
+            <span className="muted">结束 {fmtTime(f.endTs)}</span>
+          )}
+        </div>
+        {hasDetail && (
+          <div className="flower-detail">
+            {f.lv > 0 && <span className="flower-chip" title="等级">Lv {f.lv}</span>}
+            {f.bindName && (
+              <span
+                className="flower-chip flower-bind"
+                title={f.bindEvo > 0 ? `绑定守护宠物,进化阶段 ${f.bindEvo}` : '绑定守护宠物'}
+              >
+                <ImgAvatar src={f.bindImg} alt={f.bindName} className="flower-chip-img" />
+                绑定 {f.bindName}
+              </span>
+            )}
+            {f.medalName && (
+              <span className="flower-chip flower-medal" title="绑定宠物佩戴的奖牌">
+                {f.medalIcon && <ImgAvatar src={f.medalIcon} alt={f.medalName} className="flower-chip-img" />}
+                {f.medalName}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

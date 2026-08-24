@@ -1,1 +1,101 @@
-/* 花种页(占位):家园花种的种植与收获统计。 */
+/* 花种页面:网格卡片展示 0x0375 下发的花灵 BOSS(flower_npcs)。
+   特殊花种(有 specSeedId)以金边区分,普通花种仅蓝边;卡片固定布局,缺信息留占位。 */
+
+.flowers-page { display: flex; flex-direction: column; gap: 12px; }
+.flowers-page .toolbar-hint { font-size: 13px; }
+.flowers-page .spacer { flex: 1; }
+
+.flowers-group { display: flex; flex-direction: column; gap: 8px; }
+.flowers-group-t {
+  margin: 0; font-size: 14px; font-weight: 600; color: var(--fg-dim);
+}
+
+.flower-grid {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.flower-card {
+  position: relative;
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1);
+  padding: 10px; display: flex; gap: 10px; align-items: flex-start;
+  box-shadow: var(--shadow-sm); transition: border-color .15s ease;
+}
+
+/* 右上角角标:已点过地图花种(=有 0x0338 详情)才显示;炫彩用游戏图标,普通标「普通」 */
+.flower-corner {
+  position: absolute; top: -8px; right: -6px; z-index: 1;
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 11px; font-weight: 600; line-height: 1.7; padding: 0 7px; border-radius: 999px;
+  background: var(--bg-1); border: 1px solid var(--line); color: var(--fg-dim);
+  box-shadow: var(--shadow-sm); white-space: nowrap;
+}
+.flower-corner img { width: 15px; height: 15px; object-fit: contain; display: block; }
+.flower-corner-colorful {
+  background: #3a1a2c; border-color: #ffb6e0; color: #ffb6e0;
+  box-shadow: 0 0 6px rgba(255, 182, 224, .6), var(--shadow-sm);
+}
+/* 隐藏炫彩:金色描边发光,与普通炫彩区分 */
+.flower-corner-hidden {
+  background: #3a2f14; border-color: #ffd76e; color: #ffd76e;
+  box-shadow: 0 0 8px rgba(255, 215, 110, .75), var(--shadow-sm);
+}
+.flower-corner-plain { background: var(--bg-2); color: var(--fg-dim); }
+.flower-card:hover { border-color: var(--accent); }
+.flower-card.flower-special { border-color: var(--gold); }
+
+/* 查看状态:已点过(=有 0x0338 详情)——无炫彩置灰(已查看);
+   有炫彩(普通/隐藏)粉紫高亮;捕捉后详情被清,恢复默认状态 */
+.flower-card-viewed {
+  opacity: .62; filter: grayscale(.85) contrast(.92);
+  background: var(--bg-2); border-color: var(--line);
+}
+.flower-card-viewed:hover { filter: grayscale(.55) contrast(.95); border-color: var(--fg-dim); }
+.flower-card-colorful {
+  border-color: #ffb6e0;
+  box-shadow: 0 0 10px rgba(255, 182, 224, .45), var(--shadow-sm);
+}
+.flower-card-colorful.flower-special {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(255, 215, 110, .5), var(--shadow-sm);
+}
+
+.flower-img {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none;
+}
+
+.flower-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.flower-name {
+  font-weight: 600; font-size: 14px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.flower-meta {
+  display: flex; align-items: baseline; gap: 6px; font-size: 13px; white-space: nowrap;
+  overflow: hidden;
+}
+.flower-star { color: var(--gold); letter-spacing: 1px; }
+.flower-blood { display: inline-flex; align-items: center; gap: 3px; color: var(--fg-dim); }
+.flower-blood-ic { width: 14px; height: 14px; object-fit: contain; }
+
+/* 活动结束倒计时:等宽数字避免每秒跳动;已结束变危险色 */
+.flower-left {
+  font-size: 12px; color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.flower-left.ended { color: var(--red); font-weight: 600; }
+
+/* 0x0338 详情行:点过地图花种后出现,等级/炫彩/绑定宠物/奖牌小胶囊 */
+.flower-detail {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px;
+}
+.flower-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; line-height: 1.7; padding: 0 7px; border-radius: 999px;
+  background: var(--bg-3); color: var(--fg); border: 1px solid var(--line);
+  white-space: nowrap; max-width: 100%;
+}
+.flower-chip-img { width: 14px; height: 14px; border-radius: 50%; object-fit: cover; flex: none; }
+.flower-glass {
+  color: var(--accent); border-color: var(--accent); background: var(--accent-soft);
+  font-weight: 600;
+}
+.flower-bind, .flower-medal { color: var(--fg-dim); }

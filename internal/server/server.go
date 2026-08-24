@@ -30,10 +30,11 @@ type Server struct {
 	medalIDs    map[string][]uint32 // 奖牌名 -> id 列表(同名多枚时全含),用于把筛选名解析为 id
 	icons       iconMeta
 
-	posMu    sync.Mutex                // 保护 lastPos / lastWild
-	lastPos  map[string]map[string]any // 账号 -> 最近一次位置(实时地图页加载时即时回显,不必等下一次移动)
-	lastWild map[string]any            // 账号 -> 最近一次野生宠物标记(同上,免得进页面要等下一条 AOI 通知)
-	lastHome map[string]any            // 账号 -> 最近一次家园小窝图层(同上;不在家园时为空列表)
+	posMu       sync.Mutex                // 保护 lastPos / lastWild / lastHome / lastFlowers
+	lastPos     map[string]map[string]any // 账号 -> 最近一次位置(实时地图页加载时即时回显,不必等下一次移动)
+	lastWild    map[string]any            // 账号 -> 最近一次野生宠物标记(同上,免得进页面要等下一条 AOI 通知)
+	lastHome    map[string]any            // 账号 -> 最近一次家园小窝图层(同上;不在家园时为空列表)
+	lastFlowers map[string]any            // 账号 -> 最近一次花种 BOSS 分组(花种页加载时即时回显,见 0x0375)
 
 	onlineMu sync.Mutex           // 保护 lastSeen
 	lastSeen map[string]int64     // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
@@ -73,6 +74,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
 	s.lastPos = map[string]map[string]any{}
 	s.lastWild = map[string]any{}
 	s.lastHome = map[string]any{}
+	s.lastFlowers = map[string]any{}
 	s.lastSeen = map[string]int64{}
 	s.medalIDs = map[string][]uint32{}
 	s.injects = map[string][]*injectEntry{}
@@ -157,6 +159,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/paint", s.handlePaint)
 	s.mux.HandleFunc("DELETE /api/paint", s.handlePaintReset)
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
+	s.mux.HandleFunc("GET /api/flowers", s.handleFlowers)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
