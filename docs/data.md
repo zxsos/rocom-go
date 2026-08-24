@@ -1272,14 +1272,18 @@ s2c 0x1346 DATA 明文 body
 - **战斗外捕捉**：`0x1983`(赛季球/高级球，大 body 含新宠物)同样用 FindNewPet
   → 入库 + obtain(捕捉);与放生形成完整链(实测 #2 捕5放5、#3 捕3放3 全为菊花梨);
 - **(普通)战斗内捕捉**：经 `ZONE_GOODS_REWARD_NOTIFY(0x0243)` 下发新宠物;
-- **花种(稀兽)战斗内捕捉**：不走 `GOODS_REWARD`,新宠物经通用的 `ZONE_PLAYER_SYNC_NOTIFY(0x0160)`
-  下发(实测 20497,`catch_way=4`)。该 opcode 通用(玩家数据同步),除 `FindNewPet` 严格判据外
-  额外加 `add_time` 时近性守卫(相对本包时间,默认 120s 内)以防 PvP 对手/旧快照污染;
-  实测 6 个样本里 0x0160 仅花种捕捉那一条携带有效新宠物,全量同步 543 只 0 误报;
+- **花种(稀兽)战斗内捕捉**：新宠物内嵌于 `ZONE_BATTLE_FINISH_NOTIFY(0x132c,4908)` 的
+  `ret_info.goods_reward` 下发(实测 106840 魔力猫,`catch_way=4`);通用的
+  `ZONE_PLAYER_SYNC_NOTIFY(0x0160)` 可能冗余同步同一宠物,靠 `isNew` 去重。该通道通用,
+  除 `FindNewPet` 严格判据外额外加 `add_time` 时近性守卫(相对本包时间,默认 120s 内)
+  以防 PvP 对手/旧快照污染;
 - **传说精灵战后捕捉**：挑战传说精灵、击败后耗体力捕捉,新宠物**仅**经 `ZONE_BATTLE_FINISH_NOTIFY(0x132c,4908)`
   下发(实测 21692 凡雀,`catch_way=5`),不走 `GOODS_REWARD`/`PLAYER_SYNC`。与 0x0160 同为通用通知通道,
   故同样在 `FindNewPet` 严格判据外加 `add_time` 时近性守卫;实测普通/花种捕捉的战斗也会带 0x132c(与
   `GOODS_REWARD` 重复,靠 `isNew` 去重),而无捕捉的战斗其 body 不含带中文名的新宠 `PetData`,不误报;
+- **0x132c 双路消费**：该 opcode 同时是场景与宠物两路消息——场景侧清理野怪标记
+  (`ParseBattleGoneNpcs`),宠物侧解析内嵌新宠物。主分发 `handle` 里 `handleScene` 命中即返回,
+  故对 0x132c 需在场景处理后**继续放行 `handlePet`**,否则花种/传说精灵捕捉永远不入库;
 - 上述五个获得 opcode(孵蛋/战斗外/普通战斗内/花种战斗内/传说精灵战后)统一处理:`FindNewPet` 加严格判据
   (conf_id>1000 且名称含中文)防误报,按 `catch_way` 区分子类型(1/4/5=捕捉、3=孵蛋),
   `isNew` 去重(同宠物可能多 opcode 下发);受赠宠物 `catch_way` 仍为 1 但应记「赠送获得」,
