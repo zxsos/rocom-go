@@ -26,6 +26,67 @@ const fmtTime = (ts) => {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+// PlayDailyChart 近14天每日游玩时长 SVG 柱状图:坐标轴 + 网格线 + 渐变圆角柱 + hover 高亮。
+// daily 结构见 api.adminPlaySessions:[{day,sessions,duration}]。纯 SVG 实现,不引入图表库。
+const PlayDailyChart = ({ daily }) => {
+  const W = 560, H = 200
+  const PL = 44, PR = 8, PT = 14, PB = 28 // 内边距:左(Y轴标签)/右/上/下(日期标签)
+  const iw = W - PL - PR, ih = H - PT - PB
+  const max = Math.max(...daily.map((d) => d.duration), 1)
+  const slot = iw / daily.length
+  const barW = Math.min(26, slot * 0.62)
+  // 坐标轴刻度的短时长格式:≥1h 显示 Xh,≥1m 显示 Xm,否则 Xs。
+  const fmtAxis = (s) => {
+    if (s <= 0) return '0'
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
+    if (h > 0) return h + 'h'
+    if (m > 0) return m + 'm'
+    return s + 's'
+  }
+  // 网格线位置:100% / 50% / 0 三档。
+  const ticks = [1, 0.5, 0].map((f) => ({ y: PT + ih * (1 - f), f }))
+  return (
+    <div className="admin-play-chart">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="近14天每日游玩时长柱状图">
+        <defs>
+          <linearGradient id="playBarGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#5aa9e6" />
+            <stop offset="100%" stopColor="#3d7ab8" />
+          </linearGradient>
+        </defs>
+        {ticks.map((t) => (
+          <g key={t.f}>
+            <line className="admin-play-svg-grid" x1={PL} y1={t.y} x2={W - PR} y2={t.y} />
+            <text className="admin-play-svg-label" x={PL - 6} y={t.y + 3} textAnchor="end">{fmtAxis(max * t.f)}</text>
+          </g>
+        ))}
+        <line className="admin-play-svg-axis" x1={PL} y1={PT + ih} x2={W - PR} y2={PT + ih} />
+        {daily.map((d, i) => {
+          const h = d.duration > 0 ? Math.max((d.duration / max) * ih, 2) : 2
+          const x = PL + i * slot + (slot - barW) / 2
+          const y = PT + ih - h
+          const isToday = i === daily.length - 1
+          return (
+            <g key={d.day}>
+              <title>{`${d.day}: ${d.sessions} 次会话,共 ${fmtDur(d.duration)}`}</title>
+              {d.duration > 0 ? (
+                <rect
+                  className="admin-play-svg-bar" x={x} y={y} width={barW} height={h} rx={3}
+                  fill="url(#playBarGrad)"
+                  stroke={isToday ? '#6ab8ff' : 'none'} strokeWidth={isToday ? 1.5 : 0}
+                />
+              ) : (
+                <rect className="admin-play-svg-bar-zero" x={x} y={PT + ih - 2} width={barW} height={2} rx={1} />
+              )}
+              <text className="admin-play-svg-label" x={x + barW / 2} y={PT + ih + 16} textAnchor="middle">{d.day.slice(5)}</text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 // 管理员面板(隐式入口:导航不显示,需手动输入 #/admin 进入)。
 // 首次进入引导设置密码,之后凭密码登录;面板内其余功能留空待实现。
 export default function Admin() {
@@ -308,18 +369,7 @@ export default function Admin() {
           </div>
         </div>
         {plays && plays.summary && plays.summary.daily && plays.summary.daily.length > 0 && (
-          <div className="admin-play-daily">
-            {plays.summary.daily.map((d) => {
-              const max = Math.max(...plays.summary.daily.map((x) => x.duration), 1)
-              const pct = Math.max(2, Math.round((d.duration / max) * 100))
-              return (
-                <div className="admin-play-day" key={d.day} title={`${d.day}:${d.sessions} 次会话,共 ${fmtDur(d.duration)}`}>
-                  <div className="admin-play-bar" style={{ height: pct + '%' }} />
-                  <span className="admin-play-day-label">{d.day.slice(5)}</span>
-                </div>
-              )
-            })}
-          </div>
+          <PlayDailyChart daily={plays.summary.daily} />
         )}
         <div className="admin-play-toolbar">
           <select className="select" value={playAccount} onChange={(e) => { setPlayAccount(e.target.value); loadPlaySessions() }}

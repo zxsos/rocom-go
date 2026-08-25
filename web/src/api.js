@@ -108,6 +108,22 @@ export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
 // 之后由 SSE flowers 覆盖;从未收到过 0x0375(游戏内未打开过花种面板)时返回 null。
 export const getFlowers = () => getJSON('/api/flowers?' + buildQuery(), null)
 
+// getFlowerSlots 返回当前账号的花种世界存档槽位列表(槽位管理用):
+//   {slots:[{key,name,ts,flowers:[…]}]}——key 为 "self"(自己世界)或 "owner:<uid>"(好友世界,
+// uid 即世界归属者)。每槽 flowers 是该世界最近一次完整花种列表(含 0x0338 详情)。
+export const getFlowerSlots = () => getJSON('/api/flowers/slots?' + buildQuery(), { slots: [] })
+
+// deleteFlowerSlot 删除一个好友世界存档槽(?key=);self 槽后端拒绝,删除后回访该世界会重新建档。
+export async function deleteFlowerSlot(key) {
+  const r = await fetch('/api/flowers/slots?' + buildQuery({ key }), { method: 'DELETE' })
+  if (!r.ok) {
+    let msg = '删除失败(' + r.status + ')'
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
 // getEggs 返回背包里的精灵蛋(库里存的就是背包现状,破壳/送人的行已删):
 //   {eggs:[{gid,name,species,icon,typeName,medals,heightM,weightKg,heightPct,weightPct,
 //           obtainedAt,hatching,parents,…}]}

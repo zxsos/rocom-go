@@ -234,9 +234,14 @@ func (dc *dnsCache) refreshHost(host string) {
 	dc.mu.Unlock()
 }
 
-// dialTarget 拨号到 target("host:port"),域名经 dns 缓存解析后逐个 IP 尝试,
-// 首个连通的 IP 返回连接。相比 net.Dialer 默认"解析→连第一个 IP 失败即报错",
-// 逐个尝试可避免单 IP 不可达时直接失败,也更抗跨地域抖动。
+// fallbackDelay 是 happy eyeballs 的第二批拨号延迟:首个 IP 立即拨号,
+// 若 fallbackDelay 内未成功则并发拨其余全部 IP,取最先连通的连接。
+// 跨地域云服务器上某运营商路由可能黑洞掉部分 IP,串行逐个尝试会让客户端
+// 空等到拨号超时;并发探测把「发现首个 IP 不可达」的代价压到 fallbackDelay。
+const fallbackDelay = 300 * time.Millisecond
+
+// dialTarget 拨号到 target("host:port"),域名经 dns 缓存解析后对候选 IP
+// 做 happy eyeballs 并发探测(首个立即,其余 fallbackDelay 后并发),取最先连通。
 func dialTarget(ctx context.Context, target string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(target)
 	if err != nil {
@@ -246,15 +251,69 @@ func dialTarget(ctx context.Context, target string) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	var lastErr error
-	for _, a := range addrs {
+	return dialAddrs(ctx, addrs, port)
+}
+
+// dialAddrs 对多个候选 IP 并发拨号。首个 IP 立即拨号;若 fallbackDelay 内未成功,
+// 把其余 IP 全部并发拨号。任一连接成功即返回并取消其余拨号(避免连接风暴),
+// 其余已建立的连接随即关闭,不留泄漏。
+func dialAddrs(ctx context.Context, addrs []netip.Addr, port string) (net.Conn, error) {
+	if len(addrs) == 0 {
+		return nil, errors.New("无可连接地址")
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type res struct {
+		conn net.Conn
+		err  error
+	}
+	results := make(chan res, len(addrs))
+	var wg sync.WaitGroup
+	dialOne := func(a netip.Addr) {
+		defer wg.Done()
 		conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(a.String(), port))
-		if err == nil {
-			return conn, nil
+		if err != nil && ctx.Err() != nil {
+			return // 已被更快成功的连接取消,忽略结果
 		}
-		lastErr = err
-		if ctx.Err() != nil {
-			break
+		results <- res{conn, err}
+	}
+
+	var firstErr error
+	wg.Add(1)
+	go dialOne(addrs[0])
+	timer := time.NewTimer(fallbackDelay)
+	defer timer.Stop()
+	select {
+	case r := <-results:
+		if r.conn != nil {
+			cancel()
+			wg.Wait()
+			return r.conn, nil
+		}
+		firstErr = r.err
+	case <-timer.C:
+	}
+	// 首个未成功:并发拨其余全部 IP
+	for _, a := range addrs[1:] {
+		wg.Add(1)
+		go dialOne(a)
+	}
+	wg.Wait()
+	close(results)
+	var lastErr = firstErr
+	for r := range results {
+		if r.conn != nil {
+			cancel()
+			// 关闭并发探测中已建立的其他连接,避免泄漏
+			for extra := range results {
+				if extra.conn != nil && extra.conn != r.conn {
+					extra.conn.Close()
+				}
+			}
+			return r.conn, nil
+		}
+		if r.err != nil {
+			lastErr = r.err
 		}
 	}
 	if lastErr == nil {
@@ -294,6 +353,7 @@ func handle(c net.Conn, user, pass string) {
 		_ = tc.SetWriteBuffer(64 * 1024)
 		_ = tc.SetKeepAlive(true)
 		_ = tc.SetKeepAlivePeriod(30 * time.Second) // dialer 已设 30s,这里显式兜底
+		setQuickAck(tc)
 	}
 	if tc, ok := c.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
@@ -301,6 +361,7 @@ func handle(c net.Conn, user, pass string) {
 		_ = tc.SetWriteBuffer(64 * 1024)
 		_ = tc.SetKeepAlive(true)
 		_ = tc.SetKeepAlivePeriod(30 * time.Second)
+		setQuickAck(tc)
 	}
 
 	if err := writeReply(c, repSuccess); err != nil {
