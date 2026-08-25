@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -103,11 +104,104 @@ func (s *Server) GetLastFlowers(account string) any {
 }
 
 // handleFlowers 返回当前账号最近一次花种(花灵)BOSS 分组;无记录(尚未收到 0x0375)返回 null。
+// 内部字段(cur/worlds:世界存档表,见 pipeline/boss.go)对前端隐藏,只透传 account/flowers。
 func (s *Server) handleFlowers(w http.ResponseWriter, r *http.Request) {
 	s.posMu.Lock()
 	v := s.lastFlowers[s.acct(r)]
 	s.posMu.Unlock()
+	if m, ok := v.(map[string]any); ok {
+		cp := make(map[string]any, len(m))
+		for k, val := range m {
+			if k == "cur" || k == "worlds" {
+				continue
+			}
+			cp[k] = val
+		}
+		v = cp
+	}
 	writeJSON(w, v)
+}
+
+// flowerSlotOut 是一个花种世界存档槽(槽位管理用,见 pipeline/boss.go 的 worlds 表):
+// key 为 "self"(自己世界)或 "owner:<uid>"(好友世界,归属者 user_id),值 {"flowers","ts"}。
+type flowerSlotOut struct {
+	Key     string `json:"key"`     // 槽键:"self" 或 "owner:<uid>"
+	Name    string `json:"name"`    // 展示名:"自己世界" 或 "好友 UID:<uid>"
+	Ts      int64  `json:"ts"`      // 最近访问 Unix 秒
+	Flowers any    `json:"flowers"` // 存储的花种列表(flowerItem,含 0x0338 详情)
+}
+
+// flowerSlotName 生成槽的展示名:self=自己世界,owner:<uid>=好友 UID:<uid>。
+func flowerSlotName(key string) string {
+	if key == "self" {
+		return "自己世界"
+	}
+	if uid, ok := strings.CutPrefix(key, "owner:"); ok {
+		return "好友 UID:" + uid
+	}
+	return key
+}
+
+// handleFlowerSlots 返回当前账号的花种世界存档槽位列表(槽位管理下拉用):
+// self 槽在前,好友槽按归属者 uid 升序。仅透传存档数据,不修改。
+func (s *Server) handleFlowerSlots(w http.ResponseWriter, r *http.Request) {
+	s.posMu.Lock()
+	v := s.lastFlowers[s.acct(r)]
+	s.posMu.Unlock()
+	out := []flowerSlotOut{}
+	if m, ok := v.(map[string]any); ok {
+		if worlds, ok := m["worlds"].(map[string]any); ok {
+			for k, w := range worlds {
+				slot := flowerSlotOut{Key: k, Name: flowerSlotName(k)}
+				if sm, ok := w.(map[string]any); ok {
+					slot.Ts, _ = sm["ts"].(int64)
+					slot.Flowers = sm["flowers"]
+				}
+				out = append(out, slot)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if (out[i].Key == "self") != (out[j].Key == "self") {
+			return out[i].Key == "self"
+		}
+		return out[i].Key < out[j].Key
+	})
+	writeJSON(w, map[string]any{"slots": out})
+}
+
+// handleDeleteFlowerSlot 删除一个好友世界存档槽(?key=),self 槽不可删(自己世界,删了下次推送即重建)。
+// 删除后更新缓存;若删的是当前槽(cur),cur 置空。不广播——槽位只影响管理页,当前花种列表不变。
+func (s *Server) handleDeleteFlowerSlot(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		http.Error(w, "bad key", http.StatusBadRequest)
+		return
+	}
+	if key == "self" {
+		http.Error(w, "self 槽不可删除", http.StatusBadRequest)
+		return
+	}
+	acc := s.acct(r)
+	s.posMu.Lock()
+	deleted := false
+	if m, ok := s.lastFlowers[acc].(map[string]any); ok {
+		if worlds, ok := m["worlds"].(map[string]any); ok {
+			if _, exists := worlds[key]; exists {
+				delete(worlds, key)
+				if cur, _ := m["cur"].(string); cur == key {
+					m["cur"] = ""
+				}
+				deleted = true
+			}
+		}
+	}
+	s.posMu.Unlock()
+	if !deleted {
+		http.Error(w, "槽不存在", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
 }
 
 // poiKind 是一个 POI 图层(前端的一个开关):图层键、中文名、图标路径、是否默认开启。

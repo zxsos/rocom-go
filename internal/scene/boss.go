@@ -46,7 +46,7 @@ type BossNpcInfo struct {
 	EndTs       uint64 // 活动结束时间戳(Unix 秒)
 	SpecSeedID  uint32 // 特殊花种种子 id(0=普通花种)
 	ActivityID  uint32 // 活动 id(仅特殊花种带)
-	OwnerUserID uint64 // 已选花种的玩家 user_id(0=未被选)
+	OwnerUserID uint64 // 世界归属判据:0=自己世界;非 0=好友世界,即世界归属者 user_id
 }
 
 // ParseBossNpcInfoRsp 从 s2c ZoneSceneQueryBossNpcInfoRsp(0x0375)取 flower_npcs(2) 分组:
@@ -84,10 +84,10 @@ func ParseBossNpcInfoRsp(body []byte) []BossNpcInfo {
 			case 24:
 				n.OwnerUserID = v
 			}
-			})
-			if n.NpcCfgID != 0 {
+		})
+		if n.NpcCfgID != 0 {
 			out = append(out, n)
-			}
+		}
 	}
 	return out
 }
@@ -115,7 +115,7 @@ type TeamBattleInfo struct {
 	SpecSeedID  uint32 // 特殊花种种子 id(0=普通花种)
 	ActivityID  uint32 // 活动 id
 	EndTs       uint64 // 活动结束时间戳(Unix 秒)
-	OwnerUserID uint64 // 已选花种的玩家 user_id(0=未被选)
+	OwnerUserID uint64 // 世界归属判据:0=自己世界;非 0=好友世界,即世界归属者 user_id
 	BindPetGID  uint64 // 绑定宠物 gid(背包实体;0=普通花种无绑定)
 	BindBaseID  uint32 // 绑定宠物 petbase id(0=无)
 	BindEvoID   uint32 // 绑定宠物进化阶段 id
