@@ -24,6 +24,21 @@
 .dbg-hex code { display: block; margin-top: 4px; word-break: break-all; white-space: pre-wrap;
   color: var(--muted); font-size: 11px; }
 
+/* 展开详情头部的一键复制按钮 */
+.btn-dbg-copy {
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 8px; font-size: 11px; cursor: pointer; color: var(--fg-dim);
+  white-space: nowrap; user-select: none; transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.btn-dbg-copy:hover { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
+.btn-dbg-copy:disabled { opacity: .45; cursor: default; }
+.btn-dbg-copy:disabled:hover { border-color: var(--line); color: var(--fg-dim); background: var(--bg-3); }
+
+/* 搜索高亮:协议名 / 解析树内容中与关键词匹配的部分 */
+.debug-table mark, .dbg-tree mark {
+  background: var(--gold); color: #1a1400; border-radius: 2px; padding: 0 1px;
+}
+
 @media (max-width: 760px) {
   /* 移动端精简为「时间/方向/名称」:隐藏说明文字、账号列与冗长的 opcode 列,
      名称长词换行,避免横向溢出 */

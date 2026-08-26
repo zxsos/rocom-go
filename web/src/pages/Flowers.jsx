@@ -14,28 +14,27 @@ export default function Flowers() {
   const account = useContext(AccountContext)
   const [data, setData] = useState(null) // null = 尚未收到任何 0x0375
   const [now, setNow] = useState(() => Date.now())
-  // 世界存档槽位管理:slots=槽列表(null=加载中),selKey=当前选中槽,slotMsg=删除结果提示。
+  // 世界存档槽位:slots=槽列表(null=加载中),selKey=选中视图(默认 __current__=当前世界实时数据),
+  // slotMsg=删除结果提示。下拉含「当前世界」(实时,显示归属 id)与各存档槽。
   const [slots, setSlots] = useState(null)
-  const [selKey, setSelKey] = useState('')
+  const [selKey, setSelKey] = useState('__current__')
   const [slotMsg, setSlotMsg] = useState('')
 
   useEffect(() => {
     getFlowers().then((v) => { if (v) setData(v) }).catch(() => {})
   }, [account])
 
-  // loadSlots 拉取世界存档槽位列表;切账号/删除后重新拉取,选中项保持有效否则回退到第一项。
+  // loadSlots 拉取世界存档槽位列表;切账号/删除后重新拉取。选中项由下方 selKey 修正 effect 统一管理。
   const loadSlots = useCallback(() => {
     getFlowerSlots().then((v) => {
-      const list = (v && v.slots) || []
-      setSlots(list)
-      setSelKey((k) => (k && list.some((s) => s.key === k) ? k : (list[0] && list[0].key) || ''))
+      setSlots((v && v.slots) || [])
     }).catch(() => setSlots([]))
   }, [])
 
   useEffect(() => { loadSlots() }, [account, loadSlots])
 
   async function handleDeleteSlot() {
-    if (!selKey || selKey === 'self') return
+    if (!selKey.startsWith('owner:')) return
     setSlotMsg('')
     try {
       await deleteFlowerSlot(selKey)
@@ -51,6 +50,17 @@ export default function Flowers() {
       if (m.type !== 'flowers') return
       if (m.account && m.account !== account) return
       setData(m.data)
+      // 广播带完整 worlds 存档表:本地同步槽列表,选中槽随实时推送保持最新。
+      const worlds = m.data && m.data.worlds
+      if (worlds) {
+        const list = Object.entries(worlds).map(([key, w]) => ({
+          key,
+          name: key === 'self' ? '自己世界' : key.startsWith('owner:') ? '好友 UID:' + key.slice(6) : key,
+          ts: (w && w.ts) || 0,
+          flowers: (w && w.flowers) || [],
+        }))
+        setSlots(list)
+      }
     })
   }, [account])
 
@@ -61,8 +71,44 @@ export default function Flowers() {
   }, [])
 
   const flowers = useMemo(() => (data && data.flowers) || [], [data])
-  const specials = flowers.filter((f) => f.specSeedId > 0)
-  const normals = flowers.filter((f) => !(f.specSeedId > 0))
+  // 当前账号自己的 uid(account 形如 "UID:<uid>"),供自己世界槽显示 id。
+  const myUID = useMemo(() => {
+    const m = /^UID:(\d+)/.exec(account || '')
+    return m ? m[1] : ''
+  }, [account])
+  // 当前世界归属 id:实时花种列表第一个非 0 ownerUserId(有 id=好友世界);全 0=自己世界,取自己 uid。
+  const curOwnerID = useMemo(() => {
+    for (const f of flowers) if (f.ownerUserId) return String(f.ownerUserId)
+    return myUID
+  }, [flowers, myUID])
+  // 当前世界对应的存档槽 key:有归属 id → owner:<uid>;全 0(自己世界)→ self。
+  const curKey = curOwnerID ? 'owner:' + curOwnerID : 'self'
+  // 选中修正:当前世界对应槽(self/owner:<uid>)存在时默认选中它(=当前世界,避免与「当前世界」项
+  // 重复显示);否则保持已选中的其他槽;都不是则回退「当前世界」实时项。
+  useEffect(() => {
+    setSelKey((k) => {
+      if (slots && k !== '__current__' && slots.some((s) => s.key === k)) return k
+      if (slots && slots.some((s) => s.key === curKey)) return curKey
+      return '__current__'
+    })
+  }, [slots, curKey])
+  // 下拉选项:当前世界已有对应槽时不重复显示「当前世界」项(该槽即当前世界,实时数据已同步进槽);
+  // 否则(未建档/花全被采完未更新槽)单独显示「当前世界 (id)」实时项。
+  const viewOptions = useMemo(() => {
+    const real = slots || []
+    if (real.some((s) => s.key === curKey)) return real
+    return [{ key: '__current__', name: curOwnerID ? `当前世界 (${curOwnerID})` : '当前世界', flowers }, ...real]
+  }, [slots, curKey, curOwnerID, flowers])
+  // 当前视图:__current__=实时当前世界;否则选中的存档槽。花种按特殊(最多 3 只)/普通(最多 20 只)分组展示。
+  const view = useMemo(() => {
+    if (selKey !== '__current__') {
+      const sel = slots && slots.find((s) => s.key === selKey)
+      if (sel) return { name: sel.key === 'self' && myUID ? `自己世界 (${myUID})` : sel.name, flowers: sel.flowers || [] }
+    }
+    return { name: curOwnerID ? `当前世界 (${curOwnerID})` : '当前世界', flowers }
+  }, [selKey, slots, flowers, curOwnerID, myUID])
+  const viewSpecials = view.flowers.filter((f) => f.specSeedId > 0)
+  const viewNormals = view.flowers.filter((f) => !(f.specSeedId > 0))
 
   return (
     <div className="flowers-page">
@@ -70,61 +116,46 @@ export default function Flowers() {
         <h3 style={{ margin: 0 }}>花种</h3>
         <span className="muted toolbar-hint">打开面板自动更新,点地图花种看详情</span>
         <div className="spacer" />
-        {data && <span className="muted">共 {flowers.length} 只花灵</span>}
+        <span className="muted">共 {view.flowers.length} 只花灵</span>
       </div>
-      {/* 世界存档槽位管理:下拉选择槽查看存储的花种,可手动删除(自己世界 self 不可删) */}
-      <section className="slot-manager">
-        <div className="slot-toolbar">
-          <h4 style={{ margin: 0 }}>世界存档槽位</h4>
-          <select
-            className="select"
-            value={selKey}
-            onChange={(e) => setSelKey(e.target.value)}
-            disabled={!slots || slots.length === 0}
-          >
-            {!slots && <option value="">加载中…</option>}
-            {slots && slots.length === 0 && <option value="">暂无槽位</option>}
-            {slots && slots.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.name} ({s.flowers.length})
-              </option>
-            ))}
-          </select>
-          <button className="btn ghost" onClick={handleDeleteSlot} disabled={!selKey || selKey === 'self'}>
-            删除该槽
-          </button>
-          <span className="muted slot-hint">0=自己世界,有 id=好友世界;删除后回访该世界重新建档</span>
-          {slotMsg && <span className={'slot-msg' + (slotMsg.startsWith('已') ? '' : ' slot-msg-err')}>{slotMsg}</span>}
-        </div>
-        {selKey && (() => {
-          const sel = slots.find((s) => s.key === selKey)
-          if (!sel) return null
-          return (
-            <div className="flowers-group">
-              <h4 className="flowers-group-t">槽「{sel.name}」存储的花种({sel.flowers.length})</h4>
-              <div className="flower-grid">
-                {sel.flowers.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
-              </div>
-            </div>
-          )
-        })()}
-      </section>
-      {!data ? (
+      {/* 视图切换:默认当前世界(实时),可切到世界存档槽;切槽后只展示该槽,删除后回访重新建档 */}
+      <div className="slot-bar">
+        <select
+          className="select"
+          value={selKey}
+          onChange={(e) => setSelKey(e.target.value)}
+          disabled={!slots}
+        >
+          {viewOptions.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.key === 'self' && myUID ? `自己世界 (${myUID})` : s.name} ({s.flowers.length})
+            </option>
+          ))}
+        </select>
+        <button className="btn ghost" onClick={handleDeleteSlot} disabled={!selKey.startsWith('owner:')}>
+          删除该槽
+        </button>
+        {slotMsg && <span className={'slot-msg' + (slotMsg.startsWith('已') ? '' : ' slot-msg-err')}>{slotMsg}</span>}
+      </div>
+      {selKey === '__current__' && !data ? (
         <div className="empty">尚未收到花种数据:游戏内打开一次花种面板后自动显示…</div>
       ) : (
         <>
-          {specials.length > 0 && (
+          <div className="flowers-group">
+            <h4 className="flowers-group-t">{view.name}({view.flowers.length})</h4>
+          </div>
+          {viewSpecials.length > 0 && (
             <section className="flowers-group">
-              <h4 className="flowers-group-t">特殊花种(7 星)</h4>
+              <h4 className="flowers-group-t">特殊花种(7 星,{viewSpecials.length})</h4>
               <div className="flower-grid">
-                {specials.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
+                {viewSpecials.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
               </div>
             </section>
           )}
           <section className="flowers-group">
-            <h4 className="flowers-group-t">普通花种</h4>
+            <h4 className="flowers-group-t">普通花种({viewNormals.length})</h4>
             <div className="flower-grid">
-              {normals.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
+              {viewNormals.map((f) => <FlowerCard key={flowerKey(f)} f={f} now={now} />)}
             </div>
           </section>
         </>

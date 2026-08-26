@@ -34,6 +34,9 @@ rocom-key.pem
 .idea/
 .vscode/
 
+# IDE 本地项目数据(勿提交)
+.codebuddy/
+
 # 系统回收站(误放于工作区)
 /.Trash-0/
 
