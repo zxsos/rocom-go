@@ -1,12 +1,19 @@
 /* 捕获事件页:事件流列表 + 高亮规则侧栏。 */
 
-/* 顶部工具条复用 .toolbar/.list-toolbar,仅补最大宽度;不用 h3,避免标题行过高、内容下移 */
-.event-head { max-width: 720px; }
+/* 顶部工具条复用 .toolbar/.list-toolbar,铺满主区;不用 h3,避免标题行过高、内容下移 */
+.event-head { }
 .event-title { font-weight: 700; font-size: 15px; }
-.event-list { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
-/* 事件统计:总览卡 + 近30天柱状图 + 热门形态排行(数据来自 /api/events/stats) */
-.event-stats { display: flex; flex-direction: column; gap: 8px; max-width: 720px; margin-bottom: 10px; }
-.stat-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 事件主区自适应填充:工具条/统计固定,事件列表填满剩余视口高度内部滚动。
+   实时事件流专用——新事件从顶部推入时列表不跳动、统计区常驻可见。
+   高度 = 视口 - 顶栏(64) - .content 上下 padding(16×2);dvh 兼容移动端地址栏伸缩。 */
+.events-main { display: flex; flex-direction: column; height: calc(100vh - 96px); height: calc(100dvh - 96px); min-height: 0; }
+.events-main .event-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.event-list { display: flex; flex-direction: column; gap: 8px; }
+/* 事件统计:总览卡 + 近30天柱状图 + 热门形态排行(数据来自 /api/events/stats)。
+   桌面端两列网格填充右侧空白:总览卡跨整行,柱状图与热门排行左右并排;
+   移动端回退单列(见下方媒体查询)。 */
+.event-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.stat-cards { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 .stat-card {
   flex: 1 1 72px; min-width: 72px; padding: 8px 10px; text-align: center;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1);
@@ -16,9 +23,13 @@
 .stat-num { font-size: 18px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 12px; color: var(--fg-dim); }
 .stat-chart {
-  display: flex; align-items: flex-end; gap: 2px; height: 72px; padding: 8px 8px 4px;
+  display: flex; align-items: flex-end; gap: 2px; height: 100%; min-height: 72px; padding: 8px 8px 4px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1);
+  /* 桌面两列网格中撑满行高:与右侧热门排行等高,填充空白(行高由右侧内容决定);
+     移动端单列时行高由内容决定,height:100% 无效,由媒体查询覆盖回固定高度 */
 }
+/* 加载更多:flex column 子项默认 stretch 铺满整行,按钮文字居中 */
+.event-list .load-more { margin-top: 2px; }
 .bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
 .bar-fill { width: 100%; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; opacity: .85; transition: opacity .15s ease; }
 .bar:hover .bar-fill { opacity: 1; }
@@ -62,6 +73,14 @@
 .muted.small { font-weight: 400; font-size: 13px; }
 
 @media (max-width: 760px) {
+  /* 事件页:列表已内部滚动,去掉 .content 为滚动页预留的 72px 底距,只留与两侧一致的 12px */
+  .content:has(.events-page) { padding-bottom: 12px; }
+  /* 统计区回退单列:窄屏两列太挤,柱状图与热门排行纵向堆叠 */
+  .event-stats { grid-template-columns: 1fr; }
+  /* 单列下行高由内容决定,height:100% 无效,柱状图固定回 72px */
+  .stat-chart { height: 72px; }
+  /* 高度 = 视口 - 顶栏(~46) - .content padding(12×2) - 底部导航(~51);留 3px 余量 */
+  .events-main { height: calc(100vh - 124px); height: calc(100dvh - 124px); }
   /* 移动端抽屉:标题行吸顶,✕ 关闭显示(标题与 AND/OR 同行,靠右) */
   .rules-header {
     position: sticky; top: 0; z-index: 1; background: var(--bg-1);

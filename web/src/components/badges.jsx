@@ -72,18 +72,27 @@ export function GlassChip({ p, className }) {
   return <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />
 }
 
-// Marks 渲染异色/炫彩标记(优先游戏图标;两者兼具用合成的异色炫彩图;
-// 炫彩单标的优先用色卡图,缺图回退图标/文字)。
-export function Marks({ p }) {
+// Marks 渲染异色/炫彩标记:保留游戏图标(炫彩图标 / 异色炫彩合成图标),并排渲染
+// CSS mask 炫彩色卡(GlassChip),异色炫彩同样展示色卡;chip=false(蛋列表,按约定
+// 蛋不展示色卡)时只显示图标。色卡仅在带有效炫彩数值时渲染,旧数据无数值时
+// 只留图标,避免 GlassChip 回退图标与前面图标重复。
+export function Marks({ p, chip = true }) {
   const icons = React.useContext(IconsContext)
   if (!p) return null
-  if (p.shiny && p.colorful && icons.shinyColorful) {
-    return <MarkIcon src={icons.shinyColorful} title="异色炫彩" fallback="异彩" cls="mark-colorful" />
+  const card = chip && p.glassType > 0 && p.glassValue > 0 ? <GlassChip key="card" p={p} /> : null
+  if (p.shiny && p.colorful) {
+    return (
+      <>
+        <MarkIcon src={icons.shinyColorful} title="异色炫彩" fallback="异彩" cls="mark-colorful" />
+        {card}
+      </>
+    )
   }
   return (
     <>
       {p.shiny && <MarkIcon src={icons.shiny} title="异色" fallback="异" cls="mark-shiny" />}
-      {p.colorful && <GlassChip p={p} />}
+      {p.colorful && <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />}
+      {card}
     </>
   )
 }

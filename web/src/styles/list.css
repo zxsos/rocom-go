@@ -24,32 +24,23 @@
 .boxmap-cell.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
 /* 桌面表格(.table-wrap 调试页亦复用;移动端隐藏,调试页用内联 display:block 盖回)
-   table-layout: fixed + 预设列宽:列宽不再随每页内容动态重算,切换分页/筛选时不会出现
-   「先按内容撑开再矫正」的抖动(平板横屏走此表格分支时尤为明显)。未显式设宽的列由 fixed
-   算法均分剩余空间;white-space: nowrap 配合 overflow 防止内容撑破预设宽度。 */
+   列宽自适应内容(table-layout:auto):每列按本列最长内容自动撑开,随每页数据动态重算,
+   贴合各列实际最大长度;white-space: nowrap 保证单行不折行,总宽超出容器时由
+   .table-wrap 横向滚动。与 fixed 固定列宽相比,切页时列宽会按新内容轻微重排。 */
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); }
-table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; table-layout: fixed; }
-table.pets th, table.pets td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
-/* 列宽分配:全部 10 列显式设宽,table-layout:fixed 严格按此分配,不再有未设宽的列
-   去挤已设宽的列(原先漏掉性格/特长/奖牌 3 列,窄屏时这 3 列把第 1 列压瘪导致名称折行)。
-   合计 >100% 时表格整体在 .table-wrap 内横向滚动,而非压缩任一列。 */
-table.pets th:nth-child(1), table.pets td:nth-child(1) { width: 240px; min-width: 240px; } /* 宠物 */
-table.pets th:nth-child(2), table.pets td:nth-child(2) { width: 76px; min-width: 76px; }   /* 系别 */
-table.pets th:nth-child(3), table.pets td:nth-child(3) { width: 70px; }   /* 性格 */
-table.pets th:nth-child(4), table.pets td:nth-child(4) { width: 70px; }   /* 特长 */
-table.pets th:nth-child(5), table.pets td:nth-child(5) { width: 90px; }   /* 佩戴奖牌 */
-table.pets th:nth-child(6), table.pets td:nth-child(6) { width: 56px; }   /* 声音 */
-table.pets th:nth-child(7), table.pets td:nth-child(7) { width: 96px; }   /* 体重 */
-table.pets th:nth-child(8), table.pets td:nth-child(8) { width: 96px; }   /* 身高 */
-table.pets th:nth-child(9), table.pets td:nth-child(9) { width: 262px; }  /* 六维 */
-table.pets th:nth-child(10), table.pets td:nth-child(10) { width: 130px; } /* 捕捉时间 */
-/* 第 1 列内:名称/副标极窄时省略号兜底,不折行占位导致视觉错乱。
+table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; }
+/* 列间距:横向 padding 加大,列与列之间更宽松;宽屏时 width:100% 的富余空间
+   也会按各列内容比例摊给各列,进一步拉宽间距。 */
+table.pets th, table.pets td { padding: 10px 18px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+/* 第 1 列内:名称/副标过长省略号兜底,不折行占位导致视觉错乱。
    .pet-cell 是 flex(头像 + 文字区),文字区必须 min-width:0 + overflow:hidden 才能在
-   flex 下正确收缩并触发省略号;否则徽标多的名称行会横向溢出压进相邻的「系别」列。 */
+   flex 下正确收缩并触发省略号;否则徽标多的名称行会横向溢出压进相邻的「系别」列。
+   名称列虽自适应,仍设 320px 上限,避免极长昵称把整表撑爆(100% 在 auto 布局下
+   相对父宽会循环失效,故用固定上限)。 */
 table.pets .pet-cell { min-width: 0; }
 table.pets .pet-cell > div { min-width: 0; overflow: hidden; }
 table.pets .pet-name, table.pets .pet-sub {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;
 }
 table.pets tr:last-child td { border-bottom: none; }
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }

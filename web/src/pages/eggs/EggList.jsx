@@ -177,7 +177,7 @@ function EggCard({ egg, now, onPet }) {
           {/* 异色/炫彩蛋用全站统一的那两个标记(同宠物列表),其余品类(珍贵/唯一/噩梦…)
               用游戏自己的蛋品类角标;普通蛋什么都不画(卡片高度由右边的头像撑着,不会塌)。 */}
           {egg.shiny || egg.colorful
-            ? <span className="egg-type" title={egg.typeName}><Marks p={egg} /></span>
+            ? <span className="egg-type" title={egg.typeName}><Marks p={egg} chip={false} /></span>
             : egg.typeIcon
               ? <img className="egg-type" src={imgURL(egg.typeIcon)} alt="" title={egg.typeName} draggable={false} />
               : null}

@@ -12,8 +12,8 @@ img.pet-avatar { object-fit: cover; }
 .pet-mark-ic { top: 50%; left: 50%; width: 58%; height: 58%; transform: translate(-50%, -50%); }
 /* 名称 + 性别/异色/血脉/形态/蛋组等徽标同行:用 flex 垂直居中,消除各元素高度不一造成的错位 */
 .pet-name { font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-/* flex 下改由 gap 统一间距,清掉徽标行内布局用的 margin-left,避免间距叠加不均 */
-.pet-name > .mark, .pet-name > .mark-img { margin-left: 0; }
+/* flex 下改由 gap 统一间距,清掉徽标/色卡行内布局用的 margin-left,避免间距叠加不均 */
+.pet-name > .mark, .pet-name > .mark-img, .pet-name > .glass-chip { margin-left: 0; }
 .gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
 .gender.male { color: #4ea3ff; }
 .gender.female { color: #ff6fae; }
