@@ -14,9 +14,12 @@ import (
 //	search=          按蛋名/物种名模糊
 //	sort=quality|obtained  order=asc|desc(复刻游戏内背包的两种排序,见 docs/data.md 3.6)
 //
-// 页面不分标签页:一次取回全部,孵蛋器那几颗按 hatching 标志自行分栏
-// (与游戏一致——在孵的蛋不出现在背包格子里)。**排序只作用于背包那部分**:客户端也是先把
-// 在孵的蛋摘掉(IsRemoveEggItem)再 table.sort,喂给排序的列表不同,同键蛋的落位就不同。
+// 页面不分标签页:一次取回全部。在孵的蛋留在最前且不参与背包排序(它们属于孵蛋器),
+// 但自己按槽位序排一遍(入孵时刻升序,与背包次序无关,见 pet.SortHatchingEggs)。
+// **排序只作用于仓库那部分**:客户端也是先把在孵的蛋摘掉(IsRemoveEggItem)再 table.sort,
+// 喂给排序的列表不同,同键蛋的落位就不同。
+// 前端还会按孵化进度把标记蛋再分成「在孵(未满)/ 已孵化(满)」两段(残留标记蛋进度恒满,
+// 见 web/src/pages/eggs/EggList.jsx)——进度是前端外推的,后端无法判断,故这里只给 hatching 标志。
 func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	eggs, err := s.store.For(s.acct(r)).ListEggs(store.EggFilter{Search: q.Get("search")})

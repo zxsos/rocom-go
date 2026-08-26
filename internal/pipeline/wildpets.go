@@ -263,8 +263,10 @@ type wildMark struct {
 	// 体重在本形态取值范围内的百分位(0-100),与宠物列表/事件页的「W xx%」同一口径
 	// (pet.SizePercentile);形态范围缺失时为 nil。
 	WeightPct *float64 `json:"weightPct,omitempty"`
-	Glass     string   `json:"glass,omitempty"`    // 炫彩外观描述(暗夜拾光 / 四角星·亮X暗 - 浅紫橙);空=非炫彩
-	Mutation  int32    `json:"mutation,omitempty"` // 原始 mutation_type 位标志(排查用)
+	GlassType  int32  `json:"glassType,omitempty"`  // 炫彩类型(1=普通 / 2=隐藏;0=无炫彩)
+	Glass      string `json:"glass,omitempty"`      // 炫彩外观描述(暗夜拾光 / 四角星·亮X暗 - 浅紫橙);空=非炫彩
+	GlassValue int32  `json:"glassValue,omitempty"` // 炫彩数值(普通=(粒子id<<20)|配色id;隐藏=1/2/3 赛季、1000);前端据此渲染色卡
+	Mutation   int32  `json:"mutation,omitempty"`   // 原始 mutation_type 位标志(排查用)
 	Stale     bool     `json:"stale,omitempty"`    // 已离开 AOI:位置是最后所见,前端置灰
 }
 
@@ -310,10 +312,12 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			}),
 		}
 		if w.glassType != gamedata.GlassNull {
+			m.GlassType = w.glassType
 			m.Glass = p.db.GlassDesc(w.glassType, w.glassValue)
 			if m.Glass == "" { // 配置里查不到(新赛季款/新色号)时至少标出是炫彩
 				m.Glass = "炫彩"
 			}
+			m.GlassValue = w.glassValue
 		}
 		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
 			if info, ok := p.db.PetBase(base); ok {

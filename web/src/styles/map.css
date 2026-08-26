@@ -229,6 +229,10 @@
   pointer-events: none;
 }
 .map-wild-mark img { width: 10px; height: 10px; object-fit: contain; filter: drop-shadow(0 0 2px rgba(255,255,255,.6)); }
+/* 炫彩色卡(280x154 长条)在角标圆盘里按原比例展示:span 容器(3 层 mask 合成)或整图 img,子层铺满 */
+.map-wild-mark .map-glass-chip { width: 14px; height: 8px; border-radius: 2px; }
+.map-wild-mark .map-glass-chip > i, .map-wild-mark .map-glass-chip > img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.map-wild-mark .map-glass-chip > img { object-fit: cover; filter: none; }
 .map-wild-mark-shiny {
   background: radial-gradient(circle at 35% 30%, #4a3f8a, #241d47 70%);
   border-color: #c9b6ff;

@@ -497,6 +497,7 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 			glassDesc = "炫彩"
 		}
 		mark["glass"] = glassDesc
+		mark["glassValue"] = glassValue
 	}
 
 	// 记入 injects(生命周期管理),并合并进 lastWild 缓存供回显。

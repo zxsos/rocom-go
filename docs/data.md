@@ -669,6 +669,14 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 组装成中文描述的是 `gamedata.DB.GlassDesc(glassType, glassValue)`。宠物列表里的
 `Pet.Colorful`(`mutation_type & 8`)与这里的炫彩是同一件事,只是那边不解析具体外观。
 
+**炫彩色卡(玻璃色卡缩略图)不在后端预生成**,改由前端实时渲染:
+`scripts/gen_glass.py` 读仓库内 `COLOR_RANDOM_CONF.ts`/`PARTICLE_RANDOM_CONF.ts` 生成
+`web/src/data/glassConf.js`(底图 Bg / 中层 Bg2 / 粒子大图 / 配色 / 隐藏整图清单)。
+普通炫彩在 `web/src/components/badges.jsx` 的 `GlassChip` 里按素材 alpha 蒙版做
+CSS mask 三层填色(Bg 填 `ui_color_2` → Bg2 填 `ui_color_1` 顶部对齐 → 粒子染白最上层,
+与客户端 UMG 一致),隐藏炫彩引用 `GLASS_HIDDEN` 整图。后端只下发
+`glassType`/`glassValue`,不携带图片路径。
+
 **污染个体**(`mutation_type` 的 `MDT_CHAOS` 家族;游戏文案叫「污染」,客户端渲染函数叫
 `SetNightmare*`,同一件事)。野外实测 4 只全是 `MDT_CHAOS_TWO(4)`。它与其它稀有个体**流程不同**
 ——**丢球不会直接捉住,而是进战斗**(2026-08-02 `rocom-20260802-204107.pcap00`,污染爬爬全流程):

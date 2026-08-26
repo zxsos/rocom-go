@@ -29,6 +29,7 @@ type flowerItem struct {
 	Lv        uint32 `json:"lv"`        // 等级
 	GlassType int32  `json:"glassType"` // 炫彩类型(0=无炫彩 / 1=普通 / 2=隐藏;仅在 detail=true 时有效)
 	Glass     string `json:"glass"`     // 炫彩中文描述(GlassDesc;空=无炫彩或未获取)
+	GlassValue int32 `json:"glassValue"` // 炫彩数值(普通=(粒子id<<20)|配色id;隐藏=1/2/3 赛季、1000;前端据此渲染色卡)
 	BindName  string `json:"bindName"`  // 绑定守护宠物名(空=无绑定)
 	BindImg   string `json:"bindImg"`   // 绑定守护宠物头像 /img/<此路径>
 	BindEvo   uint32 `json:"bindEvo"`   // 绑定宠物进化阶段 id(0=无)
@@ -94,6 +95,7 @@ func mergeFlowerDetail(items, prev []flowerItem) []flowerItem {
 			it.Lv = old.Lv
 			it.GlassType = old.GlassType
 			it.Glass = old.Glass
+			it.GlassValue = old.GlassValue
 			it.BindName = old.BindName
 			it.BindImg = old.BindImg
 			it.BindEvo = old.BindEvo
@@ -315,6 +317,7 @@ func (p *Pipeline) clearFlowerDetail(acc string) {
 		f.Lv = 0
 		f.GlassType = 0
 		f.Glass = ""
+		f.GlassValue = 0
 		f.BindName = ""
 		f.BindImg = ""
 		f.BindEvo = 0
@@ -387,6 +390,7 @@ func (p *Pipeline) onTeamBattleInfo(m capture.Message, acc string) {
 			f.OwnerUserID = d.OwnerUserID
 		}
 		f.Glass = p.db.GlassDesc(d.GlassType, d.GlassValue)
+		f.GlassValue = d.GlassValue
 		if d.BindBaseID != 0 {
 			if base, ok := p.db.PetBase(d.BindBaseID); ok {
 				f.BindName = base.Name

@@ -37,6 +37,11 @@
   box-shadow: var(--shadow-sm); white-space: nowrap;
 }
 .flower-corner img { width: 15px; height: 15px; object-fit: contain; display: block; }
+/* 炫彩色卡(280x154 长条)在角标里按原比例放大展示,盖过上面 15x15 的图标尺寸
+   (span 容器 = 3 层 mask 合成,img = 隐藏炫彩整图) */
+.flower-corner .glass-chip { width: 33px; height: 18px; border-radius: 3px; }
+/* 角标里 15x15 的 img 规则会命中色卡内部整图,还原铺满 */
+.flower-corner .glass-chip > img { width: 100%; height: 100%; object-fit: cover; }
 .flower-corner-colorful {
   background: #3a1a2c; border-color: #ffb6e0; color: #ffb6e0;
   box-shadow: 0 0 6px rgba(255, 182, 224, .6), var(--shadow-sm);

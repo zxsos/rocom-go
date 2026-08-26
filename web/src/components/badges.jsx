@@ -1,6 +1,7 @@
 import React from 'react'
 import { IconsContext } from '../context'
 import { imgURL, useImgFallback, InlineIcon } from './icons'
+import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
 
 // 宠物名称行内的各种小徽标(性别/异色炫彩/血脉/形态/蛋组/系别/搭档标记)。
 
@@ -25,7 +26,54 @@ function MarkIcon({ src, title, fallback, cls }) {
   return <span className={'mark ' + cls} title={title}>{fallback}</span>
 }
 
-// Marks 渲染异色/炫彩标记(优先游戏图标;两者兼具用合成的异色炫彩图)。
+// glassMask 生成 CSS mask 层的行内样式:按素材 alpha 蒙版填色(color),素材拉伸铺满容器。
+// 与客户端 UMG 一致(见 scripts/gen_glass.py 与 docs/data.md 3.5):
+// 层1 底图 Bg 蒙版填 ui_color_2 → 层2 中层 Bg2 蒙版填 ui_color_1(顶部对齐,图内已含位置)→
+// 层3 粒子大图蒙版填白。
+const glassMask = (img, color) => {
+  const url = `url(${imgURL('dazzling/' + img)})`
+  return {
+    backgroundColor: color,
+    WebkitMaskImage: url,
+    maskImage: url,
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskSize: '100% 100%',
+    maskSize: '100% 100%',
+  }
+}
+
+// GlassChip 渲染炫彩色卡缩略图:普通炫彩(glassType=1)用 CSS mask 按素材 alpha 蒙版三层填色
+// 合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 → 粒子染白);隐藏炫彩(glassType=2)直接引用
+// 整图(素材是完整美术图,前端无法重建);配置缺失时退化为原炫彩图标。className 供各场景
+// (列表/详情/地图角标/花种角标)覆盖尺寸。
+export function GlassChip({ p, className }) {
+  const icons = React.useContext(IconsContext)
+  const type = p && p.glassType
+  const value = p && p.glassValue
+  if (type === 2) {
+    const src = GLASS_HIDDEN[value]
+    if (src) {
+      return <img className={className || 'glass-chip'} src={imgURL('dazzling/' + src)} alt="炫彩" title="炫彩色卡" />
+    }
+  } else if (type === 1 && value > 0) {
+    const particle = GLASS_PARTICLES[value >> 20]
+    const colors = GLASS_COLORS[value & 0xFFFFF]
+    if (particle && colors) {
+      return (
+        <span className={className || 'glass-chip'} title="炫彩色卡">
+          <i style={glassMask(GLASS_BG, colors[1])} />
+          <i style={glassMask(GLASS_BG2, colors[0])} />
+          <i style={glassMask(particle, '#ffffff')} />
+        </span>
+      )
+    }
+  }
+  return <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />
+}
+
+// Marks 渲染异色/炫彩标记(优先游戏图标;两者兼具用合成的异色炫彩图;
+// 炫彩单标的优先用色卡图,缺图回退图标/文字)。
 export function Marks({ p }) {
   const icons = React.useContext(IconsContext)
   if (!p) return null
@@ -35,7 +83,7 @@ export function Marks({ p }) {
   return (
     <>
       {p.shiny && <MarkIcon src={icons.shiny} title="异色" fallback="异" cls="mark-shiny" />}
-      {p.colorful && <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />}
+      {p.colorful && <GlassChip p={p} />}
     </>
   )
 }
