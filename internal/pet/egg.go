@@ -22,9 +22,10 @@ import (
 const (
 	OpGetBagItemInfoByPageRsp = 0x1344 // ZONE_GET_BAG_ITEM_INFO_BY_PAGE_RSP(4932), 背包分页全量
 	OpUseBagItemRsp           = 0x0164 // ZONE_USE_BAG_ITEM_RSP(356), 用道具(把蛋放进孵蛋器即走这条)
-	OpGetAllHatchStatusRsp    = 0x0312 // ZONE_GET_ALL_HATCH_STATUS_RSP(786), 孵蛋器里各蛋的进度
+	OpGetAllHatchStatusRsp    = 0x0312 // ZONE_GET_ALL_HATCH_STATUS_RSP(786), 孵蛋器里各蛋的进度(权威列表)
 	OpCrackEggReq             = 0x030b // ZONE_CRACK_EGG_REQ(779), c2s 破壳(egg_gid + 选用的球)
 	OpShopBuyItemRsp          = 0x0262 // ZONE_SHOP_BUY_ITEM_RSP(610), 商店购买(远行商人的神奇的蛋走这条,不发奖励通知)
+	OpStopHatchRsp            = 0x0300 // ZONE_STOP_HATCH_RSP(768), 取出孵蛋器的回包
 )
 
 // EggItemType 是精灵蛋在 BAG_ITEM_CONF/BagItem 里的 type 值。
@@ -49,7 +50,9 @@ type Egg struct {
 	// 客户端自己查 PET_EGG_CONF[conf_id].precious_egg_type,这里同样以配置为准(见 ToEggView)
 }
 
-// Hatching 报告这颗蛋是否正在孵蛋器里。
+// Hatching 报告这颗蛋是否正在孵蛋器里。仅作 data 快照内的推断值:孵蛋器状态**只由
+// 0x0312 对账维护**(store.ReconcileHatching),放入/取出/破壳的回包都不再写权威列,
+// ListEggs 读取时以列为准覆盖本字段(见 docs/data.md 3.6)。
 func (e Egg) Hatching() bool { return e.StartHatch > 0 }
 
 // ParseBagEggs 从背包分页回包(0x1344)取本页的全部精灵蛋,并返回本页页号与总页数
@@ -102,6 +105,27 @@ func ParseChangedEggs(body []byte) []Egg {
 	return out
 }
 
+// ParseHatchStatus 从孵化状态回包(0x0312)取顶层权威列表:egg_gid[](field 2)与
+// hatched_secs[](field 3)按下标配对,即「当前孵蛋器里有哪些蛋、各孵了多久」。
+// 这是服务器对「在孵蛋器里」的**唯一权威口径**:放入/取出/破壳都不另发清零报文,
+// store.hatching 列只由它全量对账维护(见 docs/data.md 3.6)。
+// 注意 proto3 会省略 0 值:hatched_secs=0(刚放入)的项会被省掉,导致两个数组长度不一致,
+// 此时调用方只应拿 gids 做标记对账,不应按下标配对刷新进度。
+func ParseHatchStatus(body []byte) (gids []uint32, secs []int32) {
+	wire.ScanFields(body, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+		if typ != protowire.VarintType {
+			return
+		}
+		switch num {
+		case 2:
+			gids = append(gids, uint32(v))
+		case 3:
+			secs = append(secs, int32(v))
+		}
+	})
+	return
+}
+
 // ParseFlowReason 取奖励通知(0x0243)的 flow_reason(3)。223 = FLOW_REASON_PET_HOME_LAY,
 // 即「家园宠物下蛋」——从小窝上收下来的蛋走的就是这个理由(见 docs/data.md 3.6)。
 func ParseFlowReason(body []byte) int32 {
@@ -116,6 +140,11 @@ const FlowReasonHomeLay = 223
 
 // ParseCrackEggReq 取 c2s 破壳请求(0x030b)里的 egg_gid;c2s 有 6 字节子头,故先定位。
 func ParseCrackEggReq(appBody []byte) uint32 {
+	return parseC2SEggGid(appBody)
+}
+
+// parseC2SEggGid 从 c2s 请求 AppBody 里取 field 1 的 egg_gid(跳过 6 字节子头)。
+func parseC2SEggGid(appBody []byte) uint32 {
 	body := appBody
 	if len(body) > c2sSubHeader {
 		body = body[c2sSubHeader:]
@@ -484,8 +513,11 @@ func eggFromView(v *EggView) Egg {
 // 库里那份是写入当时的样子:本工具后加的字段(异色标记、品类排序键…)在旧行里根本没有,
 // 游戏版本更新后名称/区间也可能变——不重算的话,得等玩家再开一次背包才对得上。
 // 双亲快照存在另一列,原样带过来,再据此补推测嗓音与奖牌。
+// **在孵标记以入参为准**(调用方 store.ListEggs 已用权威列覆盖):data 里的 StartHatch
+// 是背包快照的残留(服务器取出蛋时不把它清零),重算若按它重推会把已取出的蛋又送进孵蛋栏。
 func RefreshEggView(v *EggView, db *gamedata.DB) *EggView {
 	out := ToEggView(eggFromView(v), db)
+	out.Hatching = v.Hatching
 	out.Parents = v.Parents
 	FillEggDerived(out, db)
 	return out

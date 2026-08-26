@@ -146,21 +146,32 @@ var dialer = func() *net.Dialer {
 // 现在改为:TTL 到期后不立即同步重解析,而是返回旧值(最多容忍 staleTTL 时长),
 // 同时用 singleflight 在后台异步刷新——首个触发的请求发起一次解析,
 // 后续并发请求直接复用旧值,解析完成后更新缓存并重置 TTL。
+// dnsCall 是一次同步解析的执行记录:同一 host 的并发请求合并为一次解析,
+// 后到者等待前者的结果,避免登录等场景多连接同时新建时对同一域名重复
+// getaddrinfo(同步解析阻塞在 libc 里,重复只会放大首次连接的延迟)。
+type dnsCall struct {
+	done chan struct{}
+	ips  []netip.Addr
+	err  error
+}
+
 type dnsCache struct {
-	mu      sync.Mutex
-	ttl     time.Duration
-	stale   time.Duration // 过期后仍可容忍返回旧值的时长(滑动窗口)
-	m       map[string][]netip.Addr
-	t       map[string]time.Time
-	refresh map[string]struct{} // 正在后台刷新的 host(去重,避免惊群)
+	mu       sync.Mutex
+	ttl      time.Duration
+	stale    time.Duration // 过期后仍可容忍返回旧值的时长(滑动窗口)
+	m        map[string][]netip.Addr
+	t        map[string]time.Time
+	refresh  map[string]struct{} // 正在后台刷新的 host(去重,避免惊群)
+	inflight map[string]*dnsCall  // 正在同步解析的 host(singleflight 去重)
 }
 
 var dns = &dnsCache{
-	ttl:     5 * time.Minute,
-	stale:   30 * time.Second, // 过期后 30s 内仍返回旧值,后台异步刷新
-	m:       map[string][]netip.Addr{},
-	t:       map[string]time.Time{},
-	refresh: map[string]struct{}{},
+	ttl:      5 * time.Minute,
+	stale:    30 * time.Second, // 过期后 30s 内仍返回旧值,后台异步刷新
+	m:        map[string][]netip.Addr{},
+	t:        map[string]time.Time{},
+	refresh:  map[string]struct{}{},
+	inflight: map[string]*dnsCall{},
 }
 
 // lookup 返回 host 的解析结果。缓存命中(含 stale 期内)直接返回;
@@ -195,12 +206,35 @@ func (dc *dnsCache) lookup(ctx context.Context, host string) ([]netip.Addr, erro
 	}
 	dc.mu.Unlock()
 
-	// 未命中或超出 stale 窗口:同步解析
-	ips, err := dc.resolve(ctx, host)
+	// 未命中或超出 stale 窗口:同步解析(同一 host 的并发请求合并为一次)
+	ips, err := dc.resolveSync(ctx, host)
 	if err != nil {
 		return nil, err
 	}
 	return ips, nil
+}
+
+// resolveSync 同步解析并更新缓存,同时把同一 host 的并发请求合并为一次解析。
+func (dc *dnsCache) resolveSync(ctx context.Context, host string) ([]netip.Addr, error) {
+	dc.mu.Lock()
+	if c, ok := dc.inflight[host]; ok {
+		// 已有请求在解析,等它的结果
+		dc.mu.Unlock()
+		<-c.done
+		return c.ips, c.err
+	}
+	c := &dnsCall{done: make(chan struct{})}
+	dc.inflight[host] = c
+	dc.mu.Unlock()
+
+	ips, err := dc.resolve(ctx, host)
+
+	dc.mu.Lock()
+	c.ips, c.err = ips, err
+	close(c.done)
+	delete(dc.inflight, host)
+	dc.mu.Unlock()
+	return ips, err
 }
 
 // resolve 执行实际 DNS 解析并更新缓存。用默认 Resolver(PreferGo=false 走系统 libc,
@@ -238,7 +272,10 @@ func (dc *dnsCache) refreshHost(host string) {
 // 若 fallbackDelay 内未成功则并发拨其余全部 IP,取最先连通的连接。
 // 跨地域云服务器上某运营商路由可能黑洞掉部分 IP,串行逐个尝试会让客户端
 // 空等到拨号超时;并发探测把「发现首个 IP 不可达」的代价压到 fallbackDelay。
-const fallbackDelay = 300 * time.Millisecond
+// 首个 IP 快速失败(RST/拒绝)时 select 会立即拿到结果,不受此值影响;
+// 此值只影响「首个 IP 挂起无响应」的等待时长,云服务器常见 RTT 下 200ms 足够,
+// 再大只会让黑洞场景的连接建立白白多等。
+const fallbackDelay = 200 * time.Millisecond
 
 // dialTarget 拨号到 target("host:port"),域名经 dns 缓存解析后对候选 IP
 // 做 happy eyeballs 并发探测(首个立即,其余 fallbackDelay 后并发),取最先连通。
@@ -511,18 +548,34 @@ const relayIdleTimeout = 2 * time.Minute
 type idleReader struct {
 	r net.Conn
 	d time.Duration
+	q *net.TCPConn // 仅 TCP 连接非 nil,用于每次读前重设 TCP_QUICKACK
+}
+
+func newIdleReader(r net.Conn, d time.Duration) *idleReader {
+	ir := &idleReader{r: r, d: d}
+	if tc, ok := r.(*net.TCPConn); ok {
+		ir.q = tc
+	}
+	return ir
 }
 
 func (ir *idleReader) Read(p []byte) (int, error) {
 	// 每次读之前刷新 deadline,实现「空闲计时器」效果
 	_ = ir.r.SetReadDeadline(time.Now().Add(ir.d))
+	// TCP_QUICKACK 是一次性开关:内核在首次生效后自动关闭,回到 delayed ACK
+	// (约 40ms)。游戏是高频小包的双向交互,这里每次读前重设,保证每个数据包
+	// 都立即回 ACK,避免每轮交互白白多等一个 delayed ACK 周期。
+	// 非 TCP 连接(如测试用内存 conn)跳过。
+	if ir.q != nil {
+		setQuickAck(ir.q)
+	}
 	return ir.r.Read(p)
 }
 
 // copyWithIdle 带空闲超时的双向拷贝。
 // 任一方向结束(含 idle 超时)立即关闭对端,触发其 io.Copy 也立即返回。
 func copyWithIdle(dst, src net.Conn, buf []byte) {
-	ir := &idleReader{r: src, d: relayIdleTimeout}
+	ir := newIdleReader(src, relayIdleTimeout)
 	io.CopyBuffer(dst, ir, buf)
 	// 读结束后清除 deadline,避免影响后续可能的 close 逻辑
 	_ = src.SetReadDeadline(time.Time{})
