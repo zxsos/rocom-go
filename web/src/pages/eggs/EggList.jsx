@@ -7,9 +7,12 @@ import { fmtTime, pctHot, voiceHot } from '../../utils/format'
 import { Marks } from '../../components/badges'
 import { hatchProgress } from './hatch'
 
-// 精灵蛋页面:左栏孵蛋器(在孵的那几颗)、右栏背包(其余的,每行六个,同游戏内布局)。
-// 不分标签页——在孵的蛋本来就不出现在背包格子里(客户端 BagModuleData.IsRemoveEggItem),
-// 两栏一摆就把「在孵 / 在包」说清楚了,不必再给个过滤器。
+// 精灵蛋页面:三段垂直 —— 孵蛋器(在孵且进度未满的蛋)、已孵化蛋(进度满的标记蛋)、
+// 仓库(其余蛋)。不分标签页——在孵的蛋本来就不出现在背包格子里(BagModuleData.IsRemoveEggItem)。
+// 为何按进度分:服务器取出孵蛋器(0x02ff/0x0300)不清 start_hatch_time,背包全量/登录(0x1344)
+// 会把已取出的蛋重新标成在孵;取出时 hatched_secs/last_hatch_update_sec 被清零,前端外推的
+// 进度瞬间顶满(hatchUpdate=0 → elapsed 从 epoch 起算,见 hatch.js)。于是「标记在孵但进度满」
+// 正好圈出这些残留蛋与孵满未破壳的蛋,不再全塞进孵蛋器。
 // 排序复刻游戏内背包的两种(见 docs/data.md 3.6 与 internal/pet.SortEggs)。
 const SORTS = [
   { k: 'quality', label: '品质' },
@@ -63,18 +66,42 @@ export default function EggList() {
     return () => clearInterval(id)
   }, [])
 
-  const hatching = data.eggs.filter((e) => e.hatching)
-  const bag = data.eggs.filter((e) => !e.hatching)
-  const slots = Math.max(HATCH_SLOTS, hatching.length)
+  // 三段分类:孵蛋器=进度未满的标记蛋(保持后端槽位序);已孵化蛋=进度满的标记蛋
+  // (残留标记/孵满未破壳,放入越近越靠前);仓库=其余(后端已排好序,原样保留)。
+  const withP = data.eggs.map((e) => ({ e, p: hatchProgress(e, now) }))
+  const incubating = withP.filter((x) => x.e.hatching && (x.p == null || x.p.pct < 100)).map((x) => x.e)
+  const hatched = withP.filter((x) => x.e.hatching && x.p && x.p.pct >= 100)
+    .map((x) => x.e)
+    .sort((a, b) => (b.startHatch || 0) - (a.startHatch || 0))
+  const bag = withP.filter((x) => !x.e.hatching).map((x) => x.e)
+  // 孵蛋器固定 3 格(无论实际在孵几颗),每格三等分,同游戏内孵蛋器。
+  const slots = HATCH_SLOTS
 
   return (
     <div className="eggs-page">
-      {/* 两栏的标题都是 eggs-cols 的直接子级(同一网格行),行高一致,两栏的卡片才从同一条
-          基线开始;标题若各自塞回栏内,右栏被搜索框撑高就会比左栏低一截(见 eggs.css)。 */}
       <div className="eggs-cols">
-        <IncuTitle n={hatching.length} slots={slots} />
+        <IncuTitle n={incubating.length} slots={slots} />
+        {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
+        <aside className="eggs-incu">
+          {Array.from({ length: slots }, (_, i) => incubating[i]).map((e, i) => (
+            e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
+              : <div key={'s' + i} className="egg-slot-empty">空格子</div>
+          ))}
+        </aside>
+
+        <div className="eggs-col-t">已孵化蛋 <span className="muted">{hatched.length} 颗</span></div>
+        <section className="eggs-hatched">
+          {hatched.length === 0
+            ? <div className="empty">没有已孵化蛋(孵满或中途取走的蛋会归到这里,按放入时间排)</div>
+            : (
+              <div className="egg-grid">
+                {hatched.map((e) => <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />)}
+              </div>
+            )}
+        </section>
+
         <div className="eggs-bar">
-          <div className="eggs-col-t">背包 <span className="muted">{bag.length} 颗</span></div>
+          <div className="eggs-col-t">仓库 <span className="muted">{bag.length} 颗</span></div>
           <div className="eggs-sorts">
             {SORTS.map((s) => (
               <button key={s.k} className={'chip' + (sort === s.k ? ' on' : '')}
@@ -87,17 +114,9 @@ export default function EggList() {
             onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
-        <aside className="eggs-incu">
-          {Array.from({ length: slots }, (_, i) => hatching[i]).map((e, i) => (
-            e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
-              : <div key={'s' + i} className="egg-slot-empty">空格子</div>
-          ))}
-        </aside>
-
         <section className="eggs-bag">
           {bag.length === 0
-            ? <div className="empty">背包里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
+            ? <div className="empty">仓库里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
             : (
               <div className="egg-grid">
                 {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />)}
@@ -111,7 +130,7 @@ export default function EggList() {
 }
 
 // IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
-// 点击弹出半透明气泡,说明计数口径(中途取走的蛋也算)。点气泡外关闭。
+// 点击弹出半透明气泡,说明计数口径(只算仍在孵化的;进度满的另列「已孵化蛋」)。点气泡外关闭。
 function IncuTitle({ n, slots }) {
   const ref = useRef(null)
   const [tip, setTip] = useState(false)
@@ -125,9 +144,9 @@ function IncuTitle({ n, slots }) {
     <div className="eggs-col-t">
       孵蛋器 <span className="muted">{n}/{slots}</span>
       <span ref={ref} className="incu-tip">
-        <img className="incu-tip-ic" src="/ps.svg" alt="?" title="孵化中途取走的蛋也算"
+        <img className="incu-tip-ic" src="/ps.svg" alt="?" title="只列孵化进度未满的蛋"
           onClick={() => setTip((t) => !t)} draggable={false} />
-        {tip && <span className="incu-tip-bubble">孵化中途取走的蛋也算</span>}
+        {tip && <span className="incu-tip-bubble">只列孵化进度未满的蛋;已孵满或中途取走的在下方「已孵化蛋」一栏</span>}
       </span>
     </div>
   )

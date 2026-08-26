@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
 import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../api'
-import { AccountContext, IconsContext } from '../context'
+import { AccountContext } from '../context'
 import { fmtTime } from '../utils/format'
-import { ImgAvatar, imgURL } from '../components/icons'
+import { ImgAvatar } from '../components/icons'
+import { GlassChip } from '../components/badges'
 
 // 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
 // 只显示花种;world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)在解析层就丢弃了。
@@ -183,7 +184,6 @@ function fmtLeft(endTs, nowMs) {
 }
 
 function FlowerCard({ f, now }) {
-  const icons = useContext(IconsContext)
   const stars = (f.star || 0) > 0 ? '★'.repeat(f.star) : ''
   const left = fmtLeft(f.endTs, now)
   // 详情字段:点过地图花种后由 0x0338 合并进来;未点过全空(普通花种绑定/奖牌恒为空)。
@@ -214,9 +214,7 @@ function FlowerCard({ f, now }) {
             f.glassType === 1 ? `炫彩 · ${f.glass}` : '普通(无炫彩)'
           }
         >
-          {(f.glassType === 1 || f.glassType === 2) && icons.colorful
-            ? <img src={imgURL(icons.colorful)} alt="炫彩" />
-            : '普通'}
+          {f.glassType === 1 || f.glassType === 2 ? <GlassChip p={f} /> : '普通'}
         </span>
       )}
       <ImgAvatar src={f.img} alt={f.name} className="flower-img" />

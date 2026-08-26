@@ -38,7 +38,12 @@
   `uv run python scripts/gen_icons.py`(UI 图标 → img/{filter,blood,static,worldmap,medal,egg}:属性/
   六维/搭档标记、血脉主图标、手挑杂项、手挑大地图 POI、奖牌小图、精灵蛋图与蛋品类角标;图集精灵从解包属性 JSON + 图集 PNG 裁切,
   奖牌与精灵蛋等整张贴图直接转码;webp 保持原始解包文件名,语义键→原名索引写入 names.json;
-  详见 docs/data.md)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
+  详见 docs/data.md)、  `uv run python scripts/gen_glass.py`(炫彩色卡 → 前端渲染配置 web/src/data/glassConf.js:
+  直接读仓库内 COLOR_RANDOM_CONF.ts / PARTICLE_RANDOM_CONF.ts(不需解包数据),
+  给出底图 Bg / 中层 Bg2 / 4 张粒子大图 / 39 组配色 [ui_color_1, ui_color_2] / 4 张隐藏整图
+  (1/2/3 赛季、1000 黑白);普通炫彩 value=(粒子id<<20)|配色id 由前端按素材 alpha 蒙版
+  CSS mask 三层填色合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 顶部对齐 → 粒子染白最上层),
+  隐藏炫彩直接引用整图;渲染组件 web/src/components/badges.jsx 的 GlassChip)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
   抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
   (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq
