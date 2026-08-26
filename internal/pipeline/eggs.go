@@ -15,7 +15,12 @@ import (
 //   - 0x1344 背包分页全量:入库 + 末页对账(不在背包的删掉,与宠物列表同一套路)
 //   - 0x0243 奖励通知:新得的蛋;flow_reason=223 即家园小窝下的蛋,顺手记双亲
 //   - 0x0262 商店购买:远行商人的「神奇的蛋」等,新蛋只在这条回包里下发(不另发奖励通知)
-//   - 0x0164 用道具 / 0x0312 孵化状态:同一颗蛋的进度更新(入孵时刻、已孵秒数)
+//   - 0x0164 用道具(放蛋入孵蛋器)/0x0300 取出回包:都只当普通变化入库,不动 hatching 列
+//   - 0x0312 孵化状态:进度更新 + 顶层 egg_gid[] 权威对账,**hatching 列只由它维护**(见 applyHatchStatus)
+//
+// hatching 列只由 0x0312 全量对账维护:放入/取出/破壳动作与背包快照(0x1344/登录)的
+// start_hatch_time 都不可信(服务器取出蛋时不把它清零),upsert 一律不碰该列、新行初始为 0。
+// 标记在玩家下次打开孵蛋器时收敛;0x0312 孵蛋器空列表 = 本账号所有在孵标记清零。
 //   - 0x030b/0x030c 破壳:请求带 egg_gid,回包一到就把这颗蛋从库里删掉(它已不在背包里)
 //
 // 库里存的就是**背包现状**:页面只看背包,破壳/送人的蛋没人回看,故不留历史行。
@@ -54,7 +59,9 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 
 	case m.Direction == gcp.S2C && (m.Opcode == pet.OpGoodsRewardNotify ||
 		m.Opcode == pet.OpShopBuyItemRsp || m.Opcode == pet.OpUseBagItemRsp ||
-		m.Opcode == pet.OpGetAllHatchStatusRsp):
+		m.Opcode == pet.OpStopHatchRsp):
+		// 收蛋 0x0243、购买 0x0262、放入孵蛋器 0x0164、取出 0x0300 都只当普通变化入库,
+		// hatching 列不在这里动(权威状态只由 0x0312 对账维护,见 applyHatchStatus)。
 		eggs := pet.ParseChangedEggs(m.AppBody)
 		if len(eggs) == 0 {
 			return
@@ -63,6 +70,28 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		if m.Opcode == pet.OpGoodsRewardNotify && pet.ParseFlowReason(m.AppBody) == pet.FlowReasonHomeLay {
 			p.recordEggParents(m.Session, sc, eggs, m.Time)
 		}
+
+	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetAllHatchStatusRsp:
+		p.applyHatchStatus(m, sc, acc)
+	}
+}
+
+// applyHatchStatus 处理孵化状态回包(0x0312):ret_info.changes 里的蛋先按常规入库
+// (带精确的 last_hatch_update_sec),再用顶层 egg_gid[] 权威列表全量对账 hatching 列——
+// 这是该列的唯一维护者(见 docs/data.md 3.6)。gids 为空(孵蛋器空)同样对账,
+// 把本账号所有在孵标记清零(取出/破壳残留的最终收敛点)。
+func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc string) {
+	eggs := pet.ParseChangedEggs(m.AppBody)
+	skip := make(map[uint32]bool, len(eggs))
+	for _, e := range eggs {
+		skip[e.Gid] = true
+	}
+	if len(eggs) > 0 {
+		p.upsertEggs(sc, acc, eggs, m.Time)
+	}
+	gids, secs := pet.ParseHatchStatus(m.AppBody)
+	if changed, err := sc.ReconcileHatching(gids, secs, skip, m.Time.Unix()); err == nil && changed {
+		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}
 }
 
@@ -108,6 +137,8 @@ func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now 
 	for _, e := range eggs {
 		views = append(views, pet.ToEggView(e, p.db))
 	}
+	// UpsertEggs 不碰 hatching 列:权威状态只由 0x0312 对账(ReconcileHatching)维护,
+	// 背包快照与放入/取出动作回包的 start_hatch_time 都不可信。
 	if err := sc.UpsertEggs(views, now.Unix()); err == nil {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}

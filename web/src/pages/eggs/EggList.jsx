@@ -19,17 +19,40 @@ const SORTS = [
 // 孵蛋器格子数:实测 3 个(玩家上限可能随等级/道具变,故按实际在孵数取大)。
 const HATCH_SLOTS = 3
 
+// 孵蛋器状态只由后端 0x0312 对账维护(见 docs/data.md 3.6),故把在孵的蛋缓存到
+// localStorage(按账号隔离):打开页面先用缓存顶住孵蛋器栏,再等后端推送刷新——
+// 后端 hatching 列没变时,缓存就是最后一次 0x0312 的权威结果。
+const hatchKey = (account) => `hatch:${account}`
+const readHatchCache = (key) => {
+  try {
+    const v = JSON.parse(localStorage.getItem(key))
+    return Array.isArray(v) && v.length ? v : null
+  } catch { return null }
+}
+const writeHatchCache = (key, eggs) => {
+  try { localStorage.setItem(key, JSON.stringify(eggs)) } catch { /* 配额等异常忽略 */ }
+}
+
 export default function EggList() {
   const account = useContext(AccountContext)
   const [sort, setSort] = useState('quality')
   const [order, setOrder] = useState('desc')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState({ eggs: [] })
+  // 初始先用缓存的孵蛋器蛋(可能为空),load 拉回全量后替换;搜索会过滤在孵蛋,
+  // 故只有无搜索时才写缓存,免得把过滤后的不完整列表存进去。
+  const [data, setData] = useState(() => {
+    const cached = readHatchCache(hatchKey(account))
+    return cached ? { eggs: cached } : { eggs: [] }
+  })
   const [detailGid, setDetailGid] = useState(null)
   const [now, setNow] = useState(() => Date.now())
 
   const load = () => getEggs({ search, sort, order })
-    .then((d) => setData(d || { eggs: [] })).catch(() => {})
+    .then((d) => {
+      d = d || { eggs: [] }
+      if (!search) writeHatchCache(hatchKey(account), d.eggs.filter((e) => e.hatching))
+      setData(d)
+    }).catch(() => {})
 
   useEffect(() => { load() }, [account, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
   // 后端在蛋有变动(收蛋/入孵/进度/破壳)时推 eggs,收到就重拉。
