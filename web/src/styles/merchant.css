@@ -1,0 +1,163 @@
+/* —— 远行商人页(第三方活动 NPC 数据,见 pages/merchant/Merchant.jsx) ——
+   业务节奏:8/12/16/20 四轮上架售卖,只有 00:00~08:00 打烊休市。 */
+.merchant-page { max-width: 1080px; }
+
+/* 顶部横幅:商人名 + 营业状态 + 轮次进度(或打烊提示) */
+.merchant-hero {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--bg-1)), var(--bg-1) 60%);
+  padding: 16px 18px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.merchant-hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.merchant-name { font-size: 22px; font-weight: 800; letter-spacing: .01em; }
+.merchant-sub { color: var(--fg-dim); font-size: 13px; margin-top: 3px; }
+.merchant-hero-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* 营业状态徽标 */
+.merchant-status { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.merchant-status-ok { background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4); }
+.merchant-status-off { background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--line); }
+.merchant-day { font-size: 13px; color: var(--fg-dim); font-weight: 600; }
+.merchant-countdown { font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+
+/* 打烊提示条(00:00~08:00) */
+.merchant-closed-bar {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 13px; color: var(--fg-dim);
+  border: 1px dashed var(--line); border-radius: var(--radius); background: var(--bg-2);
+  padding: 8px 12px; text-align: center;
+}
+
+/* 轮次步骤条:8:00 / 12:00 / 16:00 / 20:00 四个节点,横线连接 */
+.merchant-steps { display: flex; align-items: flex-start; }
+.merchant-step { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.merchant-step-node { position: relative; width: 100%; display: flex; justify-content: center; }
+.merchant-step:not(:first-child) .merchant-step-node::before {
+  content: ''; position: absolute; top: 50%; right: 50%; width: 100%; height: 2px;
+  background: var(--line); transform: translateY(-50%);
+}
+.merchant-step.done:not(:first-child) .merchant-step-node::before,
+.merchant-step.cur:not(:first-child) .merchant-step-node::before { background: var(--accent); }
+.merchant-step-dot {
+  position: relative; z-index: 1; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); border: 2px solid var(--line);
+  color: transparent; font-size: 12px; font-weight: 700;
+}
+.merchant-step.done .merchant-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.merchant-step.cur .merchant-step-dot {
+  border-color: var(--accent); background: var(--accent-soft);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.merchant-step.cur .merchant-step-dot::after {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}
+.merchant-step-time { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg); }
+.merchant-step.cur .merchant-step-time { color: var(--accent); }
+.merchant-step-cap { font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
+
+/* 订阅卡片:新货邮件提醒 */
+.merchant-sub {
+  margin-top: 12px; border: 1px dashed var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); padding: 12px 14px;
+}
+.merchant-sub-head { display: flex; align-items: center; gap: 8px; }
+.merchant-sub-title { font-weight: 700; font-size: 14px; }
+.merchant-sub-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4);
+}
+.merchant-sub-warn { font-size: 12px; color: var(--danger, #e5534b); }
+.merchant-sub-desc { margin: 6px 0 10px; font-size: 12px; color: var(--fg-dim); }
+.merchant-sub-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.merchant-sub-input {
+  flex: 1 1 180px; min-width: 0; padding: 6px 10px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg-2); color: var(--fg); outline: none;
+}
+.merchant-sub-input:focus { border-color: var(--accent); }
+.merchant-sub-input:disabled { opacity: .5; cursor: not-allowed; }
+.merchant-sub-form .btn { padding: 6px 14px; font-size: 13px; }
+.merchant-sub-form .btn-ghost {
+  background: transparent; border-color: var(--line); color: var(--fg-dim);
+}
+.merchant-sub-msg { margin-top: 8px; font-size: 12px; }
+.merchant-sub-msg.ok { color: #28a745; }
+.merchant-sub-msg.err { color: var(--danger, #e5534b); }
+
+/* 操作条 */
+.merchant-bar { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 12px; gap: 10px; flex-wrap: wrap; }
+.merchant-count { font-weight: 700; }
+.merchant-btns { display: flex; gap: 8px; }
+.merchant-btns .btn { padding: 5px 12px; font-size: 13px; }
+
+/* 轮次分组卡片 */
+.merchant-rounds { display: flex; flex-direction: column; gap: 14px; }
+.merchant-turn {
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1);
+  padding: 14px; box-shadow: var(--shadow-sm);
+}
+.merchant-turn.is-cur {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), var(--shadow-sm);
+}
+.merchant-turn-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.merchant-turn-time { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.merchant-turn.is-cur .merchant-turn-time { color: var(--accent); }
+.merchant-turn-cur {
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4);
+}
+.merchant-turn-range { font-size: 12px; }
+.merchant-turn-count { margin-left: auto; font-size: 12px; color: var(--fg-dim); }
+
+/* 商品网格:竖版卡片(大图 + 信息) */
+.merchant-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.merchant-item {
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1);
+  overflow: hidden; display: flex; flex-direction: column; min-width: 0;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.merchant-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(76, 141, 255, .14); transform: translateY(-2px); }
+.merchant-item-img-wrap {
+  height: 110px; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, var(--bg-2)), var(--bg-2));
+  border-bottom: 1px solid var(--line);
+}
+.merchant-item-img { max-width: 84%; max-height: 88%; object-fit: contain; display: block; }
+.merchant-item-fb { font-size: 34px; opacity: .5; }
+
+.merchant-item-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.merchant-item-name {
+  font-weight: 600; font-size: 14px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.merchant-item-kind {
+  align-self: flex-start; font-size: 11px; line-height: 1; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--accent); color: var(--accent); white-space: nowrap;
+}
+.merchant-item-meta { margin-top: 2px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.merchant-price { font-weight: 800; color: var(--gold, #e0a83c); font-size: 16px; font-variant-numeric: tabular-nums; }
+.merchant-unit { font-size: 11px; font-weight: 500; opacity: .8; }
+.merchant-limit { font-size: 12px; color: var(--fg-dim); flex: none; }
+.merchant-item-time {
+  font-size: 11px; color: var(--fg-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 错误条 */
+.merchant-err {
+  border: 1px solid var(--danger, #e5534b); border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--danger, #e5534b) 10%, transparent);
+  color: var(--danger, #e5534b); padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
+}
+
+/* 窄屏:商品双列、步骤条收窄 */
+@media (max-width: 560px) {
+  .merchant-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .merchant-step-time { font-size: 12px; }
+  .merchant-step-cap { font-size: 10px; }
+  .merchant-item-img-wrap { height: 92px; }
+}

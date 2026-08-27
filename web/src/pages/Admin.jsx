@@ -3,6 +3,7 @@ import {
   getAdminStatus, adminSetup, adminLogin, adminLogout,
   getAdminToken, setAdminToken, adminRules, adminSetRule, adminDeleteRule,
   adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminInjectFlower, adminListInjects, adminRevokeInject,
+  adminMerchantSubs, adminMerchantSubDelete, adminTestMail,
   getAccounts, setAccountPin, deleteAccount,
 } from '../api'
 import { GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
@@ -188,6 +189,12 @@ export default function Admin() {
   const [pinMsg, setPinMsg] = useState('')
   const [pinEditing, setPinEditing] = useState(null) // 正在设 PIN 的账号 key
   const [pinValue, setPinValue] = useState('')
+  // 邮箱推送名单(远行商人订阅)+ 测试邮件
+  const [merchantSubs, setMerchantSubs] = useState(null) // {configured, subs:[{email,keywords,created_at}]}
+  const [subErr, setSubErr] = useState('')
+  const [subMsg, setSubMsg] = useState('')
+  const [testEmail, setTestEmail] = useState('')
+  const [testBusy, setTestBusy] = useState(false)
 
   useEffect(() => {
     getAdminStatus().then((s) => {
@@ -206,6 +213,7 @@ export default function Admin() {
     loadWildOptions()
     loadAccounts()
     loadInjects()
+    loadMerchantSubs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed])
 
@@ -233,6 +241,42 @@ export default function Admin() {
   const loadWildOptions = () => {
     adminWildPetOptions().then((d) => setWildOptions(d.options || []))
       .catch(() => {})
+  }
+
+  const loadMerchantSubs = () => {
+    setSubErr('')
+    adminMerchantSubs().then(setMerchantSubs)
+      .catch((err) => { setSubErr(err.message); kickIfUnauthed(err) })
+  }
+
+  // 发送测试邮件:验证 SMTP 配置(发件邮箱/授权码)是否可用。
+  const sendTestMail = async (e) => {
+    e.preventDefault()
+    setSubErr(''); setSubMsg('')
+    const email = testEmail.trim()
+    if (!email) return
+    setTestBusy(true)
+    try {
+      await adminTestMail(email)
+      setSubMsg('测试邮件已发送到 ' + email + ',请检查收件箱(含垃圾箱)。')
+    } catch (err) {
+      setSubErr(err.message || '发送失败')
+    } finally {
+      setTestBusy(false)
+    }
+  }
+
+  // 从推送名单删除订阅(不再向其发提醒)。
+  const removeSub = async (email) => {
+    setSubErr(''); setSubMsg('')
+    if (!window.confirm('确认删除 ' + email + ' 的订阅?删除后不再向其发送新货提醒。')) return
+    try {
+      await adminMerchantSubDelete(email)
+      setSubMsg('已删除订阅:' + email)
+      loadMerchantSubs()
+    } catch (err) {
+      setSubErr(err.message || '删除失败')
+    }
   }
 
   const loadAccounts = () => {
@@ -382,6 +426,9 @@ export default function Admin() {
     setAccounts([])
     setInjAccount('')
     setInjects(null)
+    setMerchantSubs(null)
+    setSubErr(''); setSubMsg('')
+    setTestEmail(''); setTestBusy(false)
   }
 
   if (loading) return <div className="admin-page"><p className="admin-hint">加载中…</p></div>
@@ -646,6 +693,58 @@ export default function Admin() {
                   </li>
                 ))}
               </ul>
+            )}
+      </div>
+
+      <div className="admin-card admin-rules">
+        <h3>邮箱推送名单(远行商人订阅)</h3>
+        <p className="admin-hint">
+          玩家在「远行商人」页登记新货邮件提醒后,名单出现在这里。每轮(8/12/16/20 点)新增商品
+          上架时,后端自动向名单内邮箱发提醒;0~8 点打烊不提醒。发件邮箱与授权码由
+          <code> -merchant-smtp-user / -merchant-smtp-pass </code>配置。
+          {merchantSubs && !merchantSubs.configured && (
+            <span style={{ color: 'var(--danger, #e5534b)' }}> ⚠ 服务端未配置 SMTP,发送会失败。</span>
+          )}
+        </p>
+        {/* 测试邮件:验证发件配置 */}
+        <form onSubmit={sendTestMail} className="admin-rule-form">
+          <input
+            className="input" type="email" placeholder="测试收件邮箱(如 123@qq.com)" value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+          />
+          <button className="btn primary" type="submit" disabled={!testEmail.trim() || testBusy}>
+            {testBusy ? '发送中…' : '发送测试邮件'}
+          </button>
+        </form>
+        {subErr && <p className="admin-error">{subErr}</p>}
+        {subMsg && <p className="admin-hint" style={{ color: 'var(--green, #4caf50)' }}>{subMsg}</p>}
+        {merchantSubs === null
+          ? <p className="admin-hint">加载中…</p>
+          : merchantSubs.subs.length === 0
+            ? <p className="admin-hint">暂无订阅(玩家在远行商人页登记后显示)。</p>
+            : (
+              <table className="admin-play-table">
+                <thead>
+                  <tr>
+                    <th>邮箱</th>
+                    <th>关键词</th>
+                    <th>订阅时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {merchantSubs.subs.map((s) => (
+                    <tr key={s.email}>
+                      <td>{s.email}</td>
+                      <td>{s.keywords || <span className="muted">全部</span>}</td>
+                      <td>{fmtTime(s.created_at)}</td>
+                      <td>
+                        <button className="btn ghost" onClick={() => removeSub(s.email)}>删除</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
       </div>
 

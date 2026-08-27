@@ -143,6 +143,52 @@ export const queryEggMatch = async (height, weight) => {
   return r.json()
 }
 
+// getMerchant 拉取远行商人数据:后端按当前时间返回营业状态与 4h 槽缓存(本地缓存,令牌在服务端,
+// 见 internal/server/api_merchant.go),只在槽缺失时才回源第三方,避免玩家反复打开页面烧 token。
+// force=true 强制后端回源第三方(烧对方额度,「强制刷新」按钮用)。
+// 响应结构:{now,day,status:"open|closed|idle",today:[{start,end,label,empty,merchant}],prev:[...]},
+// 其中 merchant 是第三方原始 JSON:{merchant_name,subtitle,fetched_at,round:{...},item_count,
+// items:[{name,kind,image,start_time,end_time,time_label,price,limit}]}。
+// 服务端未配置令牌时抛错(503)。
+export const getMerchant = async (force = false) => {
+  const r = await fetch('/api/merchant' + (force ? '?force=1' : ''))
+  if (!r.ok) {
+    let msg = `拉取失败(${r.status})`
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+// getMerchantSub 查询订阅状态:{configured(服务端是否配了发信邮箱), subscribed, email, keywords}。
+export const getMerchantSub = async (email) => {
+  const r = await fetch('/api/merchant/sub?email=' + encodeURIComponent(email))
+  if (!r.ok) throw new Error('查询订阅失败(' + r.status + ')')
+  return r.json()
+}
+
+// setMerchantSub 订阅/更新:keywords 逗号分隔的商品名关键词,空=全部新上架都提醒。
+export const setMerchantSub = async (email, keywords) => {
+  const r = await fetch('/api/merchant/sub', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, keywords }),
+  })
+  if (!r.ok) {
+    let msg = `订阅失败(${r.status})`
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
+// delMerchantSub 退订。
+export const delMerchantSub = async (email) => {
+  const r = await fetch('/api/merchant/sub?email=' + encodeURIComponent(email), { method: 'DELETE' })
+  if (!r.ok) throw new Error('退订失败(' + r.status + ')')
+  return r.json()
+}
+
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export const getEvolution = (base) => getJSON('/api/evolution?base=' + base)
 
@@ -289,6 +335,24 @@ export const adminPlaySessions = (account = '', limit = 200) =>
       if (!r.ok) throw await adminError(r, '拉取游玩记录失败')
       return r.json()
     })
+
+// adminMerchantSubs 远行商人邮箱推送名单:{configured: SMTP 是否已配置, subs:[{email,keywords,created_at}]}。
+export const adminMerchantSubs = () => adminFetch('/api/admin/merchant-subs').then(async (r) => {
+  if (!r.ok) throw await adminError(r, '拉取订阅名单失败')
+  return r.json()
+})
+
+// adminMerchantSubDelete 从推送名单删除某邮箱的订阅。
+export function adminMerchantSubDelete(email) {
+  return adminFetch('/api/admin/merchant-subs?email=' + encodeURIComponent(email), { method: 'DELETE' })
+    .then(async (r) => {
+      if (!r.ok) throw await adminError(r, '删除订阅失败')
+      return r.json()
+    })
+}
+
+// adminTestMail 发送测试邮件验证 SMTP 配置(错误信息透传后端 SMTP 具体报错)。
+export const adminTestMail = (email) => postJSON('/api/admin/merchant-test-mail', { email })
 
 // adminWildPetOptions 可投放的野生宠物形态:{options:[{base,name,book}]}。
 export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then(async (r) => {

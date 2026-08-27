@@ -258,6 +258,31 @@ CREATE TABLE IF NOT EXISTS play_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_play_sessions_account ON play_sessions(account, login_time);
 CREATE INDEX IF NOT EXISTS idx_play_sessions_login ON play_sessions(login_time);
+
+-- 远行商人第三方数据缓存(见 server/api_merchant.go 的业务模型):slot 是 4h 槽的开始时间戳
+-- (Unix 秒,对齐 8/12/16/20/0/4 点,跨天唯一),empty=1 表示「该槽查过但无货/已收摊」,
+-- data 存第三方原始 JSON;记录只保留 2 天,写入时顺手清理更早的。
+CREATE TABLE IF NOT EXISTS merchant_slots (
+  slot INTEGER PRIMARY KEY,
+  empty INTEGER NOT NULL DEFAULT 0,
+  data TEXT NOT NULL DEFAULT '',
+  fetched_at INTEGER NOT NULL
+);
+
+-- 远行商人订阅(邮件提醒,见 server/api_merchant.go):email 是玩家填的收件 QQ 邮箱,
+-- keywords 是逗号分隔的商品名关键词(空=该邮箱订阅全部新上架商品);订阅长期有效不退。
+CREATE TABLE IF NOT EXISTS merchant_subs (
+  email TEXT PRIMARY KEY,
+  keywords TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+-- 已通知记录:同一槽(4h)对同一邮箱只发一次提醒,防止强制刷新/重复回源时重复发信;
+-- 记录随槽缓存一起在写入时清理 2 天前的。
+CREATE TABLE IF NOT EXISTS merchant_notified (
+  slot INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  PRIMARY KEY(slot, email)
+);
 `)
 	return err
 }
