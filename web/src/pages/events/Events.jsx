@@ -36,20 +36,31 @@ export default function Events() {
   // 规则命中提示音开关:新捕获事件命中高亮规则时响铃(异色/炫彩响升级音)。默认关,不打扰。
   const [soundOn, setSoundOn] = useStoredFlag(localStorage, 'ev.hlSound.v1', false)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
-  // 分页:初始只拉最近 100 条,列表底部「加载更多」按 beforeId 追加更早事件(实时推送仍进顶部)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
+  // 分页:页码分页(offset 游标),列表底部「第 X / Y 页 + 每页条数」;实时推送仍进顶部(仅第 1 页)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useStoredState(localStorage, 'ev.pageSize',
+    (s) => [20, 50, 100, 200].includes(parseInt(s, 10)) ? parseInt(s, 10) : 100, (v) => String(v))
+  const [loading, setLoading] = useState(false)
   useWakeLock(keepAwake)
-  // subscribe 的 effect 只依赖 account,回调里读 rules/mode/soundOn 需走 ref 拿最新值
+  // subscribe 的 effect 只依赖 account,回调里读 rules/mode/soundOn/page/pageSize 需走 ref 拿最新值
   const soundRef = useRef({ rules, mode, soundOn })
-  useEffect(() => { soundRef.current = { rules, mode, soundOn } })
+  const pageRef = useRef({ page, pageSize })
+  useEffect(() => {
+    soundRef.current = { rules, mode, soundOn }
+    pageRef.current = { page, pageSize }
+  })
+
+  // 列表数据:页码/每页条数变化时按 offset 拉取,替换当前页(不追加)。
+  useEffect(() => {
+    setLoading(true)
+    getEvents({ limit: pageSize, offset: (page - 1) * pageSize })
+      .then((e) => setEvents(e || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [account, page, pageSize])
 
   useEffect(() => {
     // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
-    getEvents({ limit: 100 }).then((e) => {
-      setEvents(e || [])
-      setHasMore((e || []).length >= 100) // 不足一页说明没有更早事件
-    }).catch(() => {})
     getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
     getEventStats().then(setStats).catch(() => {})
     return subscribe((m) => {
@@ -61,8 +72,9 @@ export default function Events() {
       if (so && isHighlight(pet, rs, md)) {
         pet.shiny || pet.colorful ? rareChime() : chime()
       }
-      // 上限放宽到 500:实时推送裁掉最旧尾部,不影响已加载的分页历史
-      setEvents((prev) => [m.data, ...prev].slice(0, 500))
+      // 仅第 1 页实时推进(头部插入并裁掉超出本页的旧条);其他页保持不动,翻回第 1 页时重拉可见
+      const { page: curPage, pageSize: curSize } = pageRef.current
+      if (curPage === 1) setEvents((prev) => [m.data, ...prev].slice(0, curSize))
       setTotal((n) => n + 1)
       getEventStats().then(setStats).catch(() => {}) // 新事件入库后刷新统计
     })
@@ -78,26 +90,11 @@ export default function Events() {
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
   const clearAll = () => {
     if (!window.confirm('确定清空所有事件历史?计数将从头开始。')) return
-    clearEvents().then(() => { setEvents([]); setTotal(0); setStats(null); setHasMore(true) }).catch(() => {})
+    clearEvents().then(() => { setEvents([]); setTotal(0); setStats(null); setPage(1) }).catch(() => {})
   }
 
-  // 加载更早的历史事件:以当前最早一条的 id 作为 beforeId 向后端翻页,
-  // 追加到列表尾部(按 id 去重,避免与实时推送/已加载条目重复)。
-  const loadMore = () => {
-    const last = events[events.length - 1]
-    if (loadingMore || !last || !last.id) return
-    setLoadingMore(true)
-    getEvents({ limit: 100, beforeId: last.id })
-      .then((older) => {
-        setEvents((prev) => {
-          const ids = new Set(prev.map((e) => e.id))
-          return [...prev, ...(older || []).filter((o) => !ids.has(o.id))]
-        })
-        if (!older || older.length < 100) setHasMore(false) // 不足一页说明没有更早事件
-      })
-      .catch(() => {})
-      .finally(() => setLoadingMore(false))
-  }
+  // 总页数(事件总数 = total,实时推送会递增)
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className="list-layout events-page">
@@ -175,21 +172,32 @@ export default function Events() {
           </div>
         )}
         <div className="event-list">
-          {/* 先按原始下标算序号(#total-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
+          {/* 先按原始下标算序号(#total-offset-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
           {events
             .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, mode) }))
             .filter(({ hl }) => !onlyHl || hl)
             .map(({ ev, i, hl }) => (
-              <EventItem key={ev.id || ev.gid + '-' + ev.time} ev={ev} seq={total - i} hl={hl}
+              <EventItem key={ev.id || ev.gid + '-' + ev.time} ev={ev} seq={total - (page - 1) * pageSize - i} hl={hl}
                 onOpen={() => ev.gid && setDetailGid(ev.gid)} />
             ))}
-          {events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
+          {loading && <div className="empty muted">加载中…</div>}
+          {!loading && events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
           {events.length > 0 && onlyHl && !events.some((ev) => isHighlight(ev.pet, rules, mode)) &&
             <div className="empty">当前没有命中高亮规则的事件。{rules.length === 0 ? '请先添加高亮规则。' : ''}</div>}
-          {events.length > 0 && hasMore && (
-            <button className="btn load-more" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? '加载中…' : '加载更多'}
-            </button>
+          {events.length > 0 && (
+            <div className="event-pager">
+              <label className="muted pager-size">
+                每页
+                <select className="input" value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
+                  {[20, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                条
+              </label>
+              <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>‹ 上一页</button>
+              <span className="muted">第 {page} / {totalPages} 页</span>
+              <button className="btn" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>下一页 ›</button>
+            </div>
           )}
         </div>
       </section>

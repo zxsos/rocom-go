@@ -100,7 +100,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	beforeID, _ := strconv.Atoi(q.Get("beforeId"))
-	events, err := s.store.For(s.acct(r)).ListEvents(limit, beforeID)
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	events, err := s.store.For(s.acct(r)).ListEvents(limit, beforeID, offset)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
