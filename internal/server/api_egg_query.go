@@ -46,20 +46,36 @@ type eggMatchPet struct {
 // handleEggQuery 代理查询随机蛋可能孵出的物种。
 // 请求参数:height(米)、weight(千克),均可省略(缺省交给第三方按空处理)。
 // 响应为第三方原始 JSON(含 matches 列表),HTTP 状态与错误信息原样转述。
+// 统计:只要「发起了第三方请求」就记一条使用记录(未配 key 或请求没发出去不记),
+// 见 store.LogEggQuery 与管理面板「查蛋 API 统计」。
 func (s *Server) handleEggQuery(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	height, weight := q.Get("height"), q.Get("weight")
+
+	// 统一埋点:ok 表示拿到第三方正常 JSON,matches 仅在成功时有效。
+	start := time.Now()
+	sent := false
+	ok := false
+	matches := 0
+	defer func() {
+		if !sent {
+			return
+		}
+		s.store.LogEggQuery(s.acct(r), ok, int(time.Since(start).Milliseconds()), matches, height, weight)
+	}()
+
 	if s.eggAPIKey == "" {
 		http.Error(w, "服务端未配置查询令牌(启动时加 -egg-api-key)", http.StatusServiceUnavailable)
 		return
 	}
-	q := r.URL.Query()
 	params := url.Values{}
 	params.Add("key", s.eggAPIKey)
 	params.Add("format", "json")
-	if v := q.Get("height"); v != "" {
-		params.Add("height", v)
+	if height != "" {
+		params.Add("height", height)
 	}
-	if v := q.Get("weight"); v != "" {
-		params.Add("weight", v)
+	if weight != "" {
+		params.Add("weight", weight)
 	}
 	params.Add("implemented", "true")
 
@@ -76,6 +92,7 @@ func (s *Server) handleEggQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	sent = true // 已发起第三方请求,之后的成败都要计入统计
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 上限 1MB,防第三方异常大响应
 	if err != nil {
 		http.Error(w, "读取第三方响应失败", http.StatusBadGateway)
@@ -91,6 +108,8 @@ func (s *Server) handleEggQuery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "第三方响应解析失败: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	ok = true
+	matches = out.Data.Total
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(body)
 }

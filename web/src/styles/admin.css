@@ -1,8 +1,24 @@
 /* 管理员面板:隐式入口(#/admin,导航不显示),首次设置密码后凭密码登录。 */
 
-.admin-page { display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+/* 管理面板主体:自适应网格,卡片自动流动铺满页面;大内容卡片(表格/图表类)加 .admin-wide 跨整行 */
+.admin-page {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
+  gap: 16px; align-items: start;
+  padding: 40px 24px 64px; max-width: 1600px; margin: 0 auto;
+}
+/* 登录页:保持单卡片居中,不受网格影响 */
+.admin-page.admin-login { display: flex; flex-direction: column; align-items: center; max-width: none; }
+.admin-page.admin-login .admin-card { max-width: 360px; }
+/* 分区标题:把卡片归为「数据统计 / 投放管理 / 账号与规则」三组,长页更易扫读 */
+.admin-section-title {
+  grid-column: 1 / -1; width: 100%; margin: 10px 0 0;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.12em;
+  color: var(--muted); text-transform: uppercase;
+  border-bottom: 1px solid var(--line); padding-bottom: 6px;
+}
+.admin-section-title:first-of-type { margin-top: 0; }
 .admin-card {
-  width: 100%; max-width: 340px; padding: 24px;
+  width: 100%; min-width: 0; padding: 24px;
   background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   display: flex; flex-direction: column; gap: 12px;
@@ -13,21 +29,35 @@
 .admin-card form { display: flex; flex-direction: column; gap: 10px; }
 .admin-card .btn { width: 100%; }
 .admin-head {
-  width: 100%; max-width: 640px; display: flex; align-items: center;
-  justify-content: space-between; margin-bottom: 12px;
+  grid-column: 1 / -1; width: 100%; display: flex; align-items: center;
+  justify-content: space-between;
 }
 .admin-head h2 { margin: 0; font-size: 20px; }
 .admin-placeholder { opacity: 0.8; }
 
 /* —— 黑白名单 —— */
 .admin-card h3 { margin: 0; font-size: 15px; }
-.admin-rules { max-width: 640px; }
+/* 含表格/图表的大卡片跨整行,其余卡片由网格自动并排 */
+.admin-wide { grid-column: 1 / -1; }
 .admin-rule-form { display: grid; grid-template-columns: 1fr 120px 1fr auto; gap: 8px; }
 .admin-rule-form .btn { white-space: nowrap; }
 /* 测试邮件表单:收件邮箱/主题/按钮一行,正文独占一行 */
 .admin-test-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: start; }
 .admin-test-form textarea { grid-column: 1 / -1; resize: vertical; font-family: inherit; line-height: 1.5; }
 .admin-test-form .btn { white-space: nowrap; }
+
+/* —— 查蛋 API 统计 —— */
+.egg-fail { color: var(--danger, #e05656); font-size: 13px; }
+.egg-daily { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 8px; }
+.egg-daily-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.egg-daily-bar {
+  width: 100%; max-width: 26px; height: 96px; border-radius: 4px;
+  background: var(--bg-1); display: flex; flex-direction: column-reverse; overflow: hidden;
+}
+.egg-daily-fill { width: 100%; }
+.egg-daily-fill.ok { background: #4caf50; }
+.egg-daily-fill.fail { background: #e05656; }
+.egg-daily-day { font-size: 11px; color: var(--muted); }
 .admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-rule-list li {
   display: flex; align-items: center; gap: 10px;
@@ -119,9 +149,12 @@
   flex: none; width: 56px; height: 31px; border-radius: 4px;
   border: 1px solid var(--line); object-fit: cover; display: inline-block;
 }
-@media (max-width: 760px) {
+/* 网格两列或手机宽度时,投放/规则表单折叠换行 */
+@media (max-width: 1080px) {
   .admin-inject-form { grid-template-columns: 1fr 1fr; }
   .admin-inject-form .btn { grid-column: span 2; }
+  .admin-rule-form { grid-template-columns: 1fr 1fr; }
+  .admin-rule-form .btn { grid-column: span 2; }
 }
 
 /* —— 当前注入列表(管理面板撤销) —— */

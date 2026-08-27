@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
   getAdminStatus, adminSetup, adminLogin, adminLogout,
   getAdminToken, setAdminToken, adminRules, adminSetRule, adminDeleteRule,
-  adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminInjectFlower, adminListInjects, adminRevokeInject,
+  adminStats, adminPlaySessions, adminEggStats, adminWildPetOptions, adminInjectWild, adminInjectFlower, adminListInjects, adminRevokeInject,
   adminMerchantSubs, adminMerchantSubDelete, adminTestMail, getMerchant,
   getAccounts, setAccountPin, deleteAccount,
 } from '../api'
@@ -145,6 +145,33 @@ const PlayDailyChart = ({ daily }) => {
   )
 }
 
+// EggDailyChart 查蛋 API 近14天每日查询次数 CSS 柱状图:绿色=成功,红色=失败,叠加显示。
+// daily 结构见 api.adminEggStats:[{day,total,ok}]。
+const EggDailyChart = ({ daily }) => {
+  const max = Math.max(...daily.map((d) => d.total), 1)
+  return (
+    <div className="egg-daily">
+      {daily.map((d) => {
+        const okH = (d.ok / max) * 100
+        const failH = ((d.total - d.ok) / max) * 100
+        return (
+          <div key={d.day} className="egg-daily-col" title={`${d.day}:共 ${d.total} 次,成功 ${d.ok},失败 ${d.total - d.ok}`}>
+            <div className="egg-daily-bar">
+              {d.total > 0 && (
+                <>
+                  <div className="egg-daily-fill ok" style={{ height: `${okH}%` }} />
+                  {failH > 0 && <div className="egg-daily-fill fail" style={{ height: `${failH}%` }} />}
+                </>
+              )}
+            </div>
+            <span className="egg-daily-day">{d.day.slice(5)}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // 管理员面板(隐式入口:导航不显示,需手动输入 #/admin 进入)。
 // 首次进入引导设置密码,之后凭密码登录;面板内其余功能留空待实现。
 export default function Admin() {
@@ -165,6 +192,9 @@ export default function Admin() {
   const [plays, setPlays] = useState(null)      // {sessions:[], summary:{}}
   const [playErr, setPlayErr] = useState('')
   const [playAccount, setPlayAccount] = useState('') // 明细账号筛选(空=全部)
+  // 查蛋 API 使用统计(第三方图鉴,一次查蛋烧一次对方 token)
+  const [eggStats, setEggStats] = useState(null)   // {total,todayTotal,todayOK,todayFail,successRate,daily,byAccount,recent,keySet}
+  const [eggErr, setEggErr] = useState('')
   // 投放稀有野生精灵
   const [wildOptions, setWildOptions] = useState(null)
   const [accounts, setAccounts] = useState([])
@@ -190,7 +220,7 @@ export default function Admin() {
   const [pinEditing, setPinEditing] = useState(null) // 正在设 PIN 的账号 key
   const [pinValue, setPinValue] = useState('')
   // 邮箱推送名单(远行商人订阅)+ 测试邮件
-  const [merchantSubs, setMerchantSubs] = useState(null) // {configured, subs:[{email,keywords,created_at}]}
+  const [merchantSubs, setMerchantSubs] = useState(null) // {configured, subs:[{email,account,keywords,created_at}]}
   const [subErr, setSubErr] = useState('')
   const [subMsg, setSubMsg] = useState('')
   const [testEmail, setTestEmail] = useState('')
@@ -213,6 +243,7 @@ export default function Admin() {
     loadRules()
     loadStats()
     loadPlaySessions()
+    loadEggStats()
     loadWildOptions()
     loadAccounts()
     loadInjects()
@@ -239,6 +270,12 @@ export default function Admin() {
     setPlayErr('')
     adminPlaySessions(playAccount).then(setPlays)
       .catch((err) => { setPlayErr(err.message); kickIfUnauthed(err) })
+  }
+
+  const loadEggStats = () => {
+    setEggErr('')
+    adminEggStats().then(setEggStats)
+      .catch((err) => { setEggErr(err.message); kickIfUnauthed(err) })
   }
 
   const loadWildOptions = () => {
@@ -323,7 +360,7 @@ export default function Admin() {
     }
   }
 
-  // 投放假炫彩花种:向目标成员的花种页注入一只 7 星特殊花种,不要求其在线。
+  // 投放假炫彩花种:向目标成员的花种页注入一只特殊花种(默认 7 星,星级可自定义),不要求其在线。
   const injectFlower = async (e) => {
     e.preventDefault()
     const account = flAccount.trim()
@@ -452,7 +489,7 @@ export default function Admin() {
 
   if (!authed) {
     return (
-      <div className="admin-page">
+      <div className="admin-page admin-login">
         <div className="admin-card">
           <h2>{configured ? '管理员登录' : '设置管理员密码'}</h2>
           <p className="admin-hint">
@@ -489,14 +526,15 @@ export default function Admin() {
         <button className="btn" onClick={logout}>退出登录</button>
       </div>
 
-      <div className="admin-card admin-rules">
+      <div className="admin-section-title">数据统计</div>
+      <div className="admin-card admin-rules admin-wide">
         <h3>成员抓捕图表</h3>
         <p className="admin-hint">所有成员累计抓捕精灵情况(来源:获得宠物事件,近30天时间轴)。</p>
         {statsErr && <p className="admin-error">{statsErr}</p>}
         <AdminCharts data={stats} />
       </div>
 
-      <div className="admin-card admin-rules">
+      <div className="admin-card admin-rules admin-wide">
         <h3>游玩记录</h3>
         <p className="admin-hint">
           自动记录玩家每次上线的起止时间与游玩时长(来源:连接登录/断开与心跳活跃,近14天每日聚合)。
@@ -558,6 +596,92 @@ export default function Admin() {
             )}
       </div>
 
+      <div className="admin-card admin-rules admin-wide">
+        <h3>查蛋 API 统计</h3>
+        <p className="admin-hint">
+          孵蛋页「查蛋」代理第三方图鉴,每次查询消耗一次对方 token,统计已发起第三方请求的调用。
+          {eggStats && eggStats.keySet === false && '当前服务端未配置 -egg-api-key,统计恒为 0。'}
+        </p>
+        {eggErr && <p className="admin-error">{eggErr}</p>}
+        {eggStats === null
+          ? <p className="admin-hint">加载中…</p>
+          : (
+            <>
+              <div className="admin-play-summary">
+                <div className="admin-play-stat">
+                  <b>{eggStats.total}</b>
+                  <span>累计查询</span>
+                </div>
+                <div className="admin-play-stat">
+                  <b>{eggStats.todayTotal}</b>
+                  <span>今日查询</span>
+                </div>
+                <div className="admin-play-stat">
+                  <b>{eggStats.todayOK}</b>
+                  <span>今日成功</span>
+                </div>
+                <div className="admin-play-stat">
+                  <b>{eggStats.todayFail}</b>
+                  <span>今日失败</span>
+                </div>
+                <div className="admin-play-stat">
+                  <b>{eggStats.successRate}%</b>
+                  <span>成功率</span>
+                </div>
+              </div>
+              {eggStats.daily && eggStats.daily.length > 0 && (
+                <EggDailyChart daily={eggStats.daily} />
+              )}
+              {eggStats.total === 0 && <p className="admin-hint">还没有查蛋记录(玩家在孵蛋页点「查蛋」后出现)。</p>}
+              {eggStats.byAccount && eggStats.byAccount.length > 0 && (
+                <>
+                  <h4>按账号排行</h4>
+                  <table className="admin-play-table">
+                    <thead>
+                      <tr><th>玩家</th><th>累计查询</th><th>今日</th></tr>
+                    </thead>
+                    <tbody>
+                      {eggStats.byAccount.map((a) => (
+                        <tr key={a.account}>
+                          <td>{a.name || a.account} <span className="muted">{(a.account || '').replace(/^UID:/, '')}</span></td>
+                          <td>{a.total}</td>
+                          <td>{a.today}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+              {eggStats.recent && eggStats.recent.length > 0 && (
+                <>
+                  <h4>最近查询</h4>
+                  <table className="admin-play-table">
+                    <thead>
+                      <tr><th>时间</th><th>玩家</th><th>身高/体重</th><th>匹配</th><th>耗时</th><th>结果</th></tr>
+                    </thead>
+                    <tbody>
+                      {eggStats.recent.map((rec, i) => (
+                        <tr key={i}>
+                          <td>{fmtTime(rec.time)}</td>
+                          <td>{rec.name || rec.account} <span className="muted">{(rec.account || '').replace(/^UID:/, '')}</span></td>
+                          <td>{rec.height || '-'} / {rec.weight || '-'}</td>
+                          <td>{rec.matches}</td>
+                          <td>{rec.costMs}ms</td>
+                          <td>{rec.ok ? <span className="play-online">成功</span> : <span className="egg-fail">失败</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+              <div className="admin-play-toolbar">
+                <button className="btn" onClick={loadEggStats}>刷新</button>
+              </div>
+            </>
+          )}
+      </div>
+
+      <div className="admin-section-title">投放管理</div>
       <div className="admin-card admin-rules">
         <h3>投放稀有野生精灵</h3>
         <p className="admin-hint">
@@ -673,6 +797,7 @@ export default function Admin() {
         {flMsg && <p className="admin-hint" style={{ color: 'var(--green, #4caf50)' }}>{flMsg}</p>}
       </div>
 
+      <div className="admin-section-title">账号与规则</div>
       <div className="admin-card admin-rules">
         <h3>黑白名单</h3>
         <p className="admin-hint">
@@ -713,7 +838,7 @@ export default function Admin() {
             )}
       </div>
 
-      <div className="admin-card admin-rules">
+      <div className="admin-card admin-rules admin-wide">
         <h3>邮箱推送名单(远行商人订阅)</h3>
         <p className="admin-hint">
           玩家在「远行商人」页登记新货邮件提醒后,名单出现在这里。每轮(8/12/16/20 点)新增商品
@@ -759,6 +884,7 @@ export default function Admin() {
               <table className="admin-play-table">
                 <thead>
                   <tr>
+                    <th>账号</th>
                     <th>邮箱</th>
                     <th>关键词</th>
                     <th>订阅时间</th>
@@ -767,7 +893,8 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {merchantSubs.subs.map((s) => (
-                    <tr key={s.email}>
+                    <tr key={s.account}>
+                      <td>{s.account}</td>
                       <td>{s.email}</td>
                       <td>{s.keywords || <span className="muted">全部</span>}</td>
                       <td>{fmtTime(s.created_at)}</td>

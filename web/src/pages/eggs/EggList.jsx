@@ -277,7 +277,7 @@ function EggCard({ egg, now, onPet }) {
                     <span>{match.error}</span>
                     <button className="btn" onClick={() => setMatch(null)}>关闭</button>
                   </div>
-                ) : (
+                ) : match.data.data.total > 0 ? (
                   <>
                     <div className="muted egg-guess-line">
                       匹配 {match.data.data.total} 条,来源 示例玩家
@@ -300,6 +300,11 @@ function EggCard({ egg, now, onPet }) {
                     </div>
                     <button className="btn" onClick={() => setMatch(null)}>关闭</button>
                   </>
+                ) : (
+                  <div className="egg-guess-line err">
+                    <span>找不到这颗臭蛋</span>
+                    <button className="btn" onClick={() => setMatch(null)}>关闭</button>
+                  </div>
                 )}
             </div>
           ) : (

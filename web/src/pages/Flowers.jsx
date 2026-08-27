@@ -185,6 +185,7 @@ function fmtLeft(endTs, nowMs) {
 }
 
 function FlowerCard({ f, now }) {
+  const icons = useContext(IconsContext)
   const stars = (f.star || 0) > 0 ? '★'.repeat(f.star) : ''
   const left = fmtLeft(f.endTs, now)
   // 详情字段:点过地图花种后由 0x0338 合并进来;未点过全空(普通花种绑定/奖牌恒为空)。

@@ -160,16 +160,17 @@ export const getMerchant = async (force = false) => {
   return r.json()
 }
 
-// getMerchantSub 查询订阅状态:{configured(服务端是否配了发信邮箱), subscribed, email, keywords}。
-export const getMerchantSub = async (email) => {
-  const r = await fetch('/api/merchant/sub?email=' + encodeURIComponent(email))
+// getMerchantSub 查询当前账号订阅状态:{configured, subscribed, email, keywords}。
+// 订阅按登录账号绑定(buildQuery 自动带 ?account=):换设备登录同一账号也能查到同一订阅。
+export const getMerchantSub = async () => {
+  const r = await fetch('/api/merchant/sub?' + buildQuery())
   if (!r.ok) throw new Error('查询订阅失败(' + r.status + ')')
   return r.json()
 }
 
-// setMerchantSub 订阅/更新:keywords 逗号分隔的商品名关键词,空=全部新上架都提醒。
+// setMerchantSub 订阅/更新当前账号:keywords 逗号分隔的商品名关键词,空=全部新上架都提醒。
 export const setMerchantSub = async (email, keywords) => {
-  const r = await fetch('/api/merchant/sub', {
+  const r = await fetch('/api/merchant/sub?' + buildQuery(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, keywords }),
@@ -182,9 +183,9 @@ export const setMerchantSub = async (email, keywords) => {
   return r.json()
 }
 
-// delMerchantSub 退订。
-export const delMerchantSub = async (email) => {
-  const r = await fetch('/api/merchant/sub?email=' + encodeURIComponent(email), { method: 'DELETE' })
+// delMerchantSub 退订当前账号。
+export const delMerchantSub = async () => {
+  const r = await fetch('/api/merchant/sub?' + buildQuery(), { method: 'DELETE' })
   if (!r.ok) throw new Error('退订失败(' + r.status + ')')
   return r.json()
 }
@@ -336,6 +337,14 @@ export const adminPlaySessions = (account = '', limit = 200) =>
       return r.json()
     })
 
+// adminEggStats 查蛋 API(第三方图鉴)使用统计:
+// {keySet,total,todayTotal,todayOK,todayFail,successRate,
+//  daily:[{day,total,ok}], byAccount:[{account,name,total,today}], recent:[{account,name,time,ok,costMs,matches,height,weight}]}。
+export const adminEggStats = () => adminFetch('/api/admin/egg-stats').then(async (r) => {
+  if (!r.ok) throw await adminError(r, '拉取查蛋统计失败')
+  return r.json()
+})
+
 // adminMerchantSubs 远行商人邮箱推送名单:{configured: SMTP 是否已配置, subs:[{email,keywords,created_at}]}。
 export const adminMerchantSubs = () => adminFetch('/api/admin/merchant-subs').then(async (r) => {
   if (!r.ok) throw await adminError(r, '拉取订阅名单失败')
@@ -370,8 +379,8 @@ export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then
 export const adminInjectWild = (account, base, kind, offsetMeters = 30, level = 0, glassType = 0, glassValue = 0) =>
   postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters, level, glassType, glassValue })
 
-// adminInjectFlower 向指定成员投放假炫彩花种(花灵 BOSS,默认 7 星特殊花种)。
-// {account, base: 守护宠物 petbase id, star: 星级 1-7(0=默认 7), glassType, glassValue}
+// adminInjectFlower 向指定成员投放假炫彩花种(花灵 BOSS,默认 7 星特殊花种,星级可自定义)。
+// {account, base: 守护宠物 petbase id, star: 1-7(0=默认 7), glassType, glassValue}
 // glassType/glassValue 语义同 adminInjectWild(0/0=后端随机合法色卡)。
 export const adminInjectFlower = (account, base, star = 0, glassType = 0, glassValue = 0) =>
   postJSON('/api/admin/inject-flower', { account, base, star, glassType, glassValue })

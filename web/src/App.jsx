@@ -7,10 +7,16 @@ import { useStoredJSON } from './hooks/useStoredState'
 import { PinDialog } from './components/PinDialog'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
+// 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
 const NAV = [
-  { to: '/pets', label: '宠物列表', icon: '🐾' },
+  {
+    label: '我的背包', icon: '🎒',
+    children: [
+      { to: '/pets', label: '宠物列表', icon: '🐾' },
+      { to: '/eggs', label: '精灵蛋', icon: '🥚' },
+    ],
+  },
   { to: '/events', label: '捕获事件', icon: '🔔' },
-  { to: '/eggs', label: '精灵蛋', icon: '🥚' },
   { to: '/merchant', label: '远行商人', icon: '🧳' },
   { to: '/map', label: '实时地图', icon: '🗺️' },
   { to: '/flowers', label: '花种', icon: '🌱' },
@@ -130,13 +136,51 @@ export default function App() {
     setAccount(a)
   }
 
-  const navLinks = (base) => NAV.map((n) => (
-    <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
-      className={({ isActive }) => base + (isActive ? ' active' : '')}>
-      <span className={base === 'tab' ? 'tab-icon' : 'nav-icon'}>{n.icon}</span>
-      <span className={base === 'tab' ? 'tab-label' : 'nav-label'}>{n.label}</span>
-    </NavLink>
-  ))
+  // 顶栏一级导航:普通项直接链接,分组项(我的背包)hover 展开 2 级下拉菜单。
+  const topLinks = () => NAV.map((n) => {
+    if (!n.children) {
+      return (
+        <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
+          className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
+          <span className="nav-icon">{n.icon}</span>
+          <span className="nav-label">{n.label}</span>
+        </NavLink>
+      )
+    }
+    const active = n.children.some((c) => location.pathname === c.to)
+    return (
+      <div key={n.label} className={'navgroup' + (active ? ' active' : '')}>
+        <button type="button" className="navgroup-btn" title="我的背包">
+          <span className="nav-icon">{n.icon}</span>
+          <span className="nav-label">{n.label}</span>
+          <span className="navgroup-arrow">▾</span>
+        </button>
+        <div className="navgroup-pop">
+          {n.children.map((c) => (
+            <NavLink key={c.to} to={c.to} onDoubleClick={onNavDoubleClick(c.to)}
+              className={({ isActive }) => 'navgroup-item' + (isActive ? ' active' : '')}>
+              <span className="navgroup-item-icon">{c.icon}</span>
+              <span className="navgroup-item-label">{c.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      </div>
+    )
+  })
+
+  // 底部 tab(移动端):普通项直接链接,分组项点击弹出子菜单面板。
+  const tabLinks = () => NAV.map((n) => {
+    if (!n.children) {
+      return (
+        <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
+          className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>
+          <span className="tab-icon">{n.icon}</span>
+          <span className="tab-label">{n.label}</span>
+        </NavLink>
+      )
+    }
+    return <TabGroup key={n.label} item={n} location={location} onNavDoubleClick={onNavDoubleClick} />
+  })
 
   return (
     <AccountContext.Provider value={account}>
@@ -147,7 +191,7 @@ export default function App() {
             onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
             <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">妙妙屋</span>
           </button>
-          <nav className="topnav">{navLinks('navlink')}</nav>
+          <nav className="topnav">{topLinks()}</nav>
           {fullscreen.supported && (
             <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
               onClick={fullscreen.toggle}
@@ -180,7 +224,7 @@ export default function App() {
           <Outlet />
         </main>
 
-        <nav className="bottomnav">{navLinks('tab')}</nav>
+        <nav className="bottomnav">{tabLinks()}</nav>
       </div>
       {pinDialog && (
         <PinDialog
@@ -210,6 +254,42 @@ export default function App() {
       )}
       </IconsContext.Provider>
     </AccountContext.Provider>
+  )
+}
+
+// TabGroup 移动端底部「我的背包」分组 tab:点击弹出子菜单面板(向上展开),点外部/选中后关闭。
+function TabGroup({ item, location, onNavDoubleClick }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+
+  // 点外部关闭
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const active = item.children.some((c) => location.pathname === c.to)
+  return (
+    <div className="tabgroup" ref={rootRef}>
+      <button type="button" className={'tab' + (active ? ' active' : '')} onClick={() => setOpen((o) => !o)}>
+        <span className="tab-icon">{item.icon}</span>
+        <span className="tab-label">{item.label}</span>
+      </button>
+      {open && (
+        <div className="tabgroup-pop">
+          {item.children.map((c) => (
+            <NavLink key={c.to} to={c.to} onDoubleClick={onNavDoubleClick(c.to)}
+              className={({ isActive }) => 'tabgroup-item' + (isActive ? ' active' : '')}
+              onClick={() => setOpen(false)}>
+              <span className="tabgroup-item-icon">{c.icon}</span>
+              <span className="tabgroup-item-label">{c.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

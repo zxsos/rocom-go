@@ -271,8 +271,11 @@ CREATE TABLE IF NOT EXISTS merchant_slots (
 
 -- 远行商人订阅(邮件提醒,见 server/api_merchant.go):email 是玩家填的收件 QQ 邮箱,
 -- keywords 是逗号分隔的商品名关键词(空=该邮箱订阅全部新上架商品);订阅长期有效不退。
+-- 远行商人邮件订阅:按登录账号绑定(一账号一邮箱,换设备/切账号都能识别到同一订阅)。
+-- email 是收件邮箱,account 是登录账号键(如 UID:xxx)。
 CREATE TABLE IF NOT EXISTS merchant_subs (
-  email TEXT PRIMARY KEY,
+  account TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
   keywords TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
 );
@@ -283,6 +286,20 @@ CREATE TABLE IF NOT EXISTS merchant_notified (
   email TEXT NOT NULL,
   PRIMARY KEY(slot, email)
 );
+
+-- 查蛋 API(第三方图鉴,见 api_egg_query.go)使用统计:每次发起第三方请求记一行,
+-- 管理面板据此看今日消耗/成功率/谁在查。量小(一天几十次),不做清理。
+CREATE TABLE IF NOT EXISTS egg_queries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account TEXT NOT NULL DEFAULT '',
+  ts INTEGER NOT NULL,
+  ok INTEGER NOT NULL DEFAULT 0,
+  cost_ms INTEGER NOT NULL DEFAULT 0,
+  matches INTEGER NOT NULL DEFAULT 0,
+  height TEXT NOT NULL DEFAULT '',
+  weight TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_egg_queries_ts ON egg_queries(ts);
 `)
 	return err
 }

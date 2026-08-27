@@ -185,6 +185,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("DELETE /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("POST /api/admin/merchant-test-mail", s.handleAdminMerchantTestMail)
+	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
