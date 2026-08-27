@@ -129,6 +129,20 @@ export async function deleteFlowerSlot(key) {
 //           obtainedAt,hatching,parents,…}]}
 export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { eggs: [] })
 
+// queryEggMatch 查随机蛋(神奇的蛋)可能孵出的物种:后端代理第三方图鉴 API(令牌在服务端,
+// 不落地到前端)。参数为蛋的身高(米)/体重(千克),均可省略。返回第三方原始 JSON:
+//   {code,msg,data:{matches:[{pet_id,pet_name,img_name,main_type,score,hatch_label,…}],total,source}}
+// 服务端未配置令牌时抛错(503)。
+export const queryEggMatch = async (height, weight) => {
+  const r = await fetch('/api/eggs/query?' + buildQuery({ height, weight }))
+  if (!r.ok) {
+    let msg = `查询失败(${r.status})`
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export const getEvolution = (base) => getJSON('/api/evolution?base=' + base)
 

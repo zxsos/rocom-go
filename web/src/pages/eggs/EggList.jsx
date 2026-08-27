@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react'
-import { getEggs, subscribe } from '../../api'
+import { getEggs, subscribe, queryEggMatch } from '../../api'
 import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { PetDetailModal } from '../../components/PetDetailModal'
@@ -21,6 +21,36 @@ const SORTS = [
 
 // 孵蛋器格子数:实测 3 个(玩家上限可能随等级/道具变,故按实际在孵数取大)。
 const HATCH_SLOTS = 3
+
+// 部分异色形态的蛋配置名自带「的蛋」,后端模板({0}的蛋)再拼一层就成了「XX的蛋的蛋」,
+// 这里只规整结尾的重复(中间的「的蛋」是名字本身,不动)。
+const tidyEggName = (name) => (name || '').replace(/的蛋的蛋$/, '的蛋')
+
+// 随机蛋「猜猜孵出谁」查询缓存:同一组身高/体重结果相同,按 `height|weight` 为 key 存
+// localStorage,刷新页面不丢、重复查询直接复用,少烧第三方 token(限流 10 次/分钟)。
+const EGG_GUESS_CACHE_KEY = 'eggGuessCache.v1'
+const EGG_GUESS_CACHE_MAX = 30 // 最多缓存 30 组,超出按最旧淘汰(LRU)
+
+function readEggGuessCache(key) {
+  try {
+    const c = JSON.parse(localStorage.getItem(EGG_GUESS_CACHE_KEY) || '{}')
+    return c[key] && c[key].data ? c[key].data : null
+  } catch { return null }
+}
+
+function writeEggGuessCache(key, data) {
+  try {
+    const c = JSON.parse(localStorage.getItem(EGG_GUESS_CACHE_KEY) || '{}')
+    c[key] = { data, ts: Date.now() }
+    const keys = Object.keys(c)
+    if (keys.length > EGG_GUESS_CACHE_MAX) {
+      // 删最旧的,直到回到上限
+      keys.sort((a, b) => (c[a].ts || 0) - (c[b].ts || 0))
+      keys.slice(0, keys.length - EGG_GUESS_CACHE_MAX).forEach((k) => delete c[k])
+    }
+    localStorage.setItem(EGG_GUESS_CACHE_KEY, JSON.stringify(c))
+  } catch { /* 存满/隐私模式等忽略 */ }
+}
 
 // 孵蛋器状态只由后端 0x0312 对账维护(见 docs/data.md 3.6),故把在孵的蛋缓存到
 // localStorage(按账号隔离):打开页面先用缓存顶住孵蛋器栏,再等后端推送刷新——
@@ -160,13 +190,37 @@ function IncuTitle({ n, slots }) {
 function EggCard({ egg, now, onPet }) {
   const p = hatchProgress(egg, now)
   const src = egg.srcName ? `来源:${egg.srcName}` : ''
+  const name = tidyEggName(egg.name)
+  // 随机蛋(神奇的蛋)的「猜猜孵出谁」:后端代理第三方图鉴 API(令牌在服务端,不进浏览器)。
+  const [match, setMatch] = useState(null) // {loading,error,data}
+  const query = () => {
+    const key = [egg.heightM, egg.weightKg].map((v) => v ?? '').join('|')
+    const hit = readEggGuessCache(key)
+    if (hit) { // 同身高体重查过,直接复用缓存,不再请求第三方
+      setMatch({ loading: false, error: '', data: hit })
+      return
+    }
+    setMatch({ loading: true, error: '', data: null })
+    queryEggMatch(egg.heightM, egg.weightKg)
+      .then((d) => { writeEggGuessCache(key, d); setMatch({ loading: false, error: '', data: d }) })
+      .catch((e) => {
+        const msg = e.message || '查询失败'
+        if (/429|请求过于频繁/.test(msg)) {
+          // 限流:不占卡片位置,直接弹警告提醒
+          setMatch(null)
+          window.alert('喂喂喂,当我Token不要钱吗,等会再查啊魂淡')
+        } else {
+          setMatch({ loading: false, error: msg, data: null })
+        }
+      })
+  }
   return (
     <div className="egg-card">
       <div className="egg-head">
         <img className="egg-icon" src={imgURL(egg.icon)} alt="" draggable={false} />
         <div className="egg-title">
-          <div className="egg-name" title={[egg.name, egg.species && `孵出 ${egg.species}`, src]
-            .filter(Boolean).join(' · ')}>{egg.name}</div>
+          <div className="egg-name" title={[name, egg.species && `孵出 ${egg.species}`, src]
+            .filter(Boolean).join(' · ')}>{name}</div>
           <div className="egg-tags">
             {(egg.medals || []).map((m) => (
               <span key={m.dim} className="egg-chip" title={`${DIM_NAME[m.dim] || ''}奖牌`}>{m.name}</span>
@@ -203,6 +257,48 @@ function EggCard({ egg, now, onPet }) {
         <div className="egg-hatch">
           <div className="egg-bar"><div className="egg-bar-fill" style={{ width: p.pct + '%' }} /></div>
           <span className={p.pct >= 100 ? 'val-hot-hi' : undefined}>{p.pct >= 100 ? '可破壳' : p.pct + '%'}</span>
+        </div>
+      )}
+
+      {egg.random && (
+        <div className="egg-guess">
+          {match ? (
+            <div className="egg-guess-res">
+              {match.loading ? <div className="muted egg-guess-line">查询中…</div>
+                : match.error ? (
+                  <div className="egg-guess-line err">
+                    <span>{match.error}</span>
+                    <button className="btn" onClick={() => setMatch(null)}>关闭</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="muted egg-guess-line">
+                      匹配 {match.data.data.total} 条,来源 示例玩家
+                    </div>
+                    <div className="egg-guess-list">
+                      {[...(match.data.data.matches || [])]
+                        .sort((a, b) => (b.score || 0) - (a.score || 0))
+                        .map((m) => (
+                        <div key={m.pet_id} className="egg-guess-item">
+                          {/^https?:\/\//.test(m.img_name || '')
+                            ? <img className="egg-guess-img" src={m.img_name} alt="" loading="lazy" draggable={false} /> : null}
+                          <div className="egg-guess-txt">
+                            <div className="egg-guess-name">{m.pet_name}
+                              <span className="muted"> {[m.main_type, m.sub_type].filter(Boolean).join('/')}</span>
+                            </div>
+                            <div className="muted">匹配度 {m.score} · {m.hatch_label}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="btn" onClick={() => setMatch(null)}>关闭</button>
+                  </>
+                )}
+            </div>
+          ) : (
+            <button className="btn egg-guess-btn" onClick={query}
+              title="按蛋的身高/体重查第三方图鉴,猜可能孵出谁">猜猜孵出谁</button>
+          )}
         </div>
       )}
 
