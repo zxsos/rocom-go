@@ -3,7 +3,7 @@ import {
   getAdminStatus, adminSetup, adminLogin, adminLogout,
   getAdminToken, setAdminToken, adminRules, adminSetRule, adminDeleteRule,
   adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminInjectFlower, adminListInjects, adminRevokeInject,
-  adminMerchantSubs, adminMerchantSubDelete, adminTestMail,
+  adminMerchantSubs, adminMerchantSubDelete, adminTestMail, getMerchant,
   getAccounts, setAccountPin, deleteAccount,
 } from '../api'
 import { GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
@@ -194,7 +194,10 @@ export default function Admin() {
   const [subErr, setSubErr] = useState('')
   const [subMsg, setSubMsg] = useState('')
   const [testEmail, setTestEmail] = useState('')
+  const [testSubject, setTestSubject] = useState('')
+  const [testBody, setTestBody] = useState('')
   const [testBusy, setTestBusy] = useState(false)
+  const [forceBusy, setForceBusy] = useState(false) // 强制刷新商人数据(回源第三方)
 
   useEffect(() => {
     getAdminStatus().then((s) => {
@@ -249,7 +252,21 @@ export default function Admin() {
       .catch((err) => { setSubErr(err.message); kickIfUnauthed(err) })
   }
 
-  // 发送测试邮件:验证 SMTP 配置(发件邮箱/授权码)是否可用。
+  // 强制刷新商人数据:绕过后端缓存,强制后端重新向第三方抓取当前轮(烧 token,仅维护用)。
+  const forceMerchant = async () => {
+    setSubErr(''); setSubMsg('')
+    setForceBusy(true)
+    try {
+      const d = await getMerchant(true)
+      setSubMsg('已强制刷新商人数据(' + (d.status === 'open' ? '当前营业中' : '当前打烊') + '),商人页下次打开即为最新。')
+    } catch (err) {
+      setSubErr(err.message || '强制刷新失败')
+    } finally {
+      setForceBusy(false)
+    }
+  }
+
+  // 发送测试邮件:验证 SMTP 配置(发件邮箱/授权码)是否可用;主题/正文可自填,留空用默认。
   const sendTestMail = async (e) => {
     e.preventDefault()
     setSubErr(''); setSubMsg('')
@@ -257,7 +274,7 @@ export default function Admin() {
     if (!email) return
     setTestBusy(true)
     try {
-      await adminTestMail(email)
+      await adminTestMail(email, testSubject.trim(), testBody.trim())
       setSubMsg('测试邮件已发送到 ' + email + ',请检查收件箱(含垃圾箱)。')
     } catch (err) {
       setSubErr(err.message || '发送失败')
@@ -428,7 +445,7 @@ export default function Admin() {
     setInjects(null)
     setMerchantSubs(null)
     setSubErr(''); setSubMsg('')
-    setTestEmail(''); setTestBusy(false)
+    setTestEmail(''); setTestSubject(''); setTestBody(''); setTestBusy(false); setForceBusy(false)
   }
 
   if (loading) return <div className="admin-page"><p className="admin-hint">加载中…</p></div>
@@ -706,16 +723,32 @@ export default function Admin() {
             <span style={{ color: 'var(--danger, #e5534b)' }}> ⚠ 服务端未配置 SMTP,发送会失败。</span>
           )}
         </p>
-        {/* 测试邮件:验证发件配置 */}
-        <form onSubmit={sendTestMail} className="admin-rule-form">
+        {/* 测试邮件:验证发件配置,主题/正文可自填 */}
+        <form onSubmit={sendTestMail} className="admin-test-form">
           <input
             className="input" type="email" placeholder="测试收件邮箱(如 123@qq.com)" value={testEmail}
             onChange={(e) => setTestEmail(e.target.value)}
+          />
+          <input
+            className="input" placeholder="主题(留空用默认)" value={testSubject}
+            onChange={(e) => setTestSubject(e.target.value)}
+          />
+          <textarea
+            className="input" rows={3} placeholder="邮件内容(留空用默认)" value={testBody}
+            onChange={(e) => setTestBody(e.target.value)}
           />
           <button className="btn primary" type="submit" disabled={!testEmail.trim() || testBusy}>
             {testBusy ? '发送中…' : '发送测试邮件'}
           </button>
         </form>
+        {/* 强制刷新:回源第三方重抓商人数据(烧对方额度,仅维护用) */}
+        <div className="admin-play-toolbar">
+          <button className="btn" type="button" onClick={forceMerchant} disabled={forceBusy}
+            title="绕过后端缓存,强制后端重新向第三方抓取当前轮商人数据(烧对方额度,非必要别点)">
+            {forceBusy ? '强制刷新中…' : '强制刷新商人数据'}
+          </button>
+          <span className="admin-hint">绕过后端缓存,强制后端重新向第三方抓取当前轮商人数据(烧对方额度,非必要别点)。</span>
+        </div>
         {subErr && <p className="admin-error">{subErr}</p>}
         {subMsg && <p className="admin-hint" style={{ color: 'var(--green, #4caf50)' }}>{subMsg}</p>}
         {merchantSubs === null

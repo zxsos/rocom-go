@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"net/http"
-	"net/mail"
 	"net/smtp"
 	"net/url"
 	"strings"
@@ -360,8 +360,52 @@ func merchantSubMatch(keywords string, news []merchantItem) bool {
 	return false
 }
 
+// 发件人显示名(收件端显示「远哥来了 <sender@example.com>」),RFC 2047 编码支持中文。
+const merchantMailFromName = "远哥来了"
+
+// merchantMailHTMLTpl 邮件正文模板:深色暖调背景 + 浅色卡片 + 金色标题栏。
+const merchantMailHTMLTpl = `<!DOCTYPE html>
+<html lang="zh-CN"><body style="margin:0;padding:0;background:#17110a;">
+<div style="background:linear-gradient(160deg,#241809 0%,#3a2a14 55%,#4a3518 100%);padding:36px 16px;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background:#fffaf0;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.4);">
+    <div style="background:linear-gradient(135deg,#f0b429,#d99a1e);padding:22px 28px;">
+      <div style="font-size:20px;font-weight:800;color:#3a2505;">远行商人</div>
+      <div style="font-size:12px;color:#7a5a15;margin-top:4px;">新货上架提醒</div>
+    </div>
+    <div style="padding:26px 28px;color:#3a2a14;font-size:14px;line-height:1.9;">%s</div>
+    <div style="background:#f3e7cc;padding:14px 28px;font-size:12px;color:#8a6d3b;text-align:center;line-height:1.7;">
+      本邮件由「远行商人」新货提醒自动发送<br>如需退订,请到站点「远行商人」页取消订阅
+    </div>
+  </div>
+</div>
+</body></html>`
+
+// merchantMailFrom 生成带中文显示名的 From 头。
+func (s *Server) merchantMailFrom() string {
+	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + s.smtpUser + ">"
+}
+
+// merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •)。
+func merchantMailBody(body string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " ")
+		lead := len(line) - len(trimmed)
+		if strings.HasPrefix(trimmed, "- ") {
+			trimmed = "• " + strings.TrimPrefix(trimmed, "- ")
+		}
+		esc := html.EscapeString(trimmed)
+		if lead > 0 {
+			esc = strings.Repeat("&nbsp;", lead) + esc
+		}
+		lines[i] = esc
+	}
+	return fmt.Sprintf(merchantMailHTMLTpl, strings.Join(lines, "<br>"))
+}
+
 // sendMerchantMail 通过 QQ 邮箱 SMTP(465 SSL)发送邮件。subject/body 由调用方拼好
-// (订阅新货提醒 / 管理员测试)。串行发信(smtpMu),避免并发连接被 QQ 邮箱判为异常触发限流。
+// (订阅新货提醒 / 管理员测试),正文渲染为带背景的 HTML。串行发信(smtpMu),
+// 避免并发连接被 QQ 邮箱判为异常触发限流。
 func (s *Server) sendMerchantMail(to, subject, body string) error {
 	s.smtpMu.Lock()
 	defer s.smtpMu.Unlock()
@@ -389,13 +433,8 @@ func (s *Server) sendMerchantMail(to, subject, body string) error {
 	if err != nil {
 		return err
 	}
-	h := mail.Header{}
-	h.Set("From", s.smtpUser)
-	h.Set("To", to)
-	h.Set("Subject", mime.QEncoding.Encode("utf-8", subject))
-	h.Set("MIME-Version", "1.0")
-	h.Set("Content-Type", "text/plain; charset=UTF-8")
-	if _, err := w.Write([]byte(h.Encode() + "\r\n" + body)); err != nil {
+	if _, err := fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
+		s.merchantMailFrom(), to, mime.QEncoding.Encode("utf-8", subject), merchantMailBody(body)); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
@@ -438,7 +477,21 @@ func (s *Server) handleMerchantSub(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "保存失败", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"ok": true})
+		// 保存成功:自动发送验证邮件,确认收件邮箱可达。发信失败不阻塞订阅(仅提示)。
+		out := map[string]any{"ok": true, "mail_sent": false}
+		if s.smtpUser != "" && s.smtpPass != "" {
+			subject := "【远哥来了】订阅成功验证"
+			body := "你已成功订阅「远行商人」新货提醒!\n\n" +
+				"本邮件用于验证收件邮箱可正常接收提醒,无需回复。\n" +
+				"此后每轮(8/12/16/20 点)有新增商品上架时,会第一时间发邮件通知你。\n\n" +
+				"——远哥来了"
+			if err := s.sendMerchantMail(email, subject, body); err != nil {
+				out["mail_error"] = err.Error()
+			} else {
+				out["mail_sent"] = true
+			}
+		}
+		writeJSON(w, out)
 	case http.MethodDelete:
 		email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
 		if err := s.store.DeleteMerchantSub(email); err != nil {
@@ -502,7 +555,9 @@ func (s *Server) handleAdminMerchantTestMail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var req struct {
-		Email string `json:"email"`
+		Email   string `json:"email"`
+		Subject string `json:"subject"`
+		Body    string `json:"body"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "参数解析失败", http.StatusBadRequest)
@@ -517,9 +572,15 @@ func (s *Server) handleAdminMerchantTestMail(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "服务端未配置发件邮箱(-merchant-smtp-user / -merchant-smtp-pass)", http.StatusBadRequest)
 		return
 	}
-	subject := "【测试】远行商人订阅邮件"
-	body := "这是一封测试邮件,说明 QQ 邮箱 SMTP 配置正常,新货提醒可以正常投递。\n\n" +
-		"发送时间:" + time.Now().Format("2006-01-02 15:04:05") + "\n\n——远行商人订阅自动发送"
+	subject := strings.TrimSpace(req.Subject)
+	if subject == "" {
+		subject = "【测试】远行商人订阅邮件"
+	}
+	body := strings.TrimSpace(req.Body)
+	if body == "" {
+		body = "这是一封测试邮件,说明 QQ 邮箱 SMTP 配置正常,新货提醒可以正常投递。\n\n" +
+			"发送时间:" + time.Now().Format("2006-01-02 15:04:05") + "\n\n——远行商人订阅自动发送"
+	}
 	if err := s.sendMerchantMail(email, subject, body); err != nil {
 		http.Error(w, "发送失败:"+err.Error(), http.StatusInternalServerError)
 		return

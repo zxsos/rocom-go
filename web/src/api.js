@@ -145,7 +145,7 @@ export const queryEggMatch = async (height, weight) => {
 
 // getMerchant 拉取远行商人数据:后端按当前时间返回营业状态与 4h 槽缓存(本地缓存,令牌在服务端,
 // 见 internal/server/api_merchant.go),只在槽缺失时才回源第三方,避免玩家反复打开页面烧 token。
-// force=true 强制后端回源第三方(烧对方额度,「强制刷新」按钮用)。
+// force=true 强制后端回源第三方(烧对方额度,仅管理面板「强制刷新商人数据」按钮用)。
 // 响应结构:{now,day,status:"open|closed|idle",today:[{start,end,label,empty,merchant}],prev:[...]},
 // 其中 merchant 是第三方原始 JSON:{merchant_name,subtitle,fetched_at,round:{...},item_count,
 // items:[{name,kind,image,start_time,end_time,time_label,price,limit}]}。
@@ -352,7 +352,9 @@ export function adminMerchantSubDelete(email) {
 }
 
 // adminTestMail 发送测试邮件验证 SMTP 配置(错误信息透传后端 SMTP 具体报错)。
-export const adminTestMail = (email) => postJSON('/api/admin/merchant-test-mail', { email })
+// subject/body 可自定义,为空则后端用默认标题/内容。
+export const adminTestMail = (email, subject, body) =>
+  postJSON('/api/admin/merchant-test-mail', { email, subject, body })
 
 // adminWildPetOptions 可投放的野生宠物形态:{options:[{base,name,book}]}。
 export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then(async (r) => {
