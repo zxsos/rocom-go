@@ -283,10 +283,18 @@ export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then
 })
 
 // adminInjectWild 向指定成员投放稀有野生精灵。
-// {account, base: petbase id, kind: 'shiny'|'colorful', offsetMeters, level}
+// {account, base: petbase id, kind: 'shiny'|'colorful', offsetMeters, level, glassType, glassValue}
 // level: 0 或缺省=后端随机 30-60;指定 1-100 则固定该等级。
-export const adminInjectWild = (account, base, kind, offsetMeters = 30, level = 0) =>
-  postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters, level })
+// glassType/glassValue: kind=colorful 时的炫彩色卡,0/0 或缺省=后端随机合法色卡;
+//   1=普通炫彩(value=(粒子id<<20)|配色id);2=隐藏炫彩(value=1/2/3 赛季、1000 黑白)。
+export const adminInjectWild = (account, base, kind, offsetMeters = 30, level = 0, glassType = 0, glassValue = 0) =>
+  postJSON('/api/admin/inject-wild', { account, base, kind, offsetMeters, level, glassType, glassValue })
+
+// adminInjectFlower 向指定成员投放假炫彩花种(花灵 BOSS,默认 7 星特殊花种)。
+// {account, base: 守护宠物 petbase id, star: 星级 1-7(0=默认 7), glassType, glassValue}
+// glassType/glassValue 语义同 adminInjectWild(0/0=后端随机合法色卡)。
+export const adminInjectFlower = (account, base, star = 0, glassType = 0, glassValue = 0) =>
+  postJSON('/api/admin/inject-flower', { account, base, star, glassType, glassValue })
 
 // adminRevokeInject 撤销某账号的一只注入精灵(?account=&id=)。
 export function adminRevokeInject(account, id) {

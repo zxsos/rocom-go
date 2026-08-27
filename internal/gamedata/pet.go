@@ -1,6 +1,7 @@
 package gamedata
 
 import (
+	mathrand "math/rand"
 	"sort"
 	"strconv"
 )
@@ -233,6 +234,38 @@ func (db *DB) GlassDesc(glassType, glassValue int32) string {
 		}
 	}
 	return ""
+}
+
+// GlassValid 报告炫彩色卡组合是否合法:普通炫彩要求粒子/配色都能在配置里查到,
+// 隐藏炫彩要求有外观名(暗夜拾光等)。用于管理员投放假炫彩时校验手填的色号。
+func (db *DB) GlassValid(glassType, glassValue int32) bool {
+	return db.GlassDesc(glassType, glassValue) != ""
+}
+
+// RandGlass 返回一个随机的合法炫彩色卡组合:隐藏炫彩(赛季 1/2/3、黑白)与普通炫彩
+// (随机粒子 × 随机配色打包)各半,模拟真实投放的多样性。配置缺失时兜底 1 号普通色卡。
+func (db *DB) RandGlass() (glassType, glassValue int32) {
+	randKey := func(m map[string]string) string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		return keys[mathrand.Intn(len(keys))]
+	}
+	if len(db.glassNames) > 0 && mathrand.Intn(2) == 0 {
+		v, err := strconv.ParseInt(randKey(db.glassNames), 10, 32)
+		if err == nil {
+			return GlassHidden, int32(v)
+		}
+	}
+	if len(db.glassParticles) > 0 && len(db.glassColors) > 0 {
+		p, err1 := strconv.ParseInt(randKey(db.glassParticles), 10, 32)
+		c, err2 := strconv.ParseInt(randKey(db.glassColors), 10, 32)
+		if err1 == nil && err2 == nil {
+			return GlassCommon, int32(p)<<glassParticleShift | int32(c)
+		}
+	}
+	return GlassCommon, 1
 }
 
 // PetEggGroups 返回某 petbase 形态的蛋组列表(社区名+描述,按配置顺序);无则返回 nil。
