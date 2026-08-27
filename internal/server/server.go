@@ -50,6 +50,8 @@ type Server struct {
 	adminMu    sync.Mutex
 	adminToken string // 管理员会话令牌;服务重启后失效需重新登录
 
+	eggAPIKey string // 第三方图鉴 API 令牌(-egg-api-key),查随机蛋可能物种用;空=不启用
+
 	injectMu sync.Mutex
 	injects  map[string][]*injectEntry // 账号 -> 已注入精灵(管理员投放,有生命周期,见 admin.go)
 
@@ -68,9 +70,10 @@ type iconMeta struct {
 	PartnerFrame  string            `json:"partnerFrame,omitempty"` // 搭档标记徽章橙色外框底(img_collect)
 }
 
-// New 创建 HTTP 服务。
-func New(st *store.Store, hub *Hub, db *gamedata.DB) *Server {
-	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
+// New 创建 HTTP 服务。eggAPIKey 是查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌,
+// 只在服务端持有;空字符串 = 孵蛋页不提供查询(前端会提示未配置)。
+func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey string) *Server {
+	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals(), eggAPIKey: eggAPIKey}
 	s.lastPos = map[string]map[string]any{}
 	s.lastWild = map[string]any{}
 	s.lastHome = map[string]any{}
@@ -164,6 +167,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/flowers/slots", s.handleFlowerSlots)
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
+	s.mux.HandleFunc("GET /api/eggs/query", s.handleEggQuery)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
