@@ -6,6 +6,7 @@ import { PetDetailModal } from '../../components/PetDetailModal'
 import { fmtTime, pctHot, voiceHot } from '../../utils/format'
 import { Marks } from '../../components/badges'
 import { hatchProgress } from './hatch'
+import { toast } from '../../components/toast'
 
 // 精灵蛋页面:三段垂直 —— 孵蛋器(在孵且进度未满的蛋)、已孵化蛋(进度满的标记蛋)、
 // 仓库(其余蛋)。不分标签页——在孵的蛋本来就不出现在背包格子里(BagModuleData.IsRemoveEggItem)。
@@ -192,23 +193,29 @@ function EggCard({ egg, now, onPet }) {
   const src = egg.srcName ? `来源:${egg.srcName}` : ''
   const name = tidyEggName(egg.name)
   // 随机蛋(神奇的蛋)的「猜猜孵出谁」:后端代理第三方图鉴 API(令牌在服务端,不进浏览器)。
-  const [match, setMatch] = useState(null) // {loading,error,data}
+  // 查询结果按身高体重缓存(localStorage):已查过又刷新页面时,初始化直接恢复缓存结果,
+  // 不用再点「猜猜孵出谁」重新请求第三方。
+  const guessKey = [egg.heightM, egg.weightKg].map((v) => v ?? '').join('|')
+  const [match, setMatch] = useState(() => {
+    if (!egg.random) return null
+    const hit = readEggGuessCache(guessKey)
+    return hit ? { loading: false, error: '', data: hit } : null
+  }) // {loading,error,data}
   const query = () => {
-    const key = [egg.heightM, egg.weightKg].map((v) => v ?? '').join('|')
-    const hit = readEggGuessCache(key)
+    const hit = readEggGuessCache(guessKey)
     if (hit) { // 同身高体重查过,直接复用缓存,不再请求第三方
       setMatch({ loading: false, error: '', data: hit })
       return
     }
     setMatch({ loading: true, error: '', data: null })
     queryEggMatch(egg.heightM, egg.weightKg)
-      .then((d) => { writeEggGuessCache(key, d); setMatch({ loading: false, error: '', data: d }) })
+      .then((d) => { writeEggGuessCache(guessKey, d); setMatch({ loading: false, error: '', data: d }) })
       .catch((e) => {
         const msg = e.message || '查询失败'
         if (/429|请求过于频繁/.test(msg)) {
-          // 限流:不占卡片位置,直接弹警告提醒
+          // 限流:不占卡片位置,弹自制 toast 提醒(不阻塞页面)
           setMatch(null)
-          window.alert('喂喂喂,当我Token不要钱吗,等会再查啊魂淡')
+          toast('喂喂喂,当我Token不要钱吗,等会再查啊魂淡')
         } else {
           setMatch({ loading: false, error: msg, data: null })
         }

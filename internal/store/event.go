@@ -137,8 +137,9 @@ func (sc *Scoped) StatsEvents() (*EventStats, error) {
 	return st, nil
 }
 
-// ListEvents 返回本账号最近事件(按时间倒序)。
-func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
+// ListEvents 返回本账号最近事件(按时间倒序)。offset > 0 时做页码分页(跳过前 offset 条),
+// 与 beforeID 游标二选一:页码分页供前端翻页,游标供「加载更早」流式追加。
+func (sc *Scoped) ListEvents(limit, beforeID, offset int) ([]*Event, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
@@ -150,6 +151,10 @@ func (sc *Scoped) ListEvents(limit, beforeID int) ([]*Event, error) {
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
+	if offset > 0 {
+		q += ` OFFSET ?`
+		args = append(args, offset)
+	}
 	rows, err := sc.rdb.Query(q, args...)
 	if err != nil {
 		return nil, err
