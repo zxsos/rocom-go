@@ -1,6 +1,7 @@
 /* —— 远行商人页(第三方活动 NPC 数据,见 pages/merchant/Merchant.jsx) ——
    业务节奏:8/12/16/20 四轮上架售卖,只有 00:00~08:00 打烊休市。 */
-.merchant-page { max-width: 1080px; }
+/* 桌面端铺满可用宽度,右侧不留白;商品网格按列自适应 */
+.merchant-page { width: 100%; }
 
 /* 顶部横幅:商人名 + 营业状态 + 轮次进度(或打烊提示) */
 .merchant-hero {
@@ -85,6 +86,20 @@
 .merchant-sub-msg { margin-top: 8px; font-size: 12px; }
 .merchant-sub-msg.ok { color: #28a745; }
 .merchant-sub-msg.err { color: var(--danger, #e5534b); }
+.merchant-sub-toggle {
+  margin-left: auto; padding: 2px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent;
+  color: var(--fg-dim);
+}
+.merchant-sub-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.merchant-sub-fold {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 8px; padding: 8px 12px; font-size: 13px;
+  background: rgba(40, 167, 69, .07); border: 1px dashed rgba(40, 167, 69, .4);
+  border-radius: var(--radius); color: var(--fg);
+}
+.merchant-sub-fold-mail { font-weight: 600; }
+.merchant-sub-fold-kw { color: var(--fg-dim); font-size: 12px; }
 
 /* 操作条 */
 .merchant-bar { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 12px; gap: 10px; flex-wrap: wrap; }

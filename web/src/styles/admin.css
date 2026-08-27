@@ -24,6 +24,10 @@
 .admin-rules { max-width: 640px; }
 .admin-rule-form { display: grid; grid-template-columns: 1fr 120px 1fr auto; gap: 8px; }
 .admin-rule-form .btn { white-space: nowrap; }
+/* 测试邮件表单:收件邮箱/主题/按钮一行,正文独占一行 */
+.admin-test-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: start; }
+.admin-test-form textarea { grid-column: 1 / -1; resize: vertical; font-family: inherit; line-height: 1.5; }
+.admin-test-form .btn { white-space: nowrap; }
 .admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-rule-list li {
   display: flex; align-items: center; gap: 10px;
