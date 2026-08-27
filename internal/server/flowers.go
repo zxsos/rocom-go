@@ -35,45 +35,66 @@ type FlowerItem struct {
 // InjectFlowerItem 向某账号「当前花种分组」头部注入一只花种(管理员投放的假炫彩花种),
 // 同步写入自己世界存档槽,并广播 flowers 让花种页立即显示。不改游戏真实流量,
 // 仅操作 server 缓存的最近分组(与 pipeline 共用同一 payload 缓存,字段类型一致)。
+//
+// 并发安全:lastFlowers 里的 map 由 pipeline 与 server 共享,一经发布即视为不可变;
+// 任何修改都必须「构建新 map 再替换引用」,严禁原地改动——否则与管线/HTTP 读取方
+// 并发时会触发 Go map 并发读写 fatal error(整个进程崩溃)。
 func (s *Server) InjectFlowerItem(account string, f FlowerItem) {
-	payload, _ := s.GetLastFlowers(account).(map[string]any)
-	if payload == nil {
-		payload = map[string]any{"account": account, "flowers": []FlowerItem{}, "cur": "self", "worlds": map[string]any{}}
+	s.posMu.Lock()
+	old, _ := s.lastFlowers[account].(map[string]any)
+	np := map[string]any{"account": account, "cur": "self"}
+	flowers := []FlowerItem{f}
+	worlds := map[string]any{}
+	if old != nil {
+		if cur, _ := old["cur"].(string); cur != "" {
+			np["cur"] = cur
+		}
+		if fl, ok := old["flowers"].([]FlowerItem); ok {
+			flowers = append(flowers, fl...)
+		}
+		if wm, ok := old["worlds"].(map[string]any); ok {
+			for k, v := range wm {
+				worlds[k] = v
+			}
+		}
 	}
-	flowers, _ := payload["flowers"].([]FlowerItem)
-	// 复制一份再改,避免改动缓存里 pipeline 持有的共享切片。
-	flowers = append([]FlowerItem{f}, flowers...)
-	payload["flowers"] = flowers
-
 	// 同步自己世界槽:管理页切到「自己世界」槽位时数据一致;槽不存在则创建。
-	worlds, _ := payload["worlds"].(map[string]any)
-	if worlds == nil {
-		worlds = map[string]any{}
-		payload["worlds"] = worlds
-	}
+	// 复制槽 map 再插新花种,不原地改 pipeline 持有的槽(已发布数据不可变)。
 	if self, ok := worlds["self"].(map[string]any); ok {
-		slotFlowers, _ := self["flowers"].([]FlowerItem)
-		self["flowers"] = append([]FlowerItem{f}, slotFlowers...)
-		self["ts"] = time.Now().Unix()
+		ns := make(map[string]any, len(self)+1)
+		for k, v := range self {
+			ns[k] = v
+		}
+		slot := []FlowerItem{f}
+		if sf, ok := self["flowers"].([]FlowerItem); ok {
+			slot = append(slot, sf...)
+		}
+		ns["flowers"] = slot
+		ns["ts"] = time.Now().Unix()
+		worlds["self"] = ns
 	} else {
 		worlds["self"] = map[string]any{"flowers": []FlowerItem{f}, "ts": time.Now().Unix()}
 	}
-	if cur, _ := payload["cur"].(string); cur == "" {
-		payload["cur"] = "self"
-	}
-	s.SetLastFlowers(account, payload)
-	s.hub.Broadcast("flowers", account, payload)
+	np["flowers"] = flowers
+	np["worlds"] = worlds
+	s.lastFlowers[account] = np
+	s.posMu.Unlock()
+	s.hub.Broadcast("flowers", account, np)
 }
 
 // RemoveFlowerItem 从某账号「当前花种分组」删除指定 npc_logic_id 的花种(撤销投放),
 // 同步从自己世界槽中删除,并广播 flowers。返回 false 表示该花种已不在分组里。
+// 并发安全同 InjectFlowerItem:锁内深拷贝后替换引用,不原地改共享 map。
 func (s *Server) RemoveFlowerItem(account string, logicID uint64) bool {
-	payload, _ := s.GetLastFlowers(account).(map[string]any)
+	s.posMu.Lock()
+	payload, _ := s.lastFlowers[account].(map[string]any)
 	if payload == nil {
+		s.posMu.Unlock()
 		return false
 	}
 	flowers, ok := payload["flowers"].([]FlowerItem)
 	if !ok {
+		s.posMu.Unlock()
 		return false
 	}
 	out := make([]FlowerItem, 0, len(flowers))
@@ -84,23 +105,35 @@ func (s *Server) RemoveFlowerItem(account string, logicID uint64) bool {
 		out = append(out, f)
 	}
 	if len(out) == len(flowers) {
+		s.posMu.Unlock()
 		return false
 	}
-	payload["flowers"] = out
-	if worlds, ok := payload["worlds"].(map[string]any); ok {
+	np := make(map[string]any, len(payload))
+	for k, v := range payload {
+		np[k] = v
+	}
+	np["flowers"] = out
+	if worlds, ok := np["worlds"].(map[string]any); ok {
 		if self, ok := worlds["self"].(map[string]any); ok {
-			slotFlowers, _ := self["flowers"].([]FlowerItem)
-			so := make([]FlowerItem, 0, len(slotFlowers))
-			for _, f := range slotFlowers {
-				if f.NpcLogicID != logicID {
-					so = append(so, f)
+			ns := make(map[string]any, len(self)+1)
+			for k, v := range self {
+				ns[k] = v
+			}
+			so := make([]FlowerItem, 0, len(out))
+			if sf, ok := self["flowers"].([]FlowerItem); ok {
+				for _, f := range sf {
+					if f.NpcLogicID != logicID {
+						so = append(so, f)
+					}
 				}
 			}
-			self["flowers"] = so
-			self["ts"] = time.Now().Unix()
+			ns["flowers"] = so
+			ns["ts"] = time.Now().Unix()
+			worlds["self"] = ns
 		}
 	}
-	s.SetLastFlowers(account, payload)
-	s.hub.Broadcast("flowers", account, payload)
+	s.lastFlowers[account] = np
+	s.posMu.Unlock()
+	s.hub.Broadcast("flowers", account, np)
 	return true
 }

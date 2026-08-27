@@ -188,10 +188,21 @@ func (s *Server) handleDeleteFlowerSlot(w http.ResponseWriter, r *http.Request) 
 	if m, ok := s.lastFlowers[acc].(map[string]any); ok {
 		if worlds, ok := m["worlds"].(map[string]any); ok {
 			if _, exists := worlds[key]; exists {
-				delete(worlds, key)
-				if cur, _ := m["cur"].(string); cur == key {
-					m["cur"] = ""
+				// 深拷贝再删,不原地改已发布的共享 map(管线/HTTP/广播读取方均无锁)。
+				nw := make(map[string]any, len(worlds))
+				for k, v := range worlds {
+					nw[k] = v
 				}
+				delete(nw, key)
+				nm := make(map[string]any, len(m))
+				for k, v := range m {
+					nm[k] = v
+				}
+				nm["worlds"] = nw
+				if cur, _ := m["cur"].(string); cur == key {
+					nm["cur"] = ""
+				}
+				s.lastFlowers[acc] = nm
 				deleted = true
 			}
 		}

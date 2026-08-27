@@ -215,6 +215,21 @@ func (s *Server) handleAdminPlaySessions(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, map[string]any{"sessions": sessions, "summary": summary})
 }
 
+// handleAdminEggStats 返回查蛋 API(第三方图鉴)使用统计:累计/今日次数、成功率、
+// 近 14 天每日、按账号排行、最近明细。keySet 告知服务端是否配置 -egg-api-key。
+func (s *Server) handleAdminEggStats(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	st, err := s.store.EggQueryStats()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	st.KeySet = s.eggAPIKey != ""
+	writeJSON(w, st)
+}
+
 // requireAdmin 校验管理员会话,未登录则回 401 并返回 false。
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if !s.authed(r) {
@@ -547,8 +562,8 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "id": id, "u": u, "v": v})
 }
 
-// handleAdminInjectFlower 向指定成员的花种页注入一只假炫彩花种(花灵 BOSS,7 星特殊花种,
-// 随机血脉/等级,携带管理员指定或随机的炫彩色卡)。不修改游戏真实流量:直接把花种插入
+// handleAdminInjectFlower 向指定成员的花种页注入一只假炫彩花种(花灵 BOSS,默认 7 星特殊花种,
+// 星级可自定义,随机血脉/等级,携带管理员指定或随机的炫彩色卡)。不修改游戏真实流量:直接把花种插入
 // server 缓存的最远花种分组并广播 flowers,花种页立即显示,与真实花种卡片无异。
 // 生命周期:仅由管理员主动撤销(记入 injects,kind=flower,花种不在地图上,无靠近/换场景判定)。
 func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request) {
@@ -558,7 +573,7 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		Account    string `json:"account"`
 		Base       uint32 `json:"base"`      // 守护宠物 petbase id
-		Star       uint32 `json:"star"`      // 花种星级 1-7;0=默认 7 星
+		Star       uint32 `json:"star"`      // 花种星级 1-7;0=默认 7
 		GlassType  int32  `json:"glassType"` // 炫彩色卡类型(1=普通 2=隐藏;0=随机)
 		GlassValue int32  `json:"glassValue"`
 	}
@@ -575,6 +590,13 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "base required", 400)
 		return
 	}
+	star := req.Star
+	if star == 0 {
+		star = 7
+	} else if star > 7 {
+		http.Error(w, "star must be 1-7", 400)
+		return
+	}
 	info, ok := s.db.PetBase(req.Base)
 	if !ok {
 		http.Error(w, "unknown petbase", 400)
@@ -582,14 +604,6 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 	}
 	if !s.db.HasHeadImage(req.Base) {
 		http.Error(w, "该形态没有可用的头像,无法投放", 400)
-		return
-	}
-	// 花种星级:1-7 自定义;0=默认 7 星(兼容旧调用)。
-	star := req.Star
-	if star == 0 {
-		star = 7
-	} else if star > 7 {
-		http.Error(w, "star must be 1-7", 400)
 		return
 	}
 	// 炫彩色卡设置:同野生精灵投放,指定类型+数值或随机一个合法色卡。
@@ -607,6 +621,11 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 	head := s.db.PetImageByBase(req.Base, false).Head
 	blood := uint32(randRange(1, 24))
 	now := time.Now()
+	// 分组跟随星级:7 星归特殊花种组(specSeedId>0),1-6 星按普通花种组(specSeedId=0)。
+	specSeedID := uint32(0)
+	if star == 7 {
+		specSeedID = 1
+	}
 	f := FlowerItem{
 		ID:          req.Base,
 		Name:        info.Name,
@@ -617,7 +636,7 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 		BloodIcon:   s.db.BloodIcon(blood),
 		NpcLogicID:  uint64(now.UnixNano()),
 		EndTs:       uint64(now.Add(3 * 24 * time.Hour).Unix()), // 3 天活动倒计时
-		SpecSeedID:  1,                                          // 归入特殊花种组
+		SpecSeedID:  specSeedID,
 		ActivityID:  1,
 		Detail:      true,
 		Lv:          uint32(randRange(40, 70)),

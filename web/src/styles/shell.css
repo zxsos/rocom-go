@@ -9,8 +9,9 @@
   padding: 10px 16px; background: var(--bar-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; font: inherit; cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
-.brand-logo { width: 22px; height: 22px; border-radius: 6px; flex: none; }
+/* 品牌区:logo 作「头像」在上,「妙妙屋」缩小放在头像下面(垂直排列) */
+.brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
+.brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
   display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); color: var(--fg-dim);
@@ -18,6 +19,28 @@
 }
 .navlink.active { background: var(--bg-3); color: var(--fg); }
 .navlink:hover { color: var(--fg); background: var(--bg-2); }
+/* 2 级菜单分组(「我的背包」):hover/聚焦展开下拉,任一子项激活时分组同高亮 */
+.navgroup { position: relative; }
+.navgroup-btn {
+  display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius);
+  color: var(--fg-dim); background: none; border: none; cursor: pointer; font: inherit;
+  transition: background .15s ease, color .15s ease;
+}
+.navgroup:hover .navgroup-btn, .navgroup.active .navgroup-btn { background: var(--bg-3); color: var(--fg); }
+.navgroup-arrow { font-size: 9px; opacity: .7; }
+.navgroup-pop {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 160px;
+  background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; z-index: 40; backdrop-filter: blur(10px);
+}
+.navgroup:hover .navgroup-pop, .navgroup:focus-within .navgroup-pop { display: block; }
+.navgroup-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+  color: var(--fg-dim); transition: background .15s ease, color .15s ease;
+}
+.navgroup-item:hover { background: var(--bg-2); color: var(--fg); }
+.navgroup-item.active { background: var(--bg-3); color: var(--accent); }
+.navgroup-item-icon { font-size: 14px; }
 /* 顶栏全屏按钮:全局入口(原先只在宠物列表工具栏),随账号下拉一起靠右。
    按钮默认透明融入半透明磨砂顶栏,悬停/激活才给反馈,避免实色块与背景割裂 */
 .topbar-fs {
@@ -102,7 +125,7 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .topnav { display: none; }
   /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/主题按钮缩成纯图标(隐藏文字) */
   .topbar { gap: 8px; padding: 8px 12px; }
-  .brand { font-size: 15px; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .brand { font-size: 10px; max-width: none; }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
   .bottomnav {
@@ -110,10 +133,28 @@ html[data-privacy] .brand { color: var(--fg-dim); }
     background: var(--bar-bg); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
-  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; color: var(--fg-dim); transition: color .15s ease; }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; color: var(--fg-dim); background: none; border: none; cursor: pointer; -webkit-appearance: none; appearance: none; transition: color .15s ease; }
   .tab.active { color: var(--accent); }
   .tab-icon { font-size: 19px; }
   .tab-label { font-size: 11px; }
+  /* 底部「我的背包」分组 tab:点击向上弹出子菜单面板(宠物列表/精灵蛋)。
+     .tabgroup 自身不做定位上下文,面板 absolute 相对 sticky 的 .bottomnav 全宽居中 */
+  .tabgroup { flex: 1; }
+  .tabgroup .tab { width: 100%; }
+  .tabgroup-pop {
+    position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
+    background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.25); padding: 8px; z-index: 40; backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .tabgroup-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px;
+    color: var(--fg-dim); transition: background .15s ease, color .15s ease;
+  }
+  .tabgroup-item:hover { background: var(--bg-2); color: var(--fg); }
+  .tabgroup-item.active { background: var(--bg-3); color: var(--accent); }
+  .tabgroup-item-icon { font-size: 17px; }
+  .tabgroup-item-label { font-size: 13px; }
   .content { padding: 12px; padding-bottom: 72px; }
   /* 地图页占满高度:底部导航为 sticky(在流内),content 的 flex:1 已停在其上方,
      故去掉为滚动页预留的额外 70px 底距,只留与两侧一致的 12px。 */

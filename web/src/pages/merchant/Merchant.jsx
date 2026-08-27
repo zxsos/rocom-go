@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { getMerchant, getMerchantSub, setMerchantSub, delMerchantSub } from '../../api'
+import { AccountContext } from '../../context'
 import { fmtTime } from '../../utils/format'
 
 // 远行商人页:展示后端缓存的 4h 轮次数据(令牌在服务端,缓存 2 天,见
@@ -200,9 +201,11 @@ function MerchantItem({ it }) {
 }
 
 // SubCard 新货邮件提醒订阅:填任意邮箱(可选关键词,空=全部),每轮新货上架后后端发邮件。
+// 订阅按当前登录账号绑定(AccountContext):一个账号一个邮箱,换设备登录同一账号也能识别已订阅。
 // 需两次输入同一邮箱确认,订阅成功后自动发送验证邮件并默认折叠。
 // 服务端未配置发信邮箱(configured=false)时禁用并提示。
 function SubCard() {
+  const account = useContext(AccountContext)
   const [cfg, setCfg] = useState(null) // {configured, subscribed, email, keywords}
   const [email, setEmail] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -210,27 +213,21 @@ function SubCard() {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const [collapsed, setCollapsed] = useState(!!localStorage.getItem('merchant-sub-email'))
+  const [collapsed, setCollapsed] = useState(false)
 
-  const refresh = useCallback(async (e) => {
+  const refresh = useCallback(async () => {
     try {
-      const d = await getMerchantSub(e)
+      const d = await getMerchantSub() // buildQuery 自动带当前账号
       setCfg(d)
-      if (d.subscribed) setKws(d.keywords)
+      if (d.subscribed) { setEmail(d.email); setConfirm(d.email); setKws(d.keywords) }
       setCollapsed(d.subscribed)
     } catch (e2) { setErr(e2.message) }
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem('merchant-sub-email')
-    if (saved) {
-      setEmail(saved)
-      setConfirm(saved)
-      refresh(saved)
-    } else {
-      setCfg({ configured: true, subscribed: false, email: '', keywords: '' })
-    }
-  }, [refresh])
+    setMsg(''); setErr('')
+    if (account) refresh()
+  }, [account, refresh])
 
   const save = async (ev) => {
     ev.preventDefault()
@@ -240,7 +237,6 @@ function SubCard() {
     setBusy(true); setErr(''); setMsg('')
     try {
       const res = await setMerchantSub(e, kws.trim())
-      localStorage.setItem('merchant-sub-email', e)
       if (res.mail_sent) {
         setMsg('订阅成功,验证邮件已发送到 ' + e + ',请查收(含垃圾箱)。')
       } else if (res.mail_error) {
@@ -249,16 +245,14 @@ function SubCard() {
         setMsg('订阅成功(服务端未配置发信邮箱,暂无法发送验证邮件)。')
       }
       setCollapsed(true)
-      refresh(e)
+      refresh()
     } catch (e2) { setErr(e2.message) } finally { setBusy(false) }
   }
 
   const unsub = async () => {
-    const e = email.trim()
     setBusy(true); setErr(''); setMsg('')
     try {
-      await delMerchantSub(e)
-      localStorage.removeItem('merchant-sub-email')
+      await delMerchantSub()
       setKws('')
       setMsg('已退订')
       setCollapsed(false)
@@ -290,7 +284,7 @@ function SubCard() {
             订阅时需两次输入同一邮箱确认,成功后自动发送验证邮件。
           </p>
           <form className="merchant-sub-form" onSubmit={save}>
-            <input className="merchant-sub-input" type="email" placeholder="收件邮箱(如 name@example.com,不限于 QQ)"
+            <input className="merchant-sub-input" type="email" placeholder="收件邮箱(如 name@example.com)"
               value={email} onChange={(e) => setEmail(e.target.value)}
               disabled={busy || (cfg && !cfg.configured)} required />
             <input className="merchant-sub-input" type="email" placeholder="再次输入同一邮箱确认"
