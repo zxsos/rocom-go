@@ -2,10 +2,67 @@ import React, { useEffect, useState } from 'react'
 import {
   getAdminStatus, adminSetup, adminLogin, adminLogout,
   getAdminToken, setAdminToken, adminRules, adminSetRule, adminDeleteRule,
-  adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminListInjects, adminRevokeInject,
+  adminStats, adminPlaySessions, adminWildPetOptions, adminInjectWild, adminInjectFlower, adminListInjects, adminRevokeInject,
   getAccounts, setAccountPin, deleteAccount,
 } from '../api'
+import { GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
+import { imgURL } from '../components/icons'
 import AdminCharts from './AdminCharts'
+
+// glassOf 把色卡选择器的选择换算成后端接口的 glassType/glassValue。
+// random -> 0/0(后端随机合法色卡);common -> 1 + (粒子id<<20)|配色id;hidden -> 2 + 赛季id(1/2/3、1000)。
+const glassOf = (g) => {
+  if (g.type === 'common') return { glassType: 1, glassValue: (g.particle << 20) | g.color }
+  if (g.type === 'hidden') return { glassType: 2, glassValue: g.hidden }
+  return { glassType: 0, glassValue: 0 }
+}
+
+// fmtGlassName 从素材文件名里抠出展示名("img_dazzling_Bg3_png-四角星.png" -> "四角星")。
+const fmtGlassName = (name) => (name.split('-')[1] || name).replace(/\.png$/, '')
+
+// GlassPicker 炫彩色卡选择器:随机 / 普通炫彩(粒子+配色) / 隐藏炫彩(赛季整图)。
+// value={type, particle, color, hidden};普通/隐藏模式附带小预览(双色渐变块 / 整图缩略)。
+function GlassPicker({ value, onChange }) {
+  const set = (patch) => onChange({ ...value, ...patch })
+  return (
+    <div className="admin-glass-picker">
+      <select className="select" value={value.type} onChange={(e) => set({ type: e.target.value })} title="炫彩色卡类型">
+        <option value="random">随机色卡</option>
+        <option value="common">普通炫彩</option>
+        <option value="hidden">隐藏炫彩</option>
+      </select>
+      {value.type === 'common' && (
+        <>
+          <select className="select" value={value.particle} onChange={(e) => set({ particle: Number(e.target.value) })} title="粒子形状">
+            {Object.entries(GLASS_PARTICLES).map(([id, name]) => (
+              <option key={id} value={id}>{fmtGlassName(name)}</option>
+            ))}
+          </select>
+          <select className="select" value={value.color} onChange={(e) => set({ color: Number(e.target.value) })} title="配色(共 39 组)">
+            {Object.keys(GLASS_COLORS).map((id) => (
+              <option key={id} value={id}>配色{id}</option>
+            ))}
+          </select>
+          <span
+            className="admin-glass-preview"
+            style={{ background: `linear-gradient(90deg, ${GLASS_COLORS[value.color][0]}, ${GLASS_COLORS[value.color][1]})` }}
+            title={`配色${value.color} 粒子${value.particle}`}
+          />
+        </>
+      )}
+      {value.type === 'hidden' && (
+        <>
+          <select className="select" value={value.hidden} onChange={(e) => set({ hidden: Number(e.target.value) })} title="隐藏炫彩(赛季整图)">
+            {Object.entries(GLASS_HIDDEN).map(([id, name]) => (
+              <option key={id} value={id}>{fmtGlassName(name)}</option>
+            ))}
+          </select>
+          <img className="admin-glass-preview" src={imgURL('dazzling/' + GLASS_HIDDEN[value.hidden])} alt="隐藏炫彩" title="隐藏炫彩整图" />
+        </>
+      )}
+    </div>
+  )
+}
 
 // fmtDur 把秒格式化为「X小时Y分 / Y分Z秒 / Z秒」。
 const fmtDur = (s) => {
@@ -117,7 +174,15 @@ export default function Admin() {
   const [injLevel, setInjLevel] = useState(0) // 0=随机 30-60;指定 1-100 固定等级
   const [injErr, setInjErr] = useState('')
   const [injMsg, setInjMsg] = useState('')
+  const [injGlass, setInjGlass] = useState({ type: 'random', particle: 1, color: 1, hidden: 1 }) // 炫彩投放色卡
   const [injects, setInjects] = useState(null)  // 当前注入中的精灵列表(管理面板撤销)
+  // 投放假炫彩花种
+  const [flAccount, setFlAccount] = useState('')
+  const [flBase, setFlBase] = useState('')
+  const [flStar, setFlStar] = useState(7) // 花种星级 1-7
+  const [flGlass, setFlGlass] = useState({ type: 'random', particle: 1, color: 1, hidden: 1 })
+  const [flErr, setFlErr] = useState('')
+  const [flMsg, setFlMsg] = useState('')
   // 账号 PIN 管理 + 账号删除
   const [pinErr, setPinErr] = useState('')
   const [pinMsg, setPinMsg] = useState('')
@@ -186,11 +251,30 @@ export default function Admin() {
     if (!account || !injBase) return
     setInjErr(''); setInjMsg('')
     try {
-      const res = await adminInjectWild(account, Number(injBase), injKind, Number(injOffset) || 30, Number(injLevel) || 0)
+      const { glassType, glassValue } = glassOf(injGlass)
+      const res = await adminInjectWild(
+        account, Number(injBase), injKind, Number(injOffset) || 30, Number(injLevel) || 0, glassType, glassValue,
+      )
       setInjMsg('已投放:' + (res.id || '') + '(u=' + (res.u != null ? res.u.toFixed(3) : '') + ')')
       loadInjects()
     } catch (err) {
       setInjErr(err.message || '投放失败')
+    }
+  }
+
+  // 投放假炫彩花种:向目标成员的花种页注入一只 7 星特殊花种,不要求其在线。
+  const injectFlower = async (e) => {
+    e.preventDefault()
+    const account = flAccount.trim()
+    if (!account || !flBase) return
+    setFlErr(''); setFlMsg('')
+    try {
+      const { glassType, glassValue } = glassOf(flGlass)
+      const res = await adminInjectFlower(account, Number(flBase), Number(flStar), glassType, glassValue)
+      setFlMsg('已投放花种:' + (res.id || '') + '(npcLogicId=' + res.npcLogicId + ')')
+      loadInjects()
+    } catch (err) {
+      setFlErr(err.message || '投放失败')
     }
   }
 
@@ -448,6 +532,8 @@ export default function Admin() {
             <option value="shiny">异色</option>
             <option value="colorful">炫彩</option>
           </select>
+          {/* 炫彩色卡设置:仅炫彩投放时展示;选择后投出的精灵在角标/悬浮面板/详情里显示对应色卡 */}
+          {injKind === 'colorful' && <GlassPicker value={injGlass} onChange={setInjGlass} />}
           <input
             className="input" type="number" min="1" max="200" value={injOffset}
             onChange={(e) => setInjOffset(e.target.value)} title="距玩家位置米数"
@@ -471,13 +557,56 @@ export default function Admin() {
                 <li key={it.account + ':' + it.id}>
                   <span className="admin-inject-name">{it.name}</span>
                   <span className="admin-inject-kind">{(it.kinds || []).join('/') || '普通'}</span>
-                  <span className="muted admin-inject-scene">{it.sceneRes || '无底图'}</span>
+                  {it.kind === 'flower' && <span className="admin-inject-flower">花种</span>}
+                  {it.kind !== 'flower' && <span className="muted admin-inject-scene">{it.sceneRes || '无底图'}</span>}
                   <button className="btn ghost" onClick={() => revokeInject(it.account, it.id)}>撤销</button>
                 </li>
               ))}
             </ul>
           </div>
         )}
+      </div>
+
+      <div className="admin-card admin-rules">
+        <h3>投放假炫彩花种</h3>
+        <p className="admin-hint">
+          向选定成员的花种页注入一只假花种(默认 7 星特殊花灵,星级可自定义),携带指定或
+          随机炫彩色卡,卡片与真实花种无异,点开可查看完整色卡。不要求成员在线,不修改
+          真实流量;生命周期由管理员在此手动撤销(见上方「当前注入中」列表)。
+        </p>
+        <form onSubmit={injectFlower} className="admin-inject-form">
+          <select
+            className="select" value={flAccount} onChange={(e) => setFlAccount(e.target.value)}
+            title="选择投放目标玩家(无需在线)"
+          >
+            <option value="">选择目标玩家</option>
+            {accounts.map((a) => (
+              <option key={a.account} value={a.account}>
+                {a.online ? '🟢 ' : '🟥 '}{a.name} (UID:{(a.account || '').replace(/^UID:/, '')})
+              </option>
+            ))}
+          </select>
+          <select className="select" value={flBase} onChange={(e) => setFlBase(e.target.value)}>
+            <option value="">选择守护宠物</option>
+            {wildOptions && wildOptions.map((o) => (
+              <option key={o.base} value={o.base}>{o.name}(#{o.book})</option>
+            ))}
+          </select>
+          <select
+            className="select" value={flStar} onChange={(e) => setFlStar(Number(e.target.value))}
+            title="花种星级(1-7)"
+          >
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+              <option key={n} value={n}>{n} 星{n === 7 ? '(花灵 BOSS)' : ''}</option>
+            ))}
+          </select>
+          <GlassPicker value={flGlass} onChange={setFlGlass} />
+          <button className="btn primary" type="submit" disabled={!flAccount.trim() || !flBase}>
+            投放
+          </button>
+        </form>
+        {flErr && <p className="admin-error">{flErr}</p>}
+        {flMsg && <p className="admin-hint" style={{ color: 'var(--green, #4caf50)' }}>{flMsg}</p>}
       </div>
 
       <div className="admin-card admin-rules">

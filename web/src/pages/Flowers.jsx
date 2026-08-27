@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
 import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../api'
-import { AccountContext } from '../context'
+import { AccountContext, IconsContext } from '../context'
 import { fmtTime } from '../utils/format'
 import { ImgAvatar } from '../components/icons'
-import { GlassChip } from '../components/badges'
+import { GlassChip, MarkIcon } from '../components/badges'
 
 // 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
 // 只显示花种;world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)在解析层就丢弃了。
@@ -13,6 +13,7 @@ import { GlassChip } from '../components/badges'
 // 由后端合并进对应卡片后经同一 SSE 刷新;未点过的花种这些字段为空。
 export default function Flowers() {
   const account = useContext(AccountContext)
+  const icons = useContext(IconsContext)
   const [data, setData] = useState(null) // null = 尚未收到任何 0x0375
   const [now, setNow] = useState(() => Date.now())
   // 世界存档槽位:slots=槽列表(null=加载中),selKey=选中视图(默认 __current__=当前世界实时数据),
@@ -200,7 +201,8 @@ function FlowerCard({ f, now }) {
       }
     >
       {/* 右上角标记:已点过(=有 0x0338 详情)才显示——
-          炫彩用游戏图标,普通炫彩粉紫 / 隐藏炫彩金色;无炫彩标「普通」 */}
+          炫彩只放游戏炫彩图标(普通炫彩粉紫 / 隐藏炫彩金色由角标底色区分);
+          完整色卡在下方信息区大图展示,角标不再贴小色卡。无炫彩标「普通」 */}
       {f.detail && (
         <span
           className={
@@ -214,7 +216,9 @@ function FlowerCard({ f, now }) {
             f.glassType === 1 ? `炫彩 · ${f.glass}` : '普通(无炫彩)'
           }
         >
-          {f.glassType === 1 || f.glassType === 2 ? <GlassChip p={f} /> : '普通'}
+          {f.glassType === 1 || f.glassType === 2
+            ? <MarkIcon src={icons.colorful} title="炫彩" fallback="彩" cls="mark-colorful" />
+            : '普通'}
         </span>
       )}
       <ImgAvatar src={f.img} alt={f.name} className="flower-img" />
@@ -254,6 +258,14 @@ function FlowerCard({ f, now }) {
                 {f.medalName}
               </span>
             )}
+          </div>
+        )}
+        {/* 炫彩/隐藏炫彩:卡片内展示完整大色卡(角标小色卡看不清配色,这里铺满信息列可细看)。
+            后端在 glassType != 0 时才带 glassValue,故此处判断即可。 */}
+        {f.glassType > 0 && f.glassValue > 0 && (
+          <div className="flower-glass-bar">
+            <GlassChip p={f} className="flower-glass-chip" />
+            {f.glass && <span className="flower-glass-t" title={f.glass}>{f.glass}</span>}
           </div>
         )}
       </div>

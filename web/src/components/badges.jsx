@@ -18,7 +18,7 @@ export function Form({ form }) {
 }
 
 // MarkIcon 渲染单个异色/炫彩标记图;无图或加载失败退化为原文字徽标(异/彩)。
-function MarkIcon({ src, title, fallback, cls }) {
+export function MarkIcon({ src, title, fallback, cls }) {
   const [bad, onError] = useImgFallback(src)
   if (src && !bad) {
     return <img className="mark-img" src={imgURL(src)} alt={title} title={title} onError={onError} />

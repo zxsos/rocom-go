@@ -152,6 +152,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/injects", s.handleAdminListInjects)
 	s.mux.HandleFunc("POST /api/admin/inject-wild", s.handleAdminInjectWild)
 	s.mux.HandleFunc("DELETE /api/admin/inject-wild", s.handleAdminRevokeInject)
+	s.mux.HandleFunc("POST /api/admin/inject-flower", s.handleAdminInjectFlower)
 	s.mux.HandleFunc("GET /api/admin/placeholder", s.handleAdminPlaceholder)
 	s.mux.HandleFunc("GET /api/position", s.handlePosition)
 	s.mux.HandleFunc("GET /api/pois", s.handlePois)

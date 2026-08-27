@@ -103,6 +103,18 @@
   display: grid; grid-template-columns: 1fr 1.2fr 100px 100px 100px auto; gap: 8px; align-items: end;
 }
 .admin-inject-form .btn { white-space: nowrap; }
+/* 炫彩色卡选择器:占满整行(内含类型+粒子+配色+预览多个控件,内部 wrap 换行) */
+.admin-glass-picker {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px; background: var(--bg-2); border: 1px dashed var(--line); border-radius: var(--radius);
+}
+.admin-glass-picker .select { width: auto; flex: none; }
+/* 色卡预览:普通=双色渐变块(280:154 比例),隐藏=整图缩略 */
+.admin-glass-preview {
+  flex: none; width: 56px; height: 31px; border-radius: 4px;
+  border: 1px solid var(--line); object-fit: cover; display: inline-block;
+}
 @media (max-width: 760px) {
   .admin-inject-form { grid-template-columns: 1fr 1fr; }
   .admin-inject-form .btn { grid-column: span 2; }
@@ -125,6 +137,11 @@
 }
 .admin-inject-scene { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-inject-list .btn.ghost { margin-left: auto; }
+/* 花种注入类型徽标(绿色,区别于野生注入) */
+.admin-inject-flower {
+  flex: none; font-size: 11px; color: var(--green, #4caf50);
+  border: 1px solid var(--green, #4caf50); border-radius: 4px; padding: 1px 6px;
+}
 
 /* 账号 PIN 管理区:每行的 PIN 输入框窄一些 */
 .admin-pin-input { width: 100px; flex: none; padding: 5px 8px; font-size: 13px; }

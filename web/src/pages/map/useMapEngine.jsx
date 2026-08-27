@@ -360,8 +360,6 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
       const tip = wildTip === p.id
       const kinds = p.kinds || []
       const rare = kinds.includes('shiny') || kinds.includes('colorful')
-      // 仅炫彩(无异色)时用 CSS mask 渲染的色卡(GlassChip);与异色并存时优先合成图/异色图标。
-      const soloColorful = kinds.includes('colorful') && !kinds.includes('shiny')
       const mark = (kinds.includes('shiny') && kinds.includes('colorful') && icons.shinyColorful) ||
         (kinds.includes('shiny') && icons.shiny) ||
         (kinds.includes('colorful') && icons.colorful)
@@ -377,9 +375,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
           {p.img ? <img className="map-wild-face" src={imgURL(p.img)} alt="" draggable={false} /> : <span className="map-wild-face-fallback">🐾</span>}
           {rare && mark && (
             <span className={'map-wild-mark map-wild-mark-' + markKind}>
-              {soloColorful
-                ? <GlassChip p={p} className="map-glass-chip" />
-                : <img src={imgURL(mark)} alt="" draggable={false} />}
+              <img src={imgURL(mark)} alt="" draggable={false} />
             </span>
           )}
         </div>,
@@ -388,6 +384,11 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist }) => {
             style={{ left: p.u * mapPx, top: p.v * mapPx }}>
             <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
             <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
+            {/* 炫彩/异色炫彩:悬浮面板里展示完整色卡(角标圆盘太小看不清,点开可细看配色)。
+                后端在 glassType != 空 时才带这两个字段,故此处判断即可;异色(仅 shiny)无炫彩数据不显示。 */}
+            {p.glassType > 0 && p.glassValue > 0 && (
+              <div className="twg"><GlassChip p={p} className="map-wild-tip-chip" /></div>
+            )}
             <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
             <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
             <div className="twd">距离 {dist != null ? dist : '-'} 米</div>

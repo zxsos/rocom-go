@@ -311,6 +311,7 @@ func (s *Server) handleAdminListInjects(w http.ResponseWriter, r *http.Request) 
 				"kinds":    kinds,
 				"sceneRes": e.sceneRes,
 				"created":  e.created.Unix(),
+				"kind":     e.kind, // wild=野生精灵 / flower=花种
 			})
 		}
 	}
@@ -334,11 +335,13 @@ func (s *Server) handleAdminListInjects(w http.ResponseWriter, r *http.Request) 
 type injectEntry struct {
 	id       string // 前端标记 id,前缀 admin-inject-
 	account  string // 所属账号
-	sceneRes int32  // 投放时所在场景
-	x, y     int32  // 投放世界坐标(厘米),用于距离判定
-	mark     map[string]any // 广播给前端的标记载荷
+	sceneRes int32  // 投放时所在场景(花种注入恒为 0)
+	x, y     int32  // 投放世界坐标(厘米),用于距离判定(花种注入恒为 0)
+	mark     map[string]any // 广播给前端的标记载荷(花种注入仅作记录,不广播 wildpets)
 	created  time.Time      // 投放时刻
 	nearSec  int            // 距离玩家 <10 米累计的秒数(连续靠近 10 秒触发自动撤销)
+	kind          string // 注入类型:wild=野生精灵 / flower=花种
+	flowerLogicID uint64 // kind=flower 时花种 npc_logic_id,撤销时据此从花种分组删除
 }
 
 // randRange 返回 [lo, hi] 闭区间的随机整数。注入精灵的个体值(嗓音/身高/体重)用它取
@@ -371,6 +374,8 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 		Kind         string `json:"kind"`         // shiny | colorful
 		OffsetMeters int32  `json:"offsetMeters"` // 投放点距玩家位置的米数(默认 30)
 		Level        int32  `json:"level"`        // 注入精灵等级(0=随机,取 30-60)
+		GlassType    int32  `json:"glassType"`    // 炫彩色卡类型(kind=colorful 时生效:1=普通 2=隐藏;0=随机)
+		GlassValue   int32  `json:"glassValue"`   // 炫彩色卡数值(普通=(粒子id<<20)|配色id;隐藏=1/2/3 赛季、1000)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", 400)
@@ -449,8 +454,15 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	glassType := int32(0)
 	glassValue := int32(0)
 	if req.Kind == "colorful" {
-		glassType = 1 // GlassCommon
-		glassValue = 1
+		// 炫彩色卡设置:管理员可指定类型+数值(普通=粒子×配色打包,隐藏=赛季/黑白);
+		// 都不传(0/0)时随机一个合法色卡,模拟真实炫彩的多样性。
+		glassType, glassValue = req.GlassType, req.GlassValue
+		if glassType == 0 && glassValue == 0 {
+			glassType, glassValue = s.db.RandGlass()
+		} else if !s.db.GlassValid(glassType, glassValue) {
+			http.Error(w, "invalid glass color card", 400)
+			return
+		}
 	}
 	// 嗓音/身高/体重用合法范围内的随机个体值,模拟真实野生精灵的个体差异
 	// (固定取 0 或中值会让每只假精灵都一样,一眼假)。
@@ -497,13 +509,14 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 			glassDesc = "炫彩"
 		}
 		mark["glass"] = glassDesc
+		mark["glassType"] = glassType
 		mark["glassValue"] = glassValue
 	}
 
 	// 记入 injects(生命周期管理),并合并进 lastWild 缓存供回显。
 	entry := &injectEntry{
 		id: id, account: req.Account, sceneRes: sceneRes,
-		x: wx, y: wy, mark: mark, created: time.Now(),
+		x: wx, y: wy, mark: mark, created: time.Now(), kind: "wild",
 	}
 	s.injectMu.Lock()
 	s.injects[req.Account] = append(s.injects[req.Account], entry)
@@ -534,6 +547,101 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "id": id, "u": u, "v": v})
 }
 
+// handleAdminInjectFlower 向指定成员的花种页注入一只假炫彩花种(花灵 BOSS,7 星特殊花种,
+// 随机血脉/等级,携带管理员指定或随机的炫彩色卡)。不修改游戏真实流量:直接把花种插入
+// server 缓存的最远花种分组并广播 flowers,花种页立即显示,与真实花种卡片无异。
+// 生命周期:仅由管理员主动撤销(记入 injects,kind=flower,花种不在地图上,无靠近/换场景判定)。
+func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	var req struct {
+		Account    string `json:"account"`
+		Base       uint32 `json:"base"`      // 守护宠物 petbase id
+		Star       uint32 `json:"star"`      // 花种星级 1-7;0=默认 7 星
+		GlassType  int32  `json:"glassType"` // 炫彩色卡类型(1=普通 2=隐藏;0=随机)
+		GlassValue int32  `json:"glassValue"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+	req.Account = strings.TrimSpace(req.Account)
+	if req.Account == "" {
+		http.Error(w, "account required", 400)
+		return
+	}
+	if req.Base == 0 {
+		http.Error(w, "base required", 400)
+		return
+	}
+	info, ok := s.db.PetBase(req.Base)
+	if !ok {
+		http.Error(w, "unknown petbase", 400)
+		return
+	}
+	if !s.db.HasHeadImage(req.Base) {
+		http.Error(w, "该形态没有可用的头像,无法投放", 400)
+		return
+	}
+	// 花种星级:1-7 自定义;0=默认 7 星(兼容旧调用)。
+	star := req.Star
+	if star == 0 {
+		star = 7
+	} else if star > 7 {
+		http.Error(w, "star must be 1-7", 400)
+		return
+	}
+	// 炫彩色卡设置:同野生精灵投放,指定类型+数值或随机一个合法色卡。
+	glassType, glassValue := req.GlassType, req.GlassValue
+	if glassType == 0 && glassValue == 0 {
+		glassType, glassValue = s.db.RandGlass()
+	} else if !s.db.GlassValid(glassType, glassValue) {
+		http.Error(w, "invalid glass color card", 400)
+		return
+	}
+	glassDesc := s.db.GlassDesc(glassType, glassValue)
+	if glassDesc == "" {
+		glassDesc = "炫彩"
+	}
+	head := s.db.PetImageByBase(req.Base, false).Head
+	blood := uint32(randRange(1, 24))
+	now := time.Now()
+	f := FlowerItem{
+		ID:          req.Base,
+		Name:        info.Name,
+		Img:         head,
+		Star:        star,
+		Blood:       blood,
+		BloodName:   s.db.BloodName(blood),
+		BloodIcon:   s.db.BloodIcon(blood),
+		NpcLogicID:  uint64(now.UnixNano()),
+		EndTs:       uint64(now.Add(3 * 24 * time.Hour).Unix()), // 3 天活动倒计时
+		SpecSeedID:  1,                                          // 归入特殊花种组
+		ActivityID:  1,
+		Detail:      true,
+		Lv:          uint32(randRange(40, 70)),
+		GlassType:   glassType,
+		Glass:       glassDesc,
+		GlassValue:  glassValue,
+		BindName:    info.Name,
+		BindImg:     head,
+	}
+	s.InjectFlowerItem(req.Account, f)
+
+	id := "admin-inject-" + strconv.FormatInt(now.UnixNano(), 36)
+	s.injectMu.Lock()
+	s.injects[req.Account] = append(s.injects[req.Account], &injectEntry{
+		id: id, account: req.Account, mark: map[string]any{
+			"id": id, "n": info.Name + "(花种)", "kinds": []string{"colorful"},
+			"glass": glassDesc, "glassType": glassType, "glassValue": glassValue,
+		},
+		created: now, kind: "flower", flowerLogicID: f.NpcLogicID,
+	})
+	s.injectMu.Unlock()
+	writeJSON(w, map[string]any{"ok": true, "id": id, "npcLogicId": f.NpcLogicID})
+}
+
 // handleAdminRevokeInject 撤销一只注入精灵(?account=xxx&id=yyy)。
 // 从 injects 与 lastWild 缓存里删掉,再广播一条 wildpets(不含该 id)让前端清掉标记。
 func (s *Server) handleAdminRevokeInject(w http.ResponseWriter, r *http.Request) {
@@ -558,9 +666,11 @@ func (s *Server) handleAdminRevokeInject(w http.ResponseWriter, r *http.Request)
 func (s *Server) removeInject(acc, id string) bool {
 	s.injectMu.Lock()
 	list := s.injects[acc]
+	var removed injectEntry
 	found := false
 	for i, e := range list {
 		if e.id == id {
+			removed = *e
 			list = append(list[:i], list[i+1:]...)
 			if len(list) == 0 {
 				delete(s.injects, acc)
@@ -574,6 +684,13 @@ func (s *Server) removeInject(acc, id string) bool {
 	s.injectMu.Unlock()
 	if !found {
 		return false
+	}
+	// 花种注入:从花种分组删除并广播 flowers(不涉及地图位置/缓存)。
+	if removed.kind == "flower" {
+		if removed.flowerLogicID != 0 {
+			s.RemoveFlowerItem(acc, removed.flowerLogicID)
+		}
+		return true
 	}
 	s.posMu.Lock()
 	cur, _ := s.lastWild[acc].(map[string]any)
@@ -623,6 +740,10 @@ func (s *Server) sweepInjects() {
 				pScene, _ = pos["sceneResId"].(int32)
 			}
 			for _, e := range list {
+				// 花种注入不在地图上,不参与靠近/换场景生命周期,只由管理员主动撤销。
+				if e.kind == "flower" {
+					continue
+				}
 				// 换场景:撤销(标记无法在新场景投影,留着会错位)。
 				if pScene != 0 && pScene != e.sceneRes {
 					revoke = append(revoke, struct{ acc, id string }{acc, e.id})
