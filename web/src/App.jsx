@@ -11,6 +11,7 @@ const NAV = [
   { to: '/pets', label: '宠物列表', icon: '🐾' },
   { to: '/events', label: '捕获事件', icon: '🔔' },
   { to: '/eggs', label: '精灵蛋', icon: '🥚' },
+  { to: '/merchant', label: '远行商人', icon: '🧳' },
   { to: '/map', label: '实时地图', icon: '🗺️' },
   { to: '/flowers', label: '花种', icon: '🌱' },
 ]

@@ -34,6 +34,8 @@ func main() {
 	socks5User := flag.String("socks5-user", "", "SOCKS5 认证用户名(空=无认证)。建议配合 -socks5-allow 白名单使用;RFC 1929 密码为明文传输,公网直连时配合加密隧道更稳")
 	socks5Pass := flag.String("socks5-pass", "", "SOCKS5 认证密码(空=无认证;-socks5-user 非空时必填)")
 	eggAPIKey := flag.String("egg-api-key", "", "查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌(只在服务端持有,不下发前端;空=孵蛋页不提供查询)")
+	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
+	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
 	flag.Parse()
 
 	db, err := gamedata.Load()
@@ -44,7 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("打开数据库失败: %v", err)
 	}
-	srv := server.New(st, server.NewHub(), db, *eggAPIKey)
+	srv := server.New(st, server.NewHub(), db, *eggAPIKey, *smtpUser, *smtpPass)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 	for s := range strings.SplitSeq(*ignoreIPs, ",") {
