@@ -19,6 +19,17 @@ const imgSrc = (it) => {
 // msTime 第三方的时间戳是毫秒,fmtTime 要秒,这里除 1000 再交给它。
 const msTime = (ms) => (ms ? fmtTime(ms / 1000) : '')
 
+// maskEmail 邮箱脱敏显示:local 部分保留前 2 个字符与末尾 1 个字符,中间用 * 代替;
+// local 过短(≤2)时保留首位其余打星,域名部分完整保留。用于订阅成功后折叠展示,防旁窥。
+const maskEmail = (e) => {
+  const s = String(e || '')
+  const i = s.indexOf('@')
+  if (i < 2) return s // 无 @ 或 local 过短,原样返回
+  const local = s.slice(0, i)
+  if (local.length <= 2) return local[0] + '*'.repeat(local.length - 1) + s.slice(i)
+  return local.slice(0, 2) + '*'.repeat(local.length - 3) + local.slice(-1) + s.slice(i)
+}
+
 // 推荐关键词:常见「值得买」商品词,点击即填入(自动补英文逗号,再点一次取消)。
 const SUB_PRESETS = ['球', '棱镜', '国王', '项链', '粉尘', '零碎', '相框', '魔镜', '钥匙']
 // 关键词规范化:中文逗号/顿号/分号/句号/空白等间隔符统一成英文逗号,去空项。
@@ -443,7 +454,7 @@ function SubCard() {
       </div>
       {collapsed && cfg && cfg.subscribed ? (
         <div className="merchant-sub-fold">
-          <span className="merchant-sub-fold-mail">📮 {email}</span>
+          <span className="merchant-sub-fold-mail" title={email}>📮 {maskEmail(email)}</span>
           <span className="merchant-sub-fold-kw">{kws.trim() ? '关键词:' + kws.trim() : '提醒全部新货'}</span>
         </div>
       ) : (

@@ -45,3 +45,12 @@ export function fmtClock(ts) {
   const d = new Date(ts * 1000)
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
 }
+
+// maskUid 把 UID 半隐藏显示:保留前 3 后 3,中间以 ＊＊＊ 代替(1234567890 → 123＊＊＊890)。
+// 用于花种页「当前世界/自己世界/好友槽名」等展示位,防止完整 UID 被旁观者直接看到;
+// 位数不足 7 位时整体隐藏意义不大,原样返回。
+export function maskUid(uid) {
+  const s = String(uid || '')
+  if (s.length <= 6) return s
+  return s.slice(0, 3) + '＊＊＊' + s.slice(-3)
+}

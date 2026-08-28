@@ -15,6 +15,7 @@ type FlowerItem struct {
 	BloodName   string `json:"bloodName"`   // 血脉中文短名(普通/草/火…;未知时为空)
 	BloodIcon   string `json:"bloodIcon"`   // 血脉主图标 /img/<此路径>(未知时为空)
 	NpcLogicID  uint64 `json:"npcLogicId"`  // NPC 逻辑 id(每只花种唯一;详情合并按此匹配)
+	ChallengeCount uint32 `json:"challengeCount"` // 本账号累计挑战次数(按品种持久化,花种消失仍保留;0=未挑战过)
 	EndTs       uint64 `json:"endTs"`       // 活动结束 Unix 秒(0=未设置)
 	SpecSeedID  uint32 `json:"specSeedId"`  // 特殊花种种子 id(0=普通花种)
 	ActivityID  uint32 `json:"activityId"`  // 活动 id

@@ -182,6 +182,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/eggs/query", s.handleEggQuery)
+	s.mux.HandleFunc("GET /api/handbook-glasses", s.handleHandbookGlasses)
 	s.mux.HandleFunc("GET /api/merchant", s.handleMerchant)
 	s.mux.HandleFunc("GET /api/merchant/sub", s.handleMerchantSub)
 	s.mux.HandleFunc("POST /api/merchant/sub", s.handleMerchantSub)

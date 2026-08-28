@@ -200,6 +200,11 @@ func (p *Pipeline) sweepOnce(now time.Time) {
 	if err := p.st.ForceEndStaleSessions(nowTS-24*3600, nowTS); err != nil {
 		log.Printf("ForceEndStaleSessions 失败: %v", err)
 	}
+	// 花种挑战计数兜底清理:活动结束后花种从分组消失,0x0375 不再触发实时删除,
+	// 这里按记录的 end_ts 统一清掉过期品种的计数(见 boss.go onBossNpcInfo)。
+	if err := p.st.DeleteExpiredFlowerChallenges(nowTS); err != nil {
+		log.Printf("DeleteExpiredFlowerChallenges 失败: %v", err)
+	}
 }
 
 func (p *Pipeline) handle(m capture.Message) {
