@@ -124,25 +124,31 @@ export function usePaint(account, res, layer, paintable) {
     if (node) draw()
   }, [draw])
 
+  // 加载世代号:断线补拉/换场景/开关图层并发时,旧请求迟到不得覆盖新数据。
+  const genRef = useRef(0)
   // 换账号/场景/分层、或刚打开图层:重取整张位图。
   // **图层关着就不取**——整张 43KB,而传送/换场景是常事,为一个没开的图层每次都拉一遍不值;
   // 后端始终在记(与开关无关),故打开的那一刻拉到的就是这一路走过的全部痕迹,不会从此刻重涂。
-  useEffect(() => {
+  // load 同时被 SSE 断线重连补拉复用(见下):重连后整张重拉一次,断线期间的增量都补回来。
+  const load = useCallback(() => {
+    const gen = ++genRef.current
     if (!res || !on || !paintable) { setDims({ w: 0, h: 0 }); bitsRef.current = null; return }
-    let alive = true
     getPaint(res, layer || 0).then((d) => {
-      if (!alive) return
+      if (gen !== genRef.current) return
       const w = d.w | 0, h = d.h | 0
       bitsRef.current = w > 0 ? decodeCells(d.cells, Math.ceil((w * h) / 8)) : null
       gridRef.current = { w, h }
       setDims({ w, h })
       setVer((v) => v + 1)
     }).catch(() => {})
-    return () => { alive = false }
-  }, [account, res, layer, on, paintable])
+  }, [res, layer, on, paintable])
 
-  // SSE 增量:新涂的格子(常态几个到几十个)直接补进位图并画上;reset 则清空重画。
+  useEffect(() => { load() }, [account, load])
+
+  // SSE 增量:新涂的格子(常态几个到几十个)直接补进位图并画上;reset 则清空重画;
+  // 断线重连成功(或首次连上)后补拉整张——断线期间的增量覆盖不了,直接重拉快照。
   useEffect(() => subscribe((m) => {
+    if (m.type === 'stream-open') { load(); return }
     if (m.type !== 'paint') return
     const d = m.data || {}
     if (d.res !== res || (d.layer || 0) !== (layer || 0)) return // 别的场景/层,不关我的事
@@ -155,7 +161,7 @@ export function usePaint(account, res, layer, paintable) {
     if (!bits || !d.cells) return
     for (const idx of d.cells) bits[idx >> 3] |= 1 << (idx & 7)
     schedule()
-  }), [account, res, layer, schedule])
+  }), [account, res, layer, schedule, load])
 
   useEffect(() => { draw() }, [ver, on, draw]) // 整张换了/图层刚打开:重画
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []) // 卸载时别留下待执行的重画

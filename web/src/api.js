@@ -252,6 +252,15 @@ function syncStream() {
       try { fn(msg) } catch { /* 单个订阅者出错不牵连其它 */ }
     }
   }
+  // 连接建立成功(首次或断线重连)时广播 {type:'stream-open'}:SSE 没有历史缓存,断线期间的
+  // 位置/野生宠/涂地/小窝增量都丢了,等下一个移动包(静止时心跳 2.5-3s 一次)才恢复太慢;
+  // 各订阅者收到后自行补拉一次快照立即恢复。注意:重连成功 = 已漏数据,onopen 必然触发,
+  // 且事件源为浏览器原生重连,不会重复开连接,无需去重。
+  es.onopen = () => {
+    for (const fn of [...subs]) {
+      try { fn({ type: 'stream-open' }) } catch { /* 单个订阅者出错不牵连其它 */ }
+    }
+  }
 }
 
 // subscribe 订阅 SSE，onMsg 收到 {type, account, data}。返回取消函数(幂等)。

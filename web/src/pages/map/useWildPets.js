@@ -337,6 +337,11 @@ export function useWildPets(account) {
   // injectRevoke:后端撤销某只注入精灵时只推一个 id,从当前列表剔除该标记,避免整表替换
   // 抖动(尤其是管理员主动撤销后立即清掉那只)。
   useEffect(() => subscribe((m) => {
+    // 断线重连成功(或首次连上)后补拉全量:SSE 丢的增量覆盖不了,直接取后端最新快照恢复。
+    if (m.type === 'stream-open') {
+      getWildPets().then((d) => { if (d) { setPets(d.pets || []); setAllPets(d.allPets || []) } }).catch(() => {})
+      return
+    }
     if (m.type !== 'wildpets') return
     if (m.data.injectRevoke) {
       const id = m.data.injectRevoke
