@@ -155,11 +155,17 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
           <div className="filter-group">
             <label>跑图路线</label>
             {/* 收起时也能看出开了几条;点击展开/收起路线列表。 */}
-            <button className="map-medal-toggle" onClick={routes.toggleOpen} aria-expanded={routes.open}
-              title="B站泽口博士的收集路线(1~20 号收集片区/精灵球/冲刺),可叠加多条">
-              <span>收集路线</span>
-              <span className="map-route-count">{routes.marks.length}/{routes.kinds.length}<i className="muted">▾</i></span>
-            </button>
+            <div className="map-routes-head">
+              <button className="map-medal-toggle" onClick={routes.toggleOpen} aria-expanded={routes.open}
+                title="B站泽口博士的收集路线(1~20 号收集片区/精灵球/冲刺),可叠加多条">
+                <span>收集路线</span>
+                <span className="map-route-count">{routes.marks.length}/{routes.kinds.length}<i className="muted">▾</i></span>
+              </button>
+              <span className="map-routes-all">
+                <button onClick={() => routes.setAll(true)} title="一键开启所有路线" aria-label="全开">全开</button>
+                <button onClick={() => routes.setAll(false)} title="一键关闭所有路线" aria-label="全关">全关</button>
+              </span>
+            </div>
             {routes.open && (
               <div className="map-route-follow">
                 <button className={'map-collect-btn' + (routes.follow ? ' on' : '')}
@@ -188,7 +194,9 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
                 <button className={'map-collect-btn' + (r.on ? ' on' : '')}
                   onClick={() => routes.toggle(r.name)}
                   aria-label={`${r.short}开关`} aria-pressed={r.on}>✓</button>
-                <span className="map-wild-swatch" style={{ borderColor: r.color }} />
+                <button className="map-route-swatch" style={{ background: r.color }}
+                  onClick={() => routes.cycleColor(r.name)}
+                  title="点击换色:自动挑选与地图背景/旧色/其它路线对比明显的颜色" aria-label={`${r.short}换色`} />
                 <span className="map-layer-name">{r.short}</span>
                 <span className="muted">{routes.follow && r.progress >= 0 ? `${r.progress + 1}/${r.count}` : r.count}</span>
               </div>

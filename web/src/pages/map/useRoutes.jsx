@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { imgURL } from '../../components/icons'
 
 // —— 跑图收集路线图层(仅 10003 卡洛西亚大陆)——
-// 路线数据是 B站泽口博士的收集路线,与页面 /route-map/ 共用同一份静态 JSON:
-//   web/public/route-map/data/index.json(文件名列表) + 各路线 JSON。
+// 路线数据是 B站泽口博士的收集路线,静态 JSON 在 web/public/route-map/data/:
+//   index.json(文件名列表) + 各路线 JSON。
 // 路线坐标为 8192x8192 画布,归一化 u=x/8192 后与底图投影对齐,前端只负责开关与摆放。
 // 开关选择存 localStorage,与 POI 图层记忆互不干扰。
 // 跟走模式:玩家位置(pos 世界坐标,cm)换算回 8192 画布,与路线点比距离;
@@ -11,6 +12,7 @@ const ROUTES_LS_KEY = 'map.routeLayers'
 const FOLLOW_LS_KEY = 'map.routeFollow'
 const PROGRESS_LS_KEY = 'map.routeProgress'
 const NEAR_M_LS_KEY = 'map.routeNearM'
+const COLORS_LS_KEY = 'map.routeColors'
 const SCENE = 10003 // 卡洛西亚大陆(路线数据只在该场景有意义)
 const GRID = 8192
 // 10003 底图投影参数(与 names.json maps[10003] 一致):世界坐标 cm → 画布坐标
@@ -35,6 +37,8 @@ const PALETTE = [
   '#ec407a', '#f06292', '#f48fb1', '#e91e63', '#d81b60',
   // 黄绿/黄(色相 48-95,低于婉转声绿 95-155 禁区)
   '#aeea00', '#c0ca33', '#cddc39', '#d4e157', '#ffeb3b', '#fff176', '#fff59d',
+  // 深色(色相/亮度都不进禁区):地图背景偏亮(草原/沙地)时提供强对比
+  '#212121', '#1a237e', '#004d40', '#880e4f',
 ]
 // 地图已有标记的色相禁区(度,含边界):红(箭头/大块头)、橙(小不点)、绿(婉转声)、浅蓝(粗嗓门)、紫(污染)
 const HUE_BAN = [[345, 360], [0, 22], [22, 48], [95, 155], [180, 220], [250, 290]]
@@ -64,6 +68,84 @@ const shuffle = (arr) => {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
+}
+
+// —— 换色:点击路线色点切换颜色,自动偏向与地图背景/旧色/其它已开路线对比明显的色 ——
+// hex → {h,s,l}(h 度,-1 表示灰/白/黑),供打分用
+const hexHsl = (hex) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  const r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 510
+  if (max === min) return { h: -1, s: 0, l }
+  const d = max - min
+  const s = d / (max + min < 510 ? max + min : 510 - (max + min))
+  let h
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0)
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  return { h: h * 60, s, l }
+}
+// 色相环最短距离(0~180)
+const hueDist = (a, b) => {
+  const d = Math.abs(a - b)
+  return Math.min(d, 360 - d)
+}
+const rgbToHex = (r, g, b) => '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
+// 采样地图底图主色(缩到 8x8 取平均),全局缓存。失败/无图返回 null,评分退化为只用旧色/它色对比。
+let mapHslCache = null
+let mapHslPromise = null
+const sampleMapHsl = (img) => {
+  if (mapHslCache || !img) return Promise.resolve(mapHslCache)
+  if (!mapHslPromise) {
+    mapHslPromise = new Promise((resolve) => {
+      const im = new Image()
+      im.crossOrigin = 'anonymous'
+      im.onload = () => {
+        try {
+          const S = 8
+          const c = document.createElement('canvas')
+          c.width = S; c.height = S
+          const ctx = c.getContext('2d', { willReadFrequently: true })
+          ctx.drawImage(im, 0, 0, S, S)
+          const d = ctx.getImageData(0, 0, S, S).data
+          let r = 0, g = 0, b = 0, n = 0
+          for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++ }
+          mapHslCache = hexHsl(rgbToHex(Math.round(r / n), Math.round(g / n), Math.round(b / n)))
+        } catch { mapHslCache = null }
+        resolve(mapHslCache)
+      }
+      im.onerror = () => { mapHslCache = null; resolve(null) }
+      im.src = imgURL(`bigmap/${img}.webp`)
+    })
+  }
+  return mapHslPromise
+}
+// 从候选池挑换色目标:评分 = 与地图背景色相/亮度对比(权重最高,防背景相近)
+//  + 与旧色对比(换色后明显不同) + 与其它已开路线的最小色相距离(路线间可区分)。
+// 取 top3 随机,避免固定两个色反复横跳。
+const pickColor = (candidates, { oldColor, others, mapHsl }) => {
+  const old = oldColor ? hexHsl(oldColor) : null
+  const othersHsl = others.map(hexHsl).filter(Boolean)
+  const scored = candidates.map((c) => {
+    const h = hexHsl(c)
+    let score = 0
+    if (mapHsl && h && h.h >= 0) {
+      score += hueDist(h.h, mapHsl.h) / 180 * 1.5
+      score += Math.abs(h.l - mapHsl.l) * 1.0
+    }
+    if (h && old && old.h >= 0) score += hueDist(h.h, old.h) / 180 * 0.8
+    if (h) {
+      let minD = Infinity
+      for (const o of othersHsl) if (o.h >= 0) minD = Math.min(minD, hueDist(h.h, o.h))
+      score += (minD === Infinity ? 180 : minD) / 180 * 0.6
+    }
+    return { c, score }
+  }).sort((a, b) => b.score - a.score)
+  const top = scored.slice(0, 3)
+  return top[Math.floor(Math.random() * top.length)].c
 }
 
 const loadKeys = () => {
@@ -107,6 +189,7 @@ export function useRoutes(account, pos) {
       .then((r) => r.json())
       .then(async (names) => {
         const colors = shuffle(ROUTE_COLORS) // 每次进场景随机色序,避免固定分配
+        const savedColors = loadJSON(COLORS_LS_KEY, {}) || {} // 用户换过色的路线优先沿用
         const list = await Promise.all(names.map(async (name, i) => {
           const d = await fetch('/route-map/data/' + encodeURIComponent(name), { cache: 'no-store' }).then((r) => r.json())
           return {
@@ -114,7 +197,7 @@ export function useRoutes(account, pos) {
             short: name.replace(/\.json$/, ''),
             count: d.points.length,
             points: d.points,
-            color: colors[i % colors.length],
+            color: savedColors[name] || colors[i % colors.length],
             on: onRef.current.has(name),
           }
         }))
@@ -168,6 +251,34 @@ export function useRoutes(account, pos) {
     })
   }, [])
 
+  // 一键全开/全关:全开 = 勾选所有路线,全关 = 全部取消,均持久化
+  const setAll = useCallback((on) => {
+    setRoutes((prev) => {
+      const next = new Set(on ? prev.map((r) => r.name) : [])
+      onRef.current = next
+      localStorage.setItem(ROUTES_LS_KEY, JSON.stringify([...next]))
+      return prev.map((r) => ({ ...r, on }))
+    })
+  }, [])
+
+  // 换色:点击路线色点触发。采样地图底图主色后,从池中选「与背景/旧色/其它路线
+  // 对比明显」的新色,更新状态并持久化(map.routeColors),刷新后沿用。
+  const cycleColor = useCallback((name) => {
+    const r = routes.find((x) => x.name === name)
+    if (!r) return
+    const others = routes.filter((x) => x.on && x.name !== name).map((x) => x.color)
+    const candidates = ROUTE_COLORS.filter((c) => c !== r.color)
+    sampleMapHsl(pos && pos.img).then((mapHsl) => {
+      const color = pickColor(candidates, { oldColor: r.color, others, mapHsl })
+      setRoutes((prev) => prev.map((x) => (x.name === name ? { ...x, color } : x)))
+      try {
+        const store = loadJSON(COLORS_LS_KEY, {}) || {}
+        store[name] = color
+        localStorage.setItem(COLORS_LS_KEY, JSON.stringify(store))
+      } catch {}
+    })
+  }, [routes, pos])
+
   const toggleFollow = useCallback(() => {
     setFollow((f) => {
       const nf = !f
@@ -195,7 +306,7 @@ export function useRoutes(account, pos) {
     follow,
   })), [routes, progress, follow])
 
-  return { kinds, marks, open, toggleOpen: () => setOpen((o) => !o), toggle, follow, toggleFollow, resetProgress, nearM, setNearM }
+  return { kinds, marks, open, toggleOpen: () => setOpen((o) => !o), toggle, setAll, cycleColor, follow, toggleFollow, resetProgress, nearM, setNearM }
 }
 
 // RouteLayer 把路线画进 .map-world:一条路线一个折线 <path> + 起终点圆。

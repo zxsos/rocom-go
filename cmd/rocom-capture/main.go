@@ -33,6 +33,7 @@ func main() {
 	socks5Max := flag.Int("socks5-max-conns", 64, "SOCKS5 同时处理的最大连接数(超限直接拒绝;0=不限制),防连接风暴拖垮同进程 Web 服务")
 	socks5User := flag.String("socks5-user", "", "SOCKS5 认证用户名(空=无认证)。建议配合 -socks5-allow 白名单使用;RFC 1929 密码为明文传输,公网直连时配合加密隧道更稳")
 	socks5Pass := flag.String("socks5-pass", "", "SOCKS5 认证密码(空=无认证;-socks5-user 非空时必填)")
+	socks5Block := flag.String("socks5-block", "google.com,example.com", "SOCKS5 屏蔽的目标域名(逗号分隔,精确或子域匹配;默认含手机系统连通性探测常用域名 google.com/example.com,可覆盖。空=不屏蔽)")
 	eggAPIKey := flag.String("egg-api-key", "", "查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌(只在服务端持有,不下发前端;空=孵蛋页不提供查询)")
 	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
 	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
@@ -67,7 +68,7 @@ func main() {
 		if *skipSelf && *iface != "" {
 			log.Printf("提示: -socks5-addr 已启用但未设 -skip-self-ip=false,代理进程以本机 IP 出站的游戏流量会被丢弃")
 		}
-		go serveSocks5(*socks5Addr, *socks5Allow, *socks5Max, *socks5User, *socks5Pass)
+		go serveSocks5(*socks5Addr, *socks5Allow, *socks5Block, *socks5Max, *socks5User, *socks5Pass)
 	}
 
 	switch {
@@ -133,7 +134,7 @@ func serveWeb(addr string, h http.Handler, useTLS bool, certPath, keyPath string
 
 // serveSocks5 启动内置 SOCKS5 代理(仅 TCP CONNECT),供手机把游戏流量代理到本机,
 // 整网卡抓包即可看到代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false,见 main)。
-func serveSocks5(addr, allow string, maxConns int, user, pass string) {
+func serveSocks5(addr, allow, block string, maxConns int, user, pass string) {
 	prefs, err := socks5.ParseAllow(allow)
 	if err != nil {
 		log.Fatalf("解析 -socks5-allow 失败: %v", err)
@@ -141,7 +142,13 @@ func serveSocks5(addr, allow string, maxConns int, user, pass string) {
 	if user != "" && pass == "" {
 		log.Fatal("-socks5-user 已设置但 -socks5-pass 为空")
 	}
-	if err := socks5.ListenAndServe(addr, prefs, maxConns, user, pass); err != nil {
+	blocked := []string{}
+	for part := range strings.SplitSeq(block, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			blocked = append(blocked, part)
+		}
+	}
+	if err := socks5.ListenAndServe(addr, prefs, blocked, maxConns, user, pass); err != nil {
 		log.Fatalf("SOCKS5 服务失败: %v", err)
 	}
 }
