@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { getMerchant, getMerchantSub, setMerchantSub, delMerchantSub, getAccounts, setAccountRank } from '../../api'
 import { AccountContext } from '../../context'
 import RankTitle from '../../components/RankTitle'
+import { confirmDialog } from '../../components/confirm'
 import { fmtTime } from '../../utils/format'
 
 // 远行商人页:展示后端缓存的 4h 轮次数据(令牌在服务端,缓存 2 天,见
@@ -136,7 +137,10 @@ export default function Merchant() {
   // 金币旁的参加/退出按钮(默认参加;退出后不再参与福布斯/盈亏排行与称号评选)
   const toggleRank = async () => {
     if (!curAcc) return
-    if (join && !window.confirm('退出排行榜?退出后不再参与福布斯/盈亏排行,称号评选也会排除。')) return
+    if (join && !(await confirmDialog({
+      message: '退出排行榜?退出后不再参与福布斯/盈亏排行,称号评选也会排除。',
+      okText: '退出', danger: true,
+    }))) return
     setBusyRank(true)
     setRankErr('')
     try {

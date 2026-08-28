@@ -73,7 +73,7 @@ export function useMapEngine(account) {
   wildsRef.current = wilds.marks
   const home = useHomeNests(account)
   const paint = usePaint(account, pos && pos.sceneResId, pos && pos.layer && pos.layer.id, pos && pos.paintable)
-  const routes = useRoutes(account, pos && pos.sceneResId)
+  const routes = useRoutes(account, pos)
 
   const anchorRef = useRef(null)
   const dispRef = useRef(null)

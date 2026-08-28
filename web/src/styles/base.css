@@ -129,6 +129,27 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+/* ---- Confirm 确认框(替代 window.confirm 的自制弹层,见 components/confirm.jsx) ---- */
+.confirm-backdrop {
+  position: fixed; inset: 0; z-index: 1001;
+  background: rgba(0, 0, 0, .55); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  opacity: 0; transition: opacity .16s ease;
+}
+.confirm-backdrop.show { opacity: 1; }
+.confirm-dialog {
+  width: 100%; max-width: 340px; padding: 20px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px;
+  transform: scale(.96); transition: transform .16s ease;
+}
+.confirm-backdrop.show .confirm-dialog { transform: scale(1); }
+.confirm-message { font-size: 13px; color: var(--fg-dim); line-height: 1.6; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-actions .btn { min-width: 76px; }
+.confirm-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.confirm-danger:hover { filter: brightness(1.1); }
+
 /* ---- 炫彩色卡放大预览(GlassZoom,见 components/badges.jsx) ---- */
 /* 各场景色卡(列表/详情/地图悬浮/花种)都可点击放大;图标退化态不可点。 */
 .glass-chip, .map-wild-tip .map-wild-tip-chip, .flower-glass-chip { cursor: zoom-in; }

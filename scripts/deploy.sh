@@ -8,6 +8,9 @@
 #
 # 用法:
 #   sudo ./deploy.sh --build        # 服务器上 git pull + go build + 部署(日常更新用这个)
+#                                   # 默认从 github(HTTPS 匿名)拉取;仓库在 cnb.cool 时:
+#                                   #   sudo ROCOM_GIT_REMOTE=cnb ./deploy.sh --build
+#                                   # (需先: git remote add cnb https://cnb.cool/roco12/roco.git)
 #   sudo ./deploy.sh                # 首次安装或更新已有二进制(自动找 dist/ 或当前目录)
 #   sudo ./deploy.sh --binary /tmp/rocom-capture  # 指定二进制路径
 #   sudo ./deploy.sh --archive x.tar  # 从 tar 包安装(内含 rocom-capture 单文件)
@@ -216,13 +219,17 @@ case "$ACTION" in
         REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
         echo "==> 拉取最新代码 ($REPO_DIR)"
         cd "$REPO_DIR"
-        # 显式从 github 拉取:服务器仓库的 origin 可能指向别的托管(如 cnb.cool),
-        # 那里没有最新提交,默认 git pull 会拉空。这里确保 github remote 存在并从它拉。
-        GITHUB_URL="git@github.com:zxsos/roco-go.git"
-        if ! git remote get-url github >/dev/null 2>&1; then
-            git remote add github "$GITHUB_URL"
+        # 拉取远程:默认 github(与项目镜像同步);本机仓库托管在 cnb.cool 时,
+        # 用 ROCOM_GIT_REMOTE 覆盖(如 sudo ROCOM_GIT_REMOTE=cnb ./deploy.sh --build,
+        # 前提是已 git remote add cnb https://cnb.cool/roco12/roco.git)。
+        # 仓库地址可用 ROCOM_GIT_REMOTE_URL 覆盖(如私有镜像)。
+        # 默认用 HTTPS(公开仓库匿名可拉,服务器无需配 SSH key)。
+        REMOTE="${ROCOM_GIT_REMOTE:-github}"
+        if ! git remote get-url "$REMOTE" >/dev/null 2>&1; then
+            git remote add "$REMOTE" "${ROCOM_GIT_REMOTE_URL:-https://github.com/zxsos/roco-go.git}"
         fi
-        git pull --ff-only github master
+        echo "==> 拉取最新代码 ($REPO_DIR, remote: $REMOTE)"
+        git pull --ff-only "$REMOTE" master
 
         # 确认 go 可用:sudo 的 secure_path 可能不含 go 的安装路径,
         # 从常见位置(/usr/local/go/bin、$HOME/go/bin、原用户 PATH)自动补找。
