@@ -149,9 +149,19 @@ export const queryEggMatch = async (height, weight) => {
 // 响应结构:{now,day,status:"open|closed|idle",today:[{start,end,label,empty,merchant}],prev:[...]},
 // 其中 merchant 是第三方原始 JSON:{merchant_name,subtitle,fetched_at,round:{...},item_count,
 // items:[{name,kind,image,start_time,end_time,time_label,price,limit}]}。
-// 服务端未配置令牌时抛错(503)。
+// 服务端未配置令牌时抛错(503)。force 回源第三方可能较慢,30s 超时兜底,避免按钮无限转圈。
 export const getMerchant = async (force = false) => {
-  const r = await fetch('/api/merchant' + (force ? '?force=1' : ''))
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 30000)
+  let r
+  try {
+    r = await fetch('/api/merchant' + (force ? '?force=1' : ''), { signal: ctl.signal })
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('请求超时(回源第三方较慢),请稍后重试')
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
   if (!r.ok) {
     let msg = `拉取失败(${r.status})`
     try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }

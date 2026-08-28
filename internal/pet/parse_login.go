@@ -29,6 +29,30 @@ func ParseLoginAccount(body []byte) (userID uint64, name string, ok bool) {
 	return id, name, true
 }
 
+// ParseLoginCoins 从 ZoneLoginRsp(opcode 0x0102)取玩家金币数量。
+// 金币位于 player_info.brief_info.vitem_info.vitem_list(固定下标数组,下标 1=金币,下标 0 恒 0,
+// 实测用户 19517164 与游戏内一致)。vitem_info 同时带 liabilities_num(定长 6 槽),故用
+// 「field1 varint 60~120 个 + field2 3~12 个」的特征在 body 中唯一定位,避免误命中其他大数组。
+func ParseLoginCoins(body []byte) (coins int64, ok bool) {
+	wire.Walk(body, func(v []byte) bool {
+		if ok {
+			return false
+		}
+		list := wire.FieldVarints(v, 1)
+		if len(list) < 60 || len(list) > 120 {
+			return true // 不是 vitem_info,继续下钻
+		}
+		if n := len(wire.FieldVarints(v, 2)); n < 3 || n > 12 {
+			return true
+		}
+		if len(list) > 1 && list[1] < 1<<50 {
+			coins, ok = int64(list[1]), true
+		}
+		return false
+	})
+	return coins, ok
+}
+
 // MedalOwn 是一只宠物拥有的一枚奖牌(来自登录数据的 PetMedalInfo)。
 type MedalOwn struct {
 	Gid     uint32

@@ -33,7 +33,7 @@ func newTestServer(t *testing.T) *Server {
 	if err != nil {
 		t.Fatalf("打开数据库: %v", err)
 	}
-	return New(st, NewHub(), db)
+	return New(st, NewHub(), db, "", "", "") // 测试不涉及查蛋/邮件,三个令牌留空
 }
 
 // grid 经 HTTP 接口取某张覆盖位图(顺带验一遍 base64 编码),返回位图与边长(格)。

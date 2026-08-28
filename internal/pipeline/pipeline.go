@@ -310,6 +310,12 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 		name = acc
 	}
 	p.st.UpsertAccount(acc, name)
+	if coins, ok := pet.ParseLoginCoins(m.AppBody); ok {
+		log.Printf("登录回包解析金币 [%s] coins=%d", acc, coins)
+		if err := p.st.SetAccountCoins(acc, coins); err != nil {
+			log.Printf("SetAccountCoins 失败: %v", err)
+		}
+	}
 }
 
 // PetTotal 返回全部账号的宠物数合计(离线回放结束时的汇总日志用)。

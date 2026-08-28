@@ -7,12 +7,16 @@ import (
 // AccountInfo 是一个账号的概要(供前端账号下拉)。
 // Online 由 server 层判定后合并(最近 onlineWindow 秒内有流量),store 不持久化。
 // HasPin 由 store 层填(pin_hash 非空即 true),前端据此显示锁标。
+// Coins 是最近一次登录回包解析到的金币数;HasCoins=true 表示已解析过
+// (coins 为 0 也是真实值),false 表示从未解析(未知,待玩家重新登录游戏同步)。
 type AccountInfo struct {
 	Account  string `json:"account"`
 	Name     string `json:"name"`
 	PetCount int    `json:"petCount"`
 	Online   bool   `json:"online"`
 	HasPin   bool   `json:"hasPin"`
+	Coins    int64  `json:"coins"`
+	HasCoins bool   `json:"hasCoins"`
 }
 
 // UpsertAccount 登记/更新一个账号的展示名与活跃时间。
@@ -27,9 +31,9 @@ ON CONFLICT(account) DO UPDATE SET name=excluded.name, updated_at=excluded.updat
 // ListAccounts 返回已知账号(按最近活跃倒序),petCount 含零宠物账号(LEFT JOIN)。
 func (s *Store) ListAccounts() ([]AccountInfo, error) {
 	rows, err := s.rdb.Query(`
-SELECT a.account, a.name, COUNT(p.gid), a.pin_hash IS NOT NULL AND a.pin_hash != ''
+SELECT a.account, a.name, COUNT(p.gid), a.pin_hash IS NOT NULL AND a.pin_hash != '', a.coins, a.has_coins
 FROM accounts a LEFT JOIN pets p ON p.account = a.account
-GROUP BY a.account, a.name, a.pin_hash
+GROUP BY a.account, a.name, a.pin_hash, a.coins, a.has_coins
 ORDER BY a.updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -38,12 +42,19 @@ ORDER BY a.updated_at DESC`)
 	var out []AccountInfo
 	for rows.Next() {
 		var a AccountInfo
-		if err := rows.Scan(&a.Account, &a.Name, &a.PetCount, &a.HasPin); err != nil {
+		if err := rows.Scan(&a.Account, &a.Name, &a.PetCount, &a.HasPin, &a.Coins, &a.HasCoins); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// SetAccountCoins 写入账号的金币数(登录回包解析成功后调用;coins 为 0 也是真实值,
+// 一并置 has_coins=1 与「从未解析」区分,前端可显示「待同步」)。
+func (s *Store) SetAccountCoins(account string, coins int64) error {
+	_, err := s.db.Exec(`UPDATE accounts SET coins=?, has_coins=1 WHERE account=?`, coins, account)
+	return err
 }
 
 // AccountPinHash 返回账号的 PIN 哈希;未设置时返回空串。
