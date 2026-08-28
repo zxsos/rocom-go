@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react'
 import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../api'
 import { AccountContext, IconsContext } from '../context'
-import { fmtTime } from '../utils/format'
+import { fmtTime, maskUid } from '../utils/format'
 import { ImgAvatar } from '../components/icons'
 import { GlassChip, MarkIcon } from '../components/badges'
 
@@ -57,7 +57,7 @@ export default function Flowers() {
       if (worlds) {
         const list = Object.entries(worlds).map(([key, w]) => ({
           key,
-          name: key === 'self' ? '自己世界' : key.startsWith('owner:') ? '好友 UID:' + key.slice(6) : key,
+          name: key === 'self' ? '自己世界' : key.startsWith('owner:') ? '好友 UID:' + maskUid(key.slice(6)) : key,
           ts: (w && w.ts) || 0,
           flowers: (w && w.flowers) || [],
         }))
@@ -99,15 +99,15 @@ export default function Flowers() {
   const viewOptions = useMemo(() => {
     const real = slots || []
     if (real.some((s) => s.key === curKey)) return real
-    return [{ key: '__current__', name: curOwnerID ? `当前世界 (${curOwnerID})` : '当前世界', flowers }, ...real]
+    return [{ key: '__current__', name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }, ...real]
   }, [slots, curKey, curOwnerID, flowers])
   // 当前视图:__current__=实时当前世界;否则选中的存档槽。花种按特殊(最多 3 只)/普通(最多 20 只)分组展示。
   const view = useMemo(() => {
     if (selKey !== '__current__') {
       const sel = slots && slots.find((s) => s.key === selKey)
-      if (sel) return { name: sel.key === 'self' && myUID ? `自己世界 (${myUID})` : sel.name, flowers: sel.flowers || [] }
+      if (sel) return { name: sel.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : sel.name, flowers: sel.flowers || [] }
     }
-    return { name: curOwnerID ? `当前世界 (${curOwnerID})` : '当前世界', flowers }
+    return { name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }
   }, [selKey, slots, flowers, curOwnerID, myUID])
   const viewSpecials = view.flowers.filter((f) => f.specSeedId > 0)
   const viewNormals = view.flowers.filter((f) => !(f.specSeedId > 0))
@@ -122,18 +122,13 @@ export default function Flowers() {
       </div>
       {/* 视图切换:默认当前世界(实时),可切到世界存档槽;切槽后只展示该槽,删除后回访重新建档 */}
       <div className="slot-bar">
-        <select
-          className="select"
+        <SlotSelect
+          options={viewOptions}
           value={selKey}
-          onChange={(e) => setSelKey(e.target.value)}
+          onChange={setSelKey}
           disabled={!slots}
-        >
-          {viewOptions.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.key === 'self' && myUID ? `自己世界 (${myUID})` : s.name} ({s.flowers.length})
-            </option>
-          ))}
-        </select>
+          myUID={myUID}
+        />
         <button className="btn ghost" onClick={handleDeleteSlot} disabled={!selKey.startsWith('owner:')}>
           删除该槽
         </button>
@@ -161,6 +156,112 @@ export default function Flowers() {
             </div>
           </section>
         </>
+      )}
+    </div>
+  )
+}
+
+// SlotSelect 自定义槽位下拉:原生 <select> 的浮层是系统样式,与站点深色主题割裂,
+// 故沿用顶栏账号下拉(见 App.jsx AccountSelect)的 button + ul 浮层方案。
+// 键鼠/触屏均可操作:点击展开/选条;键盘 ↑↓ 切换、Enter/空格选择、Esc 关闭,点外部自动收起。
+function SlotSelect({ options, value, onChange, disabled, myUID }) {
+  const [open, setOpen] = useState(false)
+  const [hi, setHi] = useState(0) // 高亮项索引(键盘 ↑↓ 移动)
+  const rootRef = useRef(null)
+  const listRef = useRef(null)
+
+  // 点外部关闭
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  // 打开时高亮重置为当前选中项
+  useEffect(() => {
+    if (open) setHi(Math.max(0, options.findIndex((o) => o.key === value)))
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 高亮项滚动到可见(键盘移动时不飘出可见区)
+  useEffect(() => {
+    if (!open || !listRef.current) return
+    const el = listRef.current.children[hi]
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  }, [hi, open])
+
+  const cur = options.find((o) => o.key === value)
+
+  const choose = (o) => {
+    setOpen(false)
+    if (o.key !== value) onChange(o.key)
+  }
+
+  const onKey = (e) => {
+    if (disabled) return
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        setOpen(true)
+      }
+      return
+    }
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHi((i) => (i + 1) % options.length)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHi((i) => (i - 1 + options.length) % options.length)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (options[hi]) choose(options[hi])
+        break
+      case 'Escape':
+      case 'Tab':
+        setOpen(false)
+        break
+    }
+  }
+
+  return (
+    <div className="slot-select" ref={rootRef} onKeyDown={onKey}>
+      <button
+        type="button"
+        className={'slot-trigger' + (open ? ' open' : '')}
+        onClick={() => { if (!disabled) setOpen((o) => !o) }}
+        disabled={disabled}
+        title="切换视图:当前世界 / 世界存档槽"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="slot-trigger-name">
+          {cur ? (cur.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : cur.name) : '加载中…'}
+        </span>
+        <span className="slot-count">({cur ? cur.flowers.length : 0})</span>
+        <span className="slot-caret">▾</span>
+      </button>
+      {open && (
+        <ul className="slot-dropdown" ref={listRef} role="listbox">
+          {options.map((o, i) => (
+            <li
+              key={o.key}
+              role="option"
+              aria-selected={o.key === value}
+              className={'slot-item' + (o.key === value ? ' cur' : '') + (i === hi ? ' hi' : '')}
+              onMouseDown={(e) => { e.preventDefault(); choose(o) }}
+              onMouseEnter={() => setHi(i)}
+            >
+              <span className="slot-item-name">
+                {o.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : o.name}
+              </span>
+              <span className="slot-item-count">{o.flowers.length}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -239,6 +340,11 @@ function FlowerCard({ f, now }) {
             </span>
           ) : (
             <span className="muted">结束 {fmtTime(f.endTs)}</span>
+          )}
+          {f.challengeCount > 0 && (
+            <span className="muted flower-challenge" title="本账号累计挑战该花种品种的次数,花种消失后保留">
+              挑战 {f.challengeCount} 次
+            </span>
           )}
         </div>
         {hasDetail && (

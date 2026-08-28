@@ -1,6 +1,6 @@
 // Package store 用 SQLite(纯 Go 驱动)持久化宠物当前状态与事件历史,并支持筛选查询。
 // 文件按领域划分:session(连接会话缓存)/ account / pet / location(盒子·队伍·奖牌)/
-// event / star(眠枭之星)/ query(筛选查询)。
+// event / star(眠枭之星)/ query(筛选查询)/ flower(花种挑战)。
 package store
 
 import (
@@ -322,6 +322,31 @@ CREATE TABLE IF NOT EXISTS egg_queries (
   weight TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_egg_queries_ts ON egg_queries(ts);
+
+-- 花种挑战次数(见 flower.go):按账号 + 花种品种(npc_cfg_id + blood)累计,每次
+-- c2s 0x034E 选中花种进入战斗记一次。计数挂在品种上而非个体 npc_logic_id——个体被采/
+-- 刷新消失后计数保留(活动进行中会重生),下次同品种花种出现时卡片继续累计显示;
+-- 活动结束(end_ts 过期)后删除整行,计数随之清零。量小,直接 UPSERT。
+CREATE TABLE IF NOT EXISTS flower_challenges (
+  account TEXT NOT NULL,
+  npc_cfg_id INTEGER NOT NULL,
+  blood INTEGER NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  end_ts INTEGER NOT NULL DEFAULT 0, -- 活动结束时间(Unix 秒,0=未设置);过期即清理计数
+  updated_at INTEGER,
+  PRIMARY KEY(account, npc_cfg_id, blood)
+);
+
+-- 图鉴炫彩收集(见 pet/handbook.go):解析登录包 PlayerPetInfo.pet_handbook,按账号记录
+-- 每个品种(pet_base_id)抓到过哪些炫彩变体(glass_type 普通/隐藏 + glass_value),
+-- 登录时整体替换(数据仅登录包携带)。
+CREATE TABLE IF NOT EXISTS handbook_glass (
+  account TEXT NOT NULL,
+  pet_base_id INTEGER NOT NULL,
+  glass_type INTEGER NOT NULL,
+  glass_value INTEGER NOT NULL,
+  PRIMARY KEY(account, pet_base_id, glass_type, glass_value)
+);
 `)
 	if err != nil {
 		return err
@@ -340,6 +365,12 @@ CREATE INDEX IF NOT EXISTS idx_egg_queries_ts ON egg_queries(ts);
 	}
 	// 老库补 rank_join 列(排行榜参与开关):DEFAULT 1 = 默认参加。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN rank_join INTEGER NOT NULL DEFAULT 1`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	// 老库补 flower_challenges.end_ts 列(花种活动结束时间):本轮实现花种挑战计数时
+	// 老表无此列,直接 ALTER 加列;新库建表已含该列,报 duplicate column 可忽略。
+	if _, err := s.db.Exec(`ALTER TABLE flower_challenges ADD COLUMN end_ts INTEGER NOT NULL DEFAULT 0`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}

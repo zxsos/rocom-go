@@ -137,6 +137,11 @@ func (p *Pipeline) applyLayouts(m capture.Message, sc *store.Scoped, acc string)
 		if len(valid) > 0 {
 			updated = sc.ReplacePetMedals(valid) == nil || updated
 		}
+		// 图鉴炫彩收集(仅登录数据携带 pet_handbook):按账号整体替换,
+		// 展示每个品种抓到过哪些炫彩变体(普通/隐藏)。
+		if glasses := pet.ParseHandbookGlasses(m.AppBody); len(glasses) > 0 {
+			updated = sc.ReplaceHandbookGlasses(glasses) == nil || updated
+		}
 	}
 	if updated {
 		payload := map[string]any{"locUpdate": true}

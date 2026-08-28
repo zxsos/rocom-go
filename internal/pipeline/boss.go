@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"log"
 	"reflect"
 	"sort"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/capture"
 	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/server"
+	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
 // flowerItem 是一只花种(花灵)BOSS 的展示信息:花种页卡片按此渲染。
@@ -206,6 +208,34 @@ func (p *Pipeline) onBossNpcInfo(m capture.Message, acc string) {
 		return items[i].Blood < items[j].Blood
 	})
 
+	// 花种活动结束处理:end_ts 已过的品种(活动结束)删除挑战计数,卡片清零、库中清理,
+	// 下次新活动同品种出现时从 0 重新累计;未结束的品种刷新记录的活动结束时间
+	// (供 sweepOnce 兜底清理——活动结束后花种从分组消失,0x0375 不再触发实时删除)。
+	now := m.Time.Unix()
+	for i := range items {
+		it := &items[i]
+		if it.EndTs == 0 {
+			continue // 未设置结束时间,不参与活动判定
+		}
+		if int64(it.EndTs) < now {
+			if err := p.st.For(acc).DeleteFlowerChallenge(it.ID, it.Blood); err != nil {
+				log.Printf("DeleteFlowerChallenge 失败: %v", err)
+			}
+		} else {
+			if err := p.st.For(acc).UpsertFlowerEndTs(it.ID, it.Blood, int64(it.EndTs)); err != nil {
+				log.Printf("UpsertFlowerEndTs 失败: %v", err)
+			}
+		}
+	}
+
+	// 填充本账号累计挑战次数(按品种 npc_cfg_id+blood 持久化,花种消失仍保留):
+	// 每次整组下发都刷新卡片上的真实累计值。
+	if counts, err := p.st.For(acc).FlowerChallengeCounts(); err == nil {
+		for i := range items {
+			items[i].ChallengeCount = uint32(counts[store.FlowerChallengeKey{NpcCfgID: items[i].ID, Blood: items[i].Blood}])
+		}
+	}
+
 	// 读缓存。
 	var payload map[string]any
 	if raw, _ := p.srv.GetLastFlowers(acc).(map[string]any); raw != nil {
@@ -257,11 +287,53 @@ func (p *Pipeline) onBossNpcInfo(m capture.Message, acc string) {
 }
 
 // onSelectFlowerSeedBoss 记录 c2s 0x034E 选中的花种 npc_logic_id:
-// 玩家点某朵花进战斗时发出,作为捕捉成功(0x132c catch_way=4)后清理详情的定位锚点。
+// 玩家点某朵花进战斗时发出,作为捕捉成功(0x132c catch_way=4)后清理详情的定位锚点,
+// 同时给该花种品种累计一次挑战次数(见 countFlowerChallenge)。
 func (p *Pipeline) onSelectFlowerSeedBoss(m capture.Message, acc string) {
-	if logicID := scene.ParseSelectFlowerSeedBossReq(m.AppBody); logicID != 0 {
-		p.acct(acc).lastFlowerLogicID = logicID
+	logicID := scene.ParseSelectFlowerSeedBossReq(m.AppBody)
+	if logicID == 0 {
+		return
 	}
+	p.acct(acc).lastFlowerLogicID = logicID
+	p.countFlowerChallenge(acc, logicID)
+}
+
+// countFlowerChallenge 花种挑战计数:0x034E 只带 npc_logic_id,从当前分组反查品种
+// (npc_cfg_id + blood),按品种累计落库(花种消失/刷新后计数保留,下次同品种花种出现
+// 卡片继续显示)并广播更新卡片。分组里找不到该 logic_id(极罕见)则跳过,不影响链路。
+func (p *Pipeline) countFlowerChallenge(acc string, logicID uint64) {
+	raw := p.srv.GetLastFlowers(acc)
+	if raw == nil {
+		return
+	}
+	payload, ok := raw.(map[string]any)
+	if !ok {
+		return
+	}
+	items, ok := payload["flowers"].([]flowerItem)
+	if !ok {
+		return
+	}
+	var cfgID, blood uint32
+	idx := -1
+	for i := range items {
+		if items[i].NpcLogicID == logicID {
+			cfgID, blood = items[i].ID, items[i].Blood
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return
+	}
+	if err := p.st.For(acc).AddFlowerChallenge(cfgID, blood); err != nil {
+		log.Printf("AddFlowerChallenge 失败: %v", err)
+		return // 落库失败不更新内存,避免与库不一致
+	}
+	// 复制一份再改,避免直接动 server 缓存里的共享切片。
+	items = append([]flowerItem(nil), items...)
+	items[idx].ChallengeCount++
+	p.setFlowers(acc, items)
 }
 
 // clearFlowerDetail 花种精灵捕捉成功(catch_way=4)后清理对应花种的 0x0338 详情:
