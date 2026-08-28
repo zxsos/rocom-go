@@ -5,6 +5,7 @@ import { imgURL } from '../../components/icons'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, SMOOTH_CUTOFF, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
+import { useRoutes, RouteLayer } from './useRoutes.jsx'
 import { useWildPets, wildTags } from './useWildPets'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
@@ -72,6 +73,7 @@ export function useMapEngine(account) {
   wildsRef.current = wilds.marks
   const home = useHomeNests(account)
   const paint = usePaint(account, pos && pos.sceneResId, pos && pos.layer && pos.layer.id, pos && pos.paintable)
+  const routes = useRoutes(account, pos && pos.sceneResId)
 
   const anchorRef = useRef(null)
   const dispRef = useRef(null)
@@ -215,7 +217,7 @@ export function useMapEngine(account) {
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, applyFrame,
-    pois, wilds, home, paint,
+    pois, wilds, home, paint, routes,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap,
     // canvas PiP 用:暴露当前帧的渲染参数(供 renderToCanvas 画到外部 canvas)
     // 这些 ref 在 applyFrame 里每帧更新,canvas 渲染循环直接读,不触发 React 重渲染。
@@ -233,7 +235,7 @@ export function useMapEngine(account) {
 // engine 由 useMapEngine 产出(内部持有 sceneRef/layerRef/anchorRef 等,这里只读 pos)。
 export function MapViz({ engine, layersActive, onToggleLayers }) {
   const { pos, hasMap, imgError, layerError, setImgError, setLayerError,
-    view, worldRef, arrowRef, pois, wilds, home, paint,
+    view, worldRef, arrowRef, pois, wilds, home, paint, routes,
     detailGid, setDetailGid, wildTip, setWildDist, setWildTip, wildDist, onTap,
     draggingRef, pokeFrame } = engine
   const { focusRef, stRef } = view
@@ -295,6 +297,7 @@ export function MapViz({ engine, layersActive, onToggleLayers }) {
                 <path d={paint.edge} />
               </svg>
             </>)}
+            <RouteLayer marks={routes.marks} mapPx={mapPx} />
             <PoiLayer marks={pois.marks} mapPx={mapPx} />
             <NestLayer marks={home.marks} mapPx={mapPx} />
             <WildLayer marks={wilds.marks} mapPx={mapPx} wildTip={wildTip} dist={wildDist} />

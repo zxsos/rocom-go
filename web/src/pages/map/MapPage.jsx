@@ -15,8 +15,8 @@ export default function MapPage() {
   return (
     <div className="map-page">
       <div className="map-layout">
-        <LayerPanel pois={engine.pois} wilds={engine.wilds} paint={engine.paint} collapsed={collapsed}
-          onClose={() => setCollapsed(true)} />
+        <LayerPanel pois={engine.pois} wilds={engine.wilds} paint={engine.paint} routes={engine.routes}
+          collapsed={collapsed} onClose={() => setCollapsed(true)} />
 
         <MapViz engine={engine}
           layersActive={!collapsed}

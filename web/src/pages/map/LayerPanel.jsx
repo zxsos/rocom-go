@@ -6,8 +6,10 @@ import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
 // 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 家园小窝不在此列:那层始终开着,不给开关也不占图例(见 useHomeNests.js)。
+// 跑图路线组(useRoutes.js):B站泽口博士的收集路线,仅卡洛西亚大陆(10003)有数据;
+// 点开才见路线列表,每条可单独开关叠加,选择存 localStorage。
 // 复用宠物列表那套 .filters:所有宽度统一为侧滑抽屉(collapsed 控制开合,桌面也对齐手机端)。
-export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
+export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onClose }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   const dualNum = wilds.num.dual || 0
   const dualGone = wilds.numStale.dual || 0
@@ -148,6 +150,28 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
             )
           })}
         </div>
+        {routes.kinds.length > 0 && (
+          <div className="filter-group">
+            <label>跑图路线</label>
+            {/* 收起时也能看出开了几条;点击展开/收起路线列表。 */}
+            <button className="map-medal-toggle" onClick={routes.toggleOpen} aria-expanded={routes.open}
+              title="B站泽口博士的收集路线(1~20 号收集片区/精灵球/冲刺),可叠加多条">
+              <span>收集路线</span>
+              <span className="muted">{routes.marks.length}/{routes.kinds.length} ▾</span>
+            </button>
+            {routes.open && routes.kinds.map((r) => (
+              <div className="map-route-row" key={r.name}
+                title={r.short}>
+                <button className={'map-collect-btn' + (r.on ? ' on' : '')}
+                  onClick={() => routes.toggle(r.name)}
+                  aria-label={`${r.short}开关`} aria-pressed={r.on}>✓</button>
+                <span className="map-wild-swatch" style={{ borderColor: r.color }} />
+                <span className="map-layer-name">{r.short}</span>
+                <span className="muted">{r.count}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="filter-group">
           <label>涂色模式</label>
           <div className="map-layer-row">

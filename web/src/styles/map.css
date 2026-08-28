@@ -501,4 +501,31 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8));
 }
 
+/* 跑图收集路线层(.map-routes):铺满底图的 SVG,压在底图之上、POI 之下;
+   不吃指针事件(点它要能拖地图)。线宽固定屏幕像素,不随缩放变粗。 */
+.map-routes {
+  position: absolute; left: 0; top: 0;
+  pointer-events: none;
+}
+.map-routes path {
+  vector-effect: non-scaling-stroke;
+}
+.map-routes circle {
+  vector-effect: non-scaling-stroke;
+}
+
+/* 图层侧栏「跑图路线」组:行结构与奖牌筛选行一致(✓开关 + 色点 + 名称 + 点数)。
+   名称超长(精灵球路线带传送点说明)时省略号截断,悬停看全名。 */
+.map-route-row {
+  display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+  font-size: 13px; animation: map-medal-row-in .25s ease-out;
+}
+.map-route-row .map-collect-btn { width: 24px; }
+.map-route-row .map-wild-swatch { width: 10px; height: 10px; }
+.map-route-row .map-layer-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 关闭态:色点淡出,与野生宠物那几行的关闭态一致 */
+.map-route-row:has(.map-collect-btn:not(.on)) .map-wild-swatch { opacity: .45; }
+
 /* 右上角图层入口按钮(主页面 .map-ctrl 内的 ☰):复用 .map-btn */

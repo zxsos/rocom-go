@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html"
 	"io"
+	"io/fs"
 	"log"
 	"mime"
 	"net"
@@ -15,6 +17,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 )
 
 // 远行商人:第三方 API(https://apii.xianyuw.cn/api/v1/rocom-merchant)的本地缓存代理。
@@ -301,6 +305,7 @@ type merchantItem struct {
 	Price     int    `json:"price"`
 	Limit     int    `json:"limit"`
 	TimeLabel string `json:"time_label"`
+	Image     string `json:"image"` // 商品图:http(s) 外链原样;否则为本站 /img/ 相对路径(邮件里 base64 内嵌)
 }
 
 // merchantNotify 槽缓存写好且判定有货后调用:对比本营业日更早轮的商品,找出「新增」部分,
@@ -372,6 +377,10 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		body.WriteString("新增商品:\n")
 		for _, it := range news {
 			body.WriteString("- ")
+			if it.Image != "" {
+				// 商品图标记:merchantMailBody 渲染成 <img> 内嵌在商品行前
+				fmt.Fprintf(&body, "@img:%s ", it.Image)
+			}
 			body.WriteString(it.Name)
 			if it.Kind != "" {
 				fmt.Fprintf(&body, "(%s)", it.Kind)
@@ -385,7 +394,7 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 				fmt.Fprintf(&body, "  售卖时间:%s\n", it.TimeLabel)
 			}
 		}
-		body.WriteString("\n——\n本邮件由远行商人订阅自动发送;如需退订,请在站点「远行商人」页取消订阅。\n")
+		// 退订签名只在 HTML 模板尾部保留一份(见 merchantMailHTMLTpl),正文不再重复。
 		subject := "远行商人新货上架(" + slotStart.Format("15:04") + " 轮)"
 		if err := s.sendMerchantMail(sub.Email, subject, body.String()); err == nil {
 			s.store.MarkMerchantNotified(slotStart.Unix(), sub.Email)
@@ -437,7 +446,8 @@ func (s *Server) merchantMailFrom() string {
 	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + s.smtpUser + ">"
 }
 
-// merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •)。
+// merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •;
+// 行内 @img:<path> 商品图标记渲染为内嵌 <img>,见 merchantImgHTML)。
 func merchantMailBody(body string) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
@@ -446,7 +456,7 @@ func merchantMailBody(body string) string {
 		if strings.HasPrefix(trimmed, "- ") {
 			trimmed = "• " + strings.TrimPrefix(trimmed, "- ")
 		}
-		esc := html.EscapeString(trimmed)
+		esc := merchantMailEscaped(trimmed)
 		if lead > 0 {
 			esc = strings.Repeat("&nbsp;", lead) + esc
 		}
@@ -455,6 +465,56 @@ func merchantMailBody(body string) string {
 	// 用 Replace 而非 Sprintf:模板背景渐变色里有裸 %(0%,55%,100%),
 	// Sprintf 会把它当格式 verb 误解析导致正文占位符拿不到参数(%!s(MISSING))。
 	return strings.Replace(merchantMailHTMLTpl, "%s", strings.Join(lines, "<br>"), 1)
+}
+
+// merchantMailEscaped 转义一行文本,并把行内的 @img:<path> 商品图标记替换成 <img>(不转义)。
+func merchantMailEscaped(s string) string {
+	if !strings.Contains(s, "@img:") {
+		return html.EscapeString(s)
+	}
+	var b strings.Builder
+	rest := s
+	for {
+		i := strings.Index(rest, "@img:")
+		if i < 0 {
+			b.WriteString(html.EscapeString(rest))
+			break
+		}
+		b.WriteString(html.EscapeString(rest[:i]))
+		rest = rest[i+len("@img:"):]
+		j := strings.IndexAny(rest, " \t")
+		path := rest
+		if j >= 0 {
+			path, rest = rest[:j], rest[j:]
+		} else {
+			rest = ""
+		}
+		if src := merchantImgHTML(path); src != "" {
+			b.WriteString(src)
+		}
+	}
+	return b.String()
+}
+
+// merchantImgHTML 把商品图路径渲染为邮件内嵌 <img>:http(s) 外链直接引用;
+// 本地相对路径(本站 /img/ 前缀)读 embed 的 webp 转 base64 data URI 内嵌,
+// 收件端无需访问本站即可显示;读不到图片时返回空串(不显示)。
+func merchantImgHTML(src string) string {
+	if src == "" {
+		return ""
+	}
+	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+		return merchantImgTag(src)
+	}
+	if b, err := fs.ReadFile(gamedata.ImageFS(), src); err == nil && len(b) > 0 {
+		return merchantImgTag("data:image/webp;base64," + base64.StdEncoding.EncodeToString(b))
+	}
+	return ""
+}
+
+// merchantImgTag 生成商品图 <img> 标签(src 已是最终可用的 URL 或 data URI)。
+func merchantImgTag(src string) string {
+	return `<img src="` + src + `" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;vertical-align:middle;margin:0 10px 0 2px;">`
 }
 
 // sendMerchantMail 通过 QQ 邮箱 SMTP(465 SSL)发送邮件。subject/body 由调用方拼好
