@@ -15,6 +15,18 @@
 .merchant-sub { color: var(--fg-dim); font-size: 13px; margin-top: 3px; }
 .merchant-hero-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* 金币徽标(顶部横幅:当前账号金币,来自登录回包 0x0102 解析) */
+.merchant-coins {
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
+  background: rgba(212, 175, 55, .16); color: #d4af37; border: 1px solid rgba(212, 175, 55, .45);
+  font-variant-numeric: tabular-nums;
+}
+/* 未同步态(该账号从未解析到金币,待玩家重新登录游戏):淡金、虚框、可悬停查看提示 */
+.merchant-coins-unk {
+  background: transparent; color: rgba(212, 175, 55, .55); border-style: dashed;
+  cursor: help;
+}
+
 /* 营业状态徽标 */
 .merchant-status { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; }
 .merchant-status-ok { background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4); }
@@ -126,6 +138,21 @@
 }
 .merchant-turn-range { font-size: 12px; }
 .merchant-turn-count { margin-left: auto; font-size: 12px; color: var(--fg-dim); }
+
+/* 按售卖时段分栏:全天栏 + 各 4h 时段栏(栏间用虚线分隔) */
+.merchant-slots { display: flex; flex-direction: column; gap: 12px; }
+.merchant-slot { border-top: 1px dashed var(--line); padding-top: 12px; }
+.merchant-slot:first-child { border-top: none; padding-top: 0; }
+.merchant-slot-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.merchant-slot-time {
+  font-size: 12px; font-weight: 700; line-height: 1; padding: 5px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent);
+}
+.merchant-slot-all {
+  background: color-mix(in srgb, var(--gold, #e0a83c) 14%, transparent);
+  color: var(--gold, #e0a83c);
+}
+.merchant-slot-count { font-size: 12px; color: var(--fg-dim); }
 
 /* 商品网格:竖版卡片(大图 + 信息) */
 .merchant-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }

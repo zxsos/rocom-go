@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -35,6 +37,11 @@ const (
 	merchantSmtpHost = "smtp.qq.com"    // QQ 邮箱 SMTP(465 SSL)
 )
 
+// merchantLoc 固定北京时间(UTC+8):游戏按北京时间 8 点开张,第三方时间戳也是北京时区语义
+// (fetched_at 为 UTC 的 8 点 = 北京 8 点)。不依赖服务器本地时区——云服务器常默认 UTC,
+// 会导致 slot 与营业状态整体错位 8 小时(UTC 凌晨被误判「打烊」,永远不回源)。
+var merchantLoc = time.FixedZone("CST", 8*3600)
+
 // merchantSlotJSON 单个 4h 槽。性质分两种:
 //   - 上架轮(8/12/16/20):该时段在售卖对应点位上架的商品,empty=查过但无货(不算休市);
 //   - 打烊休市(次日 0/4,off=true):00:00~08:00 收摊打烊,没有在售,也不查询。
@@ -57,9 +64,10 @@ type merchantRespJSON struct {
 	Prev   []merchantSlotJSON `json:"prev"`  // 仅 status=idle 时填充:昨日的 6 个槽(回顾用)
 }
 
-// merchantDayStart 返回 t 所在营业日的 0 点。
+// merchantDayStart 返回 t 所在营业日的 0 点(按北京时间计算)。
 func merchantDayStart(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	t = t.In(merchantLoc)
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, merchantLoc)
 }
 
 // merchantDaySlots 返回营业日 6 个槽的开始时刻(对齐 8 点:8/12/16/20/0/4)。
@@ -74,10 +82,10 @@ func merchantDaySlots(day time.Time) []time.Time {
 	}
 }
 
-// merchantDayStatus 返回当前时刻的营业状态:
+// merchantDayStatus 返回当前时刻的营业状态(按北京时间判定):
 // open=营业中(8 点至次日 0 点前,显示今日已上架轮次),idle=打烊休市(0 点后到次日 8 点前,显示昨日回顾)。
 func merchantDayStatus(now time.Time) string {
-	if now.Hour() < merchantOpenHour {
+	if now.In(merchantLoc).Hour() < merchantOpenHour {
 		return "idle"
 	}
 	return "open"
@@ -135,9 +143,13 @@ func (s *Server) merchantEnsure(now time.Time, force ...bool) {
 	}
 	s.merchantMu.Unlock()
 
-	for _, st := range notify {
-		s.merchantNotify(st)
-	}
+	// 订阅邮件在后台 goroutine 发:SMTP 偶发慢/挂连接,同步发会阻塞「强制刷新」的 HTTP
+	// 响应(前端 fetch 一直等)。sendMerchantMail 自带整体 deadline,这里异步双保险。
+	go func() {
+		for _, st := range notify {
+			s.merchantNotify(st)
+		}
+	}()
 }
 
 // merchantCached 判断某槽是否已有缓存记录(empty 也算,避免反复查空)。
@@ -159,18 +171,26 @@ func (s *Server) merchantFetch(slotStart time.Time) (bool, bool) {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, merchantFetchURL+"?"+params.Encode(), nil)
 	if err != nil {
+		log.Printf("merchantFetch 构造请求失败: %v", err)
 		return false, false
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.Printf("merchantFetch 请求失败: %v", err)
 		return false, false
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 上限 1MB
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
+		log.Printf("merchantFetch 读响应失败: %v", err)
 		return false, false
 	}
-	// 校验并判定有货/无货:code==0 且 data.items 非空视为有货,其余(无货/业务错误)记空。
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("merchantFetch HTTP %d, 响应前 200 字节: %q", resp.StatusCode, truncateBytes(body, 200))
+		return false, false
+	}
+	// 校验并判定有货/无货:第三方成功码不统一,实测 code=0 与 code=200 都表示成功,
+	// 故 code∈{0,200} 且 data.items 非空视为有货,其余(无货/业务错误)记空。
 	var out struct {
 		Code int `json:"code"`
 		Data struct {
@@ -178,13 +198,26 @@ func (s *Server) merchantFetch(slotStart time.Time) (bool, bool) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
+		log.Printf("merchantFetch JSON 解析失败: %v, 响应前 200 字节: %q", err, truncateBytes(body, 200))
 		return false, false
 	}
-	empty := out.Code != 0 || len(out.Data.Items) == 0
+	empty := !((out.Code == 0 || out.Code == 200) && len(out.Data.Items) > 0)
+	if empty {
+		log.Printf("merchantFetch 第三方返回无货: code=%d items=%d", out.Code, len(out.Data.Items))
+	}
 	if err := s.store.PutMerchantSlot(slotStart.Unix(), empty, string(body)); err != nil {
+		log.Printf("merchantFetch 写槽缓存失败: %v", err)
 		return false, false
 	}
 	return true, empty
+}
+
+// truncateBytes 截断字节串用于日志(避免刷屏),超长时加省略号。
+func truncateBytes(b []byte, n int) string {
+	if len(b) <= n {
+		return string(b)
+	}
+	return string(b[:n]) + "…"
 }
 
 // handleMerchant 返回当前营业日的槽缓存与状态,玩家打开页面时按当前时间补查缺失槽。
@@ -229,6 +262,10 @@ func (s *Server) merchantSlotsOfDay(day time.Time) []merchantSlotJSON {
 		}
 		if i < 4 { // 8/12/16/20 四轮读缓存
 			if empty, data, ok := s.store.GetMerchantSlot(st.Unix()); ok {
+				// 自动修正历史误判:此前 code==200 被当失败写成 empty,读缓存时按原始 body 重新判定有货。
+				if empty && merchantBodyHasItems(data) {
+					empty = false
+				}
 				js.Empty = empty
 				if !empty {
 					js.Merchant = json.RawMessage(data)
@@ -240,6 +277,21 @@ func (s *Server) merchantSlotsOfDay(day time.Time) []merchantSlotJSON {
 		out = append(out, js)
 	}
 	return out
+}
+
+// merchantBodyHasItems 判断缓存的第三方原始 JSON 是否实际有货:
+// code∈{0,200}(第三方成功码不统一)且 data.items 非空。用于读取缓存时修正历史误判的空标记。
+func merchantBodyHasItems(data string) bool {
+	var out struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []json.RawMessage `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(data), &out); err != nil {
+		return false
+	}
+	return (out.Code == 0 || out.Code == 200) && len(out.Data.Items) > 0
 }
 
 // merchantItem 第三方 items 中订阅邮件需要的字段。
@@ -408,11 +460,18 @@ func merchantMailBody(body string) string {
 // sendMerchantMail 通过 QQ 邮箱 SMTP(465 SSL)发送邮件。subject/body 由调用方拼好
 // (订阅新货提醒 / 管理员测试),正文渲染为带背景的 HTML。串行发信(smtpMu),
 // 避免并发连接被 QQ 邮箱判为异常触发限流。
+// 整体 deadline 兜底:QQ SMTP 偶发挂连接(网络波动/被限流),TLS 拨号限 10s,
+// 连接建立后全程 I/O 限 20s,避免调用方(管理页强制刷新等)无限等待。
 func (s *Server) sendMerchantMail(to, subject, body string) error {
 	s.smtpMu.Lock()
 	defer s.smtpMu.Unlock()
 
-	conn, err := tls.Dial("tcp", merchantSmtpHost+":465", &tls.Config{ServerName: merchantSmtpHost})
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := tls.DialWithDialer(dialer, "tcp", merchantSmtpHost+":465", &tls.Config{ServerName: merchantSmtpHost})
+	if err != nil {
+		return err
+	}
+	conn.SetDeadline(time.Now().Add(20 * time.Second))
 	if err != nil {
 		return err
 	}

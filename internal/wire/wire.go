@@ -94,6 +94,23 @@ func PackedVarints(b []byte) []uint64 {
 	return out
 }
 
+// FieldVarints 返回 b 里指定字段号的全部 varint 值,repeated 字段同时兼容
+// 非 packed(每个值独立 tag)与 packed(单个 bytes 内含一串)两种编码形式。
+func FieldVarints(b []byte, want protowire.Number) []uint64 {
+	var out []uint64
+	ScanFields(b, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
+		if num != want {
+			return
+		}
+		if typ == protowire.VarintType {
+			out = append(out, v)
+		} else if typ == protowire.BytesType {
+			out = append(out, PackedVarints(val)...)
+		}
+	})
+	return out
+}
+
 // Walk 深度优先遍历 b 内所有 length-delimited 字段值(先访问、后下钻):
 // 消息嵌套路径随版本/通道而异,递归尝试是在未知层级中定位目标子消息的通用手段。
 // visit 返回 false 表示该值已被识别(或需要终止),不再深入其内部。
