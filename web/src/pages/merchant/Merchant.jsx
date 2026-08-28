@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react'
-import { getMerchant, getMerchantSub, setMerchantSub, delMerchantSub, getAccounts } from '../../api'
+import { getMerchant, getMerchantSub, setMerchantSub, delMerchantSub, getAccounts, setAccountRank } from '../../api'
 import { AccountContext } from '../../context'
+import RankTitle from '../../components/RankTitle'
 import { fmtTime } from '../../utils/format'
 
 // 远行商人页:展示后端缓存的 4h 轮次数据(令牌在服务端,缓存 2 天,见
@@ -84,8 +85,14 @@ function groupBySlot(items) {
 }
 
 export default function Merchant() {
+  const account = useContext(AccountContext) // 当前登录账号 key(账号下拉切换后自动跟随)
   const [d, setD] = useState(null) // {now,day,status,today,prev}
   const [coins, setCoins] = useState(null) // 当前账号金币:null=未同步,数字=已同步(含 0)
+  const [curAcc, setCurAcc] = useState('') // 金币/参加按钮实际归属的账号
+  const [join, setJoin] = useState(true) // 是否参加排行榜(默认参加,可在金币旁一键退出)
+  const [title, setTitle] = useState('') // 当前账号今日佩戴的称号
+  const [busyRank, setBusyRank] = useState(false)
+  const [rankErr, setRankErr] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -102,21 +109,38 @@ export default function Merchant() {
     }
   }, [])
 
-  // 金币存 accounts.coins,拉账号列表取「最近活跃/在线」账号(不锁定某个 UID,
-  // 游戏里切换账号后金币会自动跟随当前在玩的号;后端按 updated_at 倒序)。
+  // 金币按当前登录账号(AccountContext)取,每个人看到自己的金币:
+  // 先精确匹配当前账号,找不到(未登录/游客)再回退到在线/最近活跃账号。
+  // hasCoins=false 表示该账号从未解析到金币(没重登游戏),显示「待同步」而非隐藏徽标。
   useEffect(() => {
     let done = false
-    console.log('[Merchant] 拉账号列表取金币…')
     getAccounts().then((list) => {
       if (done || !list) return
-      console.log('[Merchant] 账号列表 =', list)
-      const cur = list.find((a) => a.online) || list[0]
-      // hasCoins=false 表示该账号从未解析到金币(没重登游戏),显示「待同步」而非隐藏徽标。
-      console.log('[Merchant] 取最近活跃/在线账号 cur =', cur, '→ 金币 =', cur && cur.coins, 'hasCoins =', cur && cur.hasCoins)
+      const mine = list.find((a) => a.account === account)
+      const cur = mine || list.find((a) => a.online) || list[0]
+      setCurAcc(cur ? cur.account : '')
       setCoins(cur && cur.hasCoins ? cur.coins : null)
-    }).catch((e) => console.log('[Merchant] 拉账号列表失败:', e))
+      setJoin(cur ? !!cur.join : true)
+      setTitle(cur ? (cur.title || '') : '')
+    }).catch(() => {})
     return () => { done = true }
-  }, [])
+  }, [account])
+
+  // 金币旁的参加/退出按钮(默认参加;退出后不再参与福布斯/盈亏排行与称号评选)
+  const toggleRank = async () => {
+    if (!curAcc) return
+    if (join && !window.confirm('退出排行榜?退出后不再参与福布斯/盈亏排行,称号评选也会排除。')) return
+    setBusyRank(true)
+    setRankErr('')
+    try {
+      await setAccountRank(curAcc, !join)
+      setJoin(!join)
+    } catch (e) {
+      setRankErr(e.message || '设置失败')
+    } finally {
+      setBusyRank(false)
+    }
+  }
 
   useEffect(() => { load(false) }, [load])
 
@@ -153,10 +177,19 @@ export default function Merchant() {
           </div>
           <div className="merchant-hero-side">
             {coins !== null ? (
-              <span className="merchant-coins" title="当前账号金币(每次登录游戏时同步)">🪙 {coins.toLocaleString()}</span>
+              <span className="merchant-coins" title={`${account || '当前'} 金币(每次登录游戏时同步)`}>🪙 {coins.toLocaleString()}</span>
             ) : (
-              <span className="merchant-coins merchant-coins-unk" title="尚未同步到金币,请重新登录游戏后刷新">🪙 待同步</span>
+              <span className="merchant-coins merchant-coins-unk" title={`${account || '当前'} 金币尚未同步,请重新登录游戏后刷新`}>🪙 待同步</span>
             )}
+            <RankTitle title={title} />
+            {curAcc && (
+              <button type="button" className={`merchant-rank-btn${join ? ' joined' : ''}`}
+                onClick={toggleRank} disabled={busyRank}
+                title={join ? '已参加排行榜,点击退出' : '未参加排行榜,点击参加(默认参加)'}>
+                {join ? '🏆 已参加' : '🏆 参加'}
+              </button>
+            )}
+            {rankErr && <span className="merchant-rank-err">{rankErr}</span>}
             <span className={`merchant-status merchant-status-${st.cls}`}>{st.text}</span>
             <span className="merchant-day">{dayText}</span>
             {m && m.round && m.round.countdown && (

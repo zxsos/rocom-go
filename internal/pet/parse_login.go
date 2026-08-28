@@ -30,19 +30,22 @@ func ParseLoginAccount(body []byte) (userID uint64, name string, ok bool) {
 }
 
 // ParseLoginCoins 从 ZoneLoginRsp(opcode 0x0102)取玩家金币数量。
-// 金币位于 player_info.brief_info.vitem_info.vitem_list(固定下标数组,下标 1=金币,下标 0 恒 0,
-// 实测用户 19517164 与游戏内一致)。vitem_info 同时带 liabilities_num(定长 6 槽),故用
-// 「field1 varint 60~120 个 + field2 3~12 个」的特征在 body 中唯一定位,避免误命中其他大数组。
+// 金币位于 player_info.brief_info.vitem_info 的 field3(vitem_list,裸 varint 数组,
+// 下标 1=金币,下标 0 恒 0,实测 19517164 与游戏内一致)。vitem_info 的 field4 是
+// liabilities_num 槽数组(槽数随版本变化,实测 2026-08 为 81 槽),故用
+// 「field3 varint 60~120 个 + field4 varint ≥3 个」的特征在 body 中唯一定位。
+// 注意:真实 wire 与 all.pb 描述符存在版本偏移(字段号 +2),pcapdump 按描述符
+// 解码显示 vitem_list 在 field1/liabilities_num 在 field2 是假象,不能直接照搬。
 func ParseLoginCoins(body []byte) (coins int64, ok bool) {
 	wire.Walk(body, func(v []byte) bool {
 		if ok {
 			return false
 		}
-		list := wire.FieldVarints(v, 1)
+		list := wire.FieldVarints(v, 3)
 		if len(list) < 60 || len(list) > 120 {
 			return true // 不是 vitem_info,继续下钻
 		}
-		if n := len(wire.FieldVarints(v, 2)); n < 3 || n > 12 {
+		if n := len(wire.FieldVarints(v, 4)); n < 3 {
 			return true
 		}
 		if len(list) > 1 && list[1] < 1<<50 {

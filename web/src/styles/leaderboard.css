@@ -1,0 +1,90 @@
+/* —— 排行榜页(福布斯/盈利亏损双榜 + 每日称号,见 pages/leaderboard/Leaderboard.jsx) ——
+   每晚 00:05(北京时间)自动结算前一日数据,评出大富翁/赚钱王/败家子,当天佩戴一天。 */
+.rank-page { width: 100%; }
+.rank-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rank-head-right { display: flex; align-items: center; gap: 10px; }
+.rank-settle-note { font-size: 12px; color: var(--fg-dim); }
+
+/* 今日称号三卡(未结算时为待评选虚线卡) */
+.rank-titles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0 4px; }
+.rank-title-card {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); box-shadow: var(--shadow-sm); min-width: 0;
+}
+.rank-title-card.pending { border-style: dashed; opacity: .75; background: var(--bg-2); }
+.rank-title-card.rich   { border-color: rgba(212, 175, 55, .5);  background: linear-gradient(135deg, rgba(212, 175, 55, .14), var(--bg-1) 55%); }
+.rank-title-card.earner { border-color: rgba(40, 167, 69, .45);  background: linear-gradient(135deg, rgba(40, 167, 69, .12), var(--bg-1) 55%); }
+.rank-title-card.spender{ border-color: rgba(229, 83, 75, .45);  background: linear-gradient(135deg, rgba(229, 83, 75, .12), var(--bg-1) 55%); }
+.rank-title-icon { font-size: 26px; line-height: 1; }
+.rank-title-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rank-title-key { font-weight: 800; font-size: 15px; }
+.rank-title-card.rich .rank-title-key { color: #d4af37; }
+.rank-title-card.earner .rank-title-key { color: #28a745; }
+.rank-title-card.spender .rank-title-key { color: #e5534b; }
+.rank-title-who { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-title-none { color: var(--fg-dim); font-weight: 500; }
+.rank-title-desc { font-size: 11px; color: var(--fg-dim); }
+
+/* 提示条:未参加 / 未同步 */
+.rank-join-tip {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 9px 14px; font-size: 13px;
+  border: 1px dashed var(--line); border-radius: var(--radius); background: var(--bg-2); color: var(--fg);
+}
+
+/* 双榜切换 */
+.rank-tabs { display: flex; gap: 8px; margin: 16px 0 12px; }
+.rank-tabs button {
+  padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); color: var(--fg-dim);
+}
+.rank-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 排行列表 */
+.rank-list { display: flex; flex-direction: column; gap: 8px; }
+.rank-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1);
+  box-shadow: var(--shadow-sm); min-width: 0;
+}
+.rank-row.is-me { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent), var(--shadow-sm); }
+.rank-row.is-unknown { opacity: .65; }
+.rank-pos { flex: none; width: 44px; text-align: center; }
+.rank-medal { font-size: 20px; }
+.rank-no { font-weight: 700; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.rank-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.rank-uname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-me {
+  flex: none; font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* 账号旁佩戴的称号徽标(账号下拉/商人页/排行榜行通用) */
+.rank-title {
+  flex: none; font-size: 11px; line-height: 1; padding: 3px 8px; border-radius: 999px;
+  font-weight: 700; white-space: nowrap;
+}
+.rank-title.t-rich    { background: rgba(212, 175, 55, .16); color: #d4af37; border: 1px solid rgba(212, 175, 55, .5); }
+.rank-title.t-earner  { background: rgba(40, 167, 69, .14);  color: #28a745; border: 1px solid rgba(40, 167, 69, .45); }
+.rank-title.t-spender { background: rgba(229, 83, 75, .14);  color: #e5534b; border: 1px solid rgba(229, 83, 75, .45); }
+
+/* 数值列:金币 / 盈亏 / 基线 */
+.rank-num { flex: none; display: flex; align-items: baseline; gap: 10px; }
+.rank-coins { font-weight: 800; font-size: 15px; color: var(--gold, #e0a83c); font-variant-numeric: tabular-nums; }
+.rank-profit { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rank-profit.pos { color: #28a745; }
+.rank-profit.neg { color: #e5534b; }
+.rank-sub { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.rank-unknown { font-size: 12px; color: var(--fg-dim); }
+
+.rank-empty { padding: 30px 0; text-align: center; color: var(--fg-dim); font-size: 13px; }
+.rank-foot { margin-top: 12px; font-size: 11px; color: var(--fg-dim); text-align: center; }
+.rank-err { padding: 20px; color: var(--danger, #e5534b); font-size: 13px; }
+
+/* 窄屏:称号三卡收成单列 */
+@media (max-width: 700px) {
+  .rank-titles { grid-template-columns: 1fr; }
+  .rank-row { flex-wrap: wrap; }
+  .rank-num { width: 100%; justify-content: flex-end; }
+}

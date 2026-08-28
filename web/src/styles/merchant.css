@@ -27,6 +27,19 @@
   cursor: help;
 }
 
+/* 金币旁的排行榜参加/退出按钮(默认参加,每晚 00:05 结算称号) */
+.merchant-rank-btn {
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
+  cursor: pointer; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-dim);
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.merchant-rank-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.merchant-rank-btn.joined {
+  background: rgba(212, 175, 55, .14); color: #d4af37; border-color: rgba(212, 175, 55, .45);
+}
+.merchant-rank-btn:disabled { opacity: .55; cursor: not-allowed; }
+.merchant-rank-err { font-size: 12px; color: var(--danger, #e5534b); }
+
 /* 营业状态徽标 */
 .merchant-status { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; }
 .merchant-status-ok { background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4); }

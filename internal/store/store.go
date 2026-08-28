@@ -190,9 +190,29 @@ CREATE TABLE IF NOT EXISTS pet_medal (
 
 CREATE TABLE IF NOT EXISTS accounts (
   account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER, pin_hash TEXT,
-  coins INTEGER NOT NULL DEFAULT 0, has_coins INTEGER NOT NULL DEFAULT 0
+  coins INTEGER NOT NULL DEFAULT 0, has_coins INTEGER NOT NULL DEFAULT 0,
+  rank_join INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON accounts(updated_at DESC);
+
+-- 金币快照(排行榜盈亏统计用):每次登录回包解析到金币记一行,
+-- 首行为「起始资金」基线,最新行即当前 coins;盈亏 = 当前 - 基线。
+CREATE TABLE IF NOT EXISTS coin_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account TEXT NOT NULL,
+  coins INTEGER NOT NULL,
+  ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_coin_snapshots_account ON coin_snapshots(account, ts);
+
+-- 排行榜每日称号:每晚 00:05(北京时间)结算前一日数据,评出大富翁/赚钱王/败家子,
+-- 写入 date(归属日,当天佩戴一天)。每天最多 3 行,结算时整日覆盖。
+CREATE TABLE IF NOT EXISTS rank_titles (
+  date TEXT NOT NULL,
+  account TEXT NOT NULL,
+  title TEXT NOT NULL,
+  PRIMARY KEY (date, title)
+);
 -- 连接会话:key 是会话密钥(供重启后对存活连接续解,见 docs/architecture.md 3),
 -- 其余几列是实时地图重启回显所需的现场(当前场景 / 家园房屋等级 / 所在区域)。
 CREATE TABLE IF NOT EXISTS sessions (
@@ -315,6 +335,11 @@ CREATE INDEX IF NOT EXISTS idx_egg_queries_ts ON egg_queries(ts);
 	// 老库补 has_coins 列:区分「从未解析到金币(未知)」与「解析到 0(真没钱)」,
 	// 前端据此显示「待同步」而非把徽标直接隐藏。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN has_coins INTEGER NOT NULL DEFAULT 0`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	// 老库补 rank_join 列(排行榜参与开关):DEFAULT 1 = 默认参加。
+	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN rank_join INTEGER NOT NULL DEFAULT 1`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}

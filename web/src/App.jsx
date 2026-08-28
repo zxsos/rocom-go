@@ -5,6 +5,7 @@ import { AccountContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
 import { useStoredJSON } from './hooks/useStoredState'
 import { PinDialog } from './components/PinDialog'
+import RankTitle from './components/RankTitle'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 // 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
@@ -20,6 +21,7 @@ const NAV = [
   { to: '/merchant', label: '远行商人', icon: '🧳' },
   { to: '/map', label: '实时地图', icon: '🗺️' },
   { to: '/flowers', label: '花种', icon: '🌱' },
+  { to: '/leaderboard', label: '排行榜', icon: '🏆' },
 ]
 
 // uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
@@ -380,6 +382,7 @@ function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDele
         <span className="privacy account-trigger-name">
           {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
         </span>
+        {current && <RankTitle title={current.title} />}
         {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护">🔒</span>}
         <span className="account-caret">▾</span>
       </button>
@@ -428,6 +431,7 @@ function AccountItem({ account, cur, hi, uidOf, onChoose, onHover }) {
       <img className="account-state" src={account.online ? '/login.svg' : '/logout.svg'}
         alt="" draggable={false} title={account.online ? '在线' : '离线'} />
       <span className="privacy account-item-name">{account.name}</span>
+      <RankTitle title={account.title} />
       {account.hasPin && <span className="account-item-pin" title="已设 PIN">🔒</span>}
       <span className="muted privacy account-item-uid">UID:{uidOf(account.account)}</span>
     </li>
