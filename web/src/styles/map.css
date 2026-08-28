@@ -343,6 +343,17 @@
   color: var(--fg-dim); font-variant-numeric: tabular-nums;
 }
 .map-route-count i { font-style: normal; color: var(--fg); }
+/* 路线组头:折叠按钮 + 右侧一键全开/全关 */
+.map-routes-head { display: flex; align-items: center; gap: 6px; }
+.map-routes-head .map-medal-toggle { flex: 1; min-width: 0; }
+.map-routes-all { display: inline-flex; gap: 4px; flex: none; }
+.map-routes-all button {
+  padding: 2px 8px; font-size: 11px; line-height: 1.5;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--fg-dim); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.map-routes-all button:hover { background: rgba(127, 127, 127, .12); color: var(--fg); }
 .map-medal-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 13px;
   animation: map-medal-row-in .25s ease-out; }
 @keyframes map-medal-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -531,8 +542,18 @@
 .map-route-row .map-layer-name {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 换色按钮:实心色点,点击换色(自动挑与地图背景对比明显的颜色);悬停放大提示可点 */
+.map-route-row .map-route-swatch {
+  flex: none; width: 12px; height: 12px; padding: 0; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .4); cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.map-route-row .map-route-swatch:hover {
+  transform: scale(1.35); box-shadow: 0 0 0 2px rgba(255, 255, 255, .3);
+}
 /* 关闭态:色点淡出,与野生宠物那几行的关闭态一致 */
 .map-route-row:has(.map-collect-btn:not(.on)) .map-wild-swatch { opacity: .45; }
+.map-route-row:has(.map-collect-btn:not(.on)) .map-route-swatch { opacity: .45; }
 /* 跟走模式行:✓开关 + 名称 + 状态 + 重置按钮,位于路线列表上方 */
 .map-route-follow {
   display: flex; align-items: center; gap: 8px; padding: 4px 10px;

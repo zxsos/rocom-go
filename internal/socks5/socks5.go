@@ -26,14 +26,17 @@ const (
 	atypDomain     = 0x03
 	atypIPv6       = 0x04
 	repSuccess     = 0x00
+	repNotAllowed  = 0x02 // 规则集禁止连接(域名屏蔽命中时回复,客户端据此放弃)
 	repConnRefused = 0x05
 )
 
 // ListenAndServe 在 addr 上监听并处理 SOCKS5 连接,阻塞直至监听器关闭。
 // allow 非空时仅允许匹配的客户端 IP 接入(支持 IP 或 CIDR),用于挡住公网扫描器;
+// block 非空时屏蔽匹配的目标域名(精确或子域),在拨号前直接拒绝——手机系统的
+// 连通性探测(google.com/example.com 等)不属于游戏流量,拦下可避免反复拨号失败刷日志;
 // maxConns > 0 时限制同时处理的连接数,超限直接拒绝,防止连接风暴拖垮同进程的 Web 服务;
 // user 非空时启用 RFC 1929 用户名/密码认证,pass 为对应密码。
-func ListenAndServe(addr string, allow []netip.Prefix, maxConns int, user, pass string) error {
+func ListenAndServe(addr string, allow []netip.Prefix, block []string, maxConns int, user, pass string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -74,7 +77,7 @@ func ListenAndServe(addr string, allow []netip.Prefix, maxConns int, user, pass 
 			if sem != nil {
 				defer func() { <-sem }()
 			}
-			handle(c, user, pass)
+			handle(c, user, pass, block)
 		}(conn)
 	}
 }
@@ -119,6 +122,25 @@ func allowed(addr net.Addr, allow []netip.Prefix) bool {
 	ip = ip.Unmap()
 	for _, p := range allow {
 		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// blockedHost 判断目标 host(域名或 IP)是否命中屏蔽名单。
+// 域名匹配精确或子域(.前缀),大小写不敏感、容忍末尾点;IP 不参与域名屏蔽。
+func blockedHost(host string, block []string) bool {
+	if len(block) == 0 || net.ParseIP(host) != nil {
+		return false
+	}
+	h := strings.ToLower(strings.TrimSuffix(host, "."))
+	for _, b := range block {
+		b = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(b), "."))
+		if b == "" {
+			continue
+		}
+		if h == b || strings.HasSuffix(h, "."+b) {
 			return true
 		}
 	}
@@ -359,12 +381,19 @@ func dialAddrs(ctx context.Context, addrs []netip.Addr, port string) (net.Conn, 
 	return nil, lastErr
 }
 
-// handle 处理单个客户端连接:握手(含可选认证) → 拨号上游 → 双向转发。
-func handle(c net.Conn, user, pass string) {
+// handle 处理单个客户端连接:握手(含可选认证) → 域名屏蔽检查 → 拨号上游 → 双向转发。
+func handle(c net.Conn, user, pass string, block []string) {
 	defer c.Close()
 	target, err := handshake(c, user, pass)
 	if err != nil {
 		log.Printf("socks5: %s 握手失败: %v", c.RemoteAddr(), err)
+		return
+	}
+	// 域名屏蔽:命中名单(如手机系统连通性探测 google.com/example.com)在拨号前拒绝,
+	// 免去一次注定失败的 DNS+拨号,也不再刷「连接失败」日志。
+	if host, _, err := net.SplitHostPort(target); err == nil && blockedHost(host, block) {
+		writeReply(c, repNotAllowed)
+		log.Printf("socks5: 屏蔽 %s → %s", c.RemoteAddr(), target)
 		return
 	}
 	// 先写成功回复再拨号会让客户端空等一个 RTT；这里先拨号，成功后才回复。
