@@ -1,0 +1,885 @@
+{
+    "loop": false,
+    "points": [
+        {
+            "x": 3605.0,
+            "y": 4387.0,
+            "visited": false
+        },
+        {
+            "x": 3578.0,
+            "y": 4394.0,
+            "visited": false
+        },
+        {
+            "x": 3520.0,
+            "y": 4330.0,
+            "visited": false
+        },
+        {
+            "x": 3476.0,
+            "y": 4298.0,
+            "visited": false
+        },
+        {
+            "x": 3559.0,
+            "y": 4313.0,
+            "visited": false
+        },
+        {
+            "x": 3573.0,
+            "y": 4293.0,
+            "visited": false
+        },
+        {
+            "x": 3519.0,
+            "y": 4255.0,
+            "visited": false
+        },
+        {
+            "x": 3615.0,
+            "y": 4267.0,
+            "visited": false
+        },
+        {
+            "x": 3645.0,
+            "y": 4348.0,
+            "visited": false
+        },
+        {
+            "x": 3663.0,
+            "y": 4301.0,
+            "visited": false
+        },
+        {
+            "x": 3724.0,
+            "y": 4279.0,
+            "visited": false
+        },
+        {
+            "x": 3771.0,
+            "y": 4291.0,
+            "visited": false
+        },
+        {
+            "x": 3858.0,
+            "y": 4351.0,
+            "visited": false
+        },
+        {
+            "x": 3912.0,
+            "y": 4354.0,
+            "visited": false
+        },
+        {
+            "x": 3961.0,
+            "y": 4337.0,
+            "visited": false
+        },
+        {
+            "x": 4026.0,
+            "y": 4254.0,
+            "visited": false
+        },
+        {
+            "x": 4042.0,
+            "y": 4179.0,
+            "visited": false
+        },
+        {
+            "x": 4120.0,
+            "y": 4155.0,
+            "visited": false
+        },
+        {
+            "x": 4098.0,
+            "y": 4185.0,
+            "visited": false
+        },
+        {
+            "x": 4121.0,
+            "y": 4248.0,
+            "visited": false
+        },
+        {
+            "x": 4174.0,
+            "y": 4291.0,
+            "visited": false
+        },
+        {
+            "x": 4274.0,
+            "y": 4266.0,
+            "visited": false
+        },
+        {
+            "x": 4307.0,
+            "y": 4302.0,
+            "visited": false
+        },
+        {
+            "x": 4350.0,
+            "y": 4304.0,
+            "visited": false
+        },
+        {
+            "x": 4382.0,
+            "y": 4310.0,
+            "visited": false
+        },
+        {
+            "x": 4397.0,
+            "y": 4340.0,
+            "visited": false
+        },
+        {
+            "x": 4423.0,
+            "y": 4429.0,
+            "visited": false
+        },
+        {
+            "x": 4324.0,
+            "y": 4375.0,
+            "visited": false
+        },
+        {
+            "x": 4297.0,
+            "y": 4348.0,
+            "visited": false
+        },
+        {
+            "x": 4289.0,
+            "y": 4360.0,
+            "visited": false
+        },
+        {
+            "x": 4262.0,
+            "y": 4353.0,
+            "visited": false
+        },
+        {
+            "x": 4254.0,
+            "y": 4339.0,
+            "visited": false
+        },
+        {
+            "x": 4235.0,
+            "y": 4379.0,
+            "visited": false
+        },
+        {
+            "x": 4194.0,
+            "y": 4419.0,
+            "visited": false
+        },
+        {
+            "x": 4207.0,
+            "y": 4446.0,
+            "visited": false
+        },
+        {
+            "x": 4132.0,
+            "y": 4449.0,
+            "visited": false
+        },
+        {
+            "x": 4101.0,
+            "y": 4525.0,
+            "visited": false
+        },
+        {
+            "x": 4162.0,
+            "y": 4508.0,
+            "visited": false
+        },
+        {
+            "x": 4187.0,
+            "y": 4504.0,
+            "visited": false
+        },
+        {
+            "x": 4222.0,
+            "y": 4468.0,
+            "visited": false
+        },
+        {
+            "x": 4255.0,
+            "y": 4447.0,
+            "visited": false
+        },
+        {
+            "x": 4340.0,
+            "y": 4486.0,
+            "visited": false
+        },
+        {
+            "x": 4392.0,
+            "y": 4511.0,
+            "visited": false
+        },
+        {
+            "x": 4430.0,
+            "y": 4517.0,
+            "visited": false
+        },
+        {
+            "x": 4450.0,
+            "y": 4540.0,
+            "visited": false
+        },
+        {
+            "x": 4462.0,
+            "y": 4571.0,
+            "visited": false
+        },
+        {
+            "x": 4464.0,
+            "y": 4607.0,
+            "visited": false
+        },
+        {
+            "x": 4500.0,
+            "y": 4636.0,
+            "visited": false
+        },
+        {
+            "x": 4513.0,
+            "y": 4656.0,
+            "visited": false
+        },
+        {
+            "x": 4472.0,
+            "y": 4726.0,
+            "visited": false
+        },
+        {
+            "x": 4414.0,
+            "y": 4676.0,
+            "visited": false
+        },
+        {
+            "x": 4401.0,
+            "y": 4614.0,
+            "visited": false
+        },
+        {
+            "x": 4373.0,
+            "y": 4703.0,
+            "visited": false
+        },
+        {
+            "x": 4337.0,
+            "y": 4557.0,
+            "visited": false
+        },
+        {
+            "x": 4314.0,
+            "y": 4595.0,
+            "visited": false
+        },
+        {
+            "x": 4337.0,
+            "y": 4642.0,
+            "visited": false
+        },
+        {
+            "x": 4346.0,
+            "y": 4662.0,
+            "visited": false
+        },
+        {
+            "x": 4320.0,
+            "y": 4657.0,
+            "visited": false
+        },
+        {
+            "x": 4306.0,
+            "y": 4664.0,
+            "visited": false
+        },
+        {
+            "x": 4325.0,
+            "y": 4699.0,
+            "visited": false
+        },
+        {
+            "x": 4325.0,
+            "y": 4747.0,
+            "visited": false
+        },
+        {
+            "x": 4283.0,
+            "y": 4677.0,
+            "visited": false
+        },
+        {
+            "x": 4225.0,
+            "y": 4667.0,
+            "visited": false
+        },
+        {
+            "x": 4232.0,
+            "y": 4642.0,
+            "visited": false
+        },
+        {
+            "x": 4272.0,
+            "y": 4599.0,
+            "visited": false
+        },
+        {
+            "x": 4247.0,
+            "y": 4540.0,
+            "visited": false
+        },
+        {
+            "x": 4187.0,
+            "y": 4612.0,
+            "visited": false
+        },
+        {
+            "x": 4163.0,
+            "y": 4562.0,
+            "visited": false
+        },
+        {
+            "x": 4123.0,
+            "y": 4622.0,
+            "visited": false
+        },
+        {
+            "x": 3988.0,
+            "y": 4636.0,
+            "visited": false
+        },
+        {
+            "x": 4006.0,
+            "y": 4703.0,
+            "visited": false
+        },
+        {
+            "x": 3990.0,
+            "y": 4724.0,
+            "visited": false
+        },
+        {
+            "x": 4004.0,
+            "y": 4788.0,
+            "visited": false
+        },
+        {
+            "x": 4029.0,
+            "y": 4826.0,
+            "visited": false
+        },
+        {
+            "x": 4067.0,
+            "y": 4818.0,
+            "visited": false
+        },
+        {
+            "x": 4138.0,
+            "y": 4797.0,
+            "visited": false
+        },
+        {
+            "x": 4131.0,
+            "y": 4835.0,
+            "visited": false
+        },
+        {
+            "x": 4087.0,
+            "y": 4834.0,
+            "visited": false
+        },
+        {
+            "x": 4049.0,
+            "y": 4877.0,
+            "visited": false
+        },
+        {
+            "x": 4026.0,
+            "y": 4884.0,
+            "visited": false
+        },
+        {
+            "x": 4059.0,
+            "y": 4907.0,
+            "visited": false
+        },
+        {
+            "x": 4052.0,
+            "y": 4930.0,
+            "visited": false
+        },
+        {
+            "x": 4086.0,
+            "y": 4917.0,
+            "visited": false
+        },
+        {
+            "x": 4094.0,
+            "y": 4938.0,
+            "visited": false
+        },
+        {
+            "x": 4087.0,
+            "y": 4983.0,
+            "visited": false
+        },
+        {
+            "x": 4126.0,
+            "y": 4933.0,
+            "visited": false
+        },
+        {
+            "x": 4161.0,
+            "y": 4920.0,
+            "visited": false
+        },
+        {
+            "x": 4183.0,
+            "y": 4916.0,
+            "visited": false
+        },
+        {
+            "x": 4229.0,
+            "y": 4935.0,
+            "visited": false
+        },
+        {
+            "x": 4174.0,
+            "y": 4961.0,
+            "visited": false
+        },
+        {
+            "x": 4157.0,
+            "y": 4973.0,
+            "visited": false
+        },
+        {
+            "x": 4172.0,
+            "y": 4980.0,
+            "visited": false
+        },
+        {
+            "x": 4135.0,
+            "y": 4981.0,
+            "visited": false
+        },
+        {
+            "x": 4141.0,
+            "y": 5013.0,
+            "visited": false
+        },
+        {
+            "x": 4201.0,
+            "y": 5030.0,
+            "visited": false
+        },
+        {
+            "x": 4199.0,
+            "y": 5074.0,
+            "visited": false
+        },
+        {
+            "x": 4210.0,
+            "y": 5122.0,
+            "visited": false
+        },
+        {
+            "x": 4209.0,
+            "y": 5153.0,
+            "visited": false
+        },
+        {
+            "x": 4233.0,
+            "y": 5197.0,
+            "visited": false
+        },
+        {
+            "x": 4250.0,
+            "y": 5208.0,
+            "visited": false
+        },
+        {
+            "x": 4287.0,
+            "y": 5147.0,
+            "visited": false
+        },
+        {
+            "x": 4284.0,
+            "y": 5112.0,
+            "visited": false
+        },
+        {
+            "x": 4281.0,
+            "y": 5004.0,
+            "visited": false
+        },
+        {
+            "x": 4314.0,
+            "y": 5075.0,
+            "visited": false
+        },
+        {
+            "x": 4379.0,
+            "y": 5100.0,
+            "visited": false
+        },
+        {
+            "x": 4434.0,
+            "y": 5111.0,
+            "visited": false
+        },
+        {
+            "x": 4483.0,
+            "y": 5112.0,
+            "visited": false
+        },
+        {
+            "x": 4458.0,
+            "y": 4995.0,
+            "visited": false
+        },
+        {
+            "x": 4486.0,
+            "y": 4955.0,
+            "visited": false
+        },
+        {
+            "x": 4522.0,
+            "y": 5040.0,
+            "visited": false
+        },
+        {
+            "x": 4523.0,
+            "y": 5067.0,
+            "visited": false
+        },
+        {
+            "x": 4506.0,
+            "y": 5237.0,
+            "visited": false
+        },
+        {
+            "x": 4514.0,
+            "y": 5261.0,
+            "visited": false
+        },
+        {
+            "x": 4436.0,
+            "y": 5264.0,
+            "visited": false
+        },
+        {
+            "x": 4421.0,
+            "y": 5268.0,
+            "visited": false
+        },
+        {
+            "x": 4419.0,
+            "y": 5297.0,
+            "visited": false
+        },
+        {
+            "x": 4314.0,
+            "y": 5299.0,
+            "visited": false
+        },
+        {
+            "x": 4297.0,
+            "y": 5255.0,
+            "visited": false
+        },
+        {
+            "x": 4299.0,
+            "y": 5233.0,
+            "visited": false
+        },
+        {
+            "x": 4245.0,
+            "y": 5260.0,
+            "visited": false
+        },
+        {
+            "x": 4227.0,
+            "y": 5263.0,
+            "visited": false
+        },
+        {
+            "x": 4225.0,
+            "y": 5308.0,
+            "visited": false
+        },
+        {
+            "x": 4207.0,
+            "y": 5314.0,
+            "visited": false
+        },
+        {
+            "x": 4172.0,
+            "y": 5286.0,
+            "visited": false
+        },
+        {
+            "x": 4168.0,
+            "y": 5244.0,
+            "visited": false
+        },
+        {
+            "x": 4118.0,
+            "y": 5167.0,
+            "visited": false
+        },
+        {
+            "x": 4050.0,
+            "y": 5121.0,
+            "visited": false
+        },
+        {
+            "x": 4101.0,
+            "y": 5223.0,
+            "visited": false
+        },
+        {
+            "x": 4048.0,
+            "y": 5270.0,
+            "visited": false
+        },
+        {
+            "x": 4012.0,
+            "y": 5355.0,
+            "visited": false
+        },
+        {
+            "x": 3978.0,
+            "y": 5447.0,
+            "visited": false
+        },
+        {
+            "x": 3924.0,
+            "y": 5461.0,
+            "visited": false
+        },
+        {
+            "x": 3852.0,
+            "y": 5462.0,
+            "visited": false
+        },
+        {
+            "x": 3778.0,
+            "y": 5462.0,
+            "visited": false
+        },
+        {
+            "x": 3834.0,
+            "y": 5388.0,
+            "visited": false
+        },
+        {
+            "x": 3804.0,
+            "y": 5343.0,
+            "visited": false
+        },
+        {
+            "x": 3770.0,
+            "y": 5273.0,
+            "visited": false
+        },
+        {
+            "x": 3731.0,
+            "y": 5233.0,
+            "visited": false
+        },
+        {
+            "x": 3628.0,
+            "y": 5237.0,
+            "visited": false
+        },
+        {
+            "x": 3556.0,
+            "y": 5285.0,
+            "visited": false
+        },
+        {
+            "x": 3449.0,
+            "y": 5334.0,
+            "visited": false
+        },
+        {
+            "x": 3433.0,
+            "y": 5349.0,
+            "visited": false
+        },
+        {
+            "x": 3458.0,
+            "y": 5442.0,
+            "visited": false
+        },
+        {
+            "x": 3378.0,
+            "y": 5530.0,
+            "visited": false
+        },
+        {
+            "x": 3399.0,
+            "y": 5607.0,
+            "visited": false
+        },
+        {
+            "x": 3447.0,
+            "y": 5613.0,
+            "visited": false
+        },
+        {
+            "x": 3408.0,
+            "y": 5668.0,
+            "visited": false
+        },
+        {
+            "x": 3442.0,
+            "y": 5706.0,
+            "visited": false
+        },
+        {
+            "x": 3402.0,
+            "y": 5705.0,
+            "visited": false
+        },
+        {
+            "x": 3401.0,
+            "y": 5763.0,
+            "visited": false
+        },
+        {
+            "x": 3463.0,
+            "y": 5820.0,
+            "visited": false
+        },
+        {
+            "x": 3502.0,
+            "y": 5812.0,
+            "visited": false
+        },
+        {
+            "x": 3621.0,
+            "y": 5885.0,
+            "visited": false
+        },
+        {
+            "x": 3692.0,
+            "y": 5854.0,
+            "visited": false
+        },
+        {
+            "x": 3716.0,
+            "y": 5818.0,
+            "visited": false
+        },
+        {
+            "x": 3667.0,
+            "y": 5791.0,
+            "visited": false
+        },
+        {
+            "x": 3667.0,
+            "y": 5764.0,
+            "visited": false
+        },
+        {
+            "x": 3746.0,
+            "y": 5678.0,
+            "visited": false
+        },
+        {
+            "x": 3787.0,
+            "y": 5683.0,
+            "visited": false
+        },
+        {
+            "x": 3781.0,
+            "y": 5616.0,
+            "visited": false
+        },
+        {
+            "x": 3832.0,
+            "y": 5597.0,
+            "visited": false
+        },
+        {
+            "x": 3840.0,
+            "y": 5566.0,
+            "visited": false
+        },
+        {
+            "x": 3902.0,
+            "y": 5551.0,
+            "visited": false
+        },
+        {
+            "x": 3964.0,
+            "y": 5486.0,
+            "visited": false
+        },
+        {
+            "x": 4058.0,
+            "y": 5491.0,
+            "visited": false
+        },
+        {
+            "x": 4095.0,
+            "y": 5517.0,
+            "visited": false
+        },
+        {
+            "x": 4101.0,
+            "y": 5542.0,
+            "visited": false
+        },
+        {
+            "x": 4111.0,
+            "y": 5593.0,
+            "visited": false
+        },
+        {
+            "x": 4172.0,
+            "y": 5631.0,
+            "visited": false
+        },
+        {
+            "x": 4215.0,
+            "y": 5652.0,
+            "visited": false
+        },
+        {
+            "x": 4198.0,
+            "y": 5608.0,
+            "visited": false
+        },
+        {
+            "x": 4217.0,
+            "y": 5589.0,
+            "visited": false
+        },
+        {
+            "x": 4232.0,
+            "y": 5556.0,
+            "visited": false
+        },
+        {
+            "x": 4285.0,
+            "y": 5574.0,
+            "visited": false
+        },
+        {
+            "x": 4326.0,
+            "y": 5473.0,
+            "visited": false
+        },
+        {
+            "x": 4345.0,
+            "y": 5424.0,
+            "visited": false
+        }
+    ]
+}
