@@ -212,7 +212,12 @@ export function useMapEngine(account) {
     return () => { alive = false }
   }, [account, applyPos]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => subscribe((m) => { if (m.type === 'position') applyPos(m.data) }), [account, applyPos])
+  useEffect(() => subscribe((m) => {
+    if (m.type === 'position') applyPos(m.data)
+    // 断线重连成功(或首次连上)后补拉最新位置:SSE 丢的包覆盖不了,主动拉一次快照立即恢复,
+    // 不用等下一个移动包(静止时心跳 2.5-3s 一次才来)。
+    else if (m.type === 'stream-open') getPosition().then((p) => { if (p) applyPos(p) }).catch(() => {})
+  }), [account, applyPos])
 
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,

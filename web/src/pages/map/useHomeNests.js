@@ -18,8 +18,13 @@ export function useHomeNests(account) {
     return () => { alive = false }
   }, [account])
 
-  // 后端每次变化都推全量(进家园、收走一颗蛋、宠物进出窝),直接替换。
+  // 后端每次变化都推全量(进家园、收走一颗蛋、宠物进出窝),直接替换;
+  // 断线重连成功(或首次连上)后补拉快照——SSE 丢的增量覆盖不了。
   useEffect(() => subscribe((m) => {
+    if (m.type === 'stream-open') {
+      getHome().then((d) => { if (d) setNests(d.nests || []) }).catch(() => {})
+      return
+    }
     if (m.type === 'home') setNests(m.data.nests || [])
   }), [account])
 

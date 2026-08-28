@@ -420,6 +420,7 @@ func handle(c net.Conn, user, pass string, block []string) {
 		_ = tc.SetKeepAlive(true)
 		_ = tc.SetKeepAlivePeriod(30 * time.Second) // dialer 已设 30s,这里显式兜底
 		setQuickAck(tc)
+		setNotsentLowat(tc)
 	}
 	if tc, ok := c.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
@@ -428,6 +429,7 @@ func handle(c net.Conn, user, pass string, block []string) {
 		_ = tc.SetKeepAlive(true)
 		_ = tc.SetKeepAlivePeriod(30 * time.Second)
 		setQuickAck(tc)
+		setNotsentLowat(tc)
 	}
 
 	if err := writeReply(c, repSuccess); err != nil {
@@ -568,9 +570,11 @@ var bufPool = sync.Pool{
 
 // relayIdleTimeout 是中继方向的最大空闲时长:若某方向在此期间无数据可读,
 // 则认为连接已半开/死掉,主动关闭双方连接。
-// 游戏心跳间隔通常远小于此值,正常流量不会触发;仅用于清理静默断开的连接,
-// 防止 io.Copy 永久阻塞 → goroutine 与信号量泄露 → 周期性延迟飙升。
-const relayIdleTimeout = 2 * time.Minute
+// 正常游戏心跳间隔远小于此值,不会触发。取值需明显大于手机切后台/锁屏时
+// 心跳暂停的时长(Android 省电策略下可达数分钟):取值过小会把「暂时无流量的
+// 活跃会话」误杀,玩家回到前台时游戏被迫重连,表现为一次明显卡顿(999ms 级)。
+// 半开连接的实际兜底是 TCP keepalive(30s 探测),此值只作第二道保险。
+const relayIdleTimeout = 15 * time.Minute
 
 // idleReader 在读取前设置滚动 ReadDeadline:每次读成功后顺延 deadline,
 // 若 relayIdleTimeout 内无数据则读返回超时错误,relay 据此关闭连接。

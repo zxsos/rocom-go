@@ -155,8 +155,8 @@ func TestPaintCorridor(t *testing.T) {
 // TestPaintDelta:新涂的格子经 SSE 推出,下标落在位图范围内;没有新格子时不广播。
 func TestPaintDelta(t *testing.T) {
 	s := newTestServer(t)
-	ch := s.hub.subscribe()
-	defer s.hub.unsubscribe(ch)
+	sub := s.hub.subscribe()
+	defer s.hub.unsubscribe(sub)
 
 	pets := [][2]int32{{testX + 5000, testY}}
 	here := [][2]int32{{testX, testY}}
@@ -168,13 +168,12 @@ func TestPaintDelta(t *testing.T) {
 			Cells []int32
 		}
 	}
-	select {
-	case m := <-ch:
-		if err := json.Unmarshal(m.data, &msg); err != nil {
-			t.Fatalf("解析广播: %v", err)
-		}
-	default:
+	m, ok := sub.tryPop()
+	if !ok {
 		t.Fatal("涂上新格子却没有广播")
+	}
+	if err := json.Unmarshal(m.data, &msg); err != nil {
+		t.Fatalf("解析广播: %v", err)
 	}
 	if msg.Type != "paint" || len(msg.Data.Cells) == 0 {
 		t.Fatalf("广播内容不对: %+v", msg)
@@ -185,10 +184,8 @@ func TestPaintDelta(t *testing.T) {
 		}
 	}
 	s.PaintSeen(testAcc, testRes, 0, here, pets) // 没有新格子
-	select {
-	case m := <-ch:
+	if m, ok := sub.tryPop(); ok {
 		t.Fatalf("同样的视线不该再广播: %s", m.data)
-	default:
 	}
 }
 
