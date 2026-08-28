@@ -18,6 +18,13 @@ const imgSrc = (it) => {
 // msTime 第三方的时间戳是毫秒,fmtTime 要秒,这里除 1000 再交给它。
 const msTime = (ms) => (ms ? fmtTime(ms / 1000) : '')
 
+// 推荐关键词:常见「值得买」商品词,点击即填入(自动补英文逗号,再点一次取消)。
+const SUB_PRESETS = ['球', '棱镜', '国王', '项链', '粉尘', '零碎', '相框', '魔镜', '钥匙']
+// 关键词规范化:中文逗号/顿号/分号/句号/空白等间隔符统一成英文逗号,去空项。
+// 后端按英文逗号分词(大小写不敏感子串匹配),这里保证前端提交的都是规范形式。
+const normKws = (s) =>
+  String(s || '').replace(/[，、;；。\s]+/g, ',').split(',').map((x) => x.trim()).filter(Boolean).join(',')
+
 // 营业状态 → 徽标文案与样式
 const STATUS = {
   open: { cls: 'ok', text: '营业中' },
@@ -382,7 +389,7 @@ function SubCard() {
     if (e !== confirm.trim()) { setErr('两次输入的邮箱不一致,请确认后重试'); return }
     setBusy(true); setErr(''); setMsg('')
     try {
-      const res = await setMerchantSub(e, kws.trim())
+      const res = await setMerchantSub(e, normKws(kws))
       if (res.mail_sent) {
         setMsg('订阅成功,验证邮件已发送到 ' + e + ',请查收(含垃圾箱)。')
       } else if (res.mail_error) {
@@ -393,6 +400,18 @@ function SubCard() {
       setCollapsed(true)
       refresh()
     } catch (e2) { setErr(e2.message) } finally { setBusy(false) }
+  }
+
+  // 推荐词点击:已在列表则移除,否则追加(逗号自动处理);与手动输入共用 kws。
+  const kwList = normKws(kws).split(',').filter(Boolean)
+  const toggleKw = (kw) => {
+    setKws((prev) => {
+      const list = normKws(prev).split(',').filter(Boolean)
+      const i = list.indexOf(kw)
+      if (i >= 0) list.splice(i, 1)
+      else list.push(kw)
+      return list.join(',')
+    })
   }
 
   const unsub = async () => {
@@ -428,6 +447,7 @@ function SubCard() {
           <p className="merchant-sub-desc">
             每轮(8/12/16/20 点)有<b>新增商品</b>上架时,自动发邮件到你的邮箱(支持任意邮箱);0~8 点打烊不提醒。
             订阅时需两次输入同一邮箱确认,成功后自动发送验证邮件。
+            <br />关键词:新增商品<b>名称包含任一关键词</b>即提醒;多个用逗号隔开(中文逗号/顿号/空格会自动转成英文逗号),留空=提醒全部。点击下方推荐词可快速添加,再点一次取消。
           </p>
           <form className="merchant-sub-form" onSubmit={save}>
             <input className="merchant-sub-input" type="email" placeholder="收件邮箱(如 name@example.com)"
@@ -436,9 +456,18 @@ function SubCard() {
             <input className="merchant-sub-input" type="email" placeholder="再次输入同一邮箱确认"
               value={confirm} onChange={(e) => setConfirm(e.target.value)}
               disabled={busy || (cfg && !cfg.configured)} required />
-            <input className="merchant-sub-input" placeholder="关键词(逗号分隔,可留空=全部)"
-              value={kws} onChange={(e) => setKws(e.target.value)}
+            <input className="merchant-sub-input" placeholder="关键词(逗号分隔,留空=全部)"
+              value={kws} onChange={(e) => setKws(normKws(e.target.value))}
               disabled={busy || (cfg && !cfg.configured)} />
+            <div className="merchant-sub-presets">
+              <span className="merchant-sub-presets-label">推荐:</span>
+              {SUB_PRESETS.map((kw) => (
+                <button key={kw} type="button"
+                  className={'merchant-sub-chip' + (kwList.includes(kw) ? ' on' : '')}
+                  onClick={() => toggleKw(kw)}
+                  disabled={busy || (cfg && !cfg.configured)}>{kw}</button>
+              ))}
+            </div>
             <button type="submit" className="btn" disabled={busy || (cfg && !cfg.configured)}>
               {cfg && cfg.subscribed ? '更新订阅' : '订阅'}
             </button>

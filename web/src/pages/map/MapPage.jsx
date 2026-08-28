@@ -3,34 +3,23 @@ import { AccountContext } from '../../context'
 import { useMapEngine, MapViz } from './useMapEngine.jsx'
 import LayerPanel from './LayerPanel'
 
-// 实时地图页:外壳 = 图层侧栏 + MapViz(地图本体,引擎在 useMapEngine)。
-// 右上角控制组里的 ☰ 控制图层侧栏:桌面可折叠成地图全宽;移动端开/关图层抽屉。
+// 实时地图页:外壳 = 图层抽屉 + MapViz(地图本体,引擎在 useMapEngine)。
+// 图层栏所有宽度统一为侧滑抽屉(对齐手机端):右上角 ☰ / 遮罩 / ✕ 控制开合。
 export default function MapPage() {
   const account = useContext(AccountContext)
   const engine = useMapEngine(account)
-  const [collapsed, setCollapsed] = useState(true)        // 移动端图层抽屉(开合)
-  const [sidebarOpen, setSidebarOpen] = useState(true)   // 桌面图层侧栏(可折叠,折叠后地图全宽)
+  const [collapsed, setCollapsed] = useState(true) // 图层抽屉(开合),默认收起=地图全屏
 
-  // 点击时实时判移动端断点(响应窗口尺寸变化):窄屏开/关图层抽屉,桌面折叠/展开侧栏。
-  const toggleLayers = () => {
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
-      setCollapsed((c) => !c)
-    else
-      setSidebarOpen((o) => !o)
-  }
-
-  // ☰ 按钮的 on 态:窄屏看抽屉是否展开(!collapsed),桌面看侧栏是否展开(sidebarOpen)。
-  const mobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches
-  const layersActive = mobile ? !collapsed : sidebarOpen
+  const toggleLayers = () => setCollapsed((c) => !c)
 
   return (
     <div className="map-page">
-      <div className={'map-layout' + (sidebarOpen ? '' : ' closed')}>
+      <div className="map-layout">
         <LayerPanel pois={engine.pois} wilds={engine.wilds} paint={engine.paint} collapsed={collapsed}
-          onClose={() => setCollapsed(true)} onCollapseSidebar={() => setSidebarOpen(false)} />
+          onClose={() => setCollapsed(true)} />
 
         <MapViz engine={engine}
-          layersActive={layersActive}
+          layersActive={!collapsed}
           onToggleLayers={toggleLayers} />
       </div>
     </div>

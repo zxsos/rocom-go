@@ -6,22 +6,20 @@ import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
 // 而是附近实时刷出的稀有个体(见 useWildPets.js)。
 // 家园小窝不在此列:那层始终开着,不给开关也不占图例(见 useHomeNests.js)。
-// 复用宠物列表那套 .filters:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
-export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onCollapseSidebar }) {
+// 复用宠物列表那套 .filters:所有宽度统一为侧滑抽屉(collapsed 控制开合,桌面也对齐手机端)。
+export default function LayerPanel({ pois, wilds, paint, collapsed, onClose }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
   const dualNum = wilds.num.dual || 0
   const dualGone = wilds.numStale.dual || 0
   return (
     <>
-      <div className={'filters-backdrop' + (collapsed ? '' : ' show')} onClick={onClose} />
+      <div className={'map-filters-backdrop' + (collapsed ? '' : ' show')} onClick={onClose} />
       <aside className={'filters map-filters' + (collapsed ? ' collapsed' : '')}>
         <div className="filters-bar">
           <span className="filters-title">
-            <span className="filters-title-ic">🗺️</span>图层
+            <span className="filters-title-ic">⚙️</span>设置
           </span>
-          {/* 桌面:收起按钮把侧栏折进地图(地图全宽),右上角 ☰ 可再展开;移动端:✕ 关抽屉 */}
-          <button className="icon-btn map-sidebar-collapse" onClick={onCollapseSidebar}
-            title="收起图层栏" aria-label="收起图层栏">◀</button>
+          {/* ✕ 关抽屉;右上角 ☰ 再打开 */}
           <button className="icon-btn map-sidebar-close" onClick={onClose} aria-label="关闭图层">✕</button>
         </div>
         <div className="filter-group">
@@ -164,9 +162,6 @@ export default function LayerPanel({ pois, wilds, paint, collapsed, onClose, onC
               if (window.confirm('清空本场景已涂的区域?重来一遍要重新走。')) paint.reset()
             }} disabled={!paint.available} title="重置本场景的涂色" aria-label="重置涂色">↺</button>
           </div>
-        </div>
-        <div className="filters-foot">
-          <button className="btn primary" onClick={onClose}>查看地图</button>
         </div>
       </aside>
     </>

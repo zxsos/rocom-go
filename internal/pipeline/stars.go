@@ -18,7 +18,7 @@ import (
 //
 // 星/光点:已收集的服务器**根本不刷**,只有未收集的才作为 NPC 实体下发(实体带刷新点 id)。故:
 //
-//	收到某点的实体          ⇒ 未收集
+//	收到某点的实体          ⇒ 未收集(实体离开后失效,见 observeStars)
 //	走到某点附近却没有实体  ⇒ 已收集
 //
 // 石像**不同**:本体收集后不消失、实体一直下发,「出现/消失」不携带收集信息;它的星是实体上的
@@ -201,7 +201,8 @@ func starSee(ts *starTracker, a scene.NpcActor, states map[int32]int) {
 }
 
 // observeStars 收下一个 AOI 通知里的星星实体进/离(0x0413/0x0414)。
-// 实体进入 ⇒ 见 starSee;实体离开且玩家就在旁边 ⇒ 刚被收走(走远出 AOI 的离开不算,故看距离)。
+// 实体进入 ⇒ 见 starSee;实体离开即「未收集证据」失效,无条件清 seen(见下),
+// 且玩家就在旁边(平面且同层)时,离开才是「刚被收走」(走远出 AOI 的离开不算,故看距离)。
 func (p *Pipeline) observeStars(conn, acc string, body []byte) {
 	cs := p.conns[conn]
 	if cs == nil || cs.stars == nil {
@@ -221,13 +222,19 @@ func (p *Pipeline) observeStars(conn, acc string, body []byte) {
 			continue
 		}
 		delete(ts.actor, id)
+		// 无条件清 seen:实体现已不在 AOI,「收到过实体 ⇒ 未收集」的前提作废,状态回到未知。
+		// 若实体还在(未收集),玩家重新走近时 AOI 会重新下发(seen 复原,继续显示);
+		// 若已收集(服务器不再刷),由 sweepStars 的走近无实体判定结账。
+		// 不清理的话,下方「玩家在旁」判定一旦漏掉(位置缺失/通知与位置先后/出 AOI 抖动),
+		// seen 残留会让 sweepStars 的 seen 分支短路:本场景内该点永远被写回未收集、
+		// 永远无法结账已收集,已收集的点要等换场景才消失(2026-08 用户实测)。
+		delete(ts.seen, rid)
 		// 玩家不可能隔着几十米收集:只有他就在旁边(平面且同层)时,实体消失才是「被收走」。
 		px, py, pz, ok := posXYZ(pos)
 		if !ok {
 			continue
 		}
 		if poi, found := p.starPoi(ts.res, rid); found && near(px, py, poi, starCollectRadius) && sameFloor(pz, poi) {
-			delete(ts.seen, rid)
 			states[rid] = store.StarCollected
 			p.bumpStarZone(acc, ts.res, rid) // 刚收走:分区进度本地 +1(凑满即触发前端整区隐藏)
 		}
