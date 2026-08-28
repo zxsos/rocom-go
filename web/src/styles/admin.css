@@ -218,3 +218,27 @@
   color: var(--green, #4caf50); font-weight: 600;
   border: 1px solid var(--green, #4caf50); border-radius: 4px; padding: 0 6px; font-size: 12px;
 }
+
+/* —— 移动端适配:表格横向滚动、表单收单列,避免文字溢出卡片 —— */
+@media (max-width: 760px) {
+  .admin-page { padding: 14px 12px 84px; gap: 12px; }
+  .admin-card { padding: 16px; }
+  .admin-head h2 { font-size: 18px; }
+  /* 大内容表格:块级 + 横向滚动,保留全部列(管理员工具,横向滚动查全量优于删列) */
+  .admin-play-table, .admin-table { display: block; overflow-x: auto; }
+  .admin-play-table th, .admin-play-table td { padding: 6px; }
+  /* 表单收单列,控件占满整行(1080px 段的 span 2 按钮一并收回) */
+  .admin-inject-form, .admin-rule-form, .admin-test-form { grid-template-columns: 1fr; }
+  .admin-inject-form .btn, .admin-rule-form .btn { grid-column: auto; }
+  /* 工具栏可换行,筛选下拉弹性占宽(不再钉死 260px) */
+  .admin-play-toolbar { flex-wrap: wrap; }
+  .admin-play-toolbar .select { flex: 1 1 auto; max-width: none; min-width: 0; }
+  /* 统计块自动换行(游玩记录/查蛋各 5 块,三列排不下自然换行) */
+  .admin-play-summary { flex-wrap: wrap; }
+  .admin-play-stat { flex: 1 1 30%; min-width: 100px; }
+  /* 规则/注入列表行可换行:备注或场景名换行占满整行,按钮组不再挤压溢出 */
+  .admin-rule-list li, .admin-inject-list li { flex-wrap: wrap; gap: 8px; }
+  .admin-inject-scene { flex-basis: 100%; }
+  /* 成员条形图:名字列收窄,腾空间给进度条 */
+  .admin-bar-name { width: 68px; }
+}

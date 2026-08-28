@@ -3,53 +3,53 @@
    子元素不算「确定高度」导致塌陷)。仅地图页把 .content 变 flex 列(:has 作用域,不影响他页)。 */
 .content:has(.map-page) { display: flex; flex-direction: column; }
 .map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
-/* 左侧图层栏 + 地图(栏宽同宠物列表的筛选栏);两列一起撑满 .map-page 的剩余高度。
-   .closed(桌面侧栏收起):网格收成单列,地图全宽全屏展示。
-   网格列宽过渡:侧栏展开/收起时平滑变宽,不再瞬间跳变。 */
-.map-layout {
-  flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 312px 1fr; gap: 16px;
-  transition: grid-template-columns .28s cubic-bezier(.4, 0, .2, 1);
+/* 图层抽屉盖在地图上(所有宽度统一,对齐手机端):地图独占整行,抽屉 fixed 滑入/滑出。 */
+.map-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr; }
+/* 图层栏 = 全宽度侧滑抽屉:fixed 盖在 .map-vp 之上,z-index 40;折叠态 transform 滑出屏幕左缘。
+   必须用 .map-filters(而非 .filters)限定:宠物列表等普通页面桌面仍是常驻左列,仅移动端进抽屉
+   (见 panel.css 的 media query)。视觉样式同 panel.css 的移动端抽屉,另加桌面已有的毛玻璃与渐变标题。 */
+.map-filters {
+  position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
+  max-height: none; margin: 0; z-index: 40; border-radius: 0;
+  border: none; border-right: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px) saturate(1.2);
+  overflow-y: auto; padding: 0 14px 14px;
+  transform: translateX(-100%); transition: transform .32s cubic-bezier(.32, .72, 0, 1);
 }
-.map-layout.closed { grid-template-columns: 0 1fr; }
-/* 折叠后 .map-filters 变 display:none,grid 中唯一可见子项(地图/空态/无图提示)若不显式占满整行,
-   会流到默认第一格=第一行第一列=0 宽列,地图就跟着侧栏一起被「折」掉了。
-   显式跨满所有列(1 / -1)即可全宽展示。 */
-.map-layout.closed > .map-vp,
-.map-layout.closed > .empty,
-.map-layout.closed > .map-nomap { grid-column: 1 / -1; }
-@media (min-width: 761px) {
-  /* 桌面:图层栏随地图一起撑满高度,不用 .filters 那套 sticky + 视口高度(地图页本就不滚动)。
-     必须限定在桌面断点内:否则(同为单类选择器、且写在后面)会盖掉移动端把 .filters 变抽屉的规则。 */
-  .map-filters {
-    position: static; max-height: none; height: 100%;
-    backdrop-filter: blur(6px) saturate(1.2);
-    background: var(--bar-bg);
-    box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, .04);
-  }
-  .map-layout.closed .map-filters { display: none; }
-  /* 桌面:图层侧栏也常驻标题栏,放「收起」按钮(把侧栏折进地图);移动端用 ✕ 关抽屉 */
-  .map-filters .filters-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 2px 0 12px; margin-bottom: 6px;
-    border-bottom: 1px solid transparent;
-    background: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
-    background-size: 100% 1px; background-position: bottom; background-repeat: no-repeat;
-  }
-  .map-filters .filters-title {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-weight: 700; font-size: 15px;
-    background: linear-gradient(90deg, var(--accent), #8b5cf6);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .map-filters .filters-title-ic { font-size: 16px; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
-  /* 收起/关闭按钮的 hover 动效(基础样式由 base.css 全局 .icon-btn 提供) */
-  .map-sidebar-collapse:hover { transform: translateX(-2px); }
-  .map-sidebar-close:hover { transform: rotate(90deg); }
-  .map-sidebar-close { display: none; }
+.map-filters:not(.collapsed) { transform: none; }
+/* 抽屉滑出时内容逐组淡入上浮(stagger),与整体位移叠加出层次;收起时随抽屉滑走,不播动画 */
+@keyframes map-filters-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: none; }
 }
-@media (max-width: 760px) {
-  .map-sidebar-collapse { display: none; }
+.map-filters:not(.collapsed) .filter-group { animation: map-filters-in .34s ease-out both; }
+.map-filters:not(.collapsed) .filter-group:nth-of-type(2) { animation-delay: .05s; }
+.map-filters:not(.collapsed) .filter-group:nth-of-type(3) { animation-delay: .1s; }
+/* 标题栏吸顶(渐变底边);长面板滚动时始终可见 */
+.map-filters .filters-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+  padding: 12px 0 10px; margin-bottom: 4px;
+  border-bottom: 1px solid transparent;
+  background-image: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
+  background-size: 100% 1px; background-position: bottom; background-repeat: no-repeat;
 }
+.map-filters .filters-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-weight: 700; font-size: 15px;
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.map-filters .filters-title-ic { font-size: 16px; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
+/* 抽屉遮罩:盖住地图,点它关抽屉。独立兄弟节点(非 .map-filters 后代),单独类不与宠物列表共用。 */
+.map-filters-backdrop {
+  display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45);
+  opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
+}
+.map-filters-backdrop.show { opacity: 1; visibility: visible; }
+/* ✕ 关抽屉按钮的 hover 动效(基础样式由 base.css 全局 .icon-btn 提供) */
+.map-sidebar-close:hover { transform: rotate(90deg); }
 /* 视口:地图软件式窗口,内部地图层可平移缩放;flex:1 填满剩余高度。 */
 .map-vp {
   position: relative;
@@ -130,7 +130,7 @@
 .map-btn.on { color: var(--accent); border-color: var(--accent); background: rgba(76, 141, 255, .14); }
 .map-btn:disabled { opacity: .4; cursor: default; }
 .map-btn:disabled:hover { transform: none; border-color: var(--line); color: var(--fg-dim); background: var(--bar-bg); box-shadow: none; }
-/* 右上角控制组里的 ☰(图层侧栏开关):桌面折叠/展开侧栏,移动端开/关图层抽屉 */
+/* 右上角控制组里的 ☰(图层侧栏开关):所有宽度开/关图层抽屉 */
 .map-layers-toggle { display: flex; }
 
 /* POI 标记(炼金釜/魔力之源/…):在 .map-world 内按底图归一化坐标定位,尺寸恒定不随缩放变大,
