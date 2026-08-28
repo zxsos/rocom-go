@@ -138,6 +138,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   display: flex; align-items: center; justify-content: center;
   cursor: zoom-out;
   animation: glass-zoom-in .15s ease;
+  touch-action: manipulation; /* 移动端点按立即派发 click,不等双击缩放判定 */
 }
 @keyframes glass-zoom-in { from { opacity: 0; } to { opacity: 1; } }
 .glass-zoom { position: relative; max-width: min(560px, 92vw); width: 100%; }
