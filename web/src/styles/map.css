@@ -337,6 +337,12 @@
 .map-medal-toggle .muted { transition: transform .22s ease; display: inline-block; }
 .map-medal-toggle[aria-expanded="true"] .muted { transform: rotate(0deg); }
 .map-medal-toggle:not([aria-expanded="true"]) .muted { transform: rotate(-90deg); }
+/* 「跑图路线」折叠按钮的计数:数字保持水平,只让箭头旋转,避免数字跟着转出按钮。 */
+.map-route-count {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--fg-dim); font-variant-numeric: tabular-nums;
+}
+.map-route-count i { font-style: normal; color: var(--fg); }
 .map-medal-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 13px;
   animation: map-medal-row-in .25s ease-out; }
 @keyframes map-medal-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -527,5 +533,27 @@
 }
 /* 关闭态:色点淡出,与野生宠物那几行的关闭态一致 */
 .map-route-row:has(.map-collect-btn:not(.on)) .map-wild-swatch { opacity: .45; }
+/* 跟走模式行:✓开关 + 名称 + 状态 + 重置按钮,位于路线列表上方 */
+.map-route-follow {
+  display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+  font-size: 13px; animation: map-medal-row-in .25s ease-out;
+  background: rgba(127, 127, 127, .08); border-radius: 8px; margin: 2px 6px 4px;
+}
+.map-route-follow .map-collect-btn { width: 24px; }
+.map-route-follow .map-layer-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 判定范围滑块:跟走开启时显示,拖动实时生效并持久化 */
+.map-route-range {
+  display: flex; align-items: center; gap: 8px; padding: 0 10px 4px;
+  font-size: 12px; color: var(--fg-dim);
+}
+.map-route-range .map-layer-name { flex: none; }
+.map-route-range input[type="range"] {
+  flex: 1; min-width: 0; height: 4px; cursor: pointer;
+  accent-color: var(--accent, #4da3ff);
+}
+.map-route-range .muted {
+  min-width: 34px; text-align: right;
+  font-variant-numeric: tabular-nums; color: var(--fg);
+}
 
 /* 右上角图层入口按钮(主页面 .map-ctrl 内的 ☰):复用 .map-btn */

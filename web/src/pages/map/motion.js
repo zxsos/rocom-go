@@ -83,8 +83,12 @@ export function makeAnchor(p, disp, sceneChanged) {
   }
   // 与画面当前位置的落差:小落差(外推的正常误差)平滑抹平;换场景/传送这种大落差直接跳过去。
   // 有轨迹时起点是轨迹首点(箭头先并入真实路线),故落差按它算。
+  // 注意:带轨迹的包必然是普通走路(传送落点是 onTeleport 合成的无轨迹 MoveReq),其轨迹首点
+  // 是几秒前的位置,与外推画面的落差就是心跳间隔的路程(15-25m),通常远超 SNAP_DIST——若仍按
+  // 传送判定硬跳,直线走路时箭头会先瞬移到轨迹首点、再在 GLIDE 内回放归位,即「瞬移一点又归位」。
+  // 故有轨迹时无条件允许平滑,只有无轨迹的包才用 SNAP_DIST 判别传送/换场景。
   const start = posAt(a, 0)
-  if (disp && !sceneChanged && Math.hypot(disp.u - start.u, disp.v - start.v) < SNAP_DIST) {
+  if (disp && !sceneChanged && (a.cum || Math.hypot(disp.u - start.u, disp.v - start.v) < SNAP_DIST)) {
     a.cu = disp.u - start.u
     a.cv = disp.v - start.v
     a.dh = angleDiff(disp.heading, a.heading) // 转向同样平滑,不硬掰

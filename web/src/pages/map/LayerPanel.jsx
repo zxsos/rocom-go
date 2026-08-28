@@ -1,5 +1,6 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
+import { confirmDialog } from '../../components/confirm'
 import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
@@ -157,8 +158,30 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             <button className="map-medal-toggle" onClick={routes.toggleOpen} aria-expanded={routes.open}
               title="B站泽口博士的收集路线(1~20 号收集片区/精灵球/冲刺),可叠加多条">
               <span>收集路线</span>
-              <span className="muted">{routes.marks.length}/{routes.kinds.length} ▾</span>
+              <span className="map-route-count">{routes.marks.length}/{routes.kinds.length}<i className="muted">▾</i></span>
             </button>
+            {routes.open && (
+              <div className="map-route-follow">
+                <button className={'map-collect-btn' + (routes.follow ? ' on' : '')}
+                  onClick={routes.toggleFollow} aria-pressed={routes.follow} aria-label="跟走模式开关"
+                  title="开启后走到点位附近,该点之前的线自动隐藏,只留剩余路线和下一目标">✓</button>
+                <span className="map-layer-name">跟走模式</span>
+                <span className="muted">{routes.follow ? '到点即隐藏' : '显示全部'}</span>
+                <button className="map-collect-btn" onClick={() => {
+                  confirmDialog({ message: '重置所有路线的跟走进度?', okText: '重置', danger: true })
+                    .then((ok) => ok && routes.resetProgress())
+                }} title="重置跟走进度" aria-label="重置进度">↺</button>
+              </div>
+            )}
+            {routes.open && routes.follow && (
+              <div className="map-route-range">
+                <span className="map-layer-name">判定范围</span>
+                <input type="range" min={10} max={50} step={5} value={routes.nearM}
+                  onChange={(e) => routes.setNearM(Number(e.target.value))}
+                  title="走到目标点该距离内即判定到达,隐藏已走线路" aria-label="到达判定半径" />
+                <span className="muted">{routes.nearM}m</span>
+              </div>
+            )}
             {routes.open && routes.kinds.map((r) => (
               <div className="map-route-row" key={r.name}
                 title={r.short}>
@@ -167,7 +190,7 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
                   aria-label={`${r.short}开关`} aria-pressed={r.on}>✓</button>
                 <span className="map-wild-swatch" style={{ borderColor: r.color }} />
                 <span className="map-layer-name">{r.short}</span>
-                <span className="muted">{r.count}</span>
+                <span className="muted">{routes.follow && r.progress >= 0 ? `${r.progress + 1}/${r.count}` : r.count}</span>
               </div>
             ))}
           </div>
