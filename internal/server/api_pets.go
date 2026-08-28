@@ -179,8 +179,16 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 	if accs == nil {
 		accs = []store.AccountInfo{}
 	}
+	// 合并当日排行榜称号(大富翁/赚钱王/败家子,佩戴一天),供账号下拉等处展示
+	titleOf := map[string]string{}
+	if titles, err := s.store.RankTitles(todayCST()); err == nil {
+		for _, t := range titles {
+			titleOf[t.Account] = t.Title
+		}
+	}
 	for i := range accs {
 		accs[i].Online = s.AccountOnline(accs[i].Account)
+		accs[i].Title = titleOf[accs[i].Account]
 	}
 	writeJSON(w, accs)
 }

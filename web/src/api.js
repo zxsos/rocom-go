@@ -75,8 +75,31 @@ export const getNameOptions = () => getJSON('/api/name-options', { nature: [], s
 // 不随宠物/账号变化,App 启动时拉一次经 IconsContext 分发。
 export const getIcons = () => getJSON('/api/icons')
 
-// getAccounts 返回已知账号列表 [{account,name,petCount}](账号切换下拉用)。
+// getAccounts 返回已知账号列表 [{account,name,petCount,title}](账号切换下拉用;
+// title 是该账号今天佩戴的排行榜称号,见 api_rank.go 的 handleAccounts 合并)。
 export const getAccounts = () => getJSON('/api/accounts')
+
+// getLeaderboard 拉取排行榜:
+//   {forbes:[{account,name,coins,hasCoins,baseline,profit,title}], profit:[...],
+//    titles:[{date,account,name,title}], me:{account,name,join,coins,hasCoins,baseline,profit,title}}
+// forbes 按金币降序、profit 按盈亏降序(盈亏=当前金币-首次快照);
+// titles 是今天(佩戴日)每晚 00:05 结算评出的称号;me 是当前账号的参与状态。
+export const getLeaderboard = () => getJSON('/api/leaderboard', { forbes: [], profit: [], titles: [], me: null })
+
+// setAccountRank 设置账号是否参加排行榜(join=true 参加,false 退出)。默认参加。
+export async function setAccountRank(account, join) {
+  const r = await fetch('/api/account/rank', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account, join }),
+  })
+  if (!r.ok) {
+    let msg = '设置失败(' + r.status + ')'
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
 
 // getPois 返回某场景(scene_res_cfg_id)的大地图 POI 图层:
 //   {kinds:[{k,n,icon,on,num}], pois:[{k,u,v,n}]}——u,v 是底图归一化坐标(后端已投影,同玩家位置)。

@@ -36,8 +36,8 @@ type Server struct {
 	lastHome    map[string]any            // 账号 -> 最近一次家园小窝图层(同上;不在家园时为空列表)
 	lastFlowers map[string]any            // 账号 -> 最近一次花种 BOSS 分组(花种页加载时即时回显,见 0x0375)
 
-	onlineMu sync.Mutex           // 保护 lastSeen
-	lastSeen map[string]int64     // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
+	onlineMu sync.Mutex       // 保护 lastSeen
+	lastSeen map[string]int64 // 账号 -> 最近活跃 Unix 秒(pipeline 上报,/api/accounts 据此标在线)
 
 	// acctCache 缓存最近活跃账号,避免 acct() 每次请求都跑 ListAccounts 全表 JOIN。
 	// 前端首次加载(currentAccount 为空)时并行发多个 API,每个都调 acct() → ListAccounts(),
@@ -111,8 +111,9 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 		PartnerFrame:  db.StaticIcon("partner_frame"),
 	}
 	s.routes()
-	go s.sweepInjects() // 注入精灵生命周期:玩家靠近 10 秒后自动消失
-	go s.merchantLoop() // 远行商人:按 4h 槽定时回源第三方并缓存(见 api_merchant.go)
+	go s.sweepInjects()        // 注入精灵生命周期:玩家靠近 10 秒后自动消失
+	go s.merchantLoop()        // 远行商人:按 4h 槽定时回源第三方并缓存(见 api_merchant.go)
+	go s.startRankSettlement() // 排行榜称号:每晚 00:05 结算,启动时补结算(见 api_rank.go)
 	return s
 }
 
@@ -151,6 +152,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/account/verify", s.handleAccountVerify)
 	s.mux.HandleFunc("POST /api/account/pin", s.handleAccountPin)
 	s.mux.HandleFunc("DELETE /api/account", s.handleAccountDelete)
+	// 排行榜:福布斯(金币) / 盈亏排行;参与开关(默认参加,可在金币旁一键退出)。
+	s.mux.HandleFunc("GET /api/leaderboard", s.handleLeaderboard)
+	s.mux.HandleFunc("POST /api/account/rank", s.handleAccountRank)
 	// 管理员(隐式面板,前端导航不显示):首启设置密码 → 登录签发内存令牌 → 校验后使用。
 	s.mux.HandleFunc("GET /api/admin/status", s.handleAdminStatus)
 	s.mux.HandleFunc("POST /api/admin/setup", s.handleAdminSetup)
