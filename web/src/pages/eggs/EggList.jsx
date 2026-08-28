@@ -27,6 +27,25 @@ const HATCH_SLOTS = 3
 // 这里只规整结尾的重复(中间的「的蛋」是名字本身,不动)。
 const tidyEggName = (name) => (name || '').replace(/的蛋的蛋$/, '的蛋')
 
+// 预计完成时间:按当前估算孵化倍率(见 hatch.js)外推剩余秒数,换算成时间点。
+// 同一天只显时分(手机双列卡片宽度紧张),跨天补「月-日 时:分」;title 里给剩余时长,
+// 并注明是估算(倍率本身是估的)。
+const pad2n = (n) => String(n).padStart(2, '0')
+function etaText(egg, p, now) {
+  const remainSecs = Math.max(0, egg.maxSecs - p.secs)
+  const eta = new Date(now + remainSecs * 1000)
+  const hm = `${pad2n(eta.getHours())}:${pad2n(eta.getMinutes())}`
+  return new Date(now).toDateString() === eta.toDateString()
+    ? hm
+    : `${eta.getMonth() + 1}-${eta.getDate()} ${hm}`
+}
+function etaTitle(egg, p) {
+  const s = Math.max(0, egg.maxSecs - p.secs)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return `按当前孵化倍率估算,约剩 ${h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`}`
+}
+
 // 随机蛋「猜猜孵出谁」查询缓存:同一组身高/体重结果相同,按 `height|weight` 为 key 存
 // localStorage,刷新页面不丢、重复查询直接复用,少烧第三方 token(限流 10 次/分钟)。
 const EGG_GUESS_CACHE_KEY = 'eggGuessCache.v1'
@@ -264,6 +283,7 @@ function EggCard({ egg, now, onPet }) {
         <div className="egg-hatch">
           <div className="egg-bar"><div className="egg-bar-fill" style={{ width: p.pct + '%' }} /></div>
           <span className={p.pct >= 100 ? 'val-hot-hi' : undefined}>{p.pct >= 100 ? '可破壳' : p.pct + '%'}</span>
+          {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p)}>预计 {etaText(egg, p, now)}</span>}
         </div>
       )}
 

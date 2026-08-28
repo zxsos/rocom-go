@@ -464,6 +464,8 @@ export default function Admin() {
       setPassword('')
       setConfirmPw('')
       setAuthed(true)
+      // 管理员免密标记:本会话已通过管理员认证,之后切到有 PIN 的账号直接放行(见 App.jsx)
+      sessionStorage.setItem('admin-unlocked', '1')
     } catch (err) {
       setError(err.message || '操作失败')
     }
@@ -471,6 +473,7 @@ export default function Admin() {
 
   const logout = async () => {
     await adminLogout()
+    sessionStorage.removeItem('admin-unlocked')
     setAuthed(false)
     setRules(null)
     setStats(null)

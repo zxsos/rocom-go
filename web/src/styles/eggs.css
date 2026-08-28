@@ -111,9 +111,10 @@
 .egg-row-p { font-size: 12px; flex: none; opacity: .8; }
 
 /* 孵化进度条 */
-.egg-hatch { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.egg-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-3); overflow: hidden; }
+.egg-hatch { display: flex; align-items: center; gap: 8px; font-size: 13px; flex-wrap: wrap; }
+.egg-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-3); overflow: hidden; min-width: 60px; }
 .egg-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s linear; }
+.egg-eta { font-size: 12px; opacity: .8; flex: none; white-space: nowrap; }
 
 /* 随机蛋「猜猜孵出谁」:第三方图鉴查询结果(令牌在服务端,见 api_egg_query.go) */
 .egg-guess { margin-top: 8px; }

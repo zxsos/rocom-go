@@ -9,19 +9,30 @@ import RankTitle from './components/RankTitle'
 import { dropBoxFilter } from './pages/pet-list/filters'
 
 // 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
+// 收纳逻辑:功能按「对游戏做了什么」归为三组——我的精灵(收集养成)、世界(探索家园)、商店(金币买卖比拼)。
 const NAV = [
   {
-    label: '我的背包', icon: '🎒',
+    label: '我的精灵', icon: '🎒',
     children: [
       { to: '/pets', label: '宠物列表', icon: '🐾' },
       { to: '/eggs', label: '精灵蛋', icon: '🥚' },
+      { to: '/events', label: '捕获事件', icon: '🔔' },
     ],
   },
-  { to: '/events', label: '捕获事件', icon: '🔔' },
-  { to: '/merchant', label: '远行商人', icon: '🧳' },
-  { to: '/map', label: '实时地图', icon: '🗺️' },
-  { to: '/flowers', label: '花种', icon: '🌱' },
-  { to: '/leaderboard', label: '排行榜', icon: '🏆' },
+  {
+    label: '世界', icon: '🗺️',
+    children: [
+      { to: '/map', label: '实时地图', icon: '🗺️' },
+      { to: '/flowers', label: '花种', icon: '🌱' },
+    ],
+  },
+  {
+    label: '商店', icon: '💰',
+    children: [
+      { to: '/merchant', label: '远行商人', icon: '🧳' },
+      { to: '/leaderboard', label: '排行榜', icon: '🏆' },
+    ],
+  },
 ]
 
 // uidOf 从账号键 "UID:<user_id>" 取出 user_id(用于展示 nickname(user_id))。
@@ -88,10 +99,10 @@ export default function App() {
       if (!cur || !list.some((a) => a.account === cur)) {
         if (target) { setCurrentAccount(target); setAccount(target) }
       }
-      // 首屏 PIN 拦截:默认账号有 PIN 且本会话未解锁
+      // 首屏 PIN 拦截:默认账号有 PIN 且本会话未解锁(管理员已认证则直接放行)
       if (target) {
         const acc = list.find((a) => a.account === target)
-        if (acc?.hasPin && sessionStorage.getItem('pin:' + target) !== '1') {
+        if (acc?.hasPin && sessionStorage.getItem('pin:' + target) !== '1' && sessionStorage.getItem('admin-unlocked') !== '1') {
           setPendingAccount(target)
           setPinDialog({ mode: 'verify', account: target, name: acc.name, hasPin: true })
         }
@@ -119,12 +130,13 @@ export default function App() {
   }
 
   // 切换账号:若目标账号设了 PIN 且本会话未解锁,弹 PIN 框;否则直接切。
+  // 管理员已认证(admin-unlocked)时无视 PIN 直接放行。
   // (下方 <main key={account}> 据此重挂各页,让其以新账号重新拉数据)。
   const switchAccount = (a) => {
     if (!a || a === account) return
     const target = accounts.find((x) => x.account === a)
     const hasPin = target?.hasPin
-    const unlocked = sessionStorage.getItem('pin:' + a) === '1'
+    const unlocked = sessionStorage.getItem('pin:' + a) === '1' || sessionStorage.getItem('admin-unlocked') === '1'
     if (hasPin && !unlocked) {
       setPendingAccount(a)
       setPinDialog({ mode: 'verify', account: a, name: target?.name, hasPin: true })
@@ -152,7 +164,7 @@ export default function App() {
     const active = n.children.some((c) => location.pathname === c.to)
     return (
       <div key={n.label} className={'navgroup' + (active ? ' active' : '')}>
-        <button type="button" className="navgroup-btn" title="我的背包">
+        <button type="button" className="navgroup-btn" title={n.label}>
           <span className="nav-icon">{n.icon}</span>
           <span className="nav-label">{n.label}</span>
           <span className="navgroup-arrow">▾</span>

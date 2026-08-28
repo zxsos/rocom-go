@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { IconsContext } from '../context'
 import { imgURL, useImgFallback, InlineIcon } from './icons'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
@@ -73,13 +74,27 @@ function GlassZoom({ type, value, onClose }) {
     }
   }
   if (!body) return null
-  return (
-    <div className="glass-zoom-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+  // Portal 渲染到 body:彻底脱离宿主(宠物列表卡片/详情弹窗)DOM 树,避免两个问题——
+  // 1. 移动端 .card:active { transform: scale(.995) } 会让祖先 transform 破坏本遮罩的
+  //    position: fixed,按下瞬间遮罩被拉进卡片坐标系而偏移抖动;
+  // 2. 触摸/点击事件冒泡到宿主的长按(宠物列表 450ms 弹菜单)与点击(selectPet/弹窗遮罩)
+  //    导致点遮罩关闭时误弹菜单或连底层弹窗一起关。
+  // 事件已在 body 层,stopPropagation 仅作防御,挡住冒泡到 #root 之上的全局监听。
+  const stop = (e) => e.stopPropagation()
+  return createPortal(
+    <div
+      className="glass-zoom-backdrop"
+      onClick={(e) => { stop(e); if (e.target === e.currentTarget) onClose() }}
+      onTouchStart={stop}
+      onTouchMove={stop}
+      onTouchEnd={stop}
+    >
       <div className="glass-zoom">
         {body}
-        <button className="icon-btn glass-zoom-close" onClick={onClose} title="关闭" aria-label="关闭">✕</button>
+        <button className="icon-btn glass-zoom-close" onClick={(e) => { stop(e); onClose() }} title="关闭" aria-label="关闭">✕</button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
