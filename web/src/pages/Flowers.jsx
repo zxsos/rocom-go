@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
 import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../api'
 import { AccountContext, IconsContext } from '../context'
 import { fmtTime, maskUid } from '../utils/format'
 import { ImgAvatar } from '../components/icons'
 import { GlassChip, MarkIcon } from '../components/badges'
+import Dropdown from '../components/Dropdown'
 
 // 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
 // 只显示花种;world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)在解析层就丢弃了。
@@ -122,12 +123,18 @@ export default function Flowers() {
       </div>
       {/* 视图切换:默认当前世界(实时),可切到世界存档槽;切槽后只展示该槽,删除后回访重新建档 */}
       <div className="slot-bar">
-        <SlotSelect
-          options={viewOptions}
+        <Dropdown
+          className="slot-select"
+          options={viewOptions.map((o) => ({
+            value: o.key,
+            label: o.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : o.name,
+            count: o.flowers.length,
+          }))}
           value={selKey}
           onChange={setSelKey}
           disabled={!slots}
-          myUID={myUID}
+          placeholder="加载中…"
+          title="切换视图:当前世界 / 世界存档槽"
         />
         <button className="btn ghost" onClick={handleDeleteSlot} disabled={!selKey.startsWith('owner:')}>
           删除该槽
@@ -156,112 +163,6 @@ export default function Flowers() {
             </div>
           </section>
         </>
-      )}
-    </div>
-  )
-}
-
-// SlotSelect 自定义槽位下拉:原生 <select> 的浮层是系统样式,与站点深色主题割裂,
-// 故沿用顶栏账号下拉(见 App.jsx AccountSelect)的 button + ul 浮层方案。
-// 键鼠/触屏均可操作:点击展开/选条;键盘 ↑↓ 切换、Enter/空格选择、Esc 关闭,点外部自动收起。
-function SlotSelect({ options, value, onChange, disabled, myUID }) {
-  const [open, setOpen] = useState(false)
-  const [hi, setHi] = useState(0) // 高亮项索引(键盘 ↑↓ 移动)
-  const rootRef = useRef(null)
-  const listRef = useRef(null)
-
-  // 点外部关闭
-  useEffect(() => {
-    if (!open) return
-    const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-
-  // 打开时高亮重置为当前选中项
-  useEffect(() => {
-    if (open) setHi(Math.max(0, options.findIndex((o) => o.key === value)))
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 高亮项滚动到可见(键盘移动时不飘出可见区)
-  useEffect(() => {
-    if (!open || !listRef.current) return
-    const el = listRef.current.children[hi]
-    if (el) el.scrollIntoView({ block: 'nearest' })
-  }, [hi, open])
-
-  const cur = options.find((o) => o.key === value)
-
-  const choose = (o) => {
-    setOpen(false)
-    if (o.key !== value) onChange(o.key)
-  }
-
-  const onKey = (e) => {
-    if (disabled) return
-    if (!open) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        setOpen(true)
-      }
-      return
-    }
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setHi((i) => (i + 1) % options.length)
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setHi((i) => (i - 1 + options.length) % options.length)
-        break
-      case 'Enter':
-      case ' ':
-        e.preventDefault()
-        if (options[hi]) choose(options[hi])
-        break
-      case 'Escape':
-      case 'Tab':
-        setOpen(false)
-        break
-    }
-  }
-
-  return (
-    <div className="slot-select" ref={rootRef} onKeyDown={onKey}>
-      <button
-        type="button"
-        className={'slot-trigger' + (open ? ' open' : '')}
-        onClick={() => { if (!disabled) setOpen((o) => !o) }}
-        disabled={disabled}
-        title="切换视图:当前世界 / 世界存档槽"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className="slot-trigger-name">
-          {cur ? (cur.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : cur.name) : '加载中…'}
-        </span>
-        <span className="slot-count">({cur ? cur.flowers.length : 0})</span>
-        <span className="slot-caret">▾</span>
-      </button>
-      {open && (
-        <ul className="slot-dropdown" ref={listRef} role="listbox">
-          {options.map((o, i) => (
-            <li
-              key={o.key}
-              role="option"
-              aria-selected={o.key === value}
-              className={'slot-item' + (o.key === value ? ' cur' : '') + (i === hi ? ' hi' : '')}
-              onMouseDown={(e) => { e.preventDefault(); choose(o) }}
-              onMouseEnter={() => setHi(i)}
-            >
-              <span className="slot-item-name">
-                {o.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : o.name}
-              </span>
-              <span className="slot-item-count">{o.flowers.length}</span>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   )

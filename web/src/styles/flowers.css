@@ -11,38 +11,8 @@
 .slot-msg { font-size: 12px; color: var(--accent); }
 .slot-msg-err { color: var(--red); }
 
-/* 槽位下拉(自定义,替代原生 select):浮层随站点主题,与顶栏账号下拉同款风格 */
-.slot-select { position: relative; flex: none; max-width: 280px; }
-.slot-trigger {
-  display: inline-flex; align-items: center; gap: 6px; width: 100%;
-  text-align: left; cursor: pointer; font: inherit; color: var(--fg);
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px;
-  transition: border-color .15s ease, background .15s ease;
-}
-.slot-trigger:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
-.slot-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.slot-trigger:disabled { opacity: .55; cursor: not-allowed; }
-.slot-trigger-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot-count { flex: none; font-size: 12px; color: var(--fg-dim); }
-.slot-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
-.slot-trigger.open .slot-caret { transform: rotate(180deg); }
-.slot-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%;
-  max-height: min(40vh, 320px); overflow-y: auto;
-  list-style: none; margin: 0; padding: 4px; z-index: 50;
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.slot-item {
-  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
-  cursor: pointer; user-select: none;
-  transition: background .12s ease;
-}
-.slot-item-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot-item-count { flex: none; font-size: 12px; color: var(--fg-dim); }
-.slot-item.hi { background: var(--bg-3); }
-.slot-item.cur { color: var(--accent); }
-.slot-item.cur .slot-item-count { color: var(--accent); opacity: .8; }
+/* 槽位下拉:复用通用 Dropdown(见 dropdown.css),此处仅收窄宽度避免撑满工具栏 */
+.slot-select { flex: none; max-width: 280px; }
 
 .flowers-group { display: flex; flex-direction: column; gap: 8px; }
 .flowers-group-t {

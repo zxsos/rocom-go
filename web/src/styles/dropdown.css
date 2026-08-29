@@ -12,6 +12,8 @@
 .dropdown-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .dropdown-trigger:disabled { opacity: .5; cursor: not-allowed; }
 .dropdown-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 触发按钮上的弱化副文本(如花种槽位数量) */
+.dropdown-count { flex: none; font-size: 12px; color: var(--fg-dim); }
 .dropdown-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
 .dropdown.open .dropdown-caret { transform: rotate(180deg); }
 
@@ -25,12 +27,14 @@
 }
 .dropdown-item {
   display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
-  cursor: pointer; user-select: none; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; user-select: none;
   transition: background .12s ease;
 }
+.dropdown-item-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown-item-count { flex: none; font-size: 12px; color: var(--fg-dim); }
 .dropdown-item.hi { background: var(--bg-3); }
 .dropdown-item.cur { color: var(--accent); }
+.dropdown-item.cur .dropdown-item-count { color: var(--accent); opacity: .8; }
 .dropdown-item.cur.hi { background: var(--accent-soft); }
 
 /* 小尺寸变体(分页条数等紧凑场景) */
