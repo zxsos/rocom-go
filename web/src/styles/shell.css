@@ -2,9 +2,11 @@
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
 
-/* ---- 顶栏 ---- */
+/* ---- 顶栏 ----
+   backdrop-filter 会创建层叠上下文:内部二级菜单等的 z-index 只在本栏内生效,
+   对外整体表现就是 --z-shell。故本栏层级必须高于内容区全部浮层,否则内部浮层会被内容区盖住。 */
 .topbar {
-  position: sticky; top: 0; z-index: var(--z-bar);
+  position: sticky; top: 0; z-index: var(--z-shell);
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; background: var(--bar-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
@@ -28,10 +30,13 @@
 }
 .navgroup:hover .navgroup-btn, .navgroup.active .navgroup-btn { background: var(--bg-3); color: var(--fg); }
 .navgroup-arrow { font-size: 9px; opacity: .7; }
+/* 二级菜单(顶栏分组 hover 展开)。z-index 用 --z-popover 而非 --z-drawer:
+   它困在 .topbar 的层叠上下文(--z-shell)内,写多大对外都表现为 --z-shell,
+   用 --z-drawer 会误导人以为它能高过顶栏。只需保证它在栏内压过其它栏内元素即可。 */
 .navgroup-pop {
   display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 160px;
   background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; z-index: var(--z-drawer); backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; z-index: var(--z-popover); backdrop-filter: blur(10px);
 }
 .navgroup:hover .navgroup-pop, .navgroup:focus-within .navgroup-pop { display: block; }
 .navgroup-item {
@@ -128,8 +133,9 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .brand { font-size: 10px; max-width: none; }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
+  /* 同 .topbar:backdrop-filter 创建层叠上下文,故本栏层级须高于内容区全部浮层。 */
   .bottomnav {
-    display: flex; position: sticky; bottom: 0; z-index: var(--z-bar);
+    display: flex; position: sticky; bottom: 0; z-index: var(--z-shell);
     background: var(--bar-bg); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
@@ -141,10 +147,12 @@ html[data-privacy] .brand { color: var(--fg-dim); }
      .tabgroup 自身不做定位上下文,面板 absolute 相对 sticky 的 .bottomnav 全宽居中 */
   .tabgroup { flex: 1; }
   .tabgroup .tab { width: 100%; }
+  /* 同 .navgroup-pop:困在 .bottomnav 的层叠上下文内,对外表现恒为 --z-shell,
+     故用 --z-popover 即可,不必写成 --z-drawer(会误导)。 */
   .tabgroup-pop {
     position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
     background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: 0 -8px 24px rgba(0,0,0,.25); padding: 8px; z-index: var(--z-drawer); backdrop-filter: blur(10px);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.25); padding: 8px; z-index: var(--z-popover); backdrop-filter: blur(10px);
     display: flex; flex-direction: column; gap: 2px;
   }
   .tabgroup-item {
