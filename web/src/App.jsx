@@ -7,30 +7,36 @@ import { useStoredJSON } from './hooks/useStoredState'
 import { PinDialog } from './components/PinDialog'
 import RankTitle from './components/RankTitle'
 import { dropBoxFilter } from './pages/pet-list/filters'
+import {
+  IconBag, IconPaw, IconEgg, IconSparkle, IconBell,
+  IconMap, IconFlower, IconCoin, IconSuitcase, IconTrophy,
+  IconSun, IconMoon, IconMonitor, IconExpand, IconCompress, IconLock,
+} from './components/svg'
 
 // 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
 // 收纳逻辑:功能按「对游戏做了什么」归为三组——我的精灵(收集养成)、世界(探索家园)、商店(金币买卖比拼)。
 const NAV = [
   {
-    label: '我的精灵', icon: '🎒',
+    label: '我的精灵', icon: IconBag,
     children: [
-      { to: '/pets', label: '宠物列表', icon: '🐾' },
-      { to: '/eggs', label: '精灵蛋', icon: '🥚' },
-      { to: '/events', label: '捕获事件', icon: '🔔' },
+      { to: '/pets', label: '宠物列表', icon: IconPaw },
+      { to: '/eggs', label: '精灵蛋', icon: IconEgg },
+      { to: '/handbook', label: '炫彩图鉴', icon: IconSparkle },
+      { to: '/events', label: '捕获事件', icon: IconBell },
     ],
   },
   {
-    label: '世界', icon: '🗺️',
+    label: '世界', icon: IconMap,
     children: [
-      { to: '/map', label: '实时地图', icon: '🗺️' },
-      { to: '/flowers', label: '花种', icon: '🌱' },
+      { to: '/map', label: '实时地图', icon: IconMap },
+      { to: '/flowers', label: '花种', icon: IconFlower },
     ],
   },
   {
-    label: '商店', icon: '💰',
+    label: '商店', icon: IconCoin,
     children: [
-      { to: '/merchant', label: '远行商人', icon: '🧳' },
-      { to: '/leaderboard', label: '排行榜', icon: '🏆' },
+      { to: '/merchant', label: '远行商人', icon: IconSuitcase },
+      { to: '/leaderboard', label: '排行榜', icon: IconTrophy },
     ],
   },
 ]
@@ -82,7 +88,7 @@ export default function App() {
   // 三态循环:auto → light → dark → auto
   const cycleTheme = () => setTheme((t) => (t === 'auto' ? 'light' : t === 'light' ? 'dark' : 'auto'))
   const themeLabel = theme === 'auto' ? '跟随系统' : theme === 'light' ? '白天' : '夜间'
-  const themeIcon = theme === 'auto' ? '🌗' : theme === 'light' ? '☀️' : '🌙'
+  const themeIcon = theme === 'auto' ? <IconMonitor size={17} /> : theme === 'light' ? <IconSun size={17} /> : <IconMoon size={17} />
 
   // 全局固定图标只随游戏版本变,拉一次即可。
   useEffect(() => { getIcons().then((d) => setIcons(d || { stat: {} })).catch(() => {}) }, [])
@@ -156,7 +162,7 @@ export default function App() {
       return (
         <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
           className={({ isActive }) => 'navlink' + (isActive ? ' active' : '')}>
-          <span className="nav-icon">{n.icon}</span>
+          <span className="nav-icon"><n.icon size={18} /></span>
           <span className="nav-label">{n.label}</span>
         </NavLink>
       )
@@ -165,7 +171,7 @@ export default function App() {
     return (
       <div key={n.label} className={'navgroup' + (active ? ' active' : '')}>
         <button type="button" className="navgroup-btn" title={n.label}>
-          <span className="nav-icon">{n.icon}</span>
+          <span className="nav-icon"><n.icon size={18} /></span>
           <span className="nav-label">{n.label}</span>
           <span className="navgroup-arrow">▾</span>
         </button>
@@ -173,7 +179,7 @@ export default function App() {
           {n.children.map((c) => (
             <NavLink key={c.to} to={c.to} onDoubleClick={onNavDoubleClick(c.to)}
               className={({ isActive }) => 'navgroup-item' + (isActive ? ' active' : '')}>
-              <span className="navgroup-item-icon">{c.icon}</span>
+              <span className="navgroup-item-icon"><c.icon size={15} /></span>
               <span className="navgroup-item-label">{c.label}</span>
             </NavLink>
           ))}
@@ -188,7 +194,7 @@ export default function App() {
       return (
         <NavLink key={n.to} to={n.to} onDoubleClick={onNavDoubleClick(n.to)}
           className={({ isActive }) => 'tab' + (isActive ? ' active' : '')}>
-          <span className="tab-icon">{n.icon}</span>
+          <span className="tab-icon"><n.icon size={20} /></span>
           <span className="tab-label">{n.label}</span>
         </NavLink>
       )
@@ -210,14 +216,14 @@ export default function App() {
             <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
               onClick={fullscreen.toggle}
               title={fullscreen.isFull ? '退出网页全屏' : '网页全屏'}>
-              <span className="topbar-fs-icon">{fullscreen.isFull ? '⤢' : '⛶'}</span>
+              <span className="topbar-fs-icon">{fullscreen.isFull ? <IconCompress size={16} /> : <IconExpand size={16} />}</span>
               <span className="topbar-fs-text">{fullscreen.isFull ? '退出全屏' : '全屏'}</span>
             </button>
           )}
           <button type="button" className="topbar-fs"
             onClick={cycleTheme}
             title={'主题:' + themeLabel + '(点击切换)'}>
-            <span>{themeIcon}</span>
+            <span className="topbar-theme-icon">{themeIcon}</span>
           </button>
           {accounts.length > 0 && (() => {
             const cur = accounts.find((a) => a.account === account)
@@ -288,7 +294,7 @@ function TabGroup({ item, location, onNavDoubleClick }) {
   return (
     <div className="tabgroup" ref={rootRef}>
       <button type="button" className={'tab' + (active ? ' active' : '')} onClick={() => setOpen((o) => !o)}>
-        <span className="tab-icon">{item.icon}</span>
+        <span className="tab-icon"><item.icon size={20} /></span>
         <span className="tab-label">{item.label}</span>
       </button>
       {open && (
@@ -297,7 +303,7 @@ function TabGroup({ item, location, onNavDoubleClick }) {
             <NavLink key={c.to} to={c.to} onDoubleClick={onNavDoubleClick(c.to)}
               className={({ isActive }) => 'tabgroup-item' + (isActive ? ' active' : '')}
               onClick={() => setOpen(false)}>
-              <span className="tabgroup-item-icon">{c.icon}</span>
+              <span className="tabgroup-item-icon"><c.icon size={17} /></span>
               <span className="tabgroup-item-label">{c.label}</span>
             </NavLink>
           ))}
@@ -395,7 +401,7 @@ function AccountSelect({ accounts, current, onChange, uidOf, onManagePin, onDele
           {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
         </span>
         {current && <RankTitle title={current.title} />}
-        {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护">🔒</span>}
+        {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护"><IconLock size={12} /></span>}
         <span className="account-caret">▾</span>
       </button>
       {open && (
@@ -444,7 +450,7 @@ function AccountItem({ account, cur, hi, uidOf, onChoose, onHover }) {
         alt="" draggable={false} title={account.online ? '在线' : '离线'} />
       <span className="privacy account-item-name">{account.name}</span>
       <RankTitle title={account.title} />
-      {account.hasPin && <span className="account-item-pin" title="已设 PIN">🔒</span>}
+      {account.hasPin && <span className="account-item-pin" title="已设 PIN"><IconLock size={11} /></span>}
       <span className="muted privacy account-item-uid">UID:{uidOf(account.account)}</span>
     </li>
   )

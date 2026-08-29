@@ -4,6 +4,7 @@ import { ALL_TYPES, ALL_EGG_GROUPS, HOT_NATURES, HOT_NATURE_NAMES } from '../../
 import { InlineIcon } from '../../components/icons'
 import { Gender } from '../../components/badges'
 import { CATCH_RANGES } from './filters'
+import Dropdown from '../../components/Dropdown'
 
 // FilterPanel 筛选侧栏:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
 // children 为顶部的位置示意图(BoxMap)插槽;筛选状态由父级持有,经 set 增量更新。
@@ -67,9 +68,11 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
         <div className="filter-group">
           <label>捕捉时间</label>
-          <select className="select" value={filter.catchRange || ''} onChange={(e) => set({ catchRange: e.target.value })}>
-            {CATCH_RANGES.map(([v, lbl]) => <option key={v || 'all'} value={v}>{lbl}</option>)}
-          </select>
+          <Dropdown
+            value={filter.catchRange || ''}
+            options={CATCH_RANGES.map(([v, lbl]) => ({ value: v, label: lbl }))}
+            onChange={(v) => set({ catchRange: v })}
+          />
         </div>
         <div className="filter-group">
           <label>性别</label>
@@ -105,24 +108,22 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
 
 // 性格下拉:热门性格逐项列出(带六维影响),「其他」= 排除全部热门项(natureExclude)。
 function NatureSelect({ filter, set }) {
+  const options = [
+    { value: '', label: '全部' },
+    ...HOT_NATURES.map(([n, eff]) => ({ value: n, label: `${n}（${eff}）` })),
+    { value: '__other__', label: '其他' },
+  ]
   return (
     <div className="filter-group">
       <label>性格</label>
-      <select
-        className="select"
+      <Dropdown
         value={filter.natureExclude ? '__other__' : filter.nature || ''}
-        onChange={(e) => {
-          const v = e.target.value
+        options={options}
+        onChange={(v) => {
           if (v === '__other__') set({ nature: '', natureExclude: HOT_NATURE_NAMES.join(',') })
           else set({ nature: v, natureExclude: '' })
         }}
-      >
-        <option value="">全部</option>
-        {HOT_NATURES.map(([n, eff]) => (
-          <option key={n} value={n}>{n}（{eff}）</option>
-        ))}
-        <option value="__other__">其他</option>
-      </select>
+      />
     </div>
   )
 }
@@ -131,10 +132,7 @@ function Select({ label, opts, value, onChange }) {
   return (
     <div className="filter-group">
       <label>{label}</label>
-      <select className="select" value={value || ''} onChange={(e) => onChange(e.target.value)}>
-        <option value="">全部</option>
-        {(opts || []).map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <Dropdown value={value || ''} options={opts || []} onChange={onChange} />
     </div>
   )
 }

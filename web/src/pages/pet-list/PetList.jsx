@@ -9,6 +9,7 @@ import BoxMap from './BoxMap'
 import PetTable from './PetTable'
 import PetCards from './PetCards'
 import ContextMenu from './ContextMenu'
+import Dropdown from '../../components/Dropdown'
 
 export default function PetList() {
   const account = useContext(AccountContext)
@@ -200,9 +201,13 @@ export default function PetList() {
         <div className="toolbar list-toolbar">
           <button className="btn filter-toggle" onClick={() => setCollapsed((c) => !c)}>筛选</button>
           <input className="input" placeholder="搜索昵称 / 种类" value={filter.search || ''} onChange={(e) => set({ search: e.target.value })} />
-          <select className="select sort-select" value={filter.sort} onChange={(e) => set({ sort: e.target.value })}>
-            {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+          <Dropdown
+            className="sort-select"
+            value={filter.sort}
+            options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
+            onChange={(v) => set({ sort: v })}
+            placeholder="排序"
+          />
           <button className="btn" onClick={() => set({ order: filter.order === 'asc' ? 'desc' : 'asc' })}>{filter.order === 'asc' ? '升序' : '降序'}</button>
           <button className={'btn' + (sync ? ' primary' : '')} title="开启后,游戏内捕捉/移动宠物会自动跳转并选中该宠物;关闭可避免打断当前筛选" onClick={() => setSync((v) => !v)}>同步</button>
           <div className="spacer" />
@@ -220,9 +225,14 @@ export default function PetList() {
           <span className="muted">{filter.page} / {pages}</span>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: filter.page + 1 })}>下一页</button>
           <button className="btn" disabled={filter.page >= pages} onClick={() => set({ page: pages })}>尾页</button>
-          <select className="select pager-size" value={filter.pageSize} onChange={(e) => set({ pageSize: +e.target.value })}>
-            {[10, 20, 30, 60, 100].map((n) => <option key={n} value={n}>{n} 条/页</option>)}
-          </select>
+          <Dropdown
+            className="pager-size"
+            small
+            value={filter.pageSize}
+            options={[10, 20, 30, 60, 100].map((n) => ({ value: n, label: `${n} 条/页` }))}
+            onChange={(v) => set({ pageSize: +v })}
+            placeholder="条/页"
+          />
         </div>
       </section>
 

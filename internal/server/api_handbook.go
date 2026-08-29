@@ -30,7 +30,7 @@ func (s *Server) handleHandbookGlasses(w http.ResponseWriter, r *http.Request) {
 	for _, rec := range records {
 		it := items[rec.PetBaseID]
 		if it == nil {
-			it = &glassBookItem{Base: rec.PetBaseID}
+			it = &glassBookItem{Base: rec.PetBaseID, Common: []int32{}, Hidden: []int32{}}
 			if b, ok := s.db.PetBase(rec.PetBaseID); ok {
 				it.Name = b.Name
 				it.Book = b.Book

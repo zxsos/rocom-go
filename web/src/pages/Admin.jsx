@@ -8,6 +8,7 @@ import {
 } from '../api'
 import { GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
 import { imgURL } from '../components/icons'
+import Dropdown from '../components/Dropdown'
 import AdminCharts from './AdminCharts'
 
 // glassOf 把色卡选择器的选择换算成后端接口的 glassType/glassValue。
@@ -27,23 +28,30 @@ function GlassPicker({ value, onChange }) {
   const set = (patch) => onChange({ ...value, ...patch })
   return (
     <div className="admin-glass-picker">
-      <select className="select" value={value.type} onChange={(e) => set({ type: e.target.value })} title="炫彩色卡类型">
-        <option value="random">随机色卡</option>
-        <option value="common">普通炫彩</option>
-        <option value="hidden">隐藏炫彩</option>
-      </select>
+      <Dropdown
+        value={value.type}
+        options={[
+          { value: 'random', label: '随机色卡' },
+          { value: 'common', label: '普通炫彩' },
+          { value: 'hidden', label: '隐藏炫彩' },
+        ]}
+        onChange={(v) => set({ type: v })}
+        title="炫彩色卡类型"
+      />
       {value.type === 'common' && (
         <>
-          <select className="select" value={value.particle} onChange={(e) => set({ particle: Number(e.target.value) })} title="粒子形状">
-            {Object.entries(GLASS_PARTICLES).map(([id, name]) => (
-              <option key={id} value={id}>{fmtGlassName(name)}</option>
-            ))}
-          </select>
-          <select className="select" value={value.color} onChange={(e) => set({ color: Number(e.target.value) })} title="配色(共 39 组)">
-            {Object.keys(GLASS_COLORS).map((id) => (
-              <option key={id} value={id}>配色{id}</option>
-            ))}
-          </select>
+          <Dropdown
+            value={value.particle}
+            options={Object.entries(GLASS_PARTICLES).map(([id, name]) => ({ value: Number(id), label: fmtGlassName(name) }))}
+            onChange={(v) => set({ particle: Number(v) })}
+            title="粒子形状"
+          />
+          <Dropdown
+            value={value.color}
+            options={Object.keys(GLASS_COLORS).map((id) => ({ value: Number(id), label: `配色${id}` }))}
+            onChange={(v) => set({ color: Number(v) })}
+            title="配色(共 39 组)"
+          />
           <span
             className="admin-glass-preview"
             style={{ background: `linear-gradient(90deg, ${GLASS_COLORS[value.color][0]}, ${GLASS_COLORS[value.color][1]})` }}
@@ -53,11 +61,12 @@ function GlassPicker({ value, onChange }) {
       )}
       {value.type === 'hidden' && (
         <>
-          <select className="select" value={value.hidden} onChange={(e) => set({ hidden: Number(e.target.value) })} title="隐藏炫彩(赛季整图)">
-            {Object.entries(GLASS_HIDDEN).map(([id, name]) => (
-              <option key={id} value={id}>{fmtGlassName(name)}</option>
-            ))}
-          </select>
+          <Dropdown
+            value={value.hidden}
+            options={Object.entries(GLASS_HIDDEN).map(([id, name]) => ({ value: Number(id), label: fmtGlassName(name) }))}
+            onChange={(v) => set({ hidden: Number(v) })}
+            title="隐藏炫彩(赛季整图)"
+          />
           <img className="admin-glass-preview" src={imgURL('dazzling/' + GLASS_HIDDEN[value.hidden])} alt="隐藏炫彩" title="隐藏炫彩整图" />
         </>
       )}
@@ -561,13 +570,15 @@ export default function Admin() {
           <PlayDailyChart daily={plays.summary.daily} />
         )}
         <div className="admin-play-toolbar">
-          <select className="select" value={playAccount} onChange={(e) => { setPlayAccount(e.target.value); loadPlaySessions() }}
-            title="按账号筛选游玩记录(空=全部)">
-            <option value="">全部账号</option>
-            {accounts.map((a) => (
-              <option key={a.account} value={a.account}>{a.name || a.account} (UID:{(a.account || '').replace(/^UID:/, '')})</option>
-            ))}
-          </select>
+          <Dropdown
+            value={playAccount}
+            options={[
+              { value: '', label: '全部账号' },
+              ...accounts.map((a) => ({ value: a.account, label: `${a.name || a.account} (UID:${(a.account || '').replace(/^UID:/, '')})` })),
+            ]}
+            onChange={(v) => { setPlayAccount(v); loadPlaySessions() }}
+            title="按账号筛选游玩记录(空=全部)"
+          />
           <button className="btn" onClick={loadPlaySessions}>刷新</button>
         </div>
         {playErr && <p className="admin-error">{playErr}</p>}
@@ -693,36 +704,33 @@ export default function Admin() {
           不修改真实流量。成员需在「有底图的场景」中且有缓存位置才能投放成功;异色只列有异色形态的精灵。
         </p>
         <form onSubmit={injectWild} className="admin-inject-form">
-          <select
-            className="select" value={injAccount} onChange={(e) => setInjAccount(e.target.value)}
+          <Dropdown
+            value={injAccount}
+            options={[
+              { value: '', label: '选择目标玩家' },
+              ...accounts.map((a) => ({ value: a.account, label: `${a.online ? '🟢 ' : '🟥 '}${a.name} (UID:${(a.account || '').replace(/^UID:/, '')})` })),
+            ]}
+            onChange={(v) => setInjAccount(v)}
             title="选择投放目标玩家(需在线且有缓存位置)"
-          >
-            <option value="">选择目标玩家</option>
-            {accounts.map((a) => (
-              <option key={a.account} value={a.account}>
-                {a.online ? '🟢 ' : '🟥 '}{a.name} (UID:{(a.account || '').replace(/^UID:/, '')})
-              </option>
-            ))}
-          </select>
-          <select
-            className="select" value={injBase} onChange={(e) => setInjBase(e.target.value)}
-          >
-            <option value="">选择精灵形态</option>
-            {wildOptions && wildOptions
-              .filter((o) => injKind !== 'shiny' || o.shiny) // 异色只列有异色形态的精灵
-              .map((o) => (
-                <option key={o.base} value={o.base}>
-                  {o.name}(#{o.book})
-                </option>
-              ))}
-          </select>
-          <select
-            className="select" value={injKind}
-            onChange={(e) => { setInjKind(e.target.value); setInjBase('') }}
-          >
-            <option value="shiny">异色</option>
-            <option value="colorful">炫彩</option>
-          </select>
+          />
+          <Dropdown
+            value={injBase}
+            options={[
+              { value: '', label: '选择精灵形态' },
+              ...(wildOptions || [])
+                .filter((o) => injKind !== 'shiny' || o.shiny) // 异色只列有异色形态的精灵
+                .map((o) => ({ value: o.base, label: `${o.name}(#${o.book})` })),
+            ]}
+            onChange={(v) => setInjBase(v)}
+          />
+          <Dropdown
+            value={injKind}
+            options={[
+              { value: 'shiny', label: '异色' },
+              { value: 'colorful', label: '炫彩' },
+            ]}
+            onChange={(v) => { setInjKind(v); setInjBase('') }}
+          />
           {/* 炫彩色卡设置:仅炫彩投放时展示;选择后投出的精灵在角标/悬浮面板/详情里显示对应色卡 */}
           {injKind === 'colorful' && <GlassPicker value={injGlass} onChange={setInjGlass} />}
           <input
@@ -766,31 +774,29 @@ export default function Admin() {
           真实流量;生命周期由管理员在此手动撤销(见上方「当前注入中」列表)。
         </p>
         <form onSubmit={injectFlower} className="admin-inject-form">
-          <select
-            className="select" value={flAccount} onChange={(e) => setFlAccount(e.target.value)}
+          <Dropdown
+            value={flAccount}
+            options={[
+              { value: '', label: '选择目标玩家' },
+              ...accounts.map((a) => ({ value: a.account, label: `${a.online ? '🟢 ' : '🟥 '}${a.name} (UID:${(a.account || '').replace(/^UID:/, '')})` })),
+            ]}
+            onChange={(v) => setFlAccount(v)}
             title="选择投放目标玩家(无需在线)"
-          >
-            <option value="">选择目标玩家</option>
-            {accounts.map((a) => (
-              <option key={a.account} value={a.account}>
-                {a.online ? '🟢 ' : '🟥 '}{a.name} (UID:{(a.account || '').replace(/^UID:/, '')})
-              </option>
-            ))}
-          </select>
-          <select className="select" value={flBase} onChange={(e) => setFlBase(e.target.value)}>
-            <option value="">选择守护宠物</option>
-            {wildOptions && wildOptions.map((o) => (
-              <option key={o.base} value={o.base}>{o.name}(#{o.book})</option>
-            ))}
-          </select>
-          <select
-            className="select" value={flStar} onChange={(e) => setFlStar(Number(e.target.value))}
+          />
+          <Dropdown
+            value={flBase}
+            options={[
+              { value: '', label: '选择守护宠物' },
+              ...(wildOptions || []).map((o) => ({ value: o.base, label: `${o.name}(#${o.book})` })),
+            ]}
+            onChange={(v) => setFlBase(v)}
+          />
+          <Dropdown
+            value={flStar}
+            options={[1, 2, 3, 4, 5, 6, 7].map((n) => ({ value: n, label: `${n} 星${n === 7 ? '(花灵 BOSS)' : ''}` }))}
+            onChange={(v) => setFlStar(Number(v))}
             title="花种星级(1-7)"
-          >
-            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <option key={n} value={n}>{n} 星{n === 7 ? '(花灵 BOSS)' : ''}</option>
-            ))}
-          </select>
+          />
           <GlassPicker value={flGlass} onChange={setFlGlass} />
           <button className="btn primary" type="submit" disabled={!flAccount.trim() || !flBase}>
             投放
@@ -812,10 +818,14 @@ export default function Admin() {
             className="input" type="text" placeholder="账号(如 UID:10001)" value={rAccount}
             onChange={(e) => setRAccount(e.target.value)}
           />
-          <select className="select" value={rMode} onChange={(e) => setRMode(e.target.value)}>
-            <option value="black">黑名单</option>
-            <option value="white">白名单</option>
-          </select>
+          <Dropdown
+            value={rMode}
+            options={[
+              { value: 'black', label: '黑名单' },
+              { value: 'white', label: '白名单' },
+            ]}
+            onChange={(v) => setRMode(v)}
+          />
           <input
             className="input" type="text" placeholder="备注(可选)" value={rNote}
             onChange={(e) => setRNote(e.target.value)}

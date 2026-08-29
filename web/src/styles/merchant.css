@@ -38,7 +38,7 @@
   background: rgba(212, 175, 55, .14); color: #d4af37; border-color: rgba(212, 175, 55, .45);
 }
 .merchant-rank-btn:disabled { opacity: .55; cursor: not-allowed; }
-.merchant-rank-err { font-size: 12px; color: var(--danger, #e5534b); }
+.merchant-rank-err { font-size: 12px; color: var(--danger); }
 
 /* 营业状态徽标 */
 .merchant-status { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; }
@@ -94,7 +94,7 @@
   font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
   background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4);
 }
-.merchant-sub-warn { font-size: 12px; color: var(--danger, #e5534b); }
+.merchant-sub-warn { font-size: 12px; color: var(--danger); }
 .merchant-sub-desc { margin: 6px 0 10px; font-size: 12px; color: var(--fg-dim); }
 .merchant-sub-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .merchant-sub-input {
@@ -110,7 +110,7 @@
 }
 .merchant-sub-msg { margin-top: 8px; font-size: 12px; }
 .merchant-sub-msg.ok { color: #28a745; }
-.merchant-sub-msg.err { color: var(--danger, #e5534b); }
+.merchant-sub-msg.err { color: var(--danger); }
 .merchant-sub-toggle {
   margin-left: auto; padding: 2px 10px; font-size: 12px; cursor: pointer;
   border: 1px solid var(--line); border-radius: 999px; background: transparent;
@@ -218,9 +218,9 @@
 
 /* 错误条 */
 .merchant-err {
-  border: 1px solid var(--danger, #e5534b); border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--danger, #e5534b) 10%, transparent);
-  color: var(--danger, #e5534b); padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
+  border: 1px solid var(--danger); border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger); padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
 }
 
 /* 窄屏:商品双列、步骤条收窄 */

@@ -33,6 +33,11 @@ async function getJSON(url, fallback) {
 
 export const getPets = (params) => getJSON('/api/pets?' + buildQuery(params))
 
+// getHandbookGlasses 返回本账号图鉴炫彩收集(按品种聚合,图鉴号升序):
+//   {glasses:[{base,name,book,head,common:[glass_value…],hidden:[glass_value…]}]}
+// 数据来自登录包 pet_handbook(每次登录时快照更新,非实时)。
+export const getHandbookGlasses = () => getJSON('/api/handbook-glasses?' + buildQuery(), { glasses: [] })
+
 export async function getPet(gid) {
   const r = await fetch('/api/pets/' + gid + '?' + buildQuery())
   if (!r.ok) throw new Error('not found')

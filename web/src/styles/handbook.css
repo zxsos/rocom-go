@@ -1,0 +1,60 @@
+/* ---- 炫彩图鉴页(HandbookGlasses) ---- */
+.hb-page { padding: 4px 0 16px; }
+.hb-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.hb-title { font-size: 17px; font-weight: 700; margin: 0; }
+.hb-note { font-size: 12px; color: var(--fg-dim); }
+
+.hb-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+.hb-stat b { color: var(--accent); font-weight: 700; }
+
+.hb-empty { padding: 32px 12px; text-align: center; color: var(--fg-dim); }
+.hb-empty-ic { display: inline-block; width: 44px; height: 44px; }
+.hb-empty-ic img { width: 100%; height: 100%; object-fit: contain; }
+.hb-empty p { margin: 8px 0 0; }
+.hb-empty-sub { font-size: 12px; }
+
+.hb-list { display: flex; flex-direction: column; gap: 8px; }
+.hb-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 10px 14px;
+}
+.hb-avatar {
+  flex: none; width: 46px; height: 46px; object-fit: contain;
+  background: var(--bg-3); border-radius: 10px; padding: 3px;
+}
+.hb-meta { flex: 1 1 auto; min-width: 0; }
+.hb-name { display: flex; align-items: baseline; gap: 8px; font-weight: 600; margin-bottom: 4px; }
+.hb-book { font-size: 12px; font-weight: 500; color: var(--fg-dim); }
+
+/* 色卡行:普通/隐藏分组并排;缩略图沿用 .glass-chip(可点击放大) */
+.hb-cards { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.hb-group { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.hb-group-label { font-size: 11px; color: var(--fg-dim); flex: none; }
+.hb-cards .glass-chip { width: 42px; height: 23px; }
+
+/* ---- 按主色分组(统计区下方) ---- */
+.hb-major { margin-bottom: 14px; }
+.hb-major-title { font-size: 13px; font-weight: 700; margin: 0 0 8px; }
+.hb-major-group {
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 10px 14px; margin-bottom: 10px;
+}
+.hb-major-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.hb-major-dot { flex: none; width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
+.hb-major-name { display: inline-flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 14px; }
+.hb-major-name em { font-style: normal; font-size: 11px; font-weight: 500; color: var(--fg-dim); }
+.hb-major-count { margin-left: auto; font-size: 12px; color: var(--fg-dim); }
+/* 色卡横向一排:该主色下已收集的全部色卡 */
+.hb-major-cards { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-bottom: 9px; }
+.hb-major-cards .glass-chip { width: 42px; height: 23px; margin-left: 0; }
+/* 下面长条:拥有该主色色卡的精灵(头像 + 其色卡 + 名字),横向滚动 */
+.hb-major-bar {
+  display: flex; align-items: center; gap: 14px; overflow-x: auto;
+  border-top: 1px dashed var(--line); padding-top: 9px;
+}
+.hb-major-pet { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.hb-major-head-ic { flex: none; width: 34px; height: 34px; object-fit: contain; background: var(--bg-3); border-radius: 8px; padding: 2px; }
+.hb-major-pet-cards { display: inline-flex; align-items: center; gap: 3px; }
+.hb-major-pet-cards .glass-chip { width: 36px; height: 20px; margin-left: 0; }
+.hb-major-pet-name { font-size: 12px; color: var(--fg); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
