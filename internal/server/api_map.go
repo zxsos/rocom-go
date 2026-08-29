@@ -1,7 +1,6 @@
 package server
 
 import (
-	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -14,13 +13,19 @@ const posFresh = 4 * time.Second
 
 // SetLastPosition 缓存某账号最近一次实时位置(由抓包消费循环在广播 position 时调用),
 // 供实时地图页加载时经 GET /api/position 即时回显,不必等玩家下一次移动。
-func (s *Server) SetLastPosition(account string, pos map[string]any) {
+func (s *Server) SetLastPosition(account string, pos *PositionPayload) {
 	if account == "" {
 		return
 	}
-	s.posMu.Lock()
-	s.lastPos[account] = pos
-	s.posMu.Unlock()
+	s.snap.setPos(account, pos)
+}
+
+// GetLastPosition 返回某账号缓存的最近一次位置;无记录返回 nil。
+//
+// 与 GetLastFlowers 对称:管线读回缓存后在其上做增量修改(如分层更新合并回位置载荷),
+// 另供测试直接断言推送出的载荷。调用方**不得**原地修改返回值 —— 它是共享快照。
+func (s *Server) GetLastPosition(account string) *PositionPayload {
+	return s.snap.getPos(account)
 }
 
 // handlePosition 返回当前账号最近一次位置(实时地图页初始定位);无记录返回 null。
@@ -28,98 +33,76 @@ func (s *Server) SetLastPosition(account string, pos map[string]any) {
 // 故过期(超过 posFresh)就抹掉速度:页面加载先静态回显,下一个移动包到达后自然接管。
 func (s *Server) handlePosition(w http.ResponseWriter, r *http.Request) {
 	acc := s.acct(r)
-	s.posMu.Lock()
-	pos := s.lastPos[acc]
-	s.posMu.Unlock()
-	if ts, ok := pos["tsMs"].(int64); ok && time.Since(time.UnixMilli(ts)) > posFresh {
-		stale := make(map[string]any, len(pos))
-		maps.Copy(stale, pos)
-		delete(stale, "vu")
-		delete(stale, "vv")
-		delete(stale, "path") // 陈旧轨迹不该再回放一遍
-		pos = stale
+	pos := s.snap.getPos(acc)
+	if pos != nil && time.Since(time.UnixMilli(pos.TsMs)) > posFresh {
+		stale := *pos // 浅拷贝:下面几个字段置 nil 不会影响原快照
+		stale.VU = nil
+		stale.VV = nil
+		stale.Path = nil // 陈旧轨迹不该再回放一遍
+		pos = &stale
 	}
 	writeJSON(w, pos) // pos 为 nil 时输出 null
 }
 
 // SetLastWildPets 缓存某账号最近一次野生宠物标记(由消费管线在广播 wildpets 时调用),
 // 供实时地图页加载时经 GET /api/wildpets 即时回显。
-func (s *Server) SetLastWildPets(account string, payload any) {
+func (s *Server) SetLastWildPets(account string, payload *WildPayload) {
 	if account == "" {
 		return
 	}
-	s.posMu.Lock()
-	s.lastWild[account] = payload
-	s.posMu.Unlock()
+	s.snap.setWild(account, payload)
 }
 
 // handleWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音);无记录返回 null。
 // 与位置不同,这里不做过期抹除:标记本身已带 stale 标志(实体离开 AOI 后由管线置位并限时保留)。
 func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {
-	s.posMu.Lock()
-	v := s.lastWild[s.acct(r)]
-	s.posMu.Unlock()
+	v := s.snap.getWild(s.acct(r))
 	writeJSON(w, v)
 }
 
 // SetLastHome 缓存某账号最近一次家园小窝图层(由消费管线在广播 home 时调用),
 // 供实时地图页加载时经 GET /api/home 即时回显。玩家不在家园时缓存的是空列表。
-func (s *Server) SetLastHome(account string, payload any) {
+func (s *Server) SetLastHome(account string, payload *HomePayload) {
 	if account == "" {
 		return
 	}
-	s.posMu.Lock()
-	s.lastHome[account] = payload
-	s.posMu.Unlock()
+	s.snap.setHome(account, payload)
 }
 
 // handleHome 返回当前账号最近一次家园小窝图层(空窝也在内);无记录返回 null。
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	s.posMu.Lock()
-	v := s.lastHome[s.acct(r)]
-	s.posMu.Unlock()
+	v := s.snap.getHome(s.acct(r))
 	writeJSON(w, v)
 }
 
 // SetLastFlowers 缓存某账号最近一次花种(花灵)BOSS 分组(由消费管线在广播 flowers 时调用),
 // 供花种页加载时经 GET /api/flowers 即时回显。字段定义见 pipeline/boss.go 的 flowerItem。
-func (s *Server) SetLastFlowers(account string, payload any) {
+func (s *Server) SetLastFlowers(account string, payload *FlowerPayload) {
 	if account == "" {
 		return
 	}
-	s.posMu.Lock()
-	s.lastFlowers[account] = payload
-	s.posMu.Unlock()
+	s.snap.setFlower(account, payload)
 }
 
 // GetLastFlowers 返回某账号最近一次花种分组(与 SetLastFlowers 对应);无记录返回 nil。
 // 供管线在收到 0x0338 详情时读取当前分组以合并字段。
-func (s *Server) GetLastFlowers(account string) any {
+func (s *Server) GetLastFlowers(account string) *FlowerPayload {
 	if account == "" {
 		return nil
 	}
-	s.posMu.Lock()
-	defer s.posMu.Unlock()
-	return s.lastFlowers[account]
+	return s.snap.getFlower(account)
 }
 
 // handleFlowers 返回当前账号最近一次花种(花灵)BOSS 分组;无记录(尚未收到 0x0375)返回 null。
 // 内部字段(cur/worlds:世界存档表,见 pipeline/boss.go)对前端隐藏,只透传 account/flowers。
 func (s *Server) handleFlowers(w http.ResponseWriter, r *http.Request) {
-	s.posMu.Lock()
-	v := s.lastFlowers[s.acct(r)]
-	s.posMu.Unlock()
-	if m, ok := v.(map[string]any); ok {
-		cp := make(map[string]any, len(m))
-		for k, val := range m {
-			if k == "cur" || k == "worlds" {
-				continue
-			}
-			cp[k] = val
-		}
-		v = cp
+	// 转出专用类型,由结构保证 cur/worlds 不外泄(原先靠运行时过滤键,漏一个就泄了)
+	v := s.snap.getFlower(s.acct(r))
+	if v == nil {
+		writeJSON(w, nil)
+		return
 	}
-	writeJSON(w, v)
+	writeJSON(w, flowerView{Account: v.Account, Flowers: v.Flowers})
 }
 
 // flowerSlotOut 是一个花种世界存档槽(槽位管理用,见 pipeline/boss.go 的 worlds 表):
@@ -145,20 +128,15 @@ func flowerSlotName(key string) string {
 // handleFlowerSlots 返回当前账号的花种世界存档槽位列表(槽位管理下拉用):
 // self 槽在前,好友槽按归属者 uid 升序。仅透传存档数据,不修改。
 func (s *Server) handleFlowerSlots(w http.ResponseWriter, r *http.Request) {
-	s.posMu.Lock()
-	v := s.lastFlowers[s.acct(r)]
-	s.posMu.Unlock()
+	v := s.snap.getFlower(s.acct(r))
 	out := []flowerSlotOut{}
-	if m, ok := v.(map[string]any); ok {
-		if worlds, ok := m["worlds"].(map[string]any); ok {
-			for k, w := range worlds {
-				slot := flowerSlotOut{Key: k, Name: flowerSlotName(k)}
-				if sm, ok := w.(map[string]any); ok {
-					slot.Ts, _ = sm["ts"].(int64)
-					slot.Flowers = sm["flowers"]
-				}
-				out = append(out, slot)
+	if v != nil {
+		for k, w := range v.Worlds {
+			slot := flowerSlotOut{Key: k, Name: flowerSlotName(k)}
+			if w != nil {
+				slot.Ts, slot.Flowers = w.TS, w.Flowers
 			}
+			out = append(out, slot)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -183,32 +161,8 @@ func (s *Server) handleDeleteFlowerSlot(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	acc := s.acct(r)
-	s.posMu.Lock()
-	deleted := false
-	if m, ok := s.lastFlowers[acc].(map[string]any); ok {
-		if worlds, ok := m["worlds"].(map[string]any); ok {
-			if _, exists := worlds[key]; exists {
-				// 深拷贝再删,不原地改已发布的共享 map(管线/HTTP/广播读取方均无锁)。
-				nw := make(map[string]any, len(worlds))
-				for k, v := range worlds {
-					nw[k] = v
-				}
-				delete(nw, key)
-				nm := make(map[string]any, len(m))
-				for k, v := range m {
-					nm[k] = v
-				}
-				nm["worlds"] = nw
-				if cur, _ := m["cur"].(string); cur == key {
-					nm["cur"] = ""
-				}
-				s.lastFlowers[acc] = nm
-				deleted = true
-			}
-		}
-	}
-	s.posMu.Unlock()
-	if !deleted {
+	// 读-改-写由 snapshotStore 在锁内完成(见 dropFlowerWorld),外部拿不到 flowerMu
+	if !s.snap.dropFlowerWorld(acc, key) {
 		http.Error(w, "槽不存在", http.StatusNotFound)
 		return
 	}

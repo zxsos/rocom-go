@@ -1,0 +1,38 @@
+{
+  "account": "UID:1",
+  "allPets": [
+    {
+      "id": "2234567890123456789",
+      "img": "HeadIcon/3001.webp",
+      "n": "鸭吉吉",
+      "u": 0.7,
+      "v": 0.2
+    }
+  ],
+  "pets": [
+    {
+      "glass": "暗夜拾光",
+      "glassType": 1,
+      "glassValue": 131073,
+      "height": 120,
+      "id": "1234567890123456789",
+      "img": "HeadIcon/3006.webp",
+      "kinds": [
+        "shiny",
+        "big"
+      ],
+      "lv": 45,
+      "mutation": 1,
+      "n": "珀尔鼬",
+      "u": 0.4,
+      "v": 0.6,
+      "voice": 96,
+      "weight": 8800,
+      "weightPct": 98.5,
+      "x": 100,
+      "y": 200,
+      "z": 30
+    }
+  ],
+  "sceneResId": 10003
+}

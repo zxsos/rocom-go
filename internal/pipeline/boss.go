@@ -88,8 +88,8 @@ func mergeFlowerDetail(items, prev []flowerItem) []flowerItem {
 }
 
 // cloneWorlds 浅复制存档表,后续增删槽不污染 server 缓存里的共享 map。
-func cloneWorlds(worlds map[string]any) map[string]any {
-	nw := make(map[string]any, len(worlds))
+func cloneWorlds(worlds server.FlowerWorlds) server.FlowerWorlds {
+	nw := make(server.FlowerWorlds, len(worlds))
 	for k, v := range worlds {
 		nw[k] = v
 	}
@@ -97,36 +97,26 @@ func cloneWorlds(worlds map[string]any) map[string]any {
 }
 
 // slotFlowers 读存档表某槽的列表与最近访问时间。
-func slotFlowers(worlds map[string]any, key string) ([]flowerItem, int64, bool) {
-	v, ok := worlds[key]
-	if !ok {
+func slotFlowers(worlds server.FlowerWorlds, key string) ([]flowerItem, int64, bool) {
+	m, ok := worlds[key]
+	if !ok || m == nil {
 		return nil, 0, false
 	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		return nil, 0, false
-	}
-	items, _ := m["flowers"].([]flowerItem)
-	ts, _ := m["ts"].(int64)
-	return items, ts, true
+	return m.Flowers, m.TS, true
 }
 
 // trimFriendWorlds 好友槽超上限时按最近访问时间(ts 升序)淘汰最老的,self 槽不受影响。
-func trimFriendWorlds(worlds map[string]any) {
+func trimFriendWorlds(worlds server.FlowerWorlds) {
 	type entry struct {
 		key string
 		ts  int64
 	}
 	var list []entry
 	for k, v := range worlds {
-		if k == "self" {
+		if k == "self" || v == nil {
 			continue
 		}
-		if m, ok := v.(map[string]any); ok {
-			if ts, ok := m["ts"].(int64); ok {
-				list = append(list, entry{k, ts})
-			}
-		}
+		list = append(list, entry{k, v.TS})
 	}
 	if len(list) <= maxFriendWorlds {
 		return
@@ -140,31 +130,25 @@ func trimFriendWorlds(worlds map[string]any) {
 // setFlowers 更新当前世界列表并写回对应槽后广播(0x0338 详情合并/捕捉清理共用)。
 // 槽同步写回,保证回访该世界时恢复的是最新 detail。
 func (p *Pipeline) setFlowers(acc string, items []flowerItem) {
-	payload, _ := p.srv.GetLastFlowers(acc).(map[string]any)
-	var worlds map[string]any
+	payload := p.srv.GetLastFlowers(acc)
+	var worlds server.FlowerWorlds
 	var cur string
 	if payload != nil {
-		worlds, _ = payload["worlds"].(map[string]any)
-		cur, _ = payload["cur"].(string)
+		worlds, cur = payload.Worlds, payload.Cur
 	}
 	if worlds == nil {
-		worlds = map[string]any{}
+		worlds = server.FlowerWorlds{}
 	}
 	worlds = cloneWorlds(worlds)
 	if cur != "" {
-		if m, ok := worlds[cur].(map[string]any); ok {
-			ns := make(map[string]any, len(m))
-			for k, v := range m {
-				if k == "avatar" {
-					continue // 0x01df 指纹键已退役,顺带清理旧缓存残留
-				}
-				ns[k] = v
-			}
-			ns["flowers"] = items
-			worlds[cur] = ns
+		if m, ok := worlds[cur]; ok && m != nil {
+			// 复制槽再改:worlds 是共享表,槽对象也可能被 HTTP 读取方持有
+			ns := *m
+			ns.Flowers = items
+			worlds[cur] = &ns
 		}
 	}
-	payload = map[string]any{"account": acc, "flowers": items, "cur": cur, "worlds": worlds}
+	payload = &server.FlowerPayload{Account: acc, Flowers: items, Cur: cur, Worlds: worlds}
 	p.srv.SetLastFlowers(acc, payload)
 	p.srv.Hub().Broadcast("flowers", acc, payload)
 }
@@ -237,28 +221,23 @@ func (p *Pipeline) onBossNpcInfo(m capture.Message, acc string) {
 	}
 
 	// 读缓存。
-	var payload map[string]any
-	if raw, _ := p.srv.GetLastFlowers(acc).(map[string]any); raw != nil {
-		payload = raw
-	}
+	payload := p.srv.GetLastFlowers(acc)
 	var oldItems []flowerItem
 	var oldCur string
-	var worlds map[string]any
+	var worlds server.FlowerWorlds
 	if payload != nil {
-		oldItems, _ = payload["flowers"].([]flowerItem)
-		oldCur, _ = payload["cur"].(string)
-		worlds, _ = payload["worlds"].(map[string]any)
+		oldItems, oldCur, worlds = payload.Flowers, payload.Cur, payload.Worlds
 	}
 	if worlds == nil {
-		worlds = map[string]any{}
+		worlds = server.FlowerWorlds{}
 	}
 
 	// 空分组(花种全被采完):当前世界清空显示,但保留槽内 detail 不覆盖,等下次推送恢复。
 	if len(items) == 0 {
 		if len(oldItems) != 0 {
-			payload = map[string]any{"account": acc, "flowers": []flowerItem{}, "cur": oldCur, "worlds": worlds}
-			p.srv.SetLastFlowers(acc, payload)
-			p.srv.Hub().Broadcast("flowers", acc, payload)
+			np := &server.FlowerPayload{Account: acc, Flowers: []flowerItem{}, Cur: oldCur, Worlds: worlds}
+			p.srv.SetLastFlowers(acc, np)
+			p.srv.Hub().Broadcast("flowers", acc, np)
 		}
 		return
 	}
@@ -274,16 +253,16 @@ func (p *Pipeline) onBossNpcInfo(m capture.Message, acc string) {
 	// 恢复同世界 detail 并更新槽(复制存档表,不动 server 缓存里的共享 map)。
 	items = mergeFlowerDetail(items, targetItems)
 	worlds = cloneWorlds(worlds)
-	worlds[targetKey] = map[string]any{"flowers": items, "ts": m.Time.Unix()}
+	worlds[targetKey] = &server.FlowerWorld{Flowers: items, TS: m.Time.Unix()}
 	trimFriendWorlds(worlds)
 
 	// 结果与当前完全一致则不刷新(退回自己世界且花未变时前端零感知)。
 	if oldCur == targetKey && reflect.DeepEqual(items, oldItems) {
 		return
 	}
-	payload = map[string]any{"account": acc, "flowers": items, "cur": targetKey, "worlds": worlds}
-	p.srv.SetLastFlowers(acc, payload)
-	p.srv.Hub().Broadcast("flowers", acc, payload)
+	np := &server.FlowerPayload{Account: acc, Flowers: items, Cur: targetKey, Worlds: worlds}
+	p.srv.SetLastFlowers(acc, np)
+	p.srv.Hub().Broadcast("flowers", acc, np)
 }
 
 // onSelectFlowerSeedBoss 记录 c2s 0x034E 选中的花种 npc_logic_id:
@@ -302,18 +281,12 @@ func (p *Pipeline) onSelectFlowerSeedBoss(m capture.Message, acc string) {
 // (npc_cfg_id + blood),按品种累计落库(花种消失/刷新后计数保留,下次同品种花种出现
 // 卡片继续显示)并广播更新卡片。分组里找不到该 logic_id(极罕见)则跳过,不影响链路。
 func (p *Pipeline) countFlowerChallenge(acc string, logicID uint64) {
-	raw := p.srv.GetLastFlowers(acc)
-	if raw == nil {
+	// GetLastFlowers 已返回强类型,无需再做类型断言
+	payload := p.srv.GetLastFlowers(acc)
+	if payload == nil {
 		return
 	}
-	payload, ok := raw.(map[string]any)
-	if !ok {
-		return
-	}
-	items, ok := payload["flowers"].([]flowerItem)
-	if !ok {
-		return
-	}
+	items := payload.Flowers
 	var cfgID, blood uint32
 	idx := -1
 	for i := range items {
@@ -344,18 +317,12 @@ func (p *Pipeline) clearFlowerDetail(acc string) {
 	if logicID == 0 {
 		return
 	}
-	raw := p.srv.GetLastFlowers(acc)
-	if raw == nil {
+	// GetLastFlowers 已返回强类型,无需再做类型断言
+	payload := p.srv.GetLastFlowers(acc)
+	if payload == nil {
 		return
 	}
-	payload, ok := raw.(map[string]any)
-	if !ok {
-		return
-	}
-	items, ok := payload["flowers"].([]flowerItem)
-	if !ok {
-		return
-	}
+	items := payload.Flowers
 	// 复制一份再改,避免直接动 server 缓存里的共享切片。
 	items = append([]flowerItem(nil), items...)
 	updated := false
@@ -397,18 +364,12 @@ func (p *Pipeline) onTeamBattleInfo(m capture.Message, acc string) {
 	if d.NpcLogicID != 0 {
 		p.acct(acc).lastFlowerLogicID = d.NpcLogicID
 	}
-	raw := p.srv.GetLastFlowers(acc)
-	if raw == nil {
+	// GetLastFlowers 已返回强类型,无需再做类型断言
+	payload := p.srv.GetLastFlowers(acc)
+	if payload == nil {
 		return // 还没收到过面板分组,无从合并
 	}
-	payload, ok := raw.(map[string]any)
-	if !ok {
-		return
-	}
-	items, ok := payload["flowers"].([]flowerItem)
-	if !ok {
-		return
-	}
+	items := payload.Flowers
 	// 复制一份再改,避免直接动 server 缓存里的共享切片。
 	items = append([]flowerItem(nil), items...)
 	updated := false

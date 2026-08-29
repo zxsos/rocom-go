@@ -28,6 +28,29 @@
 3. 生成脚本直接读 `parsed/`(解包根统一用环境变量 `ROCOM_PARSED` 覆盖,默认
    `~/Downloads/rocom/parsed`),产出随仓库提交的生成物。
 
+## 并行工作的边界（多 AI / 多人同时改动时必读）
+
+本仓库可能同时有几个 AI / 人在改动，各自负责不同区域。**跨区改动前先确认归属**，
+尤其 `docs/` 是三方共享的公共区域。
+
+| 区域 | 归属 | 说明 |
+| --- | --- | --- |
+| `internal/**`、`cmd/**`、`scripts/**`、`docs/api/**` | 后端 | Go 代码、生成脚本、对外 API 契约 |
+| `web/**`、`internal/server/web/**` | 前端 | React 源码与 vite 构建产物（后者前端独占,后端只读） |
+| `docs/`（除 `api/`）、`_private-inbox-DO-NOT-TOUCH/**` | 数据分析 | 解包/抓包分析结论、pcap 归档 |
+
+规则：
+
+1. **每个区域只有一个写者**。越界修改会与对方的未提交改动冲突，且对方无从得知。
+2. **`docs/` 是公共区域**：改前先 `git status` 看是否已有人改了同一文件；
+   分析类结论写进各自的新文件（如 `docs/pcap-<日期>.md`），不要直接往 `docs/data.md`
+   里堆 —— 需要沉淀到那里的共识，先在文件内登记再改。
+3. **跨区约束要双写**：一条约束若同时约束代码与文档，两边都要写。
+   例如「炫彩判据必须是 `mutation_type & 8`」既在 `docs/data.md` 说明，
+   也在 `internal/pet/model.go` 的 `Colorful` 处加了警示注释 ——
+   只写在文档里，改代码的人看不到。
+4. 沟通文件（`AI_*.md`）在重构结束后删除；长期共识沉淀到 `docs/`。
+
 ## 约定
 
 - Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(all.pb → internal/pb)、
@@ -68,7 +91,27 @@
   图片本体(webp)经解包 PNG 转码后 embed。更新游戏版本:重新复制 pak、重跑 unpack.sh、
   重跑生成脚本(详见 docs/data.md)。
 - 前端：`web/` 下 `npm run build`，产物输出到 `internal/server/web/`(已提交，便于 `go build` 开箱即用)。
+- **对外 HTTP 契约见 [docs/api/](docs/api/README.md)**：端点表、响应字段、以及机器可读的
+  `fields.json`。契约由 golden 快照守护 —— 改了响应结构后跑
+  `UPDATE_CONTRACT=1 go test ./internal/server/ -run TestContract` 重生成并 review diff，
+  再 `uv run python scripts/gen_apifields.py` 更新 `fields.json`。
+  三处易错点（详见 `docs/api/README.md`）：
+  - `fields.json` 是 golden **样本**，非完备清单 —— `omitempty` 字段可能缺失。
+    position/wildpets/home/flowers 的完备字段清单在 `internal/server/payload.go` 的 struct 定义。
+  - **重新生成 golden 时 diff 只能说明「变了什么」，不能说明「该不该变」**。改动实时推送侧后，
+    用 `bash scripts/capture_sse.sh <pcap>` 抓真实推送与改动前构建逐字段对比
+    （脚本先挂 SSE 再启动回放，回放是一次性的；默认端口 4940，4939 是前端 dev server 的代理目标）。
+  - 可选字段用**指针**而非 `omitempty` 值类型：`u`/`v` 为 0 是合法值，用值类型+omitempty 会被误删。
 - Python 脚本依赖用 uv 管理(项目内 `.venv`)，勿用系统级 pip。
+- **重构务必用 `uv run python scripts/check_refactor.py` 自证**：它回答「有没有**未登记**的改动」。
+  比 `go build` / `go vet` / golden 测试多查三样:注释归属(函数注释与函数体被拆到不同文件,
+  三者都查不出来)、注释完整性、净内容守恒。忽略 gofmt 的合法重排(单行 struct 展开、
+  注释列表后插入裸 `//` 行)。有意删除/改写的东西登记在脚本内的白名单
+  (`ALLOWED_REMOVED_FUNCS` / `INTENTIONALLY_CHANGED` / `RENAMES`),**新增改动务必连带理由登记**,
+  否则脚本会退化成噪音。退出码非零即有问题。
+- **新增测试后要做变异测试**：故意注入缺陷(改错一个常量、去掉一行赋值、反转一个比较符),
+  确认测试真的会失败。**不验证过的测试等于没有** —— 一个永远绿灯的测试只给人虚假的安全感。
+  覆盖率数字本身说明不了这一点。
 - `internal/pb/*.pb.go`、`internal/gamedata/data/names.json`、`internal/pbdesc/data/*` 为生成物，
   改动应改生成脚本而非手改。
 - 相关工具与开源项目清单见 [docs/reference.md](docs/reference.md)。

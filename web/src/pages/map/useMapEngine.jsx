@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect, useMe
 import { subscribe, getPosition } from '../../api'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
+import { useAsyncRun } from '../../hooks/useAsyncData'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, SMOOTH_CUTOFF, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
 import { useRoutes, RouteLayer } from './useRoutes.jsx'
-import { useWildPets, wildTags } from './useWildPets'
+import { useWildPets } from './useWildPets'
+import { wildTags } from './wildMatch'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
@@ -200,24 +202,26 @@ export function useMapEngine(account) {
     rafRef.current?.()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 切账号:清掉场景/外推/视图状态,等下面的快照重取(顺序在 reset 之后)。
   useEffect(() => {
-    let alive = true
     sceneRef.current = null
     layerRef.current = null
     anchorRef.current = null
     dispRef.current = null
     lastFrameRef.current = null
-    setPos(null); setImgError(false); setLayerError(false); view.setFollow(true); view.setZoom(ZOOM_FALLBACK)
-    getPosition().then((p) => { if (alive && p) applyPos(p) }).catch(() => {})
-    return () => { alive = false }
-  }, [account, applyPos]) // eslint-disable-line react-hooks/exhaustive-deps
+    setPos(null); setImgError(false); setLayerError(false)
+    view.setFollow(true); view.setZoom(ZOOM_FALLBACK)
+  }, [account]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => subscribe((m) => {
-    if (m.type === 'position') applyPos(m.data)
-    // 断线重连成功(或首次连上)后补拉最新位置:SSE 丢的包覆盖不了,主动拉一次快照立即恢复,
-    // 不用等下一个移动包(静止时心跳 2.5-3s 一次才来)。
-    else if (m.type === 'stream-open') getPosition().then((p) => { if (p) applyPos(p) }).catch(() => {})
-  }), [account, applyPos])
+  // 位置快照:切账号重取;断线重连成功也补拉一次——SSE 丢的包覆盖不了,主动拉一次快照
+  // 立即恢复,不用等下一个移动包(静止时心跳 2.5-3s 一次才来)。
+  const refetchPos = useAsyncRun(useCallback(() => getPosition(), []), applyPos, account)
+
+  useEffect(() => subscribe('position', applyPos, { onOpen: refetchPos }), [applyPos, refetchPos])
+
+  // 拖动修复:拖动中置 draggingRef=true 让 RAF 不因静止停止;pokeFrame 重启已停的 RAF。
+  // pokeFrame 必须稳定引用:MapViz 的 handlers useMemo 依赖它,每次渲染新建会让 memo 形同虚设。
+  const pokeFrame = useCallback(() => rafRef.current?.(), [])
 
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
@@ -230,20 +234,17 @@ export function useMapEngine(account) {
     stRef, // { zoom, follow, vp } 视图状态
     focusRef, // { u, v } 视口中心对应的地图坐标
     sceneRef, layerRef, // 当前场景底图名/层图名
-    // 拖动修复:拖动中置 draggingRef=true 让 RAF 不因静止停止;pokeFrame 重启已停的 RAF。
-    draggingRef,
-    pokeFrame: () => rafRef.current?.(),
+    draggingRef, pokeFrame,
   }
 }
 
 // MapViz 地图本体渲染:从 .map-vp 到标记层、控制按钮。
 // engine 由 useMapEngine 产出(内部持有 sceneRef/layerRef/anchorRef 等,这里只读 pos)。
 export function MapViz({ engine, layersActive, onToggleLayers }) {
-  const { pos, hasMap, imgError, layerError, setImgError, setLayerError,
+  const { pos, hasMap, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, pois, wilds, home, paint, routes,
-    detailGid, setDetailGid, wildTip, setWildDist, setWildTip, wildDist, onTap,
+    detailGid, setDetailGid, wildTip, wildDist,
     draggingRef, pokeFrame } = engine
-  const { focusRef, stRef } = view
   const mapPx = (Math.min(view.vp.w, view.vp.h) || 1) * view.zoom
   // 包装 usePanZoom 的指针 handlers:拖动期间置 draggingRef(RAF 静止判定因此不停),
   // 按下时 pokeFrame 重启可能已停的 RAF。否则玩家静止时 RAF 停止,单指平移只更新
@@ -257,7 +258,6 @@ export function MapViz({ engine, layersActive, onToggleLayers }) {
       onPointerUp: (e) => { h.onPointerUp?.(e); draggingRef.current = false },
       onPointerCancel: (e) => { h.onPointerCancel?.(e); draggingRef.current = false },
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.handlers, draggingRef, pokeFrame])
 
   // 控制组(图层/放大/缩小/居中)浮在视口右上角。无论地图是否就绪都渲染——

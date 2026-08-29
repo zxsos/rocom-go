@@ -1,7 +1,7 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
-import { WILD_LAYERS, MEDAL_FILTERS } from './useWildPets'
+import { WILD_LAYERS, MEDAL_FILTERS } from './wildConfig'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
@@ -89,7 +89,7 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             <span>奖牌筛选</span>
             <span className="muted">▾</span>
           </button>
-          {wilds.open && !wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
+          {wilds.open && !wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dir, lo, hi, step }) => {
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
             const th = wilds.medals[k]
@@ -128,7 +128,7 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             <span className="map-layer-name">双牌</span>
             <span className="muted">{dualNum}</span>
           </div>
-          {wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dim, dir, lo, hi, step }) => {
+          {wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dir, lo, hi, step }) => {
             // 双牌子滑块:范围 [单牌当前值, 极端值],只严不宽。dir>=': min=单牌值,max=hi;
             // dir<=': min=lo,max=单牌值。单牌值变化时 useWildPets 的 setThreshold 会联动
             // clampDual 把双牌阈值钳到合法范围,这里取 wilds.dual.medals[k] 即可。
@@ -212,9 +212,14 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
               <span className="map-paint-swatch" />
               <span className="map-layer-name">刷新过精灵的区域</span>
             </button>
-            {/* 重置只清当前场景/当前层。误点代价不小(要重走一遍),故要确认一次。 */}
-            <button className="map-collect-btn on" onClick={() => {
-              if (window.confirm('清空本场景已涂的区域?重来一遍要重新走。')) paint.reset()
+            {/* 重置只清当前场景/当前层。误点代价不小(要重走一遍),故要确认一次。
+                用 confirmDialog 而非 window.confirm:样式跟主题、移动端可用(原生弹窗在
+                全屏/PWA 下会打断沉浸模式)。 */}
+            <button className="map-collect-btn on" onClick={async () => {
+              if (await confirmDialog({
+                message: '清空本场景已涂的区域?重来一遍要重新走。',
+                okText: '清空', danger: true,
+              })) paint.reset()
             }} disabled={!paint.available} title="重置本场景的涂色" aria-label="重置涂色">↺</button>
           </div>
         </div>

@@ -5,7 +5,7 @@
 img.pet-avatar { object-fit: cover; }
 /* 头像 + 左上角搭档标记徽章 */
 .avatar-wrap { position: relative; display: inline-flex; line-height: 0; flex: none; }
-.pet-mark { position: absolute; top: -5px; left: -6px; width: 20px; height: 20px; pointer-events: none; z-index: 1; }
+.pet-mark { position: absolute; top: -5px; left: -6px; width: 20px; height: 20px; pointer-events: none; z-index: var(--z-base); }
 .pet-mark img { position: absolute; object-fit: contain; }
 .pet-mark-frame { top: 0; left: 0; width: 100%; height: 100%; }
 /* 白色标记符号居中叠在橙色外框上 */
@@ -15,8 +15,8 @@ img.pet-avatar { object-fit: cover; }
 /* flex 下改由 gap 统一间距,清掉徽标/色卡行内布局用的 margin-left,避免间距叠加不均 */
 .pet-name > .mark, .pet-name > .mark-img, .pet-name > .glass-chip { margin-left: 0; }
 .gender { font-size: 1.15em; font-weight: 800; line-height: 1; }
-.gender.male { color: #4ea3ff; }
-.gender.female { color: #ff6fae; }
+.gender.male { color: var(--c-male); }
+.gender.female { color: var(--c-female); }
 .pet-sub { font-size: 12px; color: var(--fg-dim); }
 /* 位置标签整体折行,不在中日韩字符间断开 */
 .pet-sub .loc { white-space: nowrap; }
@@ -41,9 +41,9 @@ img.pet-avatar { object-fit: cover; }
 .mark { font-size: 11px; padding: 0 5px; border-radius: 5px; margin-left: 4px; font-weight: 600; vertical-align: middle; }
 /* 异色/炫彩标记图(取代文字徽标;缺图时组件自动退回 .mark 文字),与血脉图标同大小 */
 .mark-img { width: 18px; height: 18px; object-fit: contain; margin-left: 4px; vertical-align: middle; }
-.mark-shiny { background: #3a2f6b; color: #c9b6ff; }
+.mark-shiny { background: var(--c-shiny-d); color: var(--c-shiny); }
 .mark-colorful { background: #6b2f50; color: #ffb6e0; }
-.mark-form { background: #2f4a3a; color: #a8e6c0; font-weight: 500; }
+.mark-form { background: var(--c-form-d); color: var(--c-form); font-weight: 500; }
 /* 炫彩色卡缩略图:普通炫彩 = span 容器内 3 层 CSS mask 合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 →
    粒子染白,见 badges.jsx GlassChip),隐藏炫彩 = 整图 img;280x154 按约 1.8:1 缩小(与 .mark-img 同高),
    细描边便于浅色卡在浅底上区分。i/img 子层绝对定位铺满容器。 */

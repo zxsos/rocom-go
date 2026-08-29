@@ -33,7 +33,7 @@
 /* 右上角角标:已点过地图花种(=有 0x0338 详情)才显示;炫彩只放游戏炫彩图标,
    完整色卡在下方 .flower-glass-bar 大图展示;无炫彩标「普通」 */
 .flower-corner {
-  position: absolute; top: -8px; right: -6px; z-index: 1;
+  position: absolute; top: -8px; right: -6px; z-index: var(--z-base);
   display: inline-flex; align-items: center; gap: 2px;
   font-size: 11px; font-weight: 600; line-height: 1.7; padding: 0 7px; border-radius: 999px;
   background: var(--bg-1); border: 1px solid var(--line); color: var(--fg-dim);
@@ -61,13 +61,13 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 .flower-corner-colorful {
-  background: #3a1a2c; border-color: #ffb6e0; color: #ffb6e0;
-  box-shadow: 0 0 6px rgba(255, 182, 224, .6), var(--shadow-sm);
+  background: var(--c-flower-dd); border-color: var(--c-flower); color: var(--c-flower);
+  box-shadow: 0 0 6px rgba(var(--c-flower-rgb), .6), var(--shadow-sm);
 }
 /* 隐藏炫彩:金色描边发光,与普通炫彩区分 */
 .flower-corner-hidden {
-  background: #3a2f14; border-color: #ffd76e; color: #ffd76e;
-  box-shadow: 0 0 8px rgba(255, 215, 110, .75), var(--shadow-sm);
+  background: var(--c-seed-d); border-color: var(--c-seed); color: var(--c-seed);
+  box-shadow: 0 0 8px rgba(var(--c-seed-rgb), .75), var(--shadow-sm);
 }
 .flower-corner-plain { background: var(--bg-2); color: var(--fg-dim); }
 .flower-card:hover { border-color: var(--accent); }
@@ -81,12 +81,12 @@
 }
 .flower-card-viewed:hover { filter: grayscale(.55) contrast(.95); border-color: var(--fg-dim); }
 .flower-card-colorful {
-  border-color: #ffb6e0;
-  box-shadow: 0 0 10px rgba(255, 182, 224, .45), var(--shadow-sm);
+  border-color: var(--c-flower);
+  box-shadow: 0 0 10px rgba(var(--c-flower-rgb), .45), var(--shadow-sm);
 }
 .flower-card-colorful.flower-special {
   border-color: var(--gold);
-  box-shadow: 0 0 12px rgba(255, 215, 110, .5), var(--shadow-sm);
+  box-shadow: 0 0 12px rgba(var(--c-seed-rgb), .5), var(--shadow-sm);
 }
 
 .flower-img {

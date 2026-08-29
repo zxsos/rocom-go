@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useContext, useRef } from 'react'
+import React, { useCallback, useState, useContext } from 'react'
 import { AccountContext } from '../../context'
 import { getLeaderboard, setAccountRank } from '../../api'
+import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
 
 // 称号展示配置:大富翁👑 / 赚钱王💹 / 败家子💸(每晚 00:05 结算,当天佩戴一天)
 const TITLES = [
@@ -48,40 +49,29 @@ function RankRow({ entry, rank, account, mode }) {
 
 export default function Leaderboard() {
   const account = useContext(AccountContext)
-  const [data, setData] = useState(null) // {forbes, profit, titles, me}
-  const [err, setErr] = useState('')
   const [tab, setTab] = useState('forbes')
-  const [busy, setBusy] = useState(false)
   const [busyJoin, setBusyJoin] = useState(false)
-  const timer = useRef(0)
-
-  const load = () => {
-    getLeaderboard().then((d) => {
-      setData(d)
-      setErr('')
-    }).catch((e) => setErr(String(e && e.message || e)))
-  }
-  useEffect(() => {
-    load()
-    timer.current = setInterval(load, 30000) // 每 30s 自动刷新(账号在线/洛克贝变化/跨日结算)
-    return () => clearInterval(timer.current)
-  }, [])
+  // 每 30s 自动刷新(账号在线/洛克贝变化/跨日结算)。
+  // 榜单本身是全局的,但 me(当前账号的参与状态)按账号变,故切账号要重取。
+  const { data, error, loading, refresh } = useAsyncData(
+    useCallback(() => getLeaderboard(), []),
+    { reloadKey: account },
+  )
+  useInterval(refresh, 30000)
 
   const join = async (want) => {
     if (!account) return
     setBusyJoin(true)
     try {
       await setAccountRank(account, want)
-      load()
-    } catch (e) {
-      setErr(String(e && e.message || e))
+      await refresh()
     } finally {
       setBusyJoin(false)
     }
   }
 
-  if (err && !data) {
-    return <div className="panel rank-page"><div className="rank-err">加载失败:{err}</div></div>
+  if (error && !data) {
+    return <div className="panel rank-page"><div className="rank-err">加载失败:{error.message}</div></div>
   }
   const forbes = data?.forbes || []
   const profit = data?.profit || []
@@ -95,7 +85,7 @@ export default function Leaderboard() {
         <h2>🏆 排行榜</h2>
         <div className="rank-head-right">
           <span className="rank-settle-note">每晚 00:05 结算 · 称号佩戴一天</span>
-          <button className="btn small ghost" disabled={busy} onClick={() => { setBusy(true); load(); setTimeout(() => setBusy(false), 400) }}>刷新</button>
+          <button className="btn small ghost" disabled={loading} onClick={refresh}>刷新</button>
         </div>
       </div>
 

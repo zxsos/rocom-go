@@ -5,12 +5,12 @@
 .map-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 /* 图层抽屉盖在地图上(所有宽度统一,对齐手机端):地图独占整行,抽屉 fixed 滑入/滑出。 */
 .map-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr; }
-/* 图层栏 = 全宽度侧滑抽屉:fixed 盖在 .map-vp 之上,z-index 40;折叠态 transform 滑出屏幕左缘。
+/* 图层栏 = 全宽度侧滑抽屉:fixed 盖在 .map-vp 之上(z-index --z-drawer);折叠态 transform 滑出屏幕左缘。
    必须用 .map-filters(而非 .filters)限定:宠物列表等普通页面桌面仍是常驻左列,仅移动端进抽屉
    (见 panel.css 的 media query)。视觉样式同 panel.css 的移动端抽屉,另加桌面已有的毛玻璃与渐变标题。 */
 .map-filters {
   position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
-  max-height: none; margin: 0; z-index: 40; border-radius: 0;
+  max-height: none; margin: 0; z-index: var(--z-drawer); border-radius: 0;
   border: none; border-right: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(6px) saturate(1.2);
@@ -29,7 +29,7 @@
 /* 标题栏吸顶(渐变底边);长面板滚动时始终可见 */
 .map-filters .filters-bar {
   display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+  position: sticky; top: 0; z-index: var(--z-base); background: var(--bg-1);
   padding: 12px 0 10px; margin-bottom: 4px;
   border-bottom: 1px solid transparent;
   background-image: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
@@ -44,7 +44,7 @@
 .map-filters .filters-title-ic { font-size: 16px; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
 /* 抽屉遮罩:盖住地图,点它关抽屉。独立兄弟节点(非 .map-filters 后代),单独类不与宠物列表共用。 */
 .map-filters-backdrop {
-  display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, .45);
+  display: block; position: fixed; inset: 0; z-index: var(--z-scrim); background: rgba(0, 0, 0, .45);
   opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
 }
 .map-filters-backdrop.show { opacity: 1; visibility: visible; }
@@ -144,7 +144,7 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
 }
 /* 收集模式下「已确认还在」的可收集点(星星/零件):描一圈金色,与尚未走到过的候选点区分开。 */
-.map-poi.sure { filter: drop-shadow(0 0 3px #ffd54a) drop-shadow(0 0 6px #ffd54a); }
+.map-poi.sure { filter: drop-shadow(0 0 3px var(--c-star)) drop-shadow(0 0 6px var(--c-star)); }
 /* 野生宠物标记:圆形头像 + 类别描边。描边色由 JS 按命中图层算(见 useWildPets 的 wildRing):
    主描边 = 最稀有的那层,次一层再加一圈 box-shadow 外环——组合数太多,不走 CSS 类。 */
 .map-wild {
@@ -197,7 +197,7 @@
 .map-wild-rare-halo {
   position: absolute; inset: -3px; border-radius: 50%;
   pointer-events: none;
-  background: conic-gradient(from 0deg, transparent 0 40%, #ffd54a 50%, #fff 55%, transparent 65% 100%);
+  background: conic-gradient(from 0deg, transparent 0 40%, var(--c-star) 50%, #fff 55%, transparent 65% 100%);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 1px));
   animation: map-wild-rare-spin 3s linear infinite;
@@ -223,24 +223,24 @@
   width: 16px; height: 16px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 35% 30%, #4a3f8a, #241d47 70%);
-  border: 1.5px solid #c9b6ff;
+  background: radial-gradient(circle at 35% 30%, var(--c-portal), var(--c-portal-d) 70%);
+  border: 1.5px solid var(--c-portal-l);
   box-shadow: 0 0 6px rgba(201, 182, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
   pointer-events: none;
 }
 .map-wild-mark img { width: 10px; height: 10px; object-fit: contain; filter: drop-shadow(0 0 2px rgba(255,255,255,.6)); }
 .map-wild-mark-shiny {
-  background: radial-gradient(circle at 35% 30%, #4a3f8a, #241d47 70%);
-  border-color: #c9b6ff;
+  background: radial-gradient(circle at 35% 30%, var(--c-portal), var(--c-portal-d) 70%);
+  border-color: var(--c-portal-l);
   box-shadow: 0 0 6px rgba(201, 182, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
 }
 .map-wild-mark-colorful {
-  background: radial-gradient(circle at 35% 30%, #6b2f50, #3a1a2c 70%);
+  background: radial-gradient(circle at 35% 30%, var(--c-flower-d), var(--c-flower-dd) 70%);
   border-color: #ffb6e0;
   box-shadow: 0 0 6px rgba(255, 182, 224, .9), 0 1px 3px rgba(0, 0, 0, .6);
 }
 .map-wild-mark-shinyColorful {
-  background: conic-gradient(from 210deg, #4a3f8a, #c9b6ff, #6b2f50, #ffb6e0, #4a3f8a);
+  background: conic-gradient(from 210deg, var(--c-portal), var(--c-shiny), var(--c-flower-d), var(--c-flower), var(--c-portal));
   border-color: #fff;
   box-shadow: 0 0 7px rgba(255, 255, 255, .9), 0 1px 3px rgba(0, 0, 0, .6);
 }
@@ -278,7 +278,7 @@
    内容比悬浮那行全:名称/Lv、标签、体重/嗓音、坐标;pointer-events:none 免得挡住
    下面标记的点击。按标记中心点定位,整体上移「自身高度 + 12px」。 */
 .map-wild-tip {
-  position: absolute; z-index: 30;
+  position: absolute; z-index: var(--z-bar);
   transform: translate(-50%, calc(-100% - 12px));
   pointer-events: none; user-select: none; white-space: nowrap;
   display: flex; flex-direction: column; gap: 2px;
@@ -397,8 +397,8 @@
 .map-medal-dual .map-collect-btn { width: 24px; }
 .map-medal-dual-ic {
   flex: none; width: 14px; text-align: center;
-  font-size: 13px; line-height: 1; color: #ffc107;
-  text-shadow: 0 0 6px rgba(255, 193, 7, .55);
+  font-size: 13px; line-height: 1; color: var(--c-medal);
+  text-shadow: 0 0 6px rgba(var(--c-medal-rgb), .55);
 }
 /* 双牌子滑块行:缩进 + 更小字号,金橙淡底延续双牌组的视觉归属。与上面 4 条单牌滑块
    视觉区分(单牌用默认底色 + accent 轨道),让用户一眼看出"这是双牌专用阈值"。 */
@@ -408,14 +408,14 @@
   font-size: 12px; opacity: .92;
 }
 .map-medal-dual-sub .map-wild-swatch { width: 9px; height: 9px; }
-.map-medal-dual-sub .map-medal-val { color: #ffc107; opacity: .85; }
+.map-medal-dual-sub .map-medal-val { color: var(--c-medal); opacity: .85; }
 /* 双牌轨道用金橙,与单牌的 accent 蓝区分;滑块拇指也金橙。 */
-.map-medal-dual-range { accent-color: #ffc107; }
+.map-medal-dual-range { accent-color: var(--c-medal); }
 .map-medal-dual-range::-webkit-slider-thumb {
-  background: #ffc107; border-color: rgba(255, 193, 7, .4);
+  background: var(--c-medal); border-color: rgba(255, 193, 7, .4);
 }
 .map-medal-dual-range::-moz-range-thumb {
-  background: #ffc107; border-color: rgba(255, 193, 7, .4);
+  background: var(--c-medal); border-color: rgba(255, 193, 7, .4);
 }
 .map-medal-dual-sub:has(input:disabled) { opacity: .4; }
 

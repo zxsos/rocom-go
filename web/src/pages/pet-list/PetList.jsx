@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } 
 import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
+import { useAsyncData } from '../../hooks/useAsyncData'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter } from './filters'
 import FilterPanel from './FilterPanel'
@@ -11,18 +12,32 @@ import PetCards from './PetCards'
 import ContextMenu from './ContextMenu'
 import Dropdown from '../../components/Dropdown'
 
+// 空数据的兜底常量:引用稳定,免得每次渲染造新对象打穿下游 memo。
+const NO_PETS = { total: 0, pets: [] }
+const NO_OPTIONS = {}
+const NO_BOXES = []
+const NO_TEAMS = { slots: [] }
+
 export default function PetList() {
   const account = useContext(AccountContext)
   const [filter, setFilter] = useStoredJSON(sessionStorage, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter)
+
+  // 盒子筛选是账号绑定的(盒子 id 归属特定账号),切账号必须清掉——否则拿 A 的盒 id 去查 B 的宠物。
+  // 原先靠 <main key={account}> 重挂载时从 sessionStorage 重读(box 已被 App 的 dropBoxFilter 删掉);
+  // 改为依赖驱动重取后不再重挂载,内存里的 filter 会残留旧 box,故在此显式清理。
+  // 用「渲染期派生」(React 官方的 adjusting-state-on-prop-change 写法)而非 useEffect:
+  // effect 里的 setFilter 要等下一轮渲染才生效,会让下方 useAsyncData 先用带旧 box 的 filter
+  // 白跑一次请求;渲染期 setState 则会被 React 合并进本次渲染,effects 只在最终结果上跑一次。
+  const [filterAccount, setFilterAccount] = useState(account)
+  if (filterAccount !== account) {
+    setFilterAccount(account)
+    setFilter((f) => (f.box ? { ...f, box: '', page: 1 } : f))
+  }
   const [collapsed, setCollapsed] = useStoredFlag(sessionStorage, 'petListCollapsed', true)
   const [sync, setSync] = useStoredFlag(localStorage, 'petSync', true) // 实时同步:游戏内操作自动跳转到对应宠物(默认开)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
-  const [data, setData] = useState({ total: 0, pets: [] })
-  const [options, setOptions] = useState({})
   const [selected, setSelected] = useState(null) // 单击选中的 gid
   const [menu, setMenu] = useState(null)          // 右键/长按菜单 {gid,pet,x,y}
-  const [boxes, setBoxes] = useState([])          // 各盒子槽位布局
-  const [teams, setTeams] = useState({ slots: [] }) // 大世界三队 18 格
   const [activeIdx, setActiveIdx] = useState(0)   // 示意图当前容器下标(0=队伍)
   const reloadRef = useRef(null)
   const filterRef = useRef(filter)      // 供 SSE 回调读取最新筛选(避免闭包旧值)
@@ -32,14 +47,21 @@ export default function PetList() {
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
   const syncRef = useRef(sync)      // 供 SSE 回调读取最新同步开关(避免闭包旧值)
 
-  const load = useCallback(() => { getPets(withCatch(filter)).then(setData).catch(() => {}) }, [filter])
-  const loadBoxes = useCallback(() => {
-    getBoxes().then(setBoxes).catch(() => {})
-    getTeams().then(setTeams).catch(() => {})
-  }, [])
-  useEffect(() => { load() }, [load])
-  useEffect(() => { getFilterOptions().then(setOptions).catch(() => {}) }, [])
-  useEffect(() => { loadBoxes() }, [loadBoxes])
+  // 列表随筛选条件重取;SSE 防抖重载复用同一个 refresh(内部读最新 fetcher,拿到的就是最新筛选)。
+  const { data, refresh: load } = useAsyncData(
+    useCallback(() => getPets(withCatch(filter)), [filter]),
+    { fallback: NO_PETS, reloadKey: account },
+  )
+  const { data: options } = useAsyncData(useCallback(() => getFilterOptions(), []),
+    { fallback: NO_OPTIONS, reloadKey: account })
+  // 盒子与队伍是两路独立拉取,但总是一起重取(SSE 收到宠物变动时都要刷新),故合成一个 loadBoxes。
+  const { data: boxes, refresh: loadBoxesData } = useAsyncData(useCallback(() => getBoxes(), []),
+    { fallback: NO_BOXES, reloadKey: account })
+  const { data: teams, refresh: loadTeams } = useAsyncData(useCallback(() => getTeams(), []),
+    { fallback: NO_TEAMS, reloadKey: account })
+  const loadBoxes = useCallback(() => { loadBoxesData(); loadTeams() }, [loadBoxesData, loadTeams])
+
+
 
   // 示意图容器:大世界队伍(6 排 × 3 队,竖向)排在所有盒子前,其后各盒子(5 排 × 6 格)
   const containers = useMemo(() => {
@@ -51,12 +73,12 @@ export default function PetList() {
     for (const b of boxes) list.push({ type: 'box', id: b.id, name: b.name || ('盒' + b.id), cols: 6, slots: b.slots, heads: b.heads || {} })
     return list
   }, [teams, boxes])
-  const boxIdxById = (id) => containers.findIndex((c) => c.type === 'box' && c.id === id)
+  const boxIdxById = useCallback((id) => containers.findIndex((c) => c.type === 'box' && c.id === id), [containers])
   // 宠物盒筛选变化时,示意图跟随展示该盒
   useEffect(() => {
     const id = parseInt((filter.box || '').split('-')[0], 10)
     if (id) { const i = boxIdxById(id); if (i >= 0) setActiveIdx(i) }
-  }, [filter.box, containers])
+  }, [filter.box, boxIdxById])
 
   useEffect(() => { containersRef.current = containers }, [containers])
   useEffect(() => { filterRef.current = filter }, [filter])
@@ -65,18 +87,16 @@ export default function PetList() {
   // 实时：收到宠物更新时防抖重载当前页;若带 focusGid(客户端刚调整位置),
   // 自动切到该宠物所在页并选中,示意图跟随展示其盒子/队伍。
   useEffect(() => {
-    return subscribe((m) => {
-      if (m.type !== 'pet') return
-      if (m.account && m.account !== account) return // 只认当前账号的更新
+    return subscribe('pet', (d) => {
       // 同步关闭时不自动跳转,避免打断当前筛选(仍走下方防抖刷新,列表静默更新)
-      const focus = m.data && m.data.focusGid
+      const focus = d && d.focusGid
       if (focus && syncRef.current) {
         setSelected(focus)
         // 清掉其它筛选、改按该宠物移动后所在的盒子过滤:既保证被选中的宠物一定在列表中
         // (否则原有筛选可能把它排除),又通过 filter.box 联动让左上角示意图切到该盒。
         const f = filterRef.current
         const base = { pageSize: f.pageSize, sort: f.sort, order: f.order }
-        const box = m.data.focusBox
+        const box = d.focusBox
         if (box) {
           const cont = containersRef.current.find((c) => c.type === 'box' && c.id === box)
           base.box = cont ? `${cont.id}-${cont.name}` : `${box}-`
@@ -86,14 +106,19 @@ export default function PetList() {
           .catch(() => setFilter({ ...base, page: 1 }))
         loadBoxes()
       }
-      // 防抖重载用 filterRef 读取最新筛选(含 focus 切过去的新页),
-      // 避免捕获旧 load 闭包,在 600ms 后把列表拉回切换前的页。
+      // 防抖重载:连串的宠物更新(如分页同步一次推几十条)只在静默 600ms 后拉一次,
+      // 避免抖动期间反复重取整页。load 内部读的是最新 fetcher,拿到的是最新筛选
+      // (含 focus 刚切过去的那一页),不会被旧闭包拉回切换前的页。
       clearTimeout(reloadRef.current)
       reloadRef.current = setTimeout(() => {
-        if (reloadRef.current) { getPets(withCatch(filterRef.current)).then(setData).catch(() => {}); loadBoxes() }
+        load()
+        loadBoxes()
       }, 600)
     })
-  }, [load, loadBoxes, account])
+  }, [load, loadBoxes, setFilter])
+
+  // 卸载时清掉防抖定时器:否则组件销毁后仍会触发一次拉取与 setState。
+  useEffect(() => () => clearTimeout(reloadRef.current), [])
 
   const set = (patch) => setFilter((f) => ({ ...f, ...patch, page: patch.page || 1 }))
   const toggleType = (t) =>

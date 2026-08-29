@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "lint": "eslint .",
+    "verify": "node scripts/verify-pages.mjs && node scripts/verify-subscribe.mjs && node scripts/verify-switch.mjs && node scripts/verify-sse.mjs",
+    "verify:live": "bash ../scripts/capture_sse.sh $(node -e \"console.log(process.env.ROCOM_PCAP||'/workspace/_private-inbox-DO-NOT-TOUCH/rocom-20260829-224409.pcap')\") /tmp/sse-live.txt 4942 && node scripts/verify-live-sse.mjs /tmp/sse-live.txt"
   },
   "dependencies": {
     "html-to-image": "^1.11.11",
@@ -13,7 +16,14 @@
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^15.15.0",
+    "jsdom": "^30.0.1",
     "vite": "^7.3.6"
   }
 }

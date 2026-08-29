@@ -237,14 +237,8 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// 清理内存态
-	s.posMu.Lock()
-	delete(s.lastPos, req.Account)
-	delete(s.lastWild, req.Account)
-	delete(s.lastHome, req.Account)
-	s.posMu.Unlock()
-	s.onlineMu.Lock()
-	delete(s.lastSeen, req.Account)
-	s.onlineMu.Unlock()
+	s.snap.forget(req.Account)
+	s.online.forget(req.Account)
 	s.injectMu.Lock()
 	delete(s.injects, req.Account)
 	s.injectMu.Unlock()

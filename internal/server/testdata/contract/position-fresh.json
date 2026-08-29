@@ -1,0 +1,29 @@
+{
+  "account": "UID:1",
+  "heading": 123.5,
+  "img": "bigmap/10003.webp",
+  "paintable": true,
+  "path": [
+    {
+      "u": 0.49,
+      "v": 0.49
+    },
+    {
+      "u": 0.5,
+      "v": 0.5
+    }
+  ],
+  "sceneCfgId": 1001,
+  "sceneName": "卡洛西亚大陆",
+  "sceneResId": 10003,
+  "stop": false,
+  "ts": 0,
+  "tsMs": 0,
+  "u": 0.5,
+  "v": 0.5,
+  "vu": 0.0001,
+  "vv": -0.0002,
+  "x": 510000,
+  "y": 612000,
+  "z": 1200
+}

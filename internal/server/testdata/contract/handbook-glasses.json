@@ -1,0 +1,18 @@
+{
+  "glasses": [
+    {
+      "base": 3006,
+      "book": 7,
+      "common": [
+        131073
+      ],
+      "evo": 3003,
+      "head": "HeadIcon/3006.webp",
+      "hidden": [
+        2
+      ],
+      "name": "火神",
+      "stage": 3
+    }
+  ]
+}

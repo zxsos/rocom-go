@@ -18,12 +18,12 @@
 /* 洛克贝徽标(顶部横幅:当前账号洛克贝,来自登录回包 0x0102 解析) */
 .merchant-coins {
   padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
-  background: rgba(212, 175, 55, .16); color: #d4af37; border: 1px solid rgba(212, 175, 55, .45);
+  background: rgba(var(--c-wealth-rgb), .16); color: var(--c-wealth); border: 1px solid rgba(var(--c-wealth-rgb), .45);
   font-variant-numeric: tabular-nums;
 }
 /* 未同步态(该账号从未解析到洛克贝,待玩家重新登录游戏):淡金、虚框、可悬停查看提示 */
 .merchant-coins-unk {
-  background: transparent; color: rgba(212, 175, 55, .55); border-style: dashed;
+  background: transparent; color: rgba(var(--c-wealth-rgb), .55); border-style: dashed;
   cursor: help;
 }
 
@@ -35,14 +35,14 @@
 }
 .merchant-rank-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .merchant-rank-btn.joined {
-  background: rgba(212, 175, 55, .14); color: #d4af37; border-color: rgba(212, 175, 55, .45);
+  background: rgba(var(--c-wealth-rgb), .14); color: var(--c-wealth); border-color: rgba(var(--c-wealth-rgb), .45);
 }
 .merchant-rank-btn:disabled { opacity: .55; cursor: not-allowed; }
 .merchant-rank-err { font-size: 12px; color: var(--danger); }
 
 /* 营业状态徽标 */
 .merchant-status { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4; }
-.merchant-status-ok { background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4); }
+.merchant-status-ok { background: rgba(var(--c-earn-rgb), .14); color: var(--c-earn); border: 1px solid rgba(var(--c-earn-rgb), .4); }
 .merchant-status-off { background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--line); }
 .merchant-day { font-size: 13px; color: var(--fg-dim); font-weight: 600; }
 .merchant-countdown { font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
@@ -66,7 +66,7 @@
 .merchant-step.done:not(:first-child) .merchant-step-node::before,
 .merchant-step.cur:not(:first-child) .merchant-step-node::before { background: var(--accent); }
 .merchant-step-dot {
-  position: relative; z-index: 1; width: 22px; height: 22px; border-radius: 50%;
+  position: relative; z-index: var(--z-base); width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--bg-2); border: 2px solid var(--line);
   color: transparent; font-size: 12px; font-weight: 700;
@@ -92,7 +92,7 @@
 .merchant-sub-title { font-weight: 700; font-size: 14px; }
 .merchant-sub-badge {
   font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
-  background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4);
+  background: rgba(var(--c-earn-rgb), .14); color: var(--c-earn); border: 1px solid rgba(var(--c-earn-rgb), .4);
 }
 .merchant-sub-warn { font-size: 12px; color: var(--danger); }
 .merchant-sub-desc { margin: 6px 0 10px; font-size: 12px; color: var(--fg-dim); }
@@ -109,7 +109,7 @@
   background: transparent; border-color: var(--line); color: var(--fg-dim);
 }
 .merchant-sub-msg { margin-top: 8px; font-size: 12px; }
-.merchant-sub-msg.ok { color: #28a745; }
+.merchant-sub-msg.ok { color: var(--c-earn); }
 .merchant-sub-msg.err { color: var(--danger); }
 .merchant-sub-toggle {
   margin-left: auto; padding: 2px 10px; font-size: 12px; cursor: pointer;
@@ -128,13 +128,13 @@
 .merchant-sub-chip:hover { border-color: var(--accent); color: var(--accent); }
 .merchant-sub-chip.on {
   border-color: var(--accent); color: var(--accent);
-  background: rgba(76, 141, 255, .12); font-weight: 600;
+  background: rgba(var(--c-accent-rgb), .12); font-weight: 600;
 }
 .merchant-sub-chip:disabled { opacity: .5; cursor: not-allowed; }
 .merchant-sub-fold {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-top: 8px; padding: 8px 12px; font-size: 13px;
-  background: rgba(40, 167, 69, .07); border: 1px dashed rgba(40, 167, 69, .4);
+  background: rgba(var(--c-earn-rgb), .07); border: 1px dashed rgba(var(--c-earn-rgb), .4);
   border-radius: var(--radius); color: var(--fg);
 }
 .merchant-sub-fold-mail { font-weight: 600; }
@@ -161,7 +161,7 @@
 .merchant-turn.is-cur .merchant-turn-time { color: var(--accent); }
 .merchant-turn-cur {
   font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
-  background: rgba(40, 167, 69, .14); color: #28a745; border: 1px solid rgba(40, 167, 69, .4);
+  background: rgba(var(--c-earn-rgb), .14); color: var(--c-earn); border: 1px solid rgba(var(--c-earn-rgb), .4);
 }
 .merchant-turn-range { font-size: 12px; }
 .merchant-turn-count { margin-left: auto; font-size: 12px; color: var(--fg-dim); }
@@ -189,7 +189,7 @@
   box-shadow: var(--shadow-sm);
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
-.merchant-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(76, 141, 255, .14); transform: translateY(-2px); }
+.merchant-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(var(--c-accent-rgb), .14); transform: translateY(-2px); }
 .merchant-item-img-wrap {
   height: 110px; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, var(--bg-2)), var(--bg-2));

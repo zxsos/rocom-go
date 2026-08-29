@@ -91,7 +91,7 @@
   .events-main { height: calc(100vh - 124px); height: calc(100dvh - 124px); }
   /* 移动端抽屉:标题行吸顶,✕ 关闭显示(标题与 AND/OR 同行,靠右) */
   .rules-header {
-    position: sticky; top: 0; z-index: 1; background: var(--bg-1);
+    position: sticky; top: 0; z-index: var(--z-base); background: var(--bg-1);
     padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
   }
   .rules-close { display: inline-flex; }

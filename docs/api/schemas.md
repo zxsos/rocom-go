@@ -1,0 +1,340 @@
+# 响应结构
+
+## 关于可信度标记
+
+- **✅ 已验证**：有 golden 快照，由 `internal/server/contract_test.go` 守护，
+  与线上输出必然一致。示例即 `internal/server/testdata/contract/*.json`。
+- **⚠️ 源码推导**：无 golden 快照，据 Go struct 的 `json` tag 与 handler 代码整理，
+  可能滞后。**以代码为准**，欢迎补 golden。
+
+> **阶段 3 已把这四个 payload 强类型化**，定义见 `internal/server/payload.go`，
+> pipeline 与 server 共用同一份，字段名受编译期保护 —— 不再有「拼错 key 编译照样过」的风险。
+> 此前它们是无 Go struct 的 `map[string]any`，字段只能靠 golden 反推。
+
+---
+
+## 宠物
+
+### `GET /api/pets` ✅
+
+```json
+{ "total": 2, "pets": [ { ...宠物对象... } ] }
+```
+
+`pets` 为 `[]`（非 `null`）当无结果。
+
+### `GET /api/pets/{gid}` ✅
+
+单个宠物对象。不存在返回 `404`。
+
+### 宠物对象（Pet）✅
+
+取自 `pet-detail.json`，标注了类型的字段来自 `internal/pet/model.go`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `gid` | int | 唯一实例 id |
+| `confId` | int | 种类配置 id（指向进化线**一阶** base） |
+| `baseConfId` | int | 当前形态 petbase id（进化后随之变化） |
+| `species` | str | 种类名（当前形态） |
+| `book` | int? | 图鉴编号 |
+| `form` | str? | 地区/季节形态名（普通宠物为空） |
+| `stage` | int? | 进化阶段 |
+| `name` | str | 昵称 |
+| `level` | int | 等级 |
+| `natureId` / `nature` | int / str | 性格 |
+| `gender` | str | `♂` / `♀` |
+| `types` | str[] | 系别中文（可多系） |
+| `typeIcons` | str[]? | 系别图标相对路径 |
+| `bloodId` / `blood` / `bloodIcon` | int?/str?/str? | 血脉编号/中文短名/主图标 |
+| `eggGroups` | obj[]? | 蛋组，`{name, desc}` |
+| `heightM` / `weightKg` | float | 身高（米）/ 体重（千克） |
+| `heightMin/Max` `weightMin/Max` | float? | 该形态取值区间（读取时注入，不入库） |
+| `heightPct` / `weightPct` | float? | 形态内百分位 0-100（可为 `null`） |
+| `voice` | int | 声音值 |
+| `talentRank` | str | 天分评价 |
+| `medal` / `medalDesc` / `medalIcon` | str / str / str? | 佩戴奖牌 |
+| `wearMedalConfId` | int | 佩戴奖牌配置 id |
+| `medalIds` | int[]? | 已拥有奖牌 id（佩戴+custom+free，去重） |
+| `partnerMark` / `partnerMarkIcon` | str / str? | 搭档标记 |
+| `speciality` / `specialityId` | str / int | 特长 |
+| `catchTime` | int | 捕捉时间（Unix 秒） |
+| `shiny` / `colorful` | bool | 异色 / 炫彩 |
+| `glassType` / `glassValue` | int? | 炫彩类型与数值 |
+| `image` | obj | `{head, bigHead, portrait, portraitSmall}`，相对 `/img/` 的路径 |
+| `box` | obj? | `{boxId, slot, boxName?, mark?}`（在盒中） |
+| `team` | obj? | `{teamIdx, pos}`（在队中；与 `box` **互斥**） |
+| `hp` `attack` `defense` `spAttack` `spDefense` `speed` | obj | `{value, talentLv, nature}` |
+| `skillIds` | int[] | 技能 id |
+
+> `image` 取图优先 `baseConfId` 回退 `confId` —— 只按 `confId` 取会拿到进化线一阶的图。
+
+### `GET /api/stats` ✅
+```json
+{ "petCount": 2 }
+```
+
+### `GET /api/pet-page` ✅
+```json
+{ "page": 1, "found": true }
+```
+
+### `GET /api/filter-options` ✅
+
+键为维度名，值为可选值数组。**`medal` 可能为 `null`**（本账号无奖牌时）。
+
+```json
+{ "nature": ["固执"], "talentRank": ["S"], "speciality": ["暴击"],
+  "partnerMark": ["首领"], "box": ["1-常用"], "medal": null }
+```
+
+维度来源：`nature`/`talentRank`/`speciality`/`partnerMark`/`form` 取自 `pets` 表去重，
+`box` 取自 `pet_box`，`medal` 由后端把 id 转成中文名后追加。
+
+> **值为空时该键直接缺失**（不是 `[]`）：上例因种子宠物无形态而**不含 `form`**，
+> 无奖牌时 `medal` 为 `null`（该键总存在，值可能为空）。前端取值需容错。
+
+### `GET /api/boxes` ✅
+```json
+[{ "id": 1, "name": "常用", "slots": [1002, 0, 0, ...], "heads": { "1002": "HeadIcon/3001.webp" } }]
+```
+`slots` 长 30，下标=格位（0 起），值=宠物 gid（`0` 空）。`heads` 是 gid 字符串→小头像路径。
+
+### `GET /api/teams` ✅
+```json
+{ "slots": [0, 0, 1001, 0, ...], "heads": { "1001": "HeadIcon/3006.webp" } }
+```
+18 格（三队各 6）。
+
+### `GET /api/evolution?base=3006` ✅
+```json
+[{ "petbase": 3001, "name": "小火猴", "stage": 1, "book": 1, "image": { ... } }]
+```
+按阶段升序。无链时返回 `[]`。
+
+---
+
+## 事件
+
+### `GET /api/events` ✅
+```json
+[{ "id": 1, "time": 1700000000, "subKind": "捕捉", "gid": 1001, "pet": { ...宠物对象... } }]
+```
+按 id 倒序。参数：`limit` / `beforeId` / `offset`。无结果时为 `[]`。
+
+### `GET /api/events/stats` ✅
+```json
+{ "total": 1, "bySubKind": { "捕捉": 1 }, "shiny": 0, "colorful": 0,
+  "daily": [{ "day": "11-14", "n": 1 }], "topSpecies": [{ "s": "火神", "n": 1 }] }
+```
+`daily` 近 30 天升序（含 0）；`topSpecies` 至多 10。
+
+---
+
+## 全局固定数据
+
+### `GET /api/icons` ✅
+```json
+{ "stat": { "hp": "...", "attack": "...", "spAttack": "...",
+            "defense": "...", "spDefense": "...", "speed": "..." },
+  "type": { "火": "...", "水": "..." },
+  "shiny": "...", "colorful": "...", "shinyColorful": "...",
+  "pollution": "...", "partnerFrame": "..." }
+```
+值为相对 `/img/` 的路径。不随宠物/账号变化，App 启动拉一次即可。
+
+### `GET /api/medals` ✅
+```json
+[{ "id": 1, "name": "大块头", "desc": "...", "icon": "..." }]
+```
+
+### `GET /api/name-options` ✅
+```json
+{ "speciality": ["暴击", "..."] }
+```
+
+### `GET /api/accounts` ⚠️
+```json
+[{ "account": "UID:1", "name": "...", "petCount": 12, "title": "大富翁", "hasPin": true, "online": true }]
+```
+`online` 由内存表判定（最近 30s 有流量），不落库；`title` 是当日排行榜称号。
+
+### `GET /api/leaderboard` ⚠️
+```json
+{ "forbes": [{ "account", "name", "coins", "hasCoins", "baseline", "profit", "title" }],
+  "profit": [...], "titles": [{ "date", "account", "name", "title" }],
+  "me": { "account", "name", "join", "coins", "hasCoins", "baseline", "profit", "title" } }
+```
+`forbes` 按洛克贝降序（`hasCoins=false` 沉底，前端显示「待同步」）；`profit` = 当前洛克贝 − 首次快照。
+
+---
+
+## 实时快照
+
+### `GET /api/position` ✅
+
+> 结构见 `internal/server/payload.go` 的 `PositionPayload`（已强类型化）。
+> 无记录时返回 `null`。
+
+**未过期**（`tsMs` 在 `posFresh`=4s 内）保留全部字段：
+```json
+{ "account": "UID:1", "sceneResId": 10003, "sceneCfgId": 1001, "sceneName": "卡洛西亚大陆",
+  "img": "bigmap/10003.webp", "x": 510000, "y": 612000, "z": 1200,
+  "u": 0.5, "v": 0.5, "vu": 0.0001, "vv": -0.0002,
+  "heading": 123.5, "stop": false, "paintable": true,
+  "ts": 0, "tsMs": 0, "path": [{ "u": 0.49, "v": 0.49 }, { "u": 0.5, "v": 0.5 }] }
+```
+
+**已过期**则**抹掉 `vu` / `vv` / `path`**（其余字段不变）：
+```json
+{ "account": "UID:1", "sceneResId": 10003, "sceneCfgId": 1001, "sceneName": "卡洛西亚大陆",
+  "img": "bigmap/10003.webp", "x": 510000, "y": 612000, "z": 1200,
+  "u": 0.5, "v": 0.5, "heading": 123.5, "stop": false, "paintable": true,
+  "ts": 0, "tsMs": 0 }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `u` / `v` | 底图归一化坐标（0-1）；**该场景无底图时不存在** |
+| `vu` / `vv` | 速度向量（归一化坐标/秒），供前端两包之间外推；`stop=true` 时不下发 |
+| `path` | 客户端沉默后补报的真实轨迹点数组（至少 2 点才下发） |
+| `ts` / `tsMs` | Unix 秒 / **毫秒**（前端按 `tsMs` 判过期）；golden 中抹为 `0` |
+| `heading` | 朝向角（度），0=世界+X（地图东/右），顺时针增 |
+| `paintable` | 该场景能否涂地，前端据此显示图层开关 |
+| `img` | 底图文件名（家园按等级 `<res>_<lv>`）；无底图为空串 |
+
+> 过期抹除是**有意设计**：陈旧速度会让前端外推一路飘走，故先静态回显，
+> 等下一个移动包自然接管。
+
+### `GET /api/wildpets` ✅
+
+> 结构见 `internal/server/payload.go` 的 `WildPayload`（已强类型化）。
+> 从未收到 AOI 通知时返回 `null`。
+
+```json
+{ "account": "UID:1", "sceneResId": 10003,
+  "pets": [{ "id": "1234567890123456789", "n": "珀尔鼬", "img": "HeadIcon/3006.webp",
+             "kinds": ["shiny", "big"], "u": 0.4, "v": 0.6, "x": 100, "y": 200, "z": 30,
+             "lv": 45, "voice": 96, "height": 120, "weight": 8800, "weightPct": 98.5,
+             "glassType": 1, "glass": "暗夜拾光", "glassValue": 131073, "mutation": 1 }],
+  "allPets": [{ "id": "2234567890123456789", "n": "鸭吉吉", "img": "HeadIcon/3001.webp",
+                "u": 0.7, "v": 0.2 }] }
+```
+
+- `pets`：稀有标记（异色/炫彩/污染/奖牌四件套），带全量字段。
+- `allPets`：普通野生宠（「全部野生」图层），只有名/头像/坐标。
+- `id` 是 **字符串**（`actor_id` 为 uint64，超出 JS 安全整数）。
+- `kinds` 取值：`colorful` / `shiny` / `pollution` / `big` / `small` / `high` / `low`。
+- `stale`（示例未含）：已离开 AOI，位置是最后所见，前端置灰。
+- 两组均按 `id` 升序，**顺序稳定**（前端以 id 作 key，免得每次推送重排 DOM）。
+
+### `GET /api/home` ✅
+
+> 结构见 `internal/server/payload.go` 的 `HomePayload`（已强类型化）。
+> 不在家园时 `nests` 为 `[]`；从未进过家园返回 `null`。
+
+除 `account` / `nests` 外，还有四个字段**只在玩家确实在家园时下发**
+（`omitempty`，不在家园时键直接缺席）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `sceneResId` | int | 家园场景资源 id |
+| `level` | int | 家园等级（决定底图取 `<res>_<lv>`） |
+| `roomLevel` | int | 房间等级 |
+| `couplesStale` | bool | 配对信息是否已过期 |
+
+> 这四个是阶段 3 补进 golden 的 —— 原先契约只覆盖了「空家园」一种形态。
+
+```json
+{ "account": "UID:1",
+  "nests": [
+    { "id": "998877665544332211", "u": 0.3, "v": 0.8, "x": 10, "y": 20, "name": "精灵小窝",
+      "pet": { "gid": 1001, "name": "小火", "species": "火神", "level": 60, "voice": 12,
+               "weightPct": 55.5, "mates": [{ "gid": 1002, "name": "小水" }] } },
+    { "id": "998877665544332212", "u": 0.6, "v": 0.4, "x": 30, "y": 40, "name": "精灵小窝",
+      "egg": { "itemId": 5001, "name": "友爱天天的蛋", "icon": "egg/5001.webp" } }
+  ] }
+```
+
+- `pet` 与 `egg` **互斥**（`omitempty`）：`pet` 为空即空窝，`egg` 是有蛋待收。
+- `pet` 是简要信息（悬浮显示）；点击看详情走 `GET /api/pets/{gid}`。
+- `mates` 是配对的另一半；多于一个即串窝。
+- `id` 是字符串（`furniture_guid` 为 uint64）。
+
+### `GET /api/flowers` ✅
+
+> 结构见 `internal/server/payload.go` 的 `FlowerPayload`（已强类型化）。
+> 从未收到 0x0375 时返回 `null`。
+> **后端不输出内部字段 `cur` / `worlds`**：输出类型是独立的 `flowerView`（只有
+> `account`/`flowers`），由结构保证不外泄，不再是 handler 里运行时过滤键。
+
+```json
+{ "account": "UID:1",
+  "flowers": [{ "id": 7001, "name": "火神", "img": "HeadIcon/3006.webp", "star": 7,
+                "blood": 3, "bloodName": "火", "bloodIcon": "blood/3.webp",
+                "npcLogicId": 70010, "challengeCount": 2, "endTs": 1700086400,
+                "specSeedId": 0, "activityId": 7, "ownerUserId": 0, "detail": true,
+                "lv": 60, "glassType": 1, "glass": "暗夜拾光", "glassValue": 131073,
+                "bindName": "火神", "bindImg": "HeadIcon/3006.webp", "bindEvo": 2,
+                "medalName": "大块头", "medalIcon": "medal/1.webp" }] }
+```
+
+- `star`：普通花灵 5，特殊花灵 7。
+- `ownerUserId`：`0` = 自己世界，非 0 = 好友世界（该值即世界归属者）。
+- `detail`：是否已收到 0x0338 详情（玩家点过地图花种）。**仅 `detail=true` 时**
+  `lv` / `glass*` / `bind*` / `medal*` 才有效，否则为 0/空。
+- 面板 0x0375 给基础字段，点击后 0x0338 详情合并进来。
+
+### `GET /api/flowers/slots` ✅
+
+唯一把内部槽表 `worlds` **转成数组**暴露的接口 —— 不是原样透传，
+`worlds` 这个键本身不出现在响应里，每个槽变成 `slots[]` 里的一个对象
+（由前端 `[A5] §6` 指出措辞不准，原先写「透传」会让人误以为字段名就叫 `worlds`）：
+
+```json
+{ "slots": [{ "key": "self", "name": "自己世界", "ts": 1700000000,
+              "flowers": [ { ...同上 flower 对象... } ] },
+            { "key": "owner:10001", "name": "好友 UID:10001", "ts": 1700000100,
+              "flowers": [...] }] }
+```
+
+`self` 槽排在前，好友槽按 key 升序。`self` 槽不可删。
+
+---
+
+## 其它有快照的接口
+
+### `GET /api/eggs` ✅
+```json
+{ "eggs": [{ "gid": 9001, "itemId": 5001, "name": "友爱天天的蛋", "species": "火神",
+             "icon": "egg/5001.webp", "heightM": 0.3, "weightKg": 1.2,
+             "obtainedAt": 1700000000, "src": 1, "srcName": "牧场",
+             "hatching": true, "hatchedSecs": 600, "maxSecs": 3600,
+             "hatchUpdate": 1700000000, "random": false, "typeOrder": 0 }] }
+```
+`hatchUpdate` 是上面三个数的计算时刻，前端据此外推孵化进度。
+
+### `GET /api/handbook-glasses` ✅
+```json
+{ "glasses": [{ "base": 3006, "name": "火神", "book": 1, "head": "HeadIcon/3006.webp",
+                "stage": 2, "evo": 100, "common": [131073], "hidden": [2] }] }
+```
+按图鉴号升序。`common` / `hidden` 为 `glass_value` 列表（已去重保序）。
+数据来自登录包 pet_handbook 快照，非实时。
+
+---
+
+## 无快照的接口（源码推导 ⚠️）
+
+以下接口尚无 golden，结构据代码整理。需要精确契约时按
+[README 的重新生成步骤](README.md#重新生成)补一个即可。
+
+| 接口 | 结构 |
+| --- | --- |
+| `GET /api/pois?res=` | `{kinds:[{k,n,icon,on,num}], pois:[{k,u,v,n}]}`；场景无底图时两者皆空 |
+| `GET /api/paint` | `{res, layer, w, h, cell, corridor, safe, cells}`；`cells` 是 w×h 位的 base64 位图（每字节 8 格、低位在前）；无底图时 `w=0` |
+| `GET /api/merchant` | `{now, day, status:"open\|closed\|idle", today:[{start,end,label,empty,merchant}], prev:[...]}`，`merchant` 是第三方原始 JSON |
+| `GET /api/merchant/sub` | `{configured, subscribed, email, keywords}` |
+| `GET /api/eggs/query` | 第三方原始 JSON：`{code,msg,data:{matches:[{pet_id,pet_name,...}],total,source}}` |
+| `POST /api/account/verify` | `{ok, hasPin}` |
+| 各 admin 接口 | 见 `web/src/api.js` 的注释（前端侧已逐个注明响应形状） |

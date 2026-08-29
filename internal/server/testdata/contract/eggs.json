@@ -1,0 +1,21 @@
+{
+  "eggs": [
+    {
+      "gid": 9001,
+      "hatchUpdate": 1700000000,
+      "hatchedSecs": 600,
+      "hatching": false,
+      "heightM": 0.3,
+      "icon": "egg/egg_tongyong.webp",
+      "itemId": 5001,
+      "maxSecs": 3600,
+      "name": "精灵蛋",
+      "obtainedAt": 1700000000,
+      "random": true,
+      "src": 1,
+      "srcName": "远行",
+      "typeOrder": 100000,
+      "weightKg": 1.2
+    }
+  ]
+}

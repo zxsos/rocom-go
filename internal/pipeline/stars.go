@@ -7,6 +7,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/capture"
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/scene"
+	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
@@ -77,11 +78,12 @@ func newStarTracker(res int32) *starTracker {
 }
 
 // posXYZ 从位置推送里取玩家世界坐标(z 为脚底高度)。
-func posXYZ(pos map[string]any) (int32, int32, int32, bool) {
-	x, ok1 := pos["x"].(int32)
-	y, ok2 := pos["y"].(int32)
-	z, ok3 := pos["z"].(int32)
-	return x, y, z, ok1 && ok2 && ok3
+// posXYZ 取位置坐标;pos 为 nil(该账号还没有位置包)时 ok=false。
+func posXYZ(pos *server.PositionPayload) (int32, int32, int32, bool) {
+	if pos == nil {
+		return 0, 0, 0, false
+	}
+	return pos.X, pos.Y, pos.Z, true
 }
 
 // starPoi 查某刷新点的点位(星点来自 gamedata 的 POI 表)。

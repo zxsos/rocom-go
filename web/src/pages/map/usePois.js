@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { getPois, subscribe } from '../../api'
+import { useAsyncData } from '../../hooks/useAsyncData'
+
+// 空数据的兜底常量:引用稳定,免得每次渲染都造新对象、打穿下游的 useMemo。
+const NO_POIS = { kinds: [], pois: [], zones: [] }
 
 // —— POI 图层(炼金釜/魔力之源/守护地/眠枭庇护所/眠枭之星/不咕钟零件)——
 // 点位与图标由后端按场景下发(GET /api/pois,u/v 已按底图投影,同玩家位置那套),前端只管开关与摆放。
@@ -28,53 +32,56 @@ const ST_COLLECTED = 2   // 走近了却没实体 ⇒ 已收集
 // usePois 管理某场景的 POI 图层:点位/图层开关/可收集点(星星/零件)收集状态,返回筛好的可绘制标记。
 export function usePois(account, res) {
   // poi 是当前场景的图层清单与点位;poiOn 是已开启的图层键集合。
-  const [poi, setPoi] = useState({ kinds: [], pois: [], zones: [] })
   const [poiOn, setPoiOn] = useState(() => new Set(loadKeys(POI_LS_KEY) || []))
   const poiPicked = useRef(loadKeys(POI_LS_KEY) !== null) // 用户是否手动选过(未选过则跟随后端默认)
   const [collectOn, setCollectOn] = useState(() => new Set(loadKeys(COLLECT_LS_KEY) || []))
   const [starSt, setStarSt] = useState({}) // 刷新点 id -> 1未收集/2已收集(随玩家移动由后端推增量)
   const [poiVer, setPoiVer] = useState(0)  // 区域进度变化时递增,触发重取点位
 
-  // POI 随场景走(每个场景的点位/图层不同):换 scene_res 就重取。首次(用户没手动选过图层)
-  // 按后端 kinds[].on 初始化开关。
+  // POI 随场景走(每个场景的点位/图层不同):换 scene_res 就重取。
+  // poiVer 是额外的重取键:区域进度(stars 的候选区)只在进场景时更新,那时重取一次点位。
+  const fetchPois = useCallback(() => (res ? getPois(res) : Promise.resolve(NO_POIS)), [res])
+  const { data: poi } = useAsyncData(fetchPois, { fallback: NO_POIS, reloadKey: `${account}|${res}|${poiVer}` })
+
+  // 逐点状态随点位一起来(库里已确认的);之后由 SSE 推增量。
+  // 首次(用户没手动选过图层)按后端 kinds[].on 初始化开关。
   useEffect(() => {
-    if (!res) return
-    let alive = true
-    getPois(res).then((d) => {
-      if (!alive) return
-      setPoi(d)
-      // 逐点状态随点位一起来(库里已确认的);之后由 SSE 推增量。
-      setStarSt(Object.fromEntries(d.pois.filter((p) => p.r).map((p) => [p.r, p.st || 0])))
-      if (!poiPicked.current) setPoiOn(new Set(d.kinds.filter((k) => k.on).map((k) => k.k)))
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [res, poiVer])
+    setStarSt(Object.fromEntries(poi.pois.filter((p) => p.r).map((p) => [p.r, p.st || 0])))
+    if (!poiPicked.current && poi.kinds.length) setPoiOn(new Set(poi.kinds.filter((k) => k.on).map((k) => k.k)))
+  }, [poi])
 
   // 收集状态增量:玩家一边走,后端一边判定(走近却没实体 ⇒ 已收集),即时推过来。
-  // 区域进度只在进场景时更新(区域隐藏用),那时重取一次点位即可。
-  useEffect(() => subscribe((m) => {
-    if (m.type === 'stars') setStarSt((prev) => ({ ...prev, ...m.data }))
-    if (m.type === 'starzones') setPoiVer((v) => v + 1)
+  useEffect(() => subscribe(['stars', 'starzones'], (d, type) => {
+    if (type === 'stars') setStarSt((prev) => ({ ...prev, ...d }))
+    else setPoiVer((v) => v + 1)
   }), [account])
 
   const togglePoi = (k) => {
     setPoiOn((prev) => {
       const next = new Set(prev)
       next.has(k) ? next.delete(k) : next.add(k)
-      poiPicked.current = true
-      localStorage.setItem(POI_LS_KEY, JSON.stringify([...next]))
       return next
     })
+    poiPicked.current = true
   }
   // 某图层的收集模式开关(仅可收集图层有,LayerPanel 摆在该图层开关右侧)。
   const toggleCollect = (k) => {
     setCollectOn((prev) => {
       const next = new Set(prev)
       next.has(k) ? next.delete(k) : next.add(k)
-      localStorage.setItem(COLLECT_LS_KEY, JSON.stringify([...next]))
       return next
     })
   }
+
+  // 持久化:开关状态存 localStorage(下次进游戏沿用)。
+  // 放 effect 里而非 setValue 的 updater 内——StrictMode 会把 updater 调用两次,
+  // 副作用写在那里会重复执行(写盘两次虽幂等,但申请通知权限这类不是)。
+  useEffect(() => {
+    try { localStorage.setItem(POI_LS_KEY, JSON.stringify([...poiOn])) } catch { /* 隐私模式下忽略 */ }
+  }, [poiOn])
+  useEffect(() => {
+    try { localStorage.setItem(COLLECT_LS_KEY, JSON.stringify([...collectOn])) } catch { /* 同上 */ }
+  }, [collectOn])
 
   // 本场景有点位的图层才给开关(如魔法学院只有魔力之源);标记只画开启的图层。
   // 这些都只随 poi 数据走,useMemo 缓存,位置推送不触发重算。

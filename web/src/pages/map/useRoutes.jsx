@@ -235,7 +235,6 @@ export function useRoutes(account, pos) {
           }
         }
       }
-      if (next) localStorage.setItem(PROGRESS_LS_KEY, JSON.stringify(next))
       return next || prev
     })
   }, [pos, follow, routes, res, nearM])
@@ -246,7 +245,6 @@ export function useRoutes(account, pos) {
       const next = new Set(onRef.current)
       on ? next.add(name) : next.delete(name)
       onRef.current = next
-      localStorage.setItem(ROUTES_LS_KEY, JSON.stringify([...next]))
       return prev.map((r) => (r.name === name ? { ...r, on } : r))
     })
   }, [])
@@ -256,7 +254,6 @@ export function useRoutes(account, pos) {
     setRoutes((prev) => {
       const next = new Set(on ? prev.map((r) => r.name) : [])
       onRef.current = next
-      localStorage.setItem(ROUTES_LS_KEY, JSON.stringify([...next]))
       return prev.map((r) => ({ ...r, on }))
     })
   }, [])
@@ -271,33 +268,50 @@ export function useRoutes(account, pos) {
     sampleMapHsl(pos && pos.img).then((mapHsl) => {
       const color = pickColor(candidates, { oldColor: r.color, others, mapHsl })
       setRoutes((prev) => prev.map((x) => (x.name === name ? { ...x, color } : x)))
-      try {
-        const store = loadJSON(COLORS_LS_KEY, {}) || {}
-        store[name] = color
-        localStorage.setItem(COLORS_LS_KEY, JSON.stringify(store))
-      } catch {}
     })
   }, [routes, pos])
 
-  const toggleFollow = useCallback(() => {
-    setFollow((f) => {
-      const nf = !f
-      localStorage.setItem(FOLLOW_LS_KEY, JSON.stringify(nf))
-      return nf
-    })
-  }, [])
+  const toggleFollow = useCallback(() => setFollow((f) => !f), [])
 
-  const resetProgress = useCallback(() => {
-    setProgress({})
-    localStorage.removeItem(PROGRESS_LS_KEY)
-  }, [])
+  const resetProgress = useCallback(() => setProgress({}), [])
 
   // 判定半径(米):夹取到 10~50,持久化
   const setNearM = useCallback((m) => {
-    const v = Math.min(NEAR_MAX_M, Math.max(NEAR_MIN_M, m))
-    setNearMState(v)
-    localStorage.setItem(NEAR_M_LS_KEY, JSON.stringify(v))
+    setNearMState(Math.min(NEAR_MAX_M, Math.max(NEAR_MIN_M, m)))
   }, [])
+
+  // —— 持久化:全部收口到这几个 effect ——
+  // 原先散在各 setValue 的 updater 内;StrictMode(见 main.jsx)会把 updater 调用两次,
+  // 副作用写在里面会重复执行。这里统一按依赖落盘,语义等价且不重复。
+  useEffect(() => {
+    try {
+      if (Object.keys(progress).length) localStorage.setItem(PROGRESS_LS_KEY, JSON.stringify(progress))
+      else localStorage.removeItem(PROGRESS_LS_KEY)
+    } catch { /* 隐私模式下忽略 */ }
+  }, [progress])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ROUTES_LS_KEY, JSON.stringify(routes.filter((r) => r.on).map((r) => r.name)))
+    } catch { /* 同上 */ }
+  }, [routes])
+
+  // 路线配色按 name 存(与 routes 分离:换场景重建 routes 时不能丢用户挑的颜色)
+  useEffect(() => {
+    try {
+      const store = loadJSON(COLORS_LS_KEY, {}) || {}
+      for (const r of routes) if (r.color) store[r.name] = r.color
+      localStorage.setItem(COLORS_LS_KEY, JSON.stringify(store))
+    } catch { /* 同上 */ }
+  }, [routes])
+
+  useEffect(() => {
+    try { localStorage.setItem(FOLLOW_LS_KEY, JSON.stringify(follow)) } catch { /* 同上 */ }
+  }, [follow])
+
+  useEffect(() => {
+    try { localStorage.setItem(NEAR_M_LS_KEY, JSON.stringify(nearM)) } catch { /* 同上 */ }
+  }, [nearM])
 
   const kinds = useMemo(() => routes.map((r) => ({ ...r, progress: progress[r.name] ?? -1 })), [routes, progress])
   const marks = useMemo(() => routes.filter((r) => r.on).map((r) => ({

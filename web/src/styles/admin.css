@@ -33,7 +33,6 @@
   justify-content: space-between;
 }
 .admin-head h2 { margin: 0; font-size: 20px; }
-.admin-placeholder { opacity: 0.8; }
 
 /* —— 黑白名单 —— */
 .admin-card h3 { margin: 0; font-size: 15px; }
@@ -71,7 +70,7 @@
   font-size: 12px; color: #fff;
 }
 .rule-badge.black { background: #b04a4a; }
-.rule-badge.white { background: #3d7ab8; }
+.rule-badge.white { background: var(--c-chart); }
 .rule-account { font-size: 12px; color: var(--fg); }
 .rule-note { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-rule-list .btn.ghost { margin-left: auto; }
@@ -106,7 +105,7 @@
   border-radius: 8px; overflow: hidden;
 }
 .admin-bar-fill {
-  height: 100%; background: linear-gradient(90deg, #3d7ab8, #5aa9e6);
+  height: 100%; background: linear-gradient(90deg, var(--c-chart), var(--c-chart-l));
   border-radius: 8px 0 0 8px; min-width: 2px;
 }
 .admin-bar-n { flex: none; width: 40px; text-align: right; font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
@@ -119,7 +118,7 @@
   background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
 }
 .admin-daily-fill {
-  width: 100%; background: linear-gradient(180deg, #5aa9e6, #3d7ab8);
+  width: 100%; background: linear-gradient(180deg, var(--c-chart-l), var(--c-chart));
   border-radius: 6px 6px 0 0; min-height: 2px;
 }
 .admin-daily-day { font-size: 10px; color: var(--muted); }

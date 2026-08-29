@@ -1,5 +1,5 @@
 // Toast 轻提示:替代 window.alert 的自制弹层——不阻塞页面、样式跟随主题、可全局调用。
-// 用法:import { toast } from '../../components/toast'; toast('文案', 3000)
+// 用法:import { toast } from './toast'; toast('文案', 3000)
 // 同一时刻只留一条,新提示顶掉旧的;时长默认 2.6s,到时自动淡出移除。
 let host = null
 let timer = null

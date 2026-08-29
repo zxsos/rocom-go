@@ -1,5 +1,5 @@
 // Confirm 确认框:替代 window.confirm 的自制弹层——样式跟随主题、可全局调用。
-// 用法:import { confirmDialog } from '../../components/confirm'
+// 用法:import { confirmDialog } from './confirm'
 //      if (!(await confirmDialog({ message: '文案', okText: '确定', danger: true }))) return
 // 返回 Promise<boolean>(点确定 true,取消/点背景/Esc false)。
 // 同一时刻只留一个,新确认顶掉旧的(旧的一律视为取消)。

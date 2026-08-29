@@ -13,15 +13,15 @@
   background: var(--bg-1); box-shadow: var(--shadow-sm); min-width: 0;
 }
 .rank-title-card.pending { border-style: dashed; opacity: .75; background: var(--bg-2); }
-.rank-title-card.rich   { border-color: rgba(212, 175, 55, .5);  background: linear-gradient(135deg, rgba(212, 175, 55, .14), var(--bg-1) 55%); }
-.rank-title-card.earner { border-color: rgba(40, 167, 69, .45);  background: linear-gradient(135deg, rgba(40, 167, 69, .12), var(--bg-1) 55%); }
-.rank-title-card.spender{ border-color: rgba(229, 83, 75, .45);  background: linear-gradient(135deg, rgba(229, 83, 75, .12), var(--bg-1) 55%); }
+.rank-title-card.rich   { border-color: rgba(var(--c-wealth-rgb), .5);  background: linear-gradient(135deg, rgba(var(--c-wealth-rgb), .14), var(--bg-1) 55%); }
+.rank-title-card.earner { border-color: rgba(var(--c-earn-rgb), .45);  background: linear-gradient(135deg, rgba(var(--c-earn-rgb), .12), var(--bg-1) 55%); }
+.rank-title-card.spender{ border-color: rgba(var(--c-spend-rgb), .45);  background: linear-gradient(135deg, rgba(var(--c-spend-rgb), .12), var(--bg-1) 55%); }
 .rank-title-icon { font-size: 26px; line-height: 1; }
 .rank-title-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rank-title-key { font-weight: 800; font-size: 15px; }
-.rank-title-card.rich .rank-title-key { color: #d4af37; }
-.rank-title-card.earner .rank-title-key { color: #28a745; }
-.rank-title-card.spender .rank-title-key { color: #e5534b; }
+.rank-title-card.rich .rank-title-key { color: var(--c-wealth); }
+.rank-title-card.earner .rank-title-key { color: var(--c-earn); }
+.rank-title-card.spender .rank-title-key { color: var(--c-spend); }
 .rank-title-who { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank-title-none { color: var(--fg-dim); font-weight: 500; }
 .rank-title-desc { font-size: 11px; color: var(--fg-dim); }
@@ -65,16 +65,16 @@
   flex: none; font-size: 11px; line-height: 1; padding: 3px 8px; border-radius: 999px;
   font-weight: 700; white-space: nowrap;
 }
-.rank-title.t-rich    { background: rgba(212, 175, 55, .16); color: #d4af37; border: 1px solid rgba(212, 175, 55, .5); }
-.rank-title.t-earner  { background: rgba(40, 167, 69, .14);  color: #28a745; border: 1px solid rgba(40, 167, 69, .45); }
-.rank-title.t-spender { background: rgba(229, 83, 75, .14);  color: #e5534b; border: 1px solid rgba(229, 83, 75, .45); }
+.rank-title.t-rich    { background: rgba(var(--c-wealth-rgb), .16); color: var(--c-wealth); border: 1px solid rgba(var(--c-wealth-rgb), .5); }
+.rank-title.t-earner  { background: rgba(var(--c-earn-rgb), .14);  color: var(--c-earn); border: 1px solid rgba(var(--c-earn-rgb), .45); }
+.rank-title.t-spender { background: rgba(var(--c-spend-rgb), .14);  color: var(--c-spend); border: 1px solid rgba(var(--c-spend-rgb), .45); }
 
 /* 数值列:洛克贝 / 盈亏 / 基线 */
 .rank-num { flex: none; display: flex; align-items: baseline; gap: 10px; }
 .rank-coins { font-weight: 800; font-size: 15px; color: var(--gold, #e0a83c); font-variant-numeric: tabular-nums; }
 .rank-profit { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
-.rank-profit.pos { color: #28a745; }
-.rank-profit.neg { color: #e5534b; }
+.rank-profit.pos { color: var(--c-earn); }
+.rank-profit.neg { color: var(--c-spend); }
 .rank-sub { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
 .rank-unknown { font-size: 12px; color: var(--fg-dim); }
 

@@ -45,6 +45,33 @@ cd web && npm install && npm run build && cd ..
 go build -o rocom-capture ./cmd/rocom-capture
 ```
 
+### 前端开发
+
+前端在 `web/`,`npm run dev` 起 Vite 开发服务器(默认 5173),已配好 `/api`、`/img` 代理到后端
+4939,故改前端不用每次 build。
+
+```bash
+cd web
+npm run dev      # 开发服务器(需后端另起在 4939)
+npm run build    # 构建到 internal/server/web/(embed 产物,vite emptyOutDir 会换掉 assets 文件名)
+npm run lint     # ESLint(含 react-hooks 规则,查依赖缺失等)
+npm run verify   # jsdom 真实渲染验收:10 条路由 + SSE 分发 + 切账号(需后端在 4939)
+```
+
+`npm run verify` 覆盖:路由渲染(含内容校验,防「渲染了空壳」)、SSE 分发层语义
+(类型过滤/账号过滤/断线补拉)、切账号(账号隔离 + 组件树未重建 + 请求数)。
+脚本在 `web/scripts/`,改完前端建议跑一次。
+
+要验「后端真推 → 前端真消费」的完整链路,用:
+
+```bash
+cd web
+npm run verify:live   # 需先按提示备好 pcap;会抓真实 SSE 事件喂给前端组件
+```
+
+它借 `scripts/capture_sse.sh`(先挂 SSE 再启动 pcap 回放)落盘真实推送,再喂给前端。
+注意 pcap 回放是一次性的(约 40ms 放完),直接连上去只能收到心跳,必须先挂后放。
+
 ### 发布构建(amd64 + arm64)
 
 抓包依赖 `gopacket/afpacket`(cgo),无法用 `CGO_ENABLED=0` 直接交叉编译。用 [zig](https://ziglang.org)

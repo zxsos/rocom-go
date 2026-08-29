@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
-import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../api'
-import { AccountContext, IconsContext } from '../context'
-import { fmtTime, maskUid } from '../utils/format'
-import { ImgAvatar } from '../components/icons'
-import { GlassChip, MarkIcon } from '../components/badges'
-import Dropdown from '../components/Dropdown'
+import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../../api'
+import { AccountContext, IconsContext } from '../../context'
+import { fmtTime, maskUid } from '../../utils/format'
+import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
+import { ImgAvatar } from '../../components/icons'
+import { GlassChip, MarkIcon } from '../../components/badges'
+import Dropdown from '../../components/Dropdown'
 
 // 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
 // 只显示花种;world_leader_npcs(世界 BOSS)与 legendary_npcs(传说 NPC)在解析层就丢弃了。
@@ -12,29 +13,29 @@ import Dropdown from '../components/Dropdown'
 // (游戏内每打开一次花种面板,服务器就会整组重发 0x0375)。
 // 游戏内点击地图上的花种时,服务器会额外下发 0x0338 单只详情(等级/炫彩/绑定宠物/奖牌),
 // 由后端合并进对应卡片后经同一 SSE 刷新;未点过的花种这些字段为空。
+// 槽展示名:一律由前端按 key 现算,**不用**后端 /api/flowers/slots 返回的 name 字段。
+// 原因:后端 flowerSlotName 拼的是原始 uid(如「好友 UID:10001」未脱敏),而 SSE 广播
+// 的 worlds 由前端自己转换、是脱敏的 —— 同一个下拉里两条路径显示不一致,且删除槽后走
+// REST 重取时,名字会从脱敏突然变成完整 uid(可观察的跳变)。脱敏属展示层职责,故归一到前端。
+const slotName = (key) =>
+  key === 'self' ? '自己世界'
+    : key.startsWith('owner:') ? '好友 UID:' + maskUid(key.slice(6))
+      : key
+
 export default function Flowers() {
   const account = useContext(AccountContext)
-  const icons = useContext(IconsContext)
-  const [data, setData] = useState(null) // null = 尚未收到任何 0x0375
+  // data:null = 尚未收到任何 0x0375
+  const { data, setData } = useAsyncData(useCallback(() => getFlowers(), []), { reloadKey: account })
   const [now, setNow] = useState(() => Date.now())
-  // 世界存档槽位:slots=槽列表(null=加载中),selKey=选中视图(默认 __current__=当前世界实时数据),
-  // slotMsg=删除结果提示。下拉含「当前世界」(实时,显示归属 id)与各存档槽。
-  const [slots, setSlots] = useState(null)
+  // 世界存档槽位列表:null=加载中。选中视图 selKey 默认 __current__=当前世界实时数据
+  // (下拉含「当前世界」与各存档槽),slotMsg=删除结果提示。
   const [selKey, setSelKey] = useState('__current__')
   const [slotMsg, setSlotMsg] = useState('')
 
-  useEffect(() => {
-    getFlowers().then((v) => { if (v) setData(v) }).catch(() => {})
-  }, [account])
-
-  // loadSlots 拉取世界存档槽位列表;切账号/删除后重新拉取。选中项由下方 selKey 修正 effect 统一管理。
-  const loadSlots = useCallback(() => {
-    getFlowerSlots().then((v) => {
-      setSlots((v && v.slots) || [])
-    }).catch(() => setSlots([]))
-  }, [])
-
-  useEffect(() => { loadSlots() }, [account, loadSlots])
+  const { data: slots, setData: setSlots, refresh: loadSlots } = useAsyncData(
+    useCallback(async () => (await getFlowerSlots()).slots || [], []),
+    { reloadKey: account },
+  )
 
   async function handleDeleteSlot() {
     if (!selKey.startsWith('owner:')) return
@@ -48,30 +49,21 @@ export default function Flowers() {
     }
   }
 
-  useEffect(() => {
-    return subscribe((m) => {
-      if (m.type !== 'flowers') return
-      if (m.account && m.account !== account) return
-      setData(m.data)
-      // 广播带完整 worlds 存档表:本地同步槽列表,选中槽随实时推送保持最新。
-      const worlds = m.data && m.data.worlds
-      if (worlds) {
-        const list = Object.entries(worlds).map(([key, w]) => ({
-          key,
-          name: key === 'self' ? '自己世界' : key.startsWith('owner:') ? '好友 UID:' + maskUid(key.slice(6)) : key,
-          ts: (w && w.ts) || 0,
-          flowers: (w && w.flowers) || [],
-        }))
-        setSlots(list)
-      }
-    })
-  }, [account])
+  useEffect(() => subscribe('flowers', (d) => {
+    setData(d)
+    // 广播带完整 worlds 存档表:本地同步槽列表,选中槽随实时推送保持最新。
+    // name 用前端的 slotName 现算而非后端给的:见下方 slotName 的说明。
+    const worlds = d && d.worlds
+    if (worlds) setSlots(Object.entries(worlds).map(([key, w]) => ({
+      key,
+      name: slotName(key),
+      ts: (w && w.ts) || 0,
+      flowers: (w && w.flowers) || [],
+    })))
+  }), [setData, setSlots])
 
   // 活动结束倒计时随时间走:秒级刷新(卡片量少,重渲染开销可忽略)。
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
+  useInterval(() => setNow(Date.now()), 1000)
 
   const flowers = useMemo(() => (data && data.flowers) || [], [data])
   // 当前账号自己的 uid(account 形如 "UID:<uid>"),供自己世界槽显示 id。
@@ -97,16 +89,21 @@ export default function Flowers() {
   }, [slots, curKey])
   // 下拉选项:当前世界已有对应槽时不重复显示「当前世界」项(该槽即当前世界,实时数据已同步进槽);
   // 否则(未建档/花全被采完未更新槽)单独显示「当前世界 (id)」实时项。
+  // 槽名一律走 slotName 重算(slots 可能来自 REST,其 name 未脱敏)。
   const viewOptions = useMemo(() => {
-    const real = slots || []
+    const real = (slots || []).map((s) => ({ ...s, name: slotName(s.key) }))
     if (real.some((s) => s.key === curKey)) return real
     return [{ key: '__current__', name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }, ...real]
   }, [slots, curKey, curOwnerID, flowers])
   // 当前视图:__current__=实时当前世界;否则选中的存档槽。花种按特殊(最多 3 只)/普通(最多 20 只)分组展示。
+  // 自己世界的槽名额外附上自己的 uid(便于确认「这是我自己」),其余用 slotName。
   const view = useMemo(() => {
     if (selKey !== '__current__') {
       const sel = slots && slots.find((s) => s.key === selKey)
-      if (sel) return { name: sel.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : sel.name, flowers: sel.flowers || [] }
+      if (sel) return {
+        name: sel.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : slotName(sel.key),
+        flowers: sel.flowers || [],
+      }
     }
     return { name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }
   }, [selKey, slots, flowers, curOwnerID, myUID])

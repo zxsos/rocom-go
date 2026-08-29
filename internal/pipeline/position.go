@@ -7,6 +7,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/gcp"
 	"github.com/whoisnian/rocom-capture/internal/scene"
+	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
@@ -144,8 +145,8 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
 	if l, ok := p.layerOf(m.Session, res, m.Time, true); ok {
 		if lp := p.layerPayload(res, l); lp != nil {
-			pos["sceneName"] = l.Name
-			pos["layer"] = lp
+			pos.SceneName = l.Name
+			pos.Layer = lp
 		}
 	}
 	p.pushPos(acc, pos)
@@ -201,7 +202,7 @@ func (p *Pipeline) curLayerID(conn string) int32 {
 }
 
 // pushPos 缓存并广播一条位置(缓存供地图页加载即时回显)。
-func (p *Pipeline) pushPos(acc string, pos map[string]any) {
+func (p *Pipeline) pushPos(acc string, pos *server.PositionPayload) {
 	p.acct(acc).lastPos = pos
 	p.srv.SetLastPosition(acc, pos)
 	p.srv.Hub().Broadcast("position", acc, pos)
@@ -214,28 +215,28 @@ const minSegSpan = 0.6
 
 // buildPos 组装一条位置推送(不含分层)。移动包与**传送落点**共用:传送时用一个只带 Pos/Yaw/StopMove
 // 的合成 MoveReq(无速度、无轨迹),这样传送一下发就能把地图切到目的地,不必干等第一个移动包。
-func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t time.Time) map[string]any {
+func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t time.Time) *server.PositionPayload {
 	// 地表底图始终作背景;玩家点用底图投影。坐标系统一为底图。
-	pos := map[string]any{
-		"account":    acc,
-		"sceneResId": res,
-		"sceneCfgId": mr.SceneCfgID,
-		"sceneName":  p.sceneDisplayName(res, mr.SceneCfgID),
-		"img":        p.db.MapImage(uint32(res), room), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
-		"x":          mr.Pos.X,
-		"y":          mr.Pos.Y,
-		"z":          mr.Pos.Z,
-		"heading":    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
-		"stop":       mr.StopMove,
-		"paintable":  p.srv.Paintable(res), // 该场景能否涂地(见 docs/data.md 3.8),前端据此显示图层开关
-		"ts":         t.Unix(),
-		"tsMs":       t.UnixMilli(), // 前端判断缓存位置是否过期(过期则不外推)
+	pos := &server.PositionPayload{
+		Account:    acc,
+		SceneResID: res,
+		SceneCfgID: mr.SceneCfgID,
+		SceneName:  p.sceneDisplayName(res, mr.SceneCfgID),
+		Img:        p.db.MapImage(uint32(res), room), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
+		X:          mr.Pos.X,
+		Y:          mr.Pos.Y,
+		Z:          mr.Pos.Z,
+		Heading:    float64(mr.Yaw) / 10, // 朝向角(度),UE Yaw:0=世界+X(地图东/右),顺时针增
+		Stop:       mr.StopMove,
+		Paintable:  p.srv.Paintable(res), // 该场景能否涂地(见 docs/data.md 3.8),前端据此显示图层开关
+		Ts:         t.Unix(),
+		TsMs:       t.UnixMilli(), // 前端判断缓存位置是否过期(过期则不外推)
 	}
 	u, v, ok := p.db.Project(uint32(res), mr.Pos.X, mr.Pos.Y)
 	if !ok {
 		return pos // 该场景无底图:只回坐标
 	}
-	pos["u"], pos["v"] = u, v
+	pos.U, pos.V = &u, &v
 	mi, ok := p.db.MapInfo(uint32(res))
 	if !ok || mi.Side == 0 {
 		return pos
@@ -244,29 +245,30 @@ func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t tim
 	// 供前端在两包之间逐帧外推(航位推算),即客户端给其他玩家做平滑的同一套办法。
 	// 实测(pcap 回放)上一包 pos+speed*Δt 预测下一包 pos:中位误差 3cm、直线段 3s 也仅几米。
 	if !mr.StopMove {
-		pos["vu"] = float64(mr.Speed.X) / float64(mi.Side)
-		pos["vv"] = float64(mr.Speed.Y) / float64(mi.Side)
+		vu := float64(mr.Speed.X) / float64(mi.Side)
+		vv := float64(mr.Speed.Y) / float64(mi.Side)
+		pos.VU, pos.VV = &vu, &vv
 	}
 	// 客户端沉默一段(直线巡航/推住摇杆盘旋时退化成 2.5-3s 心跳)后补报的真实轨迹:
 	// 那几秒里它没报过位置,前端只能外推;等这段轨迹到了就沿它把箭头滑回真实路线上(转弯尤其明显)。
 	// 持续操作时上报本就 0.1s 一包(轨迹点为空/极短),不必也不能回放——那会让 0.45s 的滑行跨过好几个
 	// 新包,箭头反而落后。故以轨迹跨度为准。
 	if mr.SegSpan() >= minSegSpan {
-		path := make([]map[string]any, 0, len(mr.Segs)+1)
+		path := make([]server.PositionPoint, 0, len(mr.Segs)+1)
 		for _, sg := range mr.Segs {
 			if su, sv, ok := p.db.Project(uint32(res), sg.Pos.X, sg.Pos.Y); ok {
-				path = append(path, map[string]any{"u": su, "v": sv})
+				path = append(path, server.PositionPoint{U: su, V: sv})
 			}
 		}
 		// 末段采样略早于包时刻(实测差 0.2–0.6 个采样步长),to_pos 才是最新位置:补作轨迹终点,
 		// 前端滑完轨迹正好落在上报位置,与其后的外推无缝衔接。
 		if len(path) > 0 {
-			if last := path[len(path)-1]; last["u"] != u || last["v"] != v {
-				path = append(path, map[string]any{"u": u, "v": v})
+			if last := path[len(path)-1]; last.U != u || last.V != v {
+				path = append(path, server.PositionPoint{U: u, V: v})
 			}
 		}
 		if len(path) >= 2 {
-			pos["path"] = path
+			pos.Path = path
 		}
 	}
 	return pos
@@ -380,24 +382,26 @@ func (p *Pipeline) settleLayer(conn, acc string, t time.Time) {
 	if ok == prevOK && (!ok || l.ID == prev.ID) {
 		return // 层没变
 	}
-	upd := map[string]any{
-		"account":   acc,
-		"layerOnly": true, // 前端只叠加/撤下切片图,不动位置锚点
-		"ts":        t.Unix(),
-		"tsMs":      t.UnixMilli(), // 仅供观测(调试页/回放核对);前端合并时不取
+	// 分层更新单独成包(layerOnly),与位置推送区分:前端只叠加/撤下切片图,不动位置锚点。
+	upd := server.PositionPayload{
+		Account:   acc,
+		LayerOnly: true,
+		Ts:        t.Unix(),
+		TsMs:      t.UnixMilli(), // 仅供观测(调试页/回放核对);前端合并时不取
 	}
 	lastPos := p.acct(acc).lastPos
 	if ok {
-		upd["layer"], upd["sceneName"] = p.layerPayload(cs.res, l), l.Name
+		upd.Layer, upd.SceneName = p.layerPayload(cs.res, l), l.Name
 	} else {
 		cfg := int32(0)
 		if lastPos != nil {
-			cfg, _ = lastPos["sceneCfgId"].(int32)
+			cfg = lastPos.SceneCfgID
 		}
-		upd["layer"], upd["sceneName"] = nil, p.sceneDisplayName(cs.res, cfg)
+		// 离开分层:Layer 留 nil(omitempty → 不下发),前端按无层处理(见 PositionPayload.Layer)
+		upd.SceneName = p.sceneDisplayName(cs.res, cfg)
 	}
 	if lastPos != nil { // 同步进缓存,页面加载(GET /api/position)也能带上分层
-		lastPos["layer"], lastPos["sceneName"] = upd["layer"], upd["sceneName"]
+		lastPos.Layer, lastPos.SceneName = upd.Layer, upd.SceneName
 		p.srv.SetLastPosition(acc, lastPos)
 	}
 	p.srv.Hub().Broadcast("position", acc, upd)

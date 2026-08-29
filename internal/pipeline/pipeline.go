@@ -75,8 +75,8 @@ type acctState struct {
 	zoneGot map[int32]int32
 	// starKnown: 已确认的星星状态(库内快照,只写增量);nil=尚未从库预热。
 	starKnown map[int32]int
-	eggSweep  *eggSweep      // 正在累积的分页背包快照(末页对账,见 eggs.go)
-	lastPos   map[string]any // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
+	eggSweep  *eggSweep               // 正在累积的分页背包快照(末页对账,见 eggs.go)
+	lastPos   *server.PositionPayload // 最近推送的位置载荷(layerOnly 更新时合并回缓存)
 	// lastFlowerLogicID: 最近一次选中进入战斗的花种 npc_logic_id(c2s 0x034E)。
 	// 捕捉成功(0x132c 内嵌 goods_reward 的新宠物 catch_way=4)时据此清掉该花的 0x0338 详情,需重新点击查看。
 	lastFlowerLogicID uint64
