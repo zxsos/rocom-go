@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { getAccounts, getCurrentAccount, setCurrentAccount, getIcons } from './api'
-import { AccountContext, IconsContext } from './context'
+import { AccountContext, AccountNameContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
 import { useStoredJSON } from './hooks/useStoredState'
 import { PinDialog } from './components/PinDialog'
@@ -155,6 +155,8 @@ export default function App() {
     dropBoxFilter()
     setAccount(a)
   }
+  // 当前账号昵称(分享图标题等展示用);未找到时为空串,由使用方兜底
+  const accountName = accounts.find((a) => a.account === account)?.name || ''
 
   // 顶栏一级导航:普通项直接链接,分组项(我的背包)hover 展开 2 级下拉菜单。
   const topLinks = () => NAV.map((n) => {
@@ -204,6 +206,7 @@ export default function App() {
 
   return (
     <AccountContext.Provider value={account}>
+      <AccountNameContext.Provider value={accountName}>
       <IconsContext.Provider value={icons}>
       <div className="app">
         <header className="topbar">
@@ -273,6 +276,7 @@ export default function App() {
         />
       )}
       </IconsContext.Provider>
+      </AccountNameContext.Provider>
     </AccountContext.Provider>
   )
 }
