@@ -95,13 +95,38 @@ func merchantDayStatus(now time.Time) string {
 	return "open"
 }
 
-// merchantLoop 定时补查:每 15 分钟检查一次当前槽,未缓存则回源(8 点开张后自动完成首次查询)。
+// merchantLoop 定时补查:每 15 分钟检查一次当前槽,未缓存则回源(8 点开张后自动完成首次查询);
+// 随后补扫当日有货槽重发未投递的订阅提醒(兜底首次发信失败/事后补发)。
 func (s *Server) merchantLoop() {
 	s.merchantEnsure(time.Now())
 	t := time.NewTicker(merchantCheck)
 	defer t.Stop()
 	for range t.C {
-		s.merchantEnsure(time.Now())
+		now := time.Now()
+		s.merchantEnsure(now)
+		s.merchantResend(now)
+	}
+}
+
+// merchantResend 补扫本营业日已开始的有货槽,对「未通知且关键词命中」的订阅重发提醒。
+// 用于兜底首次发信失败(SMTP 瞬断/授权码过期/被限流)与事后补发(如服务 8 点后才启动、
+// 当天漏看)。幂等:merchantNotify 内部按 merchant_notified 去重,已发过的槽自动跳过,
+// 不会重复打扰;SMTP 未配置或打烊(0-8 点)时直接返回。
+func (s *Server) merchantResend(now time.Time) {
+	if s.smtpUser == "" || s.smtpPass == "" {
+		return
+	}
+	if merchantDayStatus(now) == "idle" {
+		return
+	}
+	for _, st := range merchantDaySlots(merchantDayStart(now)) {
+		if st.After(now) {
+			break // 只扫已开始的槽(8/12/16/20 中开始时刻 ≤ now 的)
+		}
+		if empty, _, ok := s.store.GetMerchantSlot(st.Unix()); !ok || empty {
+			continue // 未回源或无货,无提醒可发
+		}
+		s.merchantNotify(st)
 	}
 }
 
@@ -398,6 +423,10 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		subject := "远行商人新货上架(" + slotStart.Format("15:04") + " 轮)"
 		if err := s.sendMerchantMail(sub.Email, subject, body.String()); err == nil {
 			s.store.MarkMerchantNotified(slotStart.Unix(), sub.Email)
+		} else {
+			// 发信失败不 Mark:补扫(merchantResend)或下次触发仍会重试。
+			// 之前这里是静默吞错,查无可查(邮件没到 = 授权码过期/被限流/网络瞬断都无痕迹)。
+			log.Printf("merchantNotify 发信失败 slot=%s to=%s: %v", slotStart.Format("15:04"), sub.Email, err)
 		}
 	}
 }
@@ -446,9 +475,16 @@ func (s *Server) merchantMailFrom() string {
 	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + s.smtpUser + ">"
 }
 
+// merchantMailImg 邮件内嵌图片附件(cid 引用 + 原始 webp 字节)。
+type merchantMailImg struct {
+	cid  string
+	data []byte
+}
+
 // merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •;
-// 行内 @img:<path> 商品图标记渲染为内嵌 <img>,见 merchantImgHTML)。
-func merchantMailBody(body string) string {
+// 行内 @img:<path> 商品图标记渲染为 <img src="cid:...">,图片字节收集到 imgs,
+// 由 sendMerchantMail 以 multipart/related 附件发送)。
+func merchantMailBody(body string, imgs *[]merchantMailImg) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		trimmed := strings.TrimLeft(line, " ")
@@ -456,7 +492,7 @@ func merchantMailBody(body string) string {
 		if strings.HasPrefix(trimmed, "- ") {
 			trimmed = "• " + strings.TrimPrefix(trimmed, "- ")
 		}
-		esc := merchantMailEscaped(trimmed)
+		esc := merchantMailEscaped(trimmed, imgs)
 		if lead > 0 {
 			esc = strings.Repeat("&nbsp;", lead) + esc
 		}
@@ -468,7 +504,7 @@ func merchantMailBody(body string) string {
 }
 
 // merchantMailEscaped 转义一行文本,并把行内的 @img:<path> 商品图标记替换成 <img>(不转义)。
-func merchantMailEscaped(s string) string {
+func merchantMailEscaped(s string, imgs *[]merchantMailImg) string {
 	if !strings.Contains(s, "@img:") {
 		return html.EscapeString(s)
 	}
@@ -489,17 +525,18 @@ func merchantMailEscaped(s string) string {
 		} else {
 			rest = ""
 		}
-		if src := merchantImgHTML(path); src != "" {
+		if src := merchantImgHTML(path, imgs); src != "" {
 			b.WriteString(src)
 		}
 	}
 	return b.String()
 }
 
-// merchantImgHTML 把商品图路径渲染为邮件内嵌 <img>:http(s) 外链直接引用;
-// 本地相对路径(本站 /img/ 前缀)读 embed 的 webp 转 base64 data URI 内嵌,
-// 收件端无需访问本站即可显示;读不到图片时返回空串(不显示)。
-func merchantImgHTML(src string) string {
+// merchantImgHTML 把商品图路径渲染为邮件 <img>:http(s) 外链直接引用;
+// 本地相对路径(本站 /img/ 前缀)读 embed 的 webp,以 CID 引用收集到 imgs
+// (收件端无需访问本站即可显示,且不受 SMTP 单行 998 字节限制)。
+// 读不到图片时返回空串(不显示)。
+func merchantImgHTML(src string, imgs *[]merchantMailImg) string {
 	if src == "" {
 		return ""
 	}
@@ -507,18 +544,22 @@ func merchantImgHTML(src string) string {
 		return merchantImgTag(src)
 	}
 	if b, err := fs.ReadFile(gamedata.ImageFS(), src); err == nil && len(b) > 0 {
-		return merchantImgTag("data:image/webp;base64," + base64.StdEncoding.EncodeToString(b))
+		cid := fmt.Sprintf("merchant%d", len(*imgs)+1)
+		*imgs = append(*imgs, merchantMailImg{cid: cid, data: b})
+		return merchantImgTag("cid:" + cid)
 	}
 	return ""
 }
 
-// merchantImgTag 生成商品图 <img> 标签(src 已是最终可用的 URL 或 data URI)。
+// merchantImgTag 生成商品图 <img> 标签(src 是最终可用的 URL 或 cid: 引用)。
 func merchantImgTag(src string) string {
 	return `<img src="` + src + `" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;vertical-align:middle;margin:0 10px 0 2px;">`
 }
 
 // sendMerchantMail 通过 QQ 邮箱 SMTP(465 SSL)发送邮件。subject/body 由调用方拼好
-// (订阅新货提醒 / 管理员测试),正文渲染为带背景的 HTML。串行发信(smtpMu),
+// (订阅新货提醒 / 管理员测试),正文渲染为带背景的 HTML;正文里的商品图以
+// multipart/related + CID 内嵌(HTML 引用 cid:,附件 base64 每 76 字符分行),
+// 避免单行 data URI 超过 RFC 5321 的 998 字节限制导致 500 拒收。串行发信(smtpMu),
 // 避免并发连接被 QQ 邮箱判为异常触发限流。
 // 整体 deadline 兜底:QQ SMTP 偶发挂连接(网络波动/被限流),TLS 拨号限 10s,
 // 连接建立后全程 I/O 限 20s,避免调用方(管理页强制刷新等)无限等待。
@@ -554,14 +595,42 @@ func (s *Server) sendMerchantMail(to, subject, body string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		s.merchantMailFrom(), to, mime.QEncoding.Encode("utf-8", subject), merchantMailBody(body)); err != nil {
+	var imgs []merchantMailImg
+	msg := merchantMailMessage(s.merchantMailFrom(), to, mime.QEncoding.Encode("utf-8", subject), merchantMailBody(body, &imgs), imgs)
+	if _, err := io.WriteString(w, msg); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
 		return err
 	}
 	return c.Quit()
+}
+
+// merchantMailMessage 组装完整邮件文本(头部 + 正文)。有内嵌图片时用
+// multipart/related:HTML 引用 cid:,附件 base64 每 76 字符一行(CRLF),
+// 满足 RFC 5321 单行 998 字节限制;无图片时保持单一 text/html。
+func merchantMailMessage(from, to, subject, html string, imgs []merchantMailImg) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n", from, to, subject)
+	if len(imgs) == 0 {
+		b.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
+		b.WriteString(html)
+		return b.String()
+	}
+	boundary := fmt.Sprintf("----=_rocom_%x", time.Now().UnixNano())
+	fmt.Fprintf(&b, "Content-Type: multipart/related; boundary=%s\r\n\r\n", boundary)
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n", boundary, html)
+	for _, img := range imgs {
+		fmt.Fprintf(&b, "--%s\r\nContent-Type: image/webp\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <%s>\r\n\r\n", boundary, img.cid)
+		enc := base64.StdEncoding.EncodeToString(img.data)
+		for len(enc) > 76 {
+			b.WriteString(enc[:76] + "\r\n")
+			enc = enc[76:]
+		}
+		b.WriteString(enc + "\r\n")
+	}
+	b.WriteString("--" + boundary + "--\r\n")
+	return b.String()
 }
 
 // handleMerchantSub 订阅/退订远行商人邮件提醒(按当前登录账号绑定,一个账号一个邮箱):

@@ -3,7 +3,8 @@ import React, { useEffect, useRef, useState } from 'react'
 // Dropdown 通用自绘下拉,替代原生 <select>:原生浮层是系统样式,与站点深色主题割裂,
 // 故沿用顶栏账号下拉(见 App.jsx AccountSelect)的 button + ul 浮层方案。
 // 键鼠/触屏均可操作:点击展开/选条;键盘 ↑↓ 切换、Enter/空格选择、Esc 关闭、Tab 收起,
-// 点外部自动收起。options 支持字符串/数字数组或 [{value, label}] 对象数组。
+// 点外部自动收起。options 支持字符串/数字数组或 [{value, label, count}] 对象数组;
+// count 存在时在触发按钮与列表项 label 后渲染弱化副文本(如花种槽位下拉的数量)。
 export default function Dropdown({ value, options, onChange, placeholder = '全部', className = '', small, disabled, title }) {
   const [open, setOpen] = useState(false)
   const [hi, setHi] = useState(0) // 高亮项索引(键盘 ↑↓ 移动)
@@ -91,6 +92,7 @@ export default function Dropdown({ value, options, onChange, placeholder = '全�
         aria-expanded={open}
       >
         <span className="dropdown-value">{cur ? cur.label : placeholder}</span>
+        {cur && cur.count !== undefined && <span className="dropdown-count">{cur.count}</span>}
         <span className="dropdown-caret">▾</span>
       </button>
       {open && (
@@ -104,7 +106,8 @@ export default function Dropdown({ value, options, onChange, placeholder = '全�
               onMouseDown={(e) => { e.preventDefault(); choose(o) }}
               onMouseEnter={() => setHi(i)}
             >
-              {o.label}
+              <span className="dropdown-item-text">{o.label}</span>
+              {o.count !== undefined && <span className="dropdown-item-count">{o.count}</span>}
             </li>
           ))}
         </ul>
