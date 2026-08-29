@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext, useMemo } from 'react'
 import { getHandbookGlasses } from '../api'
-import { IconsContext } from '../context'
+import { AccountNameContext, IconsContext } from '../context'
 import { imgURL } from '../components/icons'
 import { GlassChip } from '../components/badges'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
@@ -88,7 +88,7 @@ const ellipsisText = (ctx, text, maxW) => {
   return s + '…'
 }
 
-// 单张卡片:真实炫彩色卡(普通三层合成 / 隐藏整图)+ 圆形白底头像镶嵌 + 白字名字
+// 单张卡片:真实炫彩色卡(普通三层合成 / 隐藏整图)+ 左上角透明背景头像 + 白字名字
 const drawGlassCard = (ctx, x, y, w, h, card, imgs) => {
   ctx.save()
   roundRectPath(ctx, x, y, w, h, 13)
@@ -108,22 +108,13 @@ const drawGlassCard = (ctx, x, y, w, h, card, imgs) => {
     if (pimg) drawMaskLayer(ctx, x, y, w, h, pimg, '#ffffff', false)
   }
   ctx.restore()
+  // 头像:直接画在左上角(保留图片透明背景,不加白底圆),contain 等比不裁切
   const head = imgs.get(imgURL(card.head))
   if (head) {
-    const cx = x + w / 2
-    const cy = y + h * 0.44
-    const r = 21
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(cx, cy, r, 0, Math.PI * 2)
-    ctx.fillStyle = '#fff'
-    ctx.fill()
-    ctx.clip()
-    const s = Math.min(36 / head.naturalWidth, 36 / head.naturalHeight)
+    const s = Math.min(34 / head.naturalWidth, 34 / head.naturalHeight)
     const dw = head.naturalWidth * s
     const dh = head.naturalHeight * s
-    ctx.drawImage(head, cx - dw / 2, cy - dh / 2, dw, dh)
-    ctx.restore()
+    ctx.drawImage(head, x + 5, y + 5, dw, dh)
   }
   if (card.name) {
     ctx.save()
@@ -156,13 +147,15 @@ const drawLegendDot = (ctx, cx, cy, r, col) => {
   ctx.restore()
 }
 
-// 白色背景 900px 分享图:标题 + 8 色图例 + 8 列瀑布(列顶齐列底参差)+ 底部灰色水印
-const drawShareCanvas = (cols, imgs) => {
+// 白色背景 900px 分享图:标题「xx的炫彩色卡统计」+ 总数 + 8 色图例 +
+// 8 列瀑布(列顶齐列底参差)+ 底部灰色水印
+const drawShareCanvas = (cols, imgs, owner, total) => {
   const W = SHARE_W
   const colW = (W - SHARE_PAD * 2 - SHARE_COLS_GAP * (cols.length - 1)) / cols.length
   const cardH = colW * 154 / 280
   const titleY = 26 + 19
-  const legendY = titleY + 10 + 9
+  const statY = titleY + 12 // 「共收集 N 张炫彩色卡」
+  const legendY = statY + 9 + 9
   const colTop = legendY + 9 + 16
   const colBottom = cols.map((c, i) => {
     const n = c.cards.length
@@ -178,12 +171,16 @@ const drawShareCanvas = (cols, imgs) => {
   ctx.scale(SHARE_SCALE, SHARE_SCALE)
   ctx.fillStyle = '#fff'
   ctx.fillRect(0, 0, W, H)
-  // 标题
+  // 标题:xx的炫彩色卡统计(xx=当前账号,未登录时显示「我的」)
   ctx.font = `800 24px ${SHARE_FONT}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = '#222'
-  ctx.fillText('✨ 炫彩图鉴', W / 2, titleY)
+  ctx.fillText(`${owner}的炫彩色卡统计`, W / 2, titleY)
+  // 总数:共收集 N 张炫彩色卡
+  ctx.font = `400 13px ${SHARE_FONT}`
+  ctx.fillStyle = '#888'
+  ctx.fillText(`共收集 ${total} 张炫彩色卡`, W / 2, statY)
   // 图例(整体居中):8 个颜色分类圆点 + 名字
   ctx.font = `400 13px ${SHARE_FONT}`
   const items = cols.map((c) => ({ c, w: 13 + 5 + ctx.measureText(c.name).width + 16 }))
@@ -215,6 +212,7 @@ const drawShareCanvas = (cols, imgs) => {
 }
 
 export default function HandbookGlasses() {
+  const accountName = useContext(AccountNameContext) // 当前账号昵称,分享图标题「xx的炫彩色卡统计」用
   const icons = useContext(IconsContext)
   const [data, setData] = useState(null) // null=加载中,其余为 glasses 数组
   const [err, setErr] = useState('')
@@ -243,7 +241,8 @@ export default function HandbookGlasses() {
       }
       const imgs = new Map()
       await Promise.all([...srcs].map(async (src) => { imgs.set(src, await loadImg(src)) }))
-      const url = drawShareCanvas(shareCols, imgs)
+      const total = shareCols.reduce((s, c) => s + c.cards.length, 0)
+      const url = drawShareCanvas(shareCols, imgs, accountName || '我的', total)
       const a = document.createElement('a')
       a.href = url
       const d = new Date()
@@ -307,7 +306,7 @@ export default function HandbookGlasses() {
       .map(([major, g]) => ({
         major,
         name: MAJOR_NAMES[major] || major,
-        cards: [...g.cards.values()].sort((a, b) => a - b),
+        cards: [...g.cards.values()].sort((a, b) => (a & 0xFFFFF) - (b & 0xFFFFF) || a - b),
         pets: [...g.pets.values()]
           .map((p) => ({ ...p, values: [...p.values].sort((a, b) => a - b) }))
           .sort((a, b) => a.base - b.base),
@@ -316,49 +315,58 @@ export default function HandbookGlasses() {
       .sort((a, b) => (a.cards[0] & 0xFFFFF) - (b.cards[0] & 0xFFFFF))
   }, [data])
 
-  // 分享图 8 列数据:每列一个颜色分类,列内垂直堆叠该分类下的宠物卡片。
-  // ① 只取最高形态:同一进化链(evo 分组)只保留进化阶段(stage)最高的那条形态,
-  //    同阶段分支进化取 petbase 小者;无进化链(evo==0)各自成组,不受影响。
-  // ② 卡片 = (宠物 × 分类):同一宠物有多个同分类炫彩只取第一张,跨分类
-  //    (不同色系的炫彩)可出现在多列;普通炫彩按主色归入 6 个彩色系,隐藏炫彩
+  // 分享图 8 列数据:每列一个颜色分类,列内垂直堆叠该分类下的炫彩色卡卡片。
+  // ① 只取最高形态:同一进化链(evo 分组)只保留进化阶段(stage)最高的那条形态作为
+  //    展示条目(头像/名字),同阶段分支进化取 petbase 小者;无进化链(evo==0)各自成组。
+  //    但该链各形态收集到的炫彩(value)全部合并,不丢低形态的色卡。
+  // ② 卡片 = 一张炫彩变体:同一宠物有多个同分类炫彩时每张都展示(不再按 base 去重),
+  //    跨分类(不同色系的炫彩)出现在不同列;普通炫彩按主色归入 6 个彩色系,隐藏炫彩
   //    1000 归黑白、1/2/3 赛季归赛季彩色。
   // ③ 每张卡带 type/value:分享图用真实炫彩色卡(GlassChip 三层合成/隐藏整图)渲染,
-  //    头像镶嵌在色卡上面。
+  //    头像透明背景直接叠在色卡左上角。
   const shareCols = useMemo(() => {
     if (!data) return null
-    const top = new Map() // 最高形态归并:key = evo 分组
+    const chains = new Map() // key(evo||base) -> { it: 最高形态条目, common:Set, hidden:Set }
     for (const it of data) {
       const k = it.evo || it.base
-      const cur = top.get(k)
-      if (!cur || it.stage > cur.stage || (it.stage === cur.stage && it.base < cur.base)) {
-        top.set(k, it)
+      let c = chains.get(k)
+      if (!c) {
+        c = { it, common: new Set(), hidden: new Set() }
+        chains.set(k, c)
+      } else if (it.stage > c.it.stage || (it.stage === c.it.stage && it.base < c.it.base)) {
+        c.it = it // 更高形态(同阶段取更小 base)作为展示条目
       }
+      for (const v of it.common || []) c.common.add(v)
+      for (const v of it.hidden || []) c.hidden.add(v)
     }
-    const items = [...top.values()].sort((a, b) => a.book - b.book || a.base - b.base)
+    const items = [...chains.values()]
+      .map((c) => ({ base: c.it.base, book: c.it.book, name: c.it.name, head: c.it.head, common: [...c.common], hidden: [...c.hidden] }))
+      .sort((a, b) => a.book - b.book || a.base - b.base)
     const cols = SHARE_COLS.map((c) => ({ key: c.key, name: c.name, color: c.color, cards: [] }))
-    const seen = cols.map(() => new Set()) // 每列按 base 去重
     for (const it of items) {
-      for (const v of it.common || []) {
+      for (const v of it.common) {
         const colors = GLASS_COLORS[v & 0xFFFFF]
         if (!colors) continue
         const key = MAJOR_TO_SHARE[colors[0]]
         if (!key) continue
         const ci = SHARE_COLS.findIndex((c) => c.key === key)
-        const s = seen[ci]
-        if (s.has(it.base)) continue
-        s.add(it.base)
         cols[ci].cards.push({ base: it.base, book: it.book, name: it.name, head: it.head, type: 1, value: v })
       }
-      for (const v of it.hidden || []) {
+      for (const v of it.hidden) {
         const key = v === 1000 ? 'mono' : 'season'
         const ci = SHARE_COLS.findIndex((c) => c.key === key)
-        const s = seen[ci]
-        if (s.has(it.base)) continue
-        s.add(it.base)
         cols[ci].cards.push({ base: it.base, book: it.book, name: it.name, head: it.head, type: 2, value: v })
       }
     }
-    for (const c of cols) c.cards.sort((a, b) => a.base - b.base)
+    // 列内排序:普通炫彩按配色 id(先按主色 ui_color_1 分组、组内副色 ui_color_2 排完
+    // 再排下一主色,同配色再按宠物);隐藏炫彩按 value 升序(赛季 1→2→3,黑白 1000)。
+    for (const c of cols) {
+      c.cards.sort((a, b) => {
+        const ka = a.type === 1 ? a.value & 0xFFFFF : a.value
+        const kb = b.type === 1 ? b.value & 0xFFFFF : b.value
+        return ka - kb || a.base - b.base
+      })
+    }
     return cols
   }, [data])
 

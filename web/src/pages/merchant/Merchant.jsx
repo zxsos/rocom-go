@@ -30,6 +30,18 @@ const maskEmail = (e) => {
   return local.slice(0, 2) + '*'.repeat(local.length - 3) + local.slice(-1) + s.slice(i)
 }
 
+// 第三方商品 kind(英文) → 中文显示(与后端邮件 merchantKindTextMap 一致):
+// prop 直接显示为「道具」等;未收录的未知值原样返回。
+const KIND_TEXT = {
+  prop: '道具', pet: '宠物', egg: '精灵蛋', fragment: '碎片',
+  skin: '皮肤', cloth: '装扮', material: '材料', seed: '种子',
+  fruit: '果实', food: '食物', gem: '宝石', diamond: '钻石',
+  ticket: '票券', tool: '工具', equip: '装备', consumable: '消耗品',
+  furniture: '家具', card: '卡片', scroll: '卷轴', key: '钥匙',
+  medal: '奖牌', suit: '套装', decoration: '装饰', coin: '洛克贝',
+}
+const kindText = (k) => KIND_TEXT[k] || k
+
 // 推荐关键词:常见「值得买」商品词,点击即填入(自动补英文逗号,再点一次取消)。
 const SUB_PRESETS = ['球', '棱镜', '国王', '项链', '粉尘', '零碎', '相框', '魔镜', '钥匙']
 // 关键词规范化:中文逗号/顿号/分号/句号/空白等间隔符统一成英文逗号,去空项。
@@ -355,7 +367,7 @@ function MerchantItem({ it }) {
       </div>
       <div className="merchant-item-body">
         <div className="merchant-item-name" title={it.name}>{it.name}</div>
-        {it.kind && <span className="merchant-item-kind">{it.kind}</span>}
+        {it.kind && <span className="merchant-item-kind">{kindText(it.kind)}</span>}
         <div className="merchant-item-meta">
           <span className="merchant-price">{it.price} <span className="merchant-unit">洛克贝</span></span>
           {it.limit > 0 && <span className="merchant-limit">限购 {it.limit}</span>}
