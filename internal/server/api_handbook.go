@@ -14,6 +14,8 @@ type glassBookItem struct {
 	Name   string  `json:"name"` // 品种名(petbase,未知时为空)
 	Book   uint32  `json:"book"` // 图鉴编号(排序用)
 	Head   string  `json:"head"` // 小头像 /img/<此路径>(未知时为空)
+	Stage  uint32  `json:"stage"` // 进化阶段(分享图「只取最高形态」判定用)
+	Evo    uint32  `json:"evo"`   // 进化链分组 id(0=单形态无链;同链共享,见 gamedata.PetBaseInfo)
 	Common []int32 `json:"common"` // 普通炫彩 glass_value 列表(空=无)
 	Hidden []int32 `json:"hidden"` // 隐藏炫彩 glass_value 列表(空=无)
 }
@@ -34,6 +36,8 @@ func (s *Server) handleHandbookGlasses(w http.ResponseWriter, r *http.Request) {
 			if b, ok := s.db.PetBase(rec.PetBaseID); ok {
 				it.Name = b.Name
 				it.Book = b.Book
+				it.Stage = b.Stage
+				it.Evo = b.Evo
 			}
 			it.Head = s.db.PetImageByBase(rec.PetBaseID, false).Head
 			items[rec.PetBaseID] = it

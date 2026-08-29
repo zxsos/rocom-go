@@ -58,3 +58,6 @@
 .hb-major-pet-cards { display: inline-flex; align-items: center; gap: 3px; }
 .hb-major-pet-cards .glass-chip { width: 36px; height: 20px; margin-left: 0; }
 .hb-major-pet-name { font-size: 12px; color: var(--fg); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 分享图片按钮(标题行右侧) */
+.hb-share-btn { margin-left: auto; }

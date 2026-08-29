@@ -33,7 +33,7 @@ export function MarkIcon({ src, title, fallback, cls }) {
 // 层3 粒子大图蒙版填白。Bg/粒子为满幅(280x154),Bg2 只有上 108px(280x108,顶部对齐,
 // 下面 46px 透明),故 Bg2 高度按 108/154 等比且顶部对齐——若 100% 100% 拉伸会把中层
 // 图案拉到全高导致与游戏构图错位(top 传 true 的层走等比)。
-const glassMask = (img, color, top = false) => {
+export const glassMask = (img, color, top = false) => {
   const url = `url(${imgURL('dazzling/' + img)})`
   return {
     backgroundColor: color,
