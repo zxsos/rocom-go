@@ -30,7 +30,7 @@ func main() {
 	keyPath := flag.String("key", "rocom-key.pem", "TLS 私钥路径(-tls 时不存在则自动生成)")
 	socks5Addr := flag.String("socks5-addr", "", "内置 SOCKS5 代理监听地址(如 :1080;空=不启用)。手机把游戏流量代理到本机后,整网卡抓包即可见代理进程出站连接,须配合 -skip-self-ip=false")
 	socks5Allow := flag.String("socks5-allow", "", "SOCKS5 客户端 IP 白名单(逗号分隔,支持 IP 或 CIDR 网段;空=不限制)。带公网 IP 部署时必填,否则几分钟内会被全网扫描器滥用")
-	socks5Max := flag.Int("socks5-max-conns", 64, "SOCKS5 同时处理的最大连接数(超限直接拒绝;0=不限制),防连接风暴拖垮同进程 Web 服务")
+	socks5Max := flag.Int("socks5-max-conns", 128, "SOCKS5 同时处理的最大连接数(超限直接拒绝;0=不限制),防连接风暴拖垮同进程 Web 服务。多人共用或手机配了全局代理(其它 App 流量也走这里)时按需调大")
 	socks5User := flag.String("socks5-user", "", "SOCKS5 认证用户名(空=无认证)。建议配合 -socks5-allow 白名单使用;RFC 1929 密码为明文传输,公网直连时配合加密隧道更稳")
 	socks5Pass := flag.String("socks5-pass", "", "SOCKS5 认证密码(空=无认证;-socks5-user 非空时必填)")
 	socks5Block := flag.String("socks5-block", "google.com,example.com", "SOCKS5 屏蔽的目标域名(逗号分隔,精确或子域匹配;默认含手机系统连通性探测常用域名 google.com/example.com,可覆盖。空=不屏蔽)")
@@ -90,6 +90,17 @@ func main() {
 		select {}
 	case *iface != "":
 		log.Printf("实时抓包: 网卡=%s 端口=%d", *iface, *port)
+		// 定期摘要:RunLive 阻塞,故在它之前起。丢包由 capture 包在采样到增量时
+		// 立即告警,这里只做周期性汇总 —— 让人不查日志也知道当前是否在丢。
+		go func() {
+			tick := time.NewTicker(5 * time.Minute)
+			defer tick.Stop()
+			for range tick.C {
+				log.Printf("抓包统计: 收到 %d 个包,丢弃 %d 个,无密钥丢弃 %d 个,密钥错误丢弃 %d 个",
+					capture.PacketSeen(), capture.PacketDropped(),
+					eng.NoKeyDropped(), eng.BadKeyDropped())
+			}
+		}()
 		if err := eng.RunLive(*iface, *skipSelf); err != nil {
 			log.Fatalf("抓包失败(需 root): %v", err)
 		}

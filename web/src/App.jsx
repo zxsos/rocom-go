@@ -10,6 +10,7 @@ import { TopNav, BottomNav } from './components/NavBar'
 import AccountSelect from './components/AccountSelect'
 import { PinDialog } from './components/PinDialog'
 import { IconSun, IconMoon, IconMonitor, IconExpand, IconCompress } from './components/svg'
+import MapEngineProvider from './pages/map/MapEngineProvider'
 
 // App 全局壳:顶栏导航 + 账号切换 + 底部 tab(移动),并分发账号/图标两个全局 Context。
 // 各块细节分别见 hooks/useTheme、hooks/usePrivacy、hooks/useAccounts、components/NavBar、
@@ -83,11 +84,16 @@ export default function App() {
               )}
             </header>
 
-            {/* 不用 key={account} 强制重挂:各页按 account 依赖重取(见 hooks/useAsyncData 的
-                reloadKey),切账号只刷新数据、不动组件树,故筛选/页码/详情弹窗等 UI 态得以保留。 */}
-            <main className="content">
-              <Outlet />
-            </main>
+            {/* 地图引擎常驻于此(而非 MapPage):画中画要在离开地图页之后继续更新,
+                故引擎必须活在任何单个页面之外。放进独立 Provider 组件而非直接写在这里,
+                是为了把「图层数据推送」引发的重渲染隔离在地图页内——详见 MapEngineProvider。 */}
+            <MapEngineProvider account={account} theme={theme} icons={icons}>
+              {/* 不用 key={account} 强制重挂:各页按 account 依赖重取(见 hooks/useAsyncData 的
+                  reloadKey),切账号只刷新数据、不动组件树,故筛选/页码/详情弹窗等 UI 态得以保留。 */}
+              <main className="content">
+                <Outlet />
+              </main>
+            </MapEngineProvider>
 
             <BottomNav />
           </div>
