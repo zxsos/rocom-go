@@ -4,6 +4,7 @@ import { getPet, getMedals, getEvolution, subscribe } from '../api'
 import { InlineIcon, ImgAvatar } from './icons'
 import { Types, Marks, Gender, Form, Blood, EggGroups } from './badges'
 import { Portrait } from './avatar'
+import { toast } from './toast'
 import { StatRadar, StatRange } from './stats'
 import { locTag, fmtTime, voiceHot, pctHot } from '../utils/format'
 
@@ -25,17 +26,14 @@ export function PetDetailModal({ gid, onClose }) {
   useEffect(() => { getMedals().then(setMedals).catch(() => {}) }, [])
   // 实时:进化/换牌/改标记等就地更新会广播完整宠物(带 gid,已按账号过滤),
   // 命中当前详情 gid 时静默重拉,弹窗内容随之刷新(不置 null,避免闪烁)。
-  useEffect(() => {
-    return subscribe((m) => {
-      if (m.type === 'pet' && m.data && String(m.data.gid) === String(gid)) {
-        getPet(gid).then(setPet).catch(() => {})
-      }
-    })
-  }, [gid])
+  useEffect(() => subscribe('pet', (d) => {
+    if (d && String(d.gid) === String(gid)) getPet(gid).then(setPet).catch(() => {})
+  }), [gid])
   // 进化链:按当前形态 petbase(base_conf_id)拉取整条链
+  const baseConfId = pet?.baseConfId
   useEffect(() => {
-    if (pet && pet.baseConfId) getEvolution(pet.baseConfId).then((c) => setChain(c || [])).catch(() => {})
-  }, [pet && pet.baseConfId])
+    if (baseConfId) getEvolution(baseConfId).then((c) => setChain(c || [])).catch(() => {})
+  }, [baseConfId])
   // Esc 关闭弹窗
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -52,7 +50,7 @@ export function PetDetailModal({ gid, onClose }) {
         a.download = `${pet.name || pet.species}_${pet.gid}.png`
         a.click()
       })
-      .catch(() => alert('导出失败'))
+      .catch(() => toast('导出失败,请重试', 4000)) // toast 而非 alert:不阻塞、样式跟主题
   }
 
   // 点击卡片与工具栏之外的区域 → 关闭

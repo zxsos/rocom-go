@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useContext, useRef } from 'react'
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react'
 import { getEggs, subscribe, queryEggMatch } from '../../api'
 import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { PetDetailModal } from '../../components/PetDetailModal'
-import { fmtTime, pctHot, voiceHot } from '../../utils/format'
+import { fmtTime, pad2, pctHot, voiceHot } from '../../utils/format'
+import { useInterval } from '../../hooks/useAsyncData'
 import { Marks } from '../../components/badges'
 import { hatchProgress } from './hatch'
 import { toast } from '../../components/toast'
@@ -30,11 +31,10 @@ const tidyEggName = (name) => (name || '').replace(/的蛋的蛋$/, '的蛋')
 // 预计完成时间:按当前估算孵化倍率(见 hatch.js)外推剩余秒数,换算成时间点。
 // 同一天只显时分(手机双列卡片宽度紧张),跨天补「月-日 时:分」;title 里给剩余时长,
 // 并注明是估算(倍率本身是估的)。
-const pad2n = (n) => String(n).padStart(2, '0')
 function etaText(egg, p, now) {
   const remainSecs = Math.max(0, egg.maxSecs - p.secs)
   const eta = new Date(now + remainSecs * 1000)
-  const hm = `${pad2n(eta.getHours())}:${pad2n(eta.getMinutes())}`
+  const hm = `${pad2(eta.getHours())}:${pad2(eta.getMinutes())}`
   return new Date(now).toDateString() === eta.toDateString()
     ? hm
     : `${eta.getMonth() + 1}-${eta.getDate()} ${hm}`
@@ -100,21 +100,18 @@ export default function EggList() {
   const [detailGid, setDetailGid] = useState(null)
   const [now, setNow] = useState(() => Date.now())
 
-  const load = () => getEggs({ search, sort, order })
+  const load = useCallback(() => getEggs({ search, sort, order })
     .then((d) => {
       d = d || { eggs: [] }
       if (!search) writeHatchCache(hatchKey(account), d.eggs.filter((e) => e.hatching))
       setData(d)
-    }).catch(() => {})
+    }).catch(() => {}), [account, search, sort, order])
 
-  useEffect(() => { load() }, [account, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [load])
   // 后端在蛋有变动(收蛋/入孵/进度/破壳)时推 eggs,收到就重拉。
-  useEffect(() => subscribe((m) => { if (m.type === 'eggs') load() }), [account, sort, order, search]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => subscribe('eggs', load), [load])
   // 孵化进度随时间涨:秒级刷新即可。
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
+  useInterval(() => setNow(Date.now()), 1000)
 
   // 三段分类:孵蛋器=进度未满的标记蛋(保持后端槽位序);已孵化蛋=进度满的标记蛋
   // (残留标记/孵满未破壳,放入越近越靠前);仓库=其余(后端已排好序,原样保留)。

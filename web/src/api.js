@@ -29,6 +29,31 @@ async function getJSON(url, fallback) {
   return r.json()
 }
 
+// errorBody 读失败响应的正文:后端既有 JSON 的 {error},也有 http.Error 的 text/plain;
+// 都取不到就返回空串(调用方据此退回兜底文案)。
+// 注意 error 只认非空字符串:{"error":""} 不该把整个 JSON 显示给用户,留空走 fallback。
+async function errorBody(r) {
+  try {
+    const t = (await r.text()).trim()
+    try {
+      const j = JSON.parse(t)
+      if (j && typeof j.error === 'string' && j.error) return j.error
+    } catch { /* 非 JSON,按 text/plain 处理 */ }
+    return t
+  } catch { return '' }
+}
+
+// httpError 把失败响应转成 Error:正文优先;读不到正文时取 notes[status],再退回 fallback(附状态码)。
+// notes 用于替换特定状态码的文案(如 401→「PIN 错误」),这些文案本身已够明确,不再附状态码。
+// 错误对象带 status,供调用方按 401/429 等分支处理。
+async function httpError(r, fallback = '请求失败', notes) {
+  const body = await errorBody(r)
+  const note = notes && notes[r.status]
+  const err = new Error(body || note || `${fallback}(${r.status})`)
+  err.status = r.status
+  return err
+}
+
 // —— 按账号隔离的数据(自动带 ?account=)——
 
 export const getPets = (params) => getJSON('/api/pets?' + buildQuery(params))
@@ -98,11 +123,7 @@ export async function setAccountRank(account, join) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, join }),
   })
-  if (!r.ok) {
-    let msg = '设置失败(' + r.status + ')'
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await httpError(r, '设置失败')
   return r.json()
 }
 
@@ -163,11 +184,7 @@ export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { 
 // 服务端未配置令牌时抛错(503)。
 export const queryEggMatch = async (height, weight) => {
   const r = await fetch('/api/eggs/query?' + buildQuery({ height, weight }))
-  if (!r.ok) {
-    let msg = `查询失败(${r.status})`
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await httpError(r, '查询失败')
   return r.json()
 }
 
@@ -190,11 +207,7 @@ export const getMerchant = async (force = false) => {
   } finally {
     clearTimeout(timer)
   }
-  if (!r.ok) {
-    let msg = `拉取失败(${r.status})`
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await httpError(r, '拉取失败')
   return r.json()
 }
 
@@ -202,7 +215,7 @@ export const getMerchant = async (force = false) => {
 // 订阅按登录账号绑定(buildQuery 自动带 ?account=):换设备登录同一账号也能查到同一订阅。
 export const getMerchantSub = async () => {
   const r = await fetch('/api/merchant/sub?' + buildQuery())
-  if (!r.ok) throw new Error('查询订阅失败(' + r.status + ')')
+  if (!r.ok) throw await httpError(r, '查询订阅失败')
   return r.json()
 }
 
@@ -213,18 +226,14 @@ export const setMerchantSub = async (email, keywords) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, keywords }),
   })
-  if (!r.ok) {
-    let msg = `订阅失败(${r.status})`
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* 忽略 */ }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await httpError(r, '订阅失败')
   return r.json()
 }
 
 // delMerchantSub 退订当前账号。
 export const delMerchantSub = async () => {
   const r = await fetch('/api/merchant/sub?' + buildQuery(), { method: 'DELETE' })
-  if (!r.ok) throw new Error('退订失败(' + r.status + ')')
+  if (!r.ok) throw await httpError(r, '退订失败')
   return r.json()
 }
 
@@ -268,18 +277,35 @@ function syncStream() {
   }
 }
 
-// subscribe 订阅 SSE，onMsg 收到 {type, account, data}。返回取消函数(幂等)。
-// 服务端按当前 account 过滤(buildQuery 自动带上 ?account=):切账号时各页的 effect 会重订阅,
-// 届时 URL 变化触发重连。
-export function subscribe(onMsg, opts = {}) {
-  subs.add(onMsg)
+// subscribe 订阅一类 SSE 消息,返回取消函数(幂等)。
+//   type  : 关心的消息类型;数组表示多种;'*' 表示全部(onData 的第二个参数给出实际类型)
+//   onData: (data, type) => void,仅在类型匹配时调用
+//   opts.onOpen : 连接建立(首次或断线重连)时调用,用于补拉快照(理由见 syncStream 的 stream-open)
+//   opts.debug  : true 时请求后端打开高频 debug 流(仅调试页用)
+// 类型过滤、账号过滤都在这里统一做,调用方不必各写一遍:
+//   - 服务端已按 ?account= 过滤(见 server.handleStream),这里是切账号瞬间在途消息的兜底;
+//     比对用的是模块内 currentAccount,比调用方闭包里的 account 更新。未选账号时不拦
+//     (此时服务端回退到最近活跃账号,消息合法)。
+//   - stream-open 只进 onOpen、不进 onData:它表示「断线期间的数据已丢失」,不是业务消息。
+export function subscribe(type, onData, opts = {}) {
+  const types = type === '*' ? null : new Set(Array.isArray(type) ? type : [type])
+  const fn = (msg) => {
+    if (msg.type === 'stream-open') {
+      if (opts.onOpen) opts.onOpen()
+      return
+    }
+    if (types && !types.has(msg.type)) return
+    if (currentAccount && msg.account && msg.account !== currentAccount) return
+    onData(msg.data, msg.type)
+  }
+  subs.add(fn)
   if (opts.debug) debugSubs++
   syncStream()
   let done = false
   return () => {
     if (done) return // React StrictMode 会把 effect 的清理跑两遍,别把计数减穿
     done = true
-    subs.delete(onMsg)
+    subs.delete(fn)
     if (opts.debug) debugSubs--
     syncStream()
   }
@@ -297,19 +323,11 @@ async function adminFetch(url, options = {}) {
   return fetch(url, { ...options, headers })
 }
 
-// adminError 把失败响应转成带 status 的错误(401 表示会话失效,调用方据此决定是否踢回登录页)。
-async function adminError(r, fallback) {
-  let msg = r.status === 401 ? '密码错误或会话已失效' : (fallback || '请求失败(' + r.status + ')')
-  try {
-    const e = await r.json()
-    if (e && e.error) msg = e.error
-  } catch {
-    // 后端 http.Error 返回 text/plain(非 JSON),兜底读文本显示具体原因
-    try {
-      const t = (await r.text()).trim()
-      if (t) msg = t
-    } catch { /* ignore */ }
-  }
+// adminError 同 httpError,仅 401 且后端未给原因时换成面向登录页的话术
+// (401 表示会话失效,调用方据此决定是否踢回登录页)。
+async function adminError(r, fallback = '请求失败') {
+  const body = await errorBody(r)
+  const msg = body || (r.status === 401 ? '密码错误或会话已失效' : `${fallback}(${r.status})`)
   const err = new Error(msg)
   err.status = r.status
   return err
@@ -347,9 +365,6 @@ export async function adminLogout() {
   setAdminToken('')
 }
 
-// adminPlaceholder 管理员面板占位接口(其余功能待实现)。
-export const adminPlaceholder = () => adminFetch('/api/admin/placeholder').then((r) => r.json())
-
 // adminRules 黑白名单:列表 {rules:[{account,mode,note}]}。
 export const adminRules = () => adminFetch('/api/admin/rules').then(async (r) => {
   if (!r.ok) throw await adminError(r, '拉取规则失败')
@@ -364,7 +379,7 @@ export const adminSetRule = (account, mode, note) =>
 export const adminDeleteRule = (account) =>
   adminFetch('/api/admin/rules?account=' + encodeURIComponent(account), { method: 'DELETE' })
     .then(async (r) => {
-      if (!r.ok) throw new Error('删除失败(' + r.status + ')')
+      if (!r.ok) throw await adminError(r, '删除失败')
       return r.json()
     })
 
@@ -414,7 +429,7 @@ export const adminTestMail = (email, subject, body) =>
 
 // adminWildPetOptions 可投放的野生宠物形态:{options:[{base,name,book}]}。
 export const adminWildPetOptions = () => adminFetch('/api/admin/wild-pets').then(async (r) => {
-  if (!r.ok) throw new Error('拉取形态列表失败(' + r.status + ')')
+  if (!r.ok) throw await adminError(r, '拉取形态列表失败')
   return r.json()
 })
 
@@ -439,7 +454,7 @@ export function adminRevokeInject(account, id) {
     '&id=' + encodeURIComponent(id),
     { method: 'DELETE' },
   ).then(async (r) => {
-    if (!r.ok) throw new Error('撤销失败(' + r.status + ')')
+    if (!r.ok) throw await adminError(r, '撤销失败')
     return r.json()
   })
 }
@@ -447,7 +462,7 @@ export function adminRevokeInject(account, id) {
 // adminListInjects 列出当前全部注入中的精灵(管理面板撤销用)。
 // 返回 {injects:[{account,id,name,kinds,sceneRes,created}]};玩家换场景或靠近 10 米 10 秒后自动消失,列表随之减少。
 export const adminListInjects = () => adminFetch('/api/admin/injects').then(async (r) => {
-  if (!r.ok) throw new Error('拉取注入列表失败(' + r.status + ')')
+  if (!r.ok) throw await adminError(r, '拉取注入列表失败')
   return r.json()
 })
 
@@ -460,11 +475,7 @@ export async function verifyAccountPin(account, pin) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account, pin }),
   })
-  if (!r.ok) {
-    let msg = r.status === 401 ? 'PIN 错误' : r.status === 429 ? '尝试过于频繁,请稍后再试' : '校验失败(' + r.status + ')'
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
-    throw new Error(msg)
-  }
+  if (!r.ok) throw await httpError(r, '校验失败', { 401: 'PIN 错误', 429: '尝试过于频繁,请稍后再试' })
   return r.json()
 }
 
@@ -483,11 +494,11 @@ export function deleteAccount(account, pin) {
     headers: { 'Content-Type': 'application/json', ...(getAdminToken() ? { 'X-Admin-Token': getAdminToken() } : {}) },
     body: JSON.stringify({ account, pin }),
   }).then(async (r) => {
-    if (!r.ok) {
-      let msg = r.status === 401 ? 'PIN 错误' : r.status === 403 ? '该账号未设 PIN,需管理员删除' : r.status === 429 ? '尝试过于频繁,请稍后再试' : '删除失败(' + r.status + ')'
-      try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
-      throw new Error(msg)
-    }
+    if (!r.ok) throw await httpError(r, '删除失败', {
+      401: 'PIN 错误',
+      403: '该账号未设 PIN,需管理员删除',
+      429: '尝试过于频繁,请稍后再试',
+    })
     return r.json()
   })
 }

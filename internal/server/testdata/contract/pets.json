@@ -1,0 +1,164 @@
+{
+  "pets": [
+    {
+      "attack": {
+        "nature": 0,
+        "talentLv": 8,
+        "value": 250
+      },
+      "baseConfId": 3006,
+      "blood": "火",
+      "bloodId": 3,
+      "catchTime": 1700000000,
+      "colorful": false,
+      "confId": 2000672,
+      "defense": {
+        "nature": 0,
+        "talentLv": 5,
+        "value": 180
+      },
+      "gender": "♂",
+      "gid": 1001,
+      "heightM": 1.8,
+      "heightMax": 2.18,
+      "heightMin": 1.52,
+      "heightPct": 42.42,
+      "hp": {
+        "nature": 1,
+        "talentLv": 9,
+        "value": 300
+      },
+      "image": {
+        "bigHead": "BigHeadIcon256/3006.webp",
+        "head": "HeadIcon/3006.webp",
+        "portrait": "Pet1024/JL_huoshen.webp",
+        "portraitSmall": "Pet256/JL_huoshen.webp"
+      },
+      "level": 60,
+      "medal": "大块头",
+      "medalDesc": "",
+      "medalIds": [
+        1
+      ],
+      "name": "小火",
+      "nature": "固执",
+      "natureId": 3,
+      "partnerMark": "首领",
+      "shiny": true,
+      "skillIds": [
+        101,
+        102
+      ],
+      "spAttack": {
+        "nature": 0,
+        "talentLv": 7,
+        "value": 210
+      },
+      "spDefense": {
+        "nature": 0,
+        "talentLv": 4,
+        "value": 160
+      },
+      "speciality": "暴击",
+      "specialityId": 7,
+      "species": "火神",
+      "speed": {
+        "nature": 0,
+        "talentLv": 6,
+        "value": 190
+      },
+      "talentRank": "S",
+      "team": {
+        "pos": 2,
+        "teamIdx": 0
+      },
+      "typeIcons": null,
+      "types": [
+        "火"
+      ],
+      "voice": 12,
+      "wearMedalConfId": 0,
+      "weightKg": 92.5,
+      "weightMax": 110,
+      "weightMin": 90.5,
+      "weightPct": 10.26
+    },
+    {
+      "attack": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "baseConfId": 3001,
+      "box": {
+        "boxId": 1,
+        "boxName": "常用",
+        "mark": "首领",
+        "slot": 0
+      },
+      "catchTime": 0,
+      "colorful": false,
+      "confId": 3001,
+      "defense": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "gender": "",
+      "gid": 1002,
+      "heightM": 0,
+      "heightMax": 0.75,
+      "heightMin": 0.53,
+      "heightPct": 0,
+      "hp": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "image": {
+        "bigHead": "BigHeadIcon256/3001.webp",
+        "head": "HeadIcon/3001.webp",
+        "portrait": "Pet1024/JL_miaomiao.webp",
+        "portraitSmall": "Pet256/JL_miaomiao.webp"
+      },
+      "level": 1,
+      "medal": "",
+      "medalDesc": "",
+      "medalIds": null,
+      "name": "小水",
+      "nature": "",
+      "natureId": 0,
+      "partnerMark": "",
+      "shiny": false,
+      "skillIds": null,
+      "spAttack": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "spDefense": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "speciality": "",
+      "specialityId": 0,
+      "species": "水蓝蓝",
+      "speed": {
+        "nature": 0,
+        "talentLv": 0,
+        "value": 0
+      },
+      "talentRank": "",
+      "typeIcons": null,
+      "types": null,
+      "voice": 0,
+      "wearMedalConfId": 0,
+      "weightKg": 0,
+      "weightMax": 4.6,
+      "weightMin": 3.62,
+      "weightPct": 0
+    }
+  ],
+  "total": 2
+}

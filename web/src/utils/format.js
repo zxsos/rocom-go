@@ -30,13 +30,22 @@ export function locTag(pet) {
   return '⏳位置待同步'
 }
 
-const pad2 = (n) => String(n).padStart(2, '0')
+// pad2 补零到两位(时间字段的通用补位,各页自用一份的都收到这里)。
+export const pad2 = (n) => String(n).padStart(2, '0')
 
 // fmtTime 把 unix 秒格式化为本地时间(年月日 时分秒)。
 export function fmtTime(ts) {
   if (!ts) return '-'
   const d = new Date(ts * 1000)
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+}
+
+// fmtShortTime 省略年份的「月-日 时:分」:管理面板的表格列窄、且都是近期数据,年份冗余。
+// 与 fmtTime 只差年份与秒;两者刻意分开命名,免得同名不同格式的坑(曾有两个 fmtTime 并存)。
+export function fmtShortTime(ts) {
+  if (ts == null) return '-'
+  const d = new Date(ts * 1000)
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
 // fmtClock 只格式化时:分:秒(实时流事件全在「当下」发生,日期冗余,省横向宽度)。
@@ -53,4 +62,15 @@ export function maskUid(uid) {
   const s = String(uid || '')
   if (s.length <= 6) return s
   return s.slice(0, 3) + '＊＊＊' + s.slice(-3)
+}
+
+// maskEmail 邮箱脱敏:local 保留前 2 与末 1,中间打星;local 过短(≤2)只留首位,域名完整保留。
+// 用于远行商人订阅成功后折叠展示,防旁窥(与 maskUid 同为「脱敏展示」族)。
+export function maskEmail(email) {
+  const s = String(email || '')
+  const i = s.indexOf('@')
+  if (i < 2) return s // 无 @ 或 local 过短,原样返回
+  const local = s.slice(0, i)
+  if (local.length <= 2) return local[0] + '*'.repeat(local.length - 1) + s.slice(i)
+  return local.slice(0, 2) + '*'.repeat(local.length - 3) + local.slice(-1) + s.slice(i)
 }

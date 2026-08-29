@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useContext, useRef } from 'react'
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react'
 import { getEvents, getEventCount, getEventStats, clearEvents, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredState, useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useWakeLock, wakeLockSupported } from '../../hooks/useWakeLock'
+import { confirmDialog } from '../../components/confirm'
+import { useAsyncData } from '../../hooks/useAsyncData'
 import { Avatar } from '../../components/avatar'
 import { Marks, Blood, Gender } from '../../components/badges'
 import { PetDetailModal } from '../../components/PetDetailModal'
@@ -12,13 +14,11 @@ import { sanitizeRules, isHighlight, NOTABLE_BLOODS } from './highlight'
 import RulePanel from './RulePanel'
 import Dropdown from '../../components/Dropdown'
 
+// 空列表的兜底常量:引用稳定,免得每次渲染造新数组打穿下游 memo。
+const NO_EVENTS = []
+
 export default function Events() {
   const account = useContext(AccountContext)
-  const [events, setEvents] = useState([])
-  // total=自上次清空以来累计获得的宠物数(即列表最新一条的序号);列表可能因上限被截断,
-  // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
-  const [total, setTotal] = useState(0)
-  const [stats, setStats] = useState(null) // 事件统计(总览/稀有/近30天分布/热门形态)
   const [rules, setRules] = useStoredJSON(localStorage, 'hlRules', [], sanitizeRules)
   // 多规则联合逻辑:'and'=需全部命中(默认)、'or'=任一命中
   const [mode, setMode] = useStoredState(localStorage, 'hlMode', (s) => (s === 'or' ? 'or' : 'and'), (v) => v)
@@ -41,8 +41,30 @@ export default function Events() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useStoredState(localStorage, 'ev.pageSize',
     (s) => [20, 50, 100, 200].includes(parseInt(s, 10)) ? parseInt(s, 10) : 100, (v) => String(v))
-  const [loading, setLoading] = useState(false)
   useWakeLock(keepAwake)
+
+  // 三路数据拉取。必须放在 page/pageSize 声明**之后**:fetcher 闭包引用了它们,
+  // 提前到前面会因 TDZ(Cannot access 'page' before initialization)直接白屏。
+  // 列表:页码/每页条数变化时按 offset 拉取,替换当前页(不追加)。
+  const { data: events, setData: setEvents, loading } = useAsyncData(
+    useCallback(
+      () => getEvents({ limit: pageSize, offset: (page - 1) * pageSize }).then((e) => e || []),
+      [page, pageSize],
+    ),
+    { fallback: NO_EVENTS, reloadKey: account },
+  )
+  // total=自上次清空以来累计获得的宠物数(即列表最新一条的序号);列表可能因上限被截断,
+  // 故序号以后端总数为准:列表第 i 条(0=最新)序号 = total - i。
+  const { data: total, setData: setTotal } = useAsyncData(
+    useCallback(() => getEventCount().then((r) => (r && r.count) || 0), []),
+    { fallback: 0, reloadKey: account },
+  )
+  // 事件统计(总览/稀有/近30天分布/热门形态):随账号与每个新事件刷新。
+  const { data: stats, setData: setStats, refresh: refreshStats } = useAsyncData(
+    useCallback(() => getEventStats(), []),
+    { reloadKey: account },
+  )
+
   // subscribe 的 effect 只依赖 account,回调里读 rules/mode/soundOn/page/pageSize 需走 ref 拿最新值
   const soundRef = useRef({ rules, mode, soundOn })
   const pageRef = useRef({ page, pageSize })
@@ -51,35 +73,20 @@ export default function Events() {
     pageRef.current = { page, pageSize }
   })
 
-  // 列表数据:页码/每页条数变化时按 offset 拉取,替换当前页(不追加)。
-  useEffect(() => {
-    setLoading(true)
-    getEvents({ limit: pageSize, offset: (page - 1) * pageSize })
-      .then((e) => setEvents(e || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [account, page, pageSize])
-
-  useEffect(() => {
-    // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
-    getEventCount().then((r) => setTotal(r?.count || 0)).catch(() => {})
-    getEventStats().then(setStats).catch(() => {})
-    return subscribe((m) => {
-      if (m.type !== 'event') return
-      if (m.account && m.account !== account) return // 只认当前账号的事件
+  // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
+  useEffect(() => subscribe('event', (ev) => {
       // 规则命中提示音:命中高亮规则的新捕获响铃,异色/炫彩(最高优先级)响升级音
       const { rules: rs, mode: md, soundOn: so } = soundRef.current
-      const pet = m.data && m.data.pet
+      const pet = ev && ev.pet
       if (so && isHighlight(pet, rs, md)) {
         pet.shiny || pet.colorful ? rareChime() : chime()
       }
       // 仅第 1 页实时推进(头部插入并裁掉超出本页的旧条);其他页保持不动,翻回第 1 页时重拉可见
       const { page: curPage, pageSize: curSize } = pageRef.current
-      if (curPage === 1) setEvents((prev) => [m.data, ...prev].slice(0, curSize))
+      if (curPage === 1) setEvents((prev) => [ev, ...prev].slice(0, curSize))
       setTotal((n) => n + 1)
-      getEventStats().then(setStats).catch(() => {}) // 新事件入库后刷新统计
-    })
-  }, [account])
+      refreshStats() // 新事件入库后刷新统计
+    }), [refreshStats, setEvents, setTotal])
 
   // 点选条目:已选则移除、未选则添加(即时生效,无需「添加」按钮);addRule 只添加(去重)。
   const hasRule = (field, value) => rules.some((r) => r.field === field && r.value === value)
@@ -89,8 +96,11 @@ export default function Events() {
     : [...r, { field, value }])
 
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
-  const clearAll = () => {
-    if (!window.confirm('确定清空所有事件历史?计数将从头开始。')) return
+  const clearAll = async () => {
+    if (!await confirmDialog({
+      message: '确定清空所有事件历史?计数将从头开始。',
+      okText: '清空', danger: true,
+    })) return
     clearEvents().then(() => { setEvents([]); setTotal(0); setStats(null); setPage(1) }).catch(() => {})
   }
 

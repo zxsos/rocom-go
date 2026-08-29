@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react'
-import { subscribe } from '../api'
-import { AccountContext } from '../context'
-import { useStoredJSON } from '../hooks/useStoredState'
-import { fmtClock } from '../utils/format'
-import { copyText } from '../utils/clipboard'
-import { Highlight } from '../components/Highlight'
+import { subscribe } from '../../api'
+import { AccountContext } from '../../context'
+import { useStoredJSON } from '../../hooks/useStoredState'
+import { fmtClock } from '../../utils/format'
+import { copyText } from '../../utils/clipboard'
+import { Highlight } from '../../components/Highlight'
 
 // 默认忽略高频且无分析价值的场景 NPC 位置同步(每秒多条,会淹没事件流)。
 // localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
@@ -75,10 +75,9 @@ export default function Debug() {
   // account 变化时重订阅(切换账号后只看新账号的流量)。
   useEffect(() => {
     if (paused) return
-    return subscribe((m) => {
-      if (m.type !== 'debug') return
-      if (ignoredRef.current.includes(m.data.name)) return // 忽略的 opcode 直接不入缓冲,避免挤掉有用事件
-      setRows((r) => [m.data, ...r].slice(0, 800))
+    return subscribe('debug', (d) => {
+      if (ignoredRef.current.includes(d.name)) return // 忽略的 opcode 直接不入缓冲,避免挤掉有用事件
+      setRows((r) => [d, ...r].slice(0, 800))
     }, { debug: true })
   }, [paused, account])
 
@@ -121,7 +120,6 @@ export default function Debug() {
       })()
     }, 250)
     return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, rows])
 
   const addIgnore = (name) => { if (name) setIgnored((s) => (s.includes(name) ? s : [...s, name])) }

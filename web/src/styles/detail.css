@@ -2,7 +2,7 @@
 
 /* 弹窗:固定覆盖全屏(含半透明遮罩),叠在当前页之上,不打断底层操作;卡片外区域可点击返回 */
 .detail-backdrop {
-  position: fixed; inset: 0; z-index: 200; overflow: auto;
+  position: fixed; inset: 0; z-index: var(--z-modal); overflow: auto;
   background: rgba(0, 0, 0, 0.55); padding: 24px 16px;
   display: flex; align-items: flex-start; justify-content: center;
   backdrop-filter: blur(4px);
@@ -14,7 +14,9 @@
 }
 .detail-head { padding: 16px; display: flex; justify-content: space-between; align-items: baseline; }
 .detail-no { color: var(--fg-dim); }
-.detail-hero { position: relative; height: 180px; display: grid; place-items: center; font-size: 72px; background: radial-gradient(circle at 50% 30%, #38415a, transparent 70%); }
+/* hero 底衬:暗色下偏冷灰蓝,亮色下几乎不可见(白底上再叠深色会脏)。
+   原先写死 #38415a,切到亮色主题会是一块突兀的深色斑。 */
+.detail-hero { position: relative; height: 180px; display: grid; place-items: center; font-size: 72px; background: radial-gradient(circle at 50% 30%, var(--hero-tint), transparent 70%); }
 /* 仅约束全身图(直接子 img),避免波及角标里的搭档标记图 */
 .detail-hero > img { height: 168px; object-fit: contain; }
 /* 复用头像的 PetMark(橙框+白标记),在 hero 左上角放大内移;开启 hover 提示 */
@@ -81,10 +83,10 @@ img.evo-avatar { object-fit: cover; }
   background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
   font-size: 12px; font-weight: 400; line-height: 1.4;
   width: max-content; max-width: 220px; white-space: normal; text-align: left;
-  opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 50; box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none; transition: opacity .12s; z-index: var(--z-popover); box-shadow: var(--shadow);
 }
 .medal-tip:hover::after { opacity: 1; }
-.medal-tip:hover { z-index: 51; }
+.medal-tip:hover { z-index: var(--z-popover-top); }
 /* 详情奖牌墙内的奖牌图标适当增大(仅 .medals 容器内,不影响列表/事件的行内奖牌) */
 .medals .medal-ic { width: 40px; height: 40px; }
 /* 技能列表默认折叠(<details>);summary 可点击展开 */
@@ -98,7 +100,7 @@ img.evo-avatar { object-fit: cover; }
   background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
   font-size: 12px; font-weight: 400; line-height: 1.5;
   white-space: nowrap; text-align: left;
-  pointer-events: none; z-index: 200; box-shadow: var(--shadow);
+  pointer-events: none; z-index: var(--z-modal); box-shadow: var(--shadow);
 }
 
 @media (max-width: 760px) {

@@ -1,0 +1,717 @@
+{
+  "boxes": {
+    "desc": "盒子槽位布局",
+    "endpoint": "GET /api/boxes",
+    "sample": "internal/server/testdata/contract/boxes.json",
+    "shape": [
+      {
+        "heads": {
+          "1002": "str"
+        },
+        "id": "int",
+        "name": "str",
+        "slots": [
+          {}
+        ]
+      }
+    ]
+  },
+  "eggs": {
+    "desc": "背包精灵蛋",
+    "endpoint": "GET /api/eggs",
+    "sample": "internal/server/testdata/contract/eggs.json",
+    "shape": {
+      "eggs": [
+        {
+          "gid": "int",
+          "hatchUpdate": "int",
+          "hatchedSecs": "int",
+          "hatching": "bool",
+          "heightM": "float",
+          "icon": "str",
+          "itemId": "int",
+          "maxSecs": "int",
+          "name": "str",
+          "obtainedAt": "int",
+          "random": "bool",
+          "src": "int",
+          "srcName": "str",
+          "typeOrder": "int",
+          "weightKg": "float"
+        }
+      ]
+    }
+  },
+  "events": {
+    "desc": "获得事件历史",
+    "endpoint": "GET /api/events",
+    "sample": "internal/server/testdata/contract/events.json",
+    "shape": [
+      {
+        "gid": "int",
+        "id": "int",
+        "pet": {
+          "attack": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "baseConfId": "int",
+          "blood": "str",
+          "bloodId": "int",
+          "catchTime": "int",
+          "colorful": "bool",
+          "confId": "int",
+          "defense": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "gender": "str",
+          "gid": "int",
+          "heightM": "float",
+          "heightMax": "float",
+          "heightMin": "float",
+          "heightPct": "float",
+          "hp": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "image": {
+            "bigHead": "str",
+            "head": "str",
+            "portrait": "str",
+            "portraitSmall": "str"
+          },
+          "level": "int",
+          "medal": "str",
+          "medalDesc": "str",
+          "medalIds": "null",
+          "name": "str",
+          "nature": "str",
+          "natureId": "int",
+          "partnerMark": "str",
+          "shiny": "bool",
+          "skillIds": [
+            {}
+          ],
+          "spAttack": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "spDefense": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "speciality": "str",
+          "specialityId": "int",
+          "species": "str",
+          "speed": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "talentRank": "str",
+          "team": {
+            "pos": "int",
+            "teamIdx": "int"
+          },
+          "typeIcons": "null",
+          "types": [
+            {}
+          ],
+          "voice": "int",
+          "wearMedalConfId": "int",
+          "weightKg": "float",
+          "weightMax": "int",
+          "weightMin": "float",
+          "weightPct": "float"
+        },
+        "subKind": "str",
+        "time": "int"
+      }
+    ]
+  },
+  "events-stats": {
+    "desc": "事件统计",
+    "endpoint": "GET /api/events/stats",
+    "sample": "internal/server/testdata/contract/events-stats.json",
+    "shape": {
+      "bySubKind": {
+        "捕捉": "int"
+      },
+      "colorful": "int",
+      "daily": [
+        {
+          "day": "str",
+          "n": "int"
+        }
+      ],
+      "shiny": "int",
+      "topSpecies": [
+        {
+          "n": "int",
+          "s": "str"
+        }
+      ],
+      "total": "int"
+    }
+  },
+  "evolution": {
+    "desc": "某 petbase 的进化链",
+    "endpoint": "GET /api/evolution",
+    "sample": "internal/server/testdata/contract/evolution.json",
+    "shape": [
+      {
+        "book": "int",
+        "image": {
+          "bigHead": "str",
+          "head": "str",
+          "portrait": "str",
+          "portraitSmall": "str"
+        },
+        "name": "str",
+        "petbase": "int",
+        "stage": "int"
+      }
+    ]
+  },
+  "filter-options": {
+    "desc": "筛选下拉可选值",
+    "endpoint": "GET /api/filter-options",
+    "sample": "internal/server/testdata/contract/filter-options.json",
+    "shape": {
+      "box": [
+        {}
+      ],
+      "medal": "null",
+      "nature": [
+        {}
+      ],
+      "partnerMark": [
+        {}
+      ],
+      "speciality": [
+        {}
+      ],
+      "talentRank": [
+        {}
+      ]
+    }
+  },
+  "flowers": {
+    "desc": "最近一次花种分组(已剥 cur/worlds)",
+    "endpoint": "GET /api/flowers",
+    "sample": "internal/server/testdata/contract/flowers.json",
+    "shape": {
+      "account": "str",
+      "flowers": [
+        {
+          "activityId": "int",
+          "bindEvo": "int",
+          "bindImg": "str",
+          "bindName": "str",
+          "blood": "int",
+          "bloodIcon": "str",
+          "bloodName": "str",
+          "challengeCount": "int",
+          "detail": "bool",
+          "endTs": "int",
+          "glass": "str",
+          "glassType": "int",
+          "glassValue": "int",
+          "id": "int",
+          "img": "str",
+          "lv": "int",
+          "medalIcon": "str",
+          "medalName": "str",
+          "name": "str",
+          "npcLogicId": "int",
+          "ownerUserId": "int",
+          "specSeedId": "int",
+          "star": "int"
+        }
+      ]
+    }
+  },
+  "flowers-slots": {
+    "desc": "花种世界存档槽位列表",
+    "endpoint": "GET /api/flowers/slots",
+    "sample": "internal/server/testdata/contract/flowers-slots.json",
+    "shape": {
+      "slots": [
+        {
+          "flowers": [
+            {
+              "activityId": "int",
+              "bindEvo": "int",
+              "bindImg": "str",
+              "bindName": "str",
+              "blood": "int",
+              "bloodIcon": "str",
+              "bloodName": "str",
+              "challengeCount": "int",
+              "detail": "bool",
+              "endTs": "int",
+              "glass": "str",
+              "glassType": "int",
+              "glassValue": "int",
+              "id": "int",
+              "img": "str",
+              "lv": "int",
+              "medalIcon": "str",
+              "medalName": "str",
+              "name": "str",
+              "npcLogicId": "int",
+              "ownerUserId": "int",
+              "specSeedId": "int",
+              "star": "int"
+            }
+          ],
+          "key": "str",
+          "name": "str",
+          "ts": "int"
+        }
+      ]
+    }
+  },
+  "handbook-glasses": {
+    "desc": "图鉴炫彩收集",
+    "endpoint": "GET /api/handbook-glasses",
+    "sample": "internal/server/testdata/contract/handbook-glasses.json",
+    "shape": {
+      "glasses": [
+        {
+          "base": "int",
+          "book": "int",
+          "common": [
+            {}
+          ],
+          "evo": "int",
+          "head": "str",
+          "hidden": [
+            {}
+          ],
+          "name": "str",
+          "stage": "int"
+        }
+      ]
+    }
+  },
+  "home": {
+    "desc": "最近一次家园小窝图层",
+    "endpoint": "GET /api/home",
+    "sample": "internal/server/testdata/contract/home.json",
+    "shape": {
+      "account": "str",
+      "couplesStale": "bool",
+      "level": "int",
+      "nests": [
+        {
+          "egg": {
+            "icon": "str",
+            "itemId": "int",
+            "name": "str"
+          },
+          "id": "str",
+          "name": "str",
+          "pet": {
+            "gid": "int",
+            "level": "int",
+            "mates": [
+              {
+                "gid": "int",
+                "name": "str"
+              }
+            ],
+            "name": "str",
+            "species": "str",
+            "voice": "int",
+            "weightPct": "float"
+          },
+          "u": "float",
+          "v": "float",
+          "x": "int",
+          "y": "int"
+        }
+      ],
+      "roomLevel": "int",
+      "sceneResId": "int"
+    }
+  },
+  "icons": {
+    "desc": "全局固定图标(不随账号)",
+    "endpoint": "GET /api/icons",
+    "sample": "internal/server/testdata/contract/icons.json",
+    "shape": {
+      "colorful": "str",
+      "partnerFrame": "str",
+      "pollution": "str",
+      "shiny": "str",
+      "shinyColorful": "str",
+      "stat": {
+        "attack": "str",
+        "defense": "str",
+        "hp": "str",
+        "spAttack": "str",
+        "spDefense": "str",
+        "speed": "str"
+      },
+      "type": {
+        "光": "str",
+        "冰": "str",
+        "地": "str",
+        "幻": "str",
+        "幽": "str",
+        "恶": "str",
+        "普": "str",
+        "机械": "str",
+        "武": "str",
+        "毒": "str",
+        "水": "str",
+        "火": "str",
+        "电": "str",
+        "翼": "str",
+        "草": "str",
+        "萌": "str",
+        "虫": "str",
+        "龙": "str"
+      }
+    }
+  },
+  "medals": {
+    "desc": "全部奖牌(不随账号)",
+    "endpoint": "GET /api/medals",
+    "sample": "internal/server/testdata/contract/medals.json",
+    "shape": [
+      {
+        "desc": "str",
+        "icon": "str",
+        "id": "int",
+        "name": "str"
+      }
+    ]
+  },
+  "name-options": {
+    "desc": "全量特长名",
+    "endpoint": "GET /api/name-options",
+    "sample": "internal/server/testdata/contract/name-options.json",
+    "shape": {
+      "speciality": [
+        {}
+      ]
+    }
+  },
+  "pet-detail": {
+    "desc": "单只宠物详情",
+    "endpoint": "GET /api/pets/{gid}",
+    "sample": "internal/server/testdata/contract/pet-detail.json",
+    "shape": {
+      "attack": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "baseConfId": "int",
+      "blood": "str",
+      "bloodId": "int",
+      "catchTime": "int",
+      "colorful": "bool",
+      "confId": "int",
+      "defense": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "gender": "str",
+      "gid": "int",
+      "heightM": "float",
+      "heightMax": "float",
+      "heightMin": "float",
+      "heightPct": "float",
+      "hp": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "image": {
+        "bigHead": "str",
+        "head": "str",
+        "portrait": "str",
+        "portraitSmall": "str"
+      },
+      "level": "int",
+      "medal": "str",
+      "medalDesc": "str",
+      "medalIds": [
+        {}
+      ],
+      "name": "str",
+      "nature": "str",
+      "natureId": "int",
+      "partnerMark": "str",
+      "shiny": "bool",
+      "skillIds": [
+        {}
+      ],
+      "spAttack": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "spDefense": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "speciality": "str",
+      "specialityId": "int",
+      "species": "str",
+      "speed": {
+        "nature": "int",
+        "talentLv": "int",
+        "value": "int"
+      },
+      "talentRank": "str",
+      "team": {
+        "pos": "int",
+        "teamIdx": "int"
+      },
+      "typeIcons": "null",
+      "types": [
+        {}
+      ],
+      "voice": "int",
+      "wearMedalConfId": "int",
+      "weightKg": "float",
+      "weightMax": "int",
+      "weightMin": "float",
+      "weightPct": "float"
+    }
+  },
+  "pet-page": {
+    "desc": "某宠物在筛选下所处页码",
+    "endpoint": "GET /api/pet-page",
+    "sample": "internal/server/testdata/contract/pet-page.json",
+    "shape": {
+      "found": "bool",
+      "page": "int"
+    }
+  },
+  "pets": {
+    "desc": "宠物列表(分页/筛选/排序)",
+    "endpoint": "GET /api/pets",
+    "sample": "internal/server/testdata/contract/pets.json",
+    "shape": {
+      "pets": [
+        {
+          "attack": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "baseConfId": "int",
+          "blood": "str",
+          "bloodId": "int",
+          "box": {
+            "boxId": "int",
+            "boxName": "str",
+            "mark": "str",
+            "slot": "int"
+          },
+          "catchTime": "int",
+          "colorful": "bool",
+          "confId": "int",
+          "defense": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "gender": "str",
+          "gid": "int",
+          "heightM": "float",
+          "heightMax": "float",
+          "heightMin": "float",
+          "heightPct": "float",
+          "hp": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "image": {
+            "bigHead": "str",
+            "head": "str",
+            "portrait": "str",
+            "portraitSmall": "str"
+          },
+          "level": "int",
+          "medal": "str",
+          "medalDesc": "str",
+          "medalIds": [
+            {}
+          ],
+          "name": "str",
+          "nature": "str",
+          "natureId": "int",
+          "partnerMark": "str",
+          "shiny": "bool",
+          "skillIds": [
+            {}
+          ],
+          "spAttack": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "spDefense": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "speciality": "str",
+          "specialityId": "int",
+          "species": "str",
+          "speed": {
+            "nature": "int",
+            "talentLv": "int",
+            "value": "int"
+          },
+          "talentRank": "str",
+          "team": {
+            "pos": "int",
+            "teamIdx": "int"
+          },
+          "typeIcons": "null",
+          "types": [
+            {}
+          ],
+          "voice": "int",
+          "wearMedalConfId": "int",
+          "weightKg": "float",
+          "weightMax": "int",
+          "weightMin": "float",
+          "weightPct": "float"
+        }
+      ],
+      "total": "int"
+    }
+  },
+  "position-fresh": {
+    "desc": "最近位置(未过期,含速度与轨迹)",
+    "endpoint": "GET /api/position",
+    "sample": "internal/server/testdata/contract/position-fresh.json",
+    "shape": {
+      "account": "str",
+      "heading": "float",
+      "img": "str",
+      "paintable": "bool",
+      "path": [
+        {
+          "u": "float",
+          "v": "float"
+        }
+      ],
+      "sceneCfgId": "int",
+      "sceneName": "str",
+      "sceneResId": "int",
+      "stop": "bool",
+      "ts": "int",
+      "tsMs": "int",
+      "u": "float",
+      "v": "float",
+      "vu": "float",
+      "vv": "float",
+      "x": "int",
+      "y": "int",
+      "z": "int"
+    }
+  },
+  "position-stale": {
+    "desc": "最近位置(已过期,抹掉 vu/vv/path)",
+    "endpoint": "GET /api/position",
+    "sample": "internal/server/testdata/contract/position-stale.json",
+    "shape": {
+      "account": "str",
+      "heading": "float",
+      "img": "str",
+      "paintable": "bool",
+      "sceneCfgId": "int",
+      "sceneName": "str",
+      "sceneResId": "int",
+      "stop": "bool",
+      "ts": "int",
+      "tsMs": "int",
+      "u": "float",
+      "v": "float",
+      "x": "int",
+      "y": "int",
+      "z": "int"
+    }
+  },
+  "stats": {
+    "desc": "本账号宠物总数",
+    "endpoint": "GET /api/stats",
+    "sample": "internal/server/testdata/contract/stats.json",
+    "shape": {
+      "petCount": "int"
+    }
+  },
+  "teams": {
+    "desc": "大世界三队布局",
+    "endpoint": "GET /api/teams",
+    "sample": "internal/server/testdata/contract/teams.json",
+    "shape": {
+      "heads": {
+        "1001": "str"
+      },
+      "slots": [
+        {}
+      ]
+    }
+  },
+  "wildpets": {
+    "desc": "最近一次野生宠物标记",
+    "endpoint": "GET /api/wildpets",
+    "sample": "internal/server/testdata/contract/wildpets.json",
+    "shape": {
+      "account": "str",
+      "allPets": [
+        {
+          "id": "str",
+          "img": "str",
+          "n": "str",
+          "u": "float",
+          "v": "float"
+        }
+      ],
+      "pets": [
+        {
+          "glass": "str",
+          "glassType": "int",
+          "glassValue": "int",
+          "height": "int",
+          "id": "str",
+          "img": "str",
+          "kinds": [
+            {}
+          ],
+          "lv": "int",
+          "mutation": "int",
+          "n": "str",
+          "u": "float",
+          "v": "float",
+          "voice": "int",
+          "weight": "int",
+          "weightPct": "float",
+          "x": "int",
+          "y": "int",
+          "z": "int"
+        }
+      ],
+      "sceneResId": "int"
+    }
+  }
+}

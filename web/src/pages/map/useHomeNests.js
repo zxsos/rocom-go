@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { getHome, subscribe } from '../../api'
+import { useAsyncData } from '../../hooks/useAsyncData'
 
 // —— 家园小窝图层 ——
 // 只有在家园场景才有内容:后端从进场景快照里取家具布局(小窝也是家具)与住户/窝上的蛋,
@@ -7,28 +8,23 @@ import { getHome, subscribe } from '../../api'
 // 空窝也在列表里——「哪个窝还空着」正是要看的信息之一,故不过滤。
 // 不设开关:进了家园就该看得见,不在家园本来就是空列表,没什么可关的。
 
-// useHomeNests 管理小窝图层:订阅后端推送即可。
+// 空数据的兜底常量:引用稳定,免得每次渲染都造一个新数组、打穿下游 memo 子组件。
+const NO_HOME = { nests: [] }
+
+// useHomeNests 管理小窝图层:拉一次快照,之后订阅后端推送(每次变化都推全量,直接替换)。
+// 断线重连期间的增量丢失了,故重连成功时补拉一次快照。
 export function useHomeNests(account) {
-  const [nests, setNests] = useState([])
+  const { data, setData, refresh } = useAsyncData(
+    useCallback(() => getHome(), []),
+    { fallback: NO_HOME, reloadKey: account },
+  )
 
-  useEffect(() => {
-    let alive = true
-    setNests([])
-    getHome().then((d) => { if (alive && d) setNests(d.nests || []) }).catch(() => {})
-    return () => { alive = false }
-  }, [account])
+  useEffect(
+    () => subscribe('home', (d) => setData(d), { onOpen: refresh }),
+    [refresh, setData],
+  )
 
-  // 后端每次变化都推全量(进家园、收走一颗蛋、宠物进出窝),直接替换;
-  // 断线重连成功(或首次连上)后补拉快照——SSE 丢的增量覆盖不了。
-  useEffect(() => subscribe((m) => {
-    if (m.type === 'stream-open') {
-      getHome().then((d) => { if (d) setNests(d.nests || []) }).catch(() => {})
-      return
-    }
-    if (m.type === 'home') setNests(m.data.nests || [])
-  }), [account])
-
-  return { marks: nests }
+  return { marks: (data || NO_HOME).nests }
 }
 
 // nestTitle 组一个小窝标记的悬浮说明,单行「身份 · 个体」:

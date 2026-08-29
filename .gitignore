@@ -6,6 +6,9 @@
 *.pcap
 *.pcap[0-9]*
 
+# 用户私有收件箱(外部上传的待处理文件,AI 勿动,见目录内 README)
+/_private-inbox-DO-NOT-TOUCH/
+
 # 运行时数据
 *.db
 *.db-journal

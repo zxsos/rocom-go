@@ -92,7 +92,7 @@ export function usePanZoom(active, onTap) {
       stRef.current.follow = false
       focusRef.current = { u: f.u - (e.clientX - prev.x) / (base * z), v: f.v - (e.clientY - prev.y) / (base * z) }
     }
-  }, [])
+  }, [zoomAround])
   const onPointerUp = useCallback((e) => {
     ptrs.current.delete(e.pointerId)
     if (ptrs.current.size < 2) pinch.current = 0

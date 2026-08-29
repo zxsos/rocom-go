@@ -7,6 +7,7 @@ import (
 
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/scene"
+	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
@@ -173,55 +174,10 @@ func (p *Pipeline) onNpcInteract(conn string, body []byte, now time.Time) {
 // ---- 推送 ----
 
 // nestMark 是推送给前端的一个小窝(u/v 已按底图投影,与玩家位置同一套)。
-type nestMark struct {
-	ID   string  `json:"id"` // furniture_guid(uint64 超出 JS 安全整数,用字符串)
-	U    float64 `json:"u"`
-	V    float64 `json:"v"`
-	X    int32   `json:"x"`
-	Y    int32   `json:"y"`
-	Name string  `json:"name"` // 家具名(精灵小窝)
-	// Pet 为空即空窝。
-	Pet *nestPet `json:"pet,omitempty"`
-	Egg *nestEgg `json:"egg,omitempty"`
-}
-
-// nestPet 是窝里那只宠物的简要信息(悬浮显示;点击看详情走 /api/pets/{gid})。
-type nestPet struct {
-	Gid       uint32   `json:"gid"`
-	Name      string   `json:"name"`
-	Species   string   `json:"species,omitempty"`
-	Img       string   `json:"img,omitempty"`
-	Gender    string   `json:"gender,omitempty"`
-	Level     uint32   `json:"level,omitempty"`
-	HeightM   float64  `json:"heightM,omitempty"`
-	WeightKg  float64  `json:"weightKg,omitempty"`
-	HeightPct *float64 `json:"heightPct,omitempty"`
-	WeightPct *float64 `json:"weightPct,omitempty"`
-	Voice     int32    `json:"voice"`
-	Nature    string   `json:"nature,omitempty"`
-	Talent    string   `json:"talentRank,omitempty"`
-	FeedRound uint32   `json:"feedRound,omitempty"`
-	// Mates 是与它配对的另一半(母本看到候选父本,父本看到它配的母本);多于一个即串窝。
-	Mates []nestMate `json:"mates,omitempty"`
-}
-
-// nestMate 是配对里的另一半(只给名字与 gid,详情点开另一个窝即可)。
-type nestMate struct {
-	Gid  uint32 `json:"gid"`
-	Name string `json:"name"`
-}
-
-// nestEgg 是趴在窝上、还没收的蛋。
-type nestEgg struct {
-	ItemID uint32 `json:"itemId"`
-	Name   string `json:"name"`
-	Icon   string `json:"icon,omitempty"`
-}
-
 // pushHome 缓存并广播当前家园的小窝图层。
 func (p *Pipeline) pushHome(conn, acc string) {
 	cs := p.conns[conn]
-	payload := map[string]any{"account": acc, "nests": []nestMark{}}
+	payload := &server.HomePayload{Account: acc, Nests: []server.NestMark{}}
 	if cs == nil || cs.home == nil {
 		p.srv.SetLastHome(acc, payload)
 		p.srv.Hub().Broadcast("home", acc, payload)
@@ -229,16 +185,16 @@ func (p *Pipeline) pushHome(conn, acc string) {
 	}
 	h := cs.home
 	sc := p.st.For(acc)
-	marks := make([]nestMark, 0, len(h.nests))
+	marks := make([]server.NestMark, 0, len(h.nests))
 	for _, n := range h.nests {
 		u, v, _ := p.db.Project(uint32(h.res), n.Pos.X, n.Pos.Y)
 		name, _ := p.db.NestFurniture(n.ConfigID)
-		m := nestMark{ID: strconv.FormatUint(n.GUID, 10), U: u, V: v, X: n.Pos.X, Y: n.Pos.Y, Name: name}
+		m := server.NestMark{ID: strconv.FormatUint(n.GUID, 10), U: u, V: v, X: n.Pos.X, Y: n.Pos.Y, Name: name}
 		if actor, hp := h.petAt(n.GUID); hp != nil {
 			m.Pet = p.nestPetOf(sc, h, actor, hp)
 		}
 		if e := h.eggAt(n.GUID); e != nil {
-			ne := nestEgg{ItemID: e.itemID, Icon: p.db.EggIcon(e.itemID)}
+			ne := server.NestEgg{ItemID: e.itemID, Icon: p.db.EggIcon(e.itemID)}
 			if it, ok := p.db.EggItemInfo(e.itemID); ok {
 				ne.Name = it.Name
 			}
@@ -246,18 +202,22 @@ func (p *Pipeline) pushHome(conn, acc string) {
 		}
 		marks = append(marks, m)
 	}
-	payload["nests"] = marks
-	payload["sceneResId"] = h.res
-	payload["level"] = h.level
-	payload["roomLevel"] = h.roomLevel
-	payload["couplesStale"] = h.couplesStale
+	payload.Nests = marks
+	// 四个元信息字段同进同退:在家园时整体下发(值即使为 0/false 也带),
+	// 不在家园时整体缺席 —— 由 HomePayload 的内嵌指针保证,与改造前的 map 行为一致。
+	payload.HomeMeta = &server.HomeMeta{
+		SceneResID:   h.res,
+		Level:        h.level,
+		RoomLevel:    h.roomLevel,
+		CouplesStale: h.couplesStale,
+	}
 	p.srv.SetLastHome(acc, payload)
 	p.srv.Hub().Broadcast("home", acc, payload)
 }
 
 // nestPetOf 组一只入住宠物的简要信息:名字/位置来自场景实体,个体属性回库里取(宠物列表已存)。
-func (p *Pipeline) nestPetOf(sc *store.Scoped, h *homeState, actor uint64, hp *scene.HomePet) *nestPet {
-	np := &nestPet{Gid: hp.PetGid, Name: hp.Name, FeedRound: hp.FeedRound}
+func (p *Pipeline) nestPetOf(sc *store.Scoped, h *homeState, actor uint64, hp *scene.HomePet) *server.NestPet {
+	np := &server.NestPet{Gid: hp.PetGid, Name: hp.Name, FeedRound: hp.FeedRound}
 	if pp, err := sc.GetPet(hp.PetGid); err == nil && pp != nil {
 		pet.FillSizePercentile(p.db, pp)
 		np.Species, np.Img, np.Gender, np.Level = pp.Species, pp.Image.Head, pp.Gender, pp.Level
@@ -270,7 +230,7 @@ func (p *Pipeline) nestPetOf(sc *store.Scoped, h *homeState, actor uint64, hp *s
 	}
 	for _, mate := range h.matesOf(actor) {
 		if mp := h.pets[mate]; mp != nil {
-			np.Mates = append(np.Mates, nestMate{Gid: mp.PetGid, Name: mp.Name})
+			np.Mates = append(np.Mates, server.NestMate{Gid: mp.PetGid, Name: mp.Name})
 		}
 	}
 	return np

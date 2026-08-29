@@ -25,7 +25,7 @@
   background: rgba(11, 14, 19, .94); color: #e6edf3;
   border: 1px solid var(--line); box-shadow: var(--shadow);
   font-size: 12px; font-weight: 400; line-height: 1.5; white-space: nowrap;
-  z-index: 10; pointer-events: auto;
+  z-index: var(--z-tip); pointer-events: auto;
 }
 .incu-tip-bubble::after {
   content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
@@ -78,7 +78,7 @@
   padding: 10px; display: flex; flex-direction: column; gap: 8px;
   box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
 }
-.egg-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(76, 141, 255, .12); }
+.egg-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(var(--c-accent-rgb), .12); }
 
 /* 头部:蛋图 | 名称+奖牌标签 | 品类角标+孵出物种头像 */
 .egg-head { display: flex; align-items: flex-start; gap: 8px; }

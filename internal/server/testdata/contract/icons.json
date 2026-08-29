@@ -1,0 +1,35 @@
+{
+  "colorful": "static/img_bolitubian_png.webp",
+  "partnerFrame": "static/img_collect_png.webp",
+  "pollution": "static/img_emeng_png.webp",
+  "shiny": "static/img_yisetubian_png.webp",
+  "shinyColorful": "static/img_yisexuancai_png.webp",
+  "stat": {
+    "attack": "filter/ui_pet_attribute_02_png.webp",
+    "defense": "filter/ui_pet_attribute_03_png.webp",
+    "hp": "filter/ui_pet_attribute_01_png.webp",
+    "spAttack": "filter/ui_pet_attribute_04_png.webp",
+    "spDefense": "filter/ui_pet_attribute_05_png.webp",
+    "speed": "filter/ui_pet_attribute_06_png.webp"
+  },
+  "type": {
+    "光": "filter/ui_icon_species_06_png.webp",
+    "冰": "filter/ui_icon_species_09_png.webp",
+    "地": "filter/ui_icon_species_08_png.webp",
+    "幻": "filter/ui_icon_species_20_png.webp",
+    "幽": "filter/ui_icon_species_17_png.webp",
+    "恶": "filter/ui_icon_species_18_png.webp",
+    "普": "filter/ui_icon_species_02_png.webp",
+    "机械": "filter/ui_icon_species_19_png.webp",
+    "武": "filter/ui_icon_species_14_png.webp",
+    "毒": "filter/ui_icon_species_12_png.webp",
+    "水": "filter/ui_icon_species_05_png.webp",
+    "火": "filter/ui_icon_species_04_png.webp",
+    "电": "filter/ui_icon_species_11_png.webp",
+    "翼": "filter/ui_icon_species_15_png.webp",
+    "草": "filter/ui_icon_species_03_png.webp",
+    "萌": "filter/ui_icon_species_16_png.webp",
+    "虫": "filter/ui_icon_species_13_png.webp",
+    "龙": "filter/ui_icon_species_10_png.webp"
+  }
+}

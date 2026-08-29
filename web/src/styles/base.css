@@ -14,6 +14,7 @@
   --gold: #f5b942;
   --green: #3fb950;
   --red: #f85149;
+  --red-hi: #ff625a; /* --red 亮一档,危险按钮 hover 用 */
   --danger: #e5534b;
   --shadow: 0 4px 16px rgba(0, 0, 0, .35);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, .25);
@@ -42,11 +43,74 @@
   --gold: #b88200;
   --green: #1a7f37;
   --red: #cf222e;
+  --red-hi: #e5534b; /* 亮色下 hover 用略深的一档(白底上再亮会看不清) */
   --danger: #cf222e;
   --shadow: 0 4px 16px rgba(0, 0, 0, .12);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, .08);
   --bar-bg: rgba(255, 255, 255, .9);
   --bar-hover: rgba(0, 0, 0, .05);
+  --hero-tint: rgba(56, 65, 90, .12); /* 亮色下只留极淡的一层,见暗色处注释 */
+
+  /* —— 语义色:数据可视化的固定配色,**不随亮/暗主题变化** —— */
+  /* 这些色对应游戏内的具体含义(奖牌、传送门、花种星级、性别、稀有度…),玩家靠颜色辨认,
+     若跟随主题改变反而会造成误认。故只在此定义一次供各处引用,不进 [data-theme] 覆写。
+     与主题色(--fg/--bg/--accent…)的区别:主题色是 UI 外框,语义色是数据本身。 */
+  --c-medal: #ffc107;    /* 奖牌/星级金(地图奖牌阈值、星级) */
+  --c-star: #ffd54a;     /* 刷新点星标(比奖牌金更亮,用于发光) */
+  --c-portal: #4a3f8a;   /* 传送门底色 */
+  --c-portal-d: #241d47; /* 传送门暗部 */
+  --c-portal-l: #c9b6ff; /* 传送门描边/亮部 */
+  --c-flower: #ffb6e0;   /* 花种粉(炫彩花、雌性) */
+  --c-flower-d: #6b2f50; /* 花种粉暗部 */
+  --c-flower-dd: #3a1a2c;/* 花种粉最深 */
+  --c-seed: #ffd76e;     /* 种子金(普通花种) */
+  --c-seed-d: #3a2f14;   /* 种子金暗部 */
+  --c-shiny: #c9b6ff;    /* 异色标记字色 */
+  --c-shiny-d: #3a2f6b;  /* 异色标记底 */
+  --c-form: #a8e6c0;     /* 形态标记字色 */
+  --c-form-d: #2f4a3a;   /* 形态标记底 */
+  --c-male: #4ea3ff;     /* 雄性 */
+  --c-female: #ff6fae;   /* 雌性 */
+  --c-wealth: #d4af37;   /* 财富金(排行榜「富有」称号、商人价格)——比 --gold 更深,专指洛克贝 */
+  --c-earn: #28a745;     /* 盈利绿(盈亏为正、成功态) */
+  --c-spend: #e5534b;    /* 亏损红(盈亏为负、危险态)——与 --danger 同值,语义上指「花掉」 */
+  --c-chart: #3d7ab8;    /* 图表蓝(柱状图渐变起点) */
+  --c-chart-l: #5aa9e6;  /* 图表亮蓝(渐变终点) */
+
+  /* 上面几个语义色的 **rgb 分量形式**,供需要半透明的地方用:
+     `rgba(var(--c-earn-rgb), .14)`。避免各处重复写死同一串数字(改色时易漏)。 */
+  --c-wealth-rgb: 212, 175, 55;
+  --c-earn-rgb: 40, 167, 69;
+  --c-spend-rgb: 229, 83, 75;
+  --c-medal-rgb: 255, 193, 7;
+  --c-flower-rgb: 255, 182, 224;
+  --c-seed-rgb: 255, 215, 110;
+  --c-accent-rgb: 76, 141, 255;
+  /* 详情弹窗 hero 的底衬色(径向渐变中心色)。暗色下偏冷灰蓝提供纵深,
+     亮色下近乎透明 —— 白底上再叠深色会显脏(原写死 #38415a,切亮色是一块突兀深色斑)。 */
+  --hero-tint: #38415a;
+
+  /* --muted 是 --fg-dim 的别名:早先各处直接写 var(--muted) 但从未定义,
+     导致这 8 处「次要文字」静默降级为继承色(失去弱化效果)。补上定义即可,无需改调用点。 */
+  --muted: var(--fg-dim);
+
+  /* z-index 标度(从低到高)。各处一律引用变量,不写裸数字——便于看清层次、避免层层加码。
+     改值前先确认跨层依赖:抽屉遮罩必须低于抽屉,PIN 必须盖过所有弹窗。 */
+  --z-base: 1;         /* 同层内堆叠微调:吸顶表头、角标、标记、步骤点 */
+  --z-raised: 2;       /* 卡片内浮起元素(详情关闭按钮) */
+  --z-tip: 10;         /* 轻量气泡(孵化提示) */
+  --z-bar: 30;         /* 顶栏 / 底栏 / 地图控件 */
+  --z-scrim: 39;       /* 抽屉遮罩(须低于 --z-drawer) */
+  --z-drawer: 40;      /* 侧滑抽屉 */
+  --z-popover: 50;     /* 账号下拉、奖牌 tooltip */
+  --z-popover-top: 51; /* 同层浮层置顶(hover 的 tooltip 盖住兄弟) */
+  --z-dropdown: 60;    /* 通用下拉浮层(Dropdown 组件) */
+  --z-menu: 100;       /* 右键菜单 */
+  --z-modal: 200;      /* 详情弹窗 */
+  --z-pin: 300;        /* PIN 输入(须盖过所有弹窗) */
+  --z-toast: 1000;     /* 轻提示 */
+  --z-confirm: 1001;   /* 确认框 */
+  --z-loading: 1002;   /* 全屏加载遮罩 */
 }
 
 * { box-sizing: border-box; }
@@ -119,7 +183,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 
 /* ---- Toast 轻提示(替代 window.alert 的自制弹层,见 components/toast.jsx) ---- */
 .toast-host {
-  position: fixed; left: 50%; bottom: 24px; z-index: 1000;
+  position: fixed; left: 50%; bottom: 24px; z-index: var(--z-toast);
   display: flex; flex-direction: column; align-items: center;
   transform: translateX(-50%);
   pointer-events: none;
@@ -136,7 +200,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 
 /* ---- Confirm 确认框(替代 window.confirm 的自制弹层,见 components/confirm.jsx) ---- */
 .confirm-backdrop {
-  position: fixed; inset: 0; z-index: 1001;
+  position: fixed; inset: 0; z-index: var(--z-confirm);
   background: rgba(0, 0, 0, .55); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; padding: 16px;
   opacity: 0; transition: opacity .16s ease;
@@ -159,7 +223,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 /* 各场景色卡(列表/详情/地图悬浮/花种)都可点击放大;图标退化态不可点。 */
 .glass-chip, .map-wild-tip .map-wild-tip-chip, .flower-glass-chip { cursor: zoom-in; }
 .glass-zoom-backdrop {
-  position: fixed; inset: 0; z-index: 1002;
+  position: fixed; inset: 0; z-index: var(--z-loading);
   background: rgba(0, 0, 0, .55);
   display: flex; align-items: center; justify-content: center;
   cursor: zoom-out;
@@ -178,7 +242,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 }
 .glass-zoom-card > img { object-fit: cover; }
 .glass-zoom-close {
-  position: absolute; top: -10px; right: -10px; z-index: 2; width: 26px; height: 26px;
+  position: absolute; top: -10px; right: -10px; z-index: var(--z-raised); width: 26px; height: 26px;
 }
 
 /* ---- 系别色 ---- */

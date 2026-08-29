@@ -1,0 +1,50 @@
+[
+  {
+    "book": 5,
+    "image": {
+      "bigHead": "BigHeadIcon256/3003.webp",
+      "head": "HeadIcon/3003.webp",
+      "portrait": "Pet1024/JL_huohua.webp",
+      "portraitSmall": "Pet256/JL_huohua.webp"
+    },
+    "name": "火花",
+    "petbase": 3003,
+    "stage": 1
+  },
+  {
+    "book": 6,
+    "image": {
+      "bigHead": "BigHeadIcon256/3032.webp",
+      "head": "HeadIcon/3032.webp",
+      "portrait": "Pet1024/JL_yanhuo.webp",
+      "portraitSmall": "Pet256/JL_yanhuo.webp"
+    },
+    "name": "焰火",
+    "petbase": 3032,
+    "stage": 2
+  },
+  {
+    "book": 7,
+    "image": {
+      "bigHead": "BigHeadIcon256/3006.webp",
+      "head": "HeadIcon/3006.webp",
+      "portrait": "Pet1024/JL_huoshen.webp",
+      "portraitSmall": "Pet256/JL_huoshen.webp"
+    },
+    "name": "火神",
+    "petbase": 3006,
+    "stage": 3
+  },
+  {
+    "book": 7,
+    "image": {
+      "bigHead": "BigHeadIcon256/4006.webp",
+      "head": "HeadIcon/4006.webp",
+      "portrait": "Pet1024/JL_huoshen_shouling.webp",
+      "portraitSmall": "Pet256/JL_huoshen_shouling.webp"
+    },
+    "name": "烈火战神",
+    "petbase": 5017,
+    "stage": 4
+  }
+]

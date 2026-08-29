@@ -145,12 +145,9 @@ export function usePaint(account, res, layer, paintable) {
 
   useEffect(() => { load() }, [account, load])
 
-  // SSE 增量:新涂的格子(常态几个到几十个)直接补进位图并画上;reset 则清空重画;
-  // 断线重连成功(或首次连上)后补拉整张——断线期间的增量覆盖不了,直接重拉快照。
-  useEffect(() => subscribe((m) => {
-    if (m.type === 'stream-open') { load(); return }
-    if (m.type !== 'paint') return
-    const d = m.data || {}
+  // SSE 增量:新涂的格子(常态几个到几十个)直接补进位图并画上;reset 则清空重画。
+  useEffect(() => subscribe('paint', (d) => {
+    d = d || {}
     if (d.res !== res || (d.layer || 0) !== (layer || 0)) return // 别的场景/层,不关我的事
     const bits = bitsRef.current
     if (d.reset) {
@@ -161,15 +158,20 @@ export function usePaint(account, res, layer, paintable) {
     if (!bits || !d.cells) return
     for (const idx of d.cells) bits[idx >> 3] |= 1 << (idx & 7)
     schedule()
+  }, {
+    // 断线重连成功(或首次连上)后补拉整张——断线期间的增量覆盖不了,直接重拉快照。
+    onOpen: load,
   }), [account, res, layer, schedule, load])
 
   useEffect(() => { draw() }, [ver, on, draw]) // 整张换了/图层刚打开:重画
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []) // 卸载时别留下待执行的重画
 
-  const toggle = () => setOn((v) => {
-    localStorage.setItem(LS_KEY, v ? '0' : '1')
-    return !v
-  })
+  // 开关状态持久化。副作用放 effect 而非 setValue 的 updater 内——StrictMode 会把 updater
+  // 调用两次,写在那里会重复执行(此处写盘幂等无害,但保持一致更安全,见 usePois 的注释)。
+  const toggle = () => setOn((v) => !v)
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, on ? '1' : '0') } catch { /* 隐私模式下忽略 */ }
+  }, [on])
 
   // 重置只清当前场景当前层:别处扫过的照旧保留(重来一遍代价太大)。
   const reset = () => {

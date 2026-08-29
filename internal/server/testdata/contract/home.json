@@ -1,0 +1,44 @@
+{
+  "account": "UID:1",
+  "couplesStale": false,
+  "level": 5,
+  "nests": [
+    {
+      "id": "998877665544332211",
+      "name": "精灵小窝",
+      "pet": {
+        "gid": 1001,
+        "level": 60,
+        "mates": [
+          {
+            "gid": 1002,
+            "name": "小水"
+          }
+        ],
+        "name": "小火",
+        "species": "火神",
+        "voice": 12,
+        "weightPct": 55.5
+      },
+      "u": 0.3,
+      "v": 0.8,
+      "x": 10,
+      "y": 20
+    },
+    {
+      "egg": {
+        "icon": "egg/5001.webp",
+        "itemId": 5001,
+        "name": "友爱天天的蛋"
+      },
+      "id": "998877665544332212",
+      "name": "精灵小窝",
+      "u": 0.6,
+      "v": 0.4,
+      "x": 30,
+      "y": 40
+    }
+  ],
+  "roomLevel": 2,
+  "sceneResId": 10003
+}

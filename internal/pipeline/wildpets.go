@@ -8,6 +8,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/scene"
+	"github.com/whoisnian/rocom-capture/internal/server"
 )
 
 // ---- 实时地图的野生宠物图层(见 docs/data.md 3.5)----
@@ -65,6 +66,7 @@ type wildPet struct {
 // wildTracker 是一个连接在当前场景会话内的野生宠物观测态(换场景/传送即重置)。
 //   - pets:稀有类别(异色/炫彩/污染/奖牌四件套)的个体,前端按图层描边、可点资料卡;
 //   - all:其余普通野生宠,仅作「全部野生」图层的小头像点,不描边、不弹卡、不参与通知。
+//
 // 两者键不重叠:同一 actor_id 若命中 wildKinds 进 pets,否则进 all。
 type wildTracker struct {
 	pets map[uint64]*wildPet
@@ -245,43 +247,6 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 	}
 }
 
-// wildMark 是推送给前端的一只野生宠物标记(u/v 已按底图投影,与玩家位置同一套)。
-type wildMark struct {
-	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
-	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
-	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / big / small / high / low
-	U      float64  `json:"u"`
-	V      float64  `json:"v"`
-	X      int32    `json:"x"`
-	Y      int32    `json:"y"`
-	Z      int32    `json:"z"`
-	Lv     int32    `json:"lv,omitempty"`
-	Voice  int32    `json:"voice"`
-	Height int32    `json:"height,omitempty"`
-	Weight int32    `json:"weight,omitempty"`
-	// 体重在本形态取值范围内的百分位(0-100),与宠物列表/事件页的「W xx%」同一口径
-	// (pet.SizePercentile);形态范围缺失时为 nil。
-	WeightPct *float64 `json:"weightPct,omitempty"`
-	GlassType  int32  `json:"glassType,omitempty"`  // 炫彩类型(1=普通 / 2=隐藏;0=无炫彩)
-	Glass      string `json:"glass,omitempty"`      // 炫彩外观描述(暗夜拾光 / 四角星·亮X暗 - 浅紫橙);空=非炫彩
-	GlassValue int32  `json:"glassValue,omitempty"` // 炫彩数值(普通=(粒子id<<20)|配色id;隐藏=1/2/3 赛季、1000);前端据此渲染色卡
-	Mutation   int32  `json:"mutation,omitempty"`   // 原始 mutation_type 位标志(排查用)
-	Stale     bool     `json:"stale,omitempty"`    // 已离开 AOI:位置是最后所见,前端置灰
-}
-
-// wildAllMark 是「全部野生」图层的普通野生宠标记(稀有的走 wildMark,见上)。
-// 字段精简:普通宠在地图上只画小头像点,不描边、不弹资料卡、不参与通知,故不带 lv/weight/
-// voice/mutation/kinds/weightPct/glass——那些只对稀有筛选有意义,普通宠查了也白查。
-type wildAllMark struct {
-	ID    string  `json:"id"`
-	Name  string  `json:"n,omitempty"`  // 形态名(查表失败为空)
-	Img   string  `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	U     float64 `json:"u"`
-	V     float64 `json:"v"`
-	Stale bool    `json:"stale,omitempty"`
-}
-
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
 // 只在成员/状态真的变了时调用:实体进出 AOI 是低频事件,不必节流。
 // now 取**消息时刻**而非 time.Now():离线回放的包时间是几小时前的,用挂钟一比就全过期了。
@@ -291,7 +256,7 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 		return
 	}
 	ts := cs.wilds
-	marks := []wildMark{}
+	marks := []server.WildMark{}
 	for id, w := range ts.pets {
 		if w.left && now.Sub(w.seenAt) > wildStaleTTL {
 			delete(ts.pets, id)
@@ -301,7 +266,7 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 		if !ok { // 该场景无底图:投影无从谈起,标记也就无处可画
 			continue
 		}
-		m := wildMark{
+		m := server.WildMark{
 			ID: strconv.FormatUint(w.actorID, 10), U: u, V: v,
 			X: w.pos.X, Y: w.pos.Y, Z: w.pos.Z,
 			Lv: w.lv, Voice: w.voice, Height: w.height, Weight: w.weight,
@@ -336,7 +301,7 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 
 	// 「全部野生」图层:普通野生宠(未命中稀有类别的可捕捉个体)。与稀有通道同一次推送,
 	// 前端一个订阅即收齐两组。普通宠只查名/头像/投影,不带稀有的全量字段。
-	allMarks := []wildAllMark{}
+	allMarks := []server.WildAllMark{}
 	for id, w := range ts.all {
 		if w.left && now.Sub(w.seenAt) > wildStaleTTL {
 			delete(ts.all, id)
@@ -346,7 +311,7 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 		if !ok {
 			continue
 		}
-		m := wildAllMark{
+		m := server.WildAllMark{
 			ID: strconv.FormatUint(w.actorID, 10), U: u, V: v, Stale: w.left,
 		}
 		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
@@ -359,7 +324,7 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 	}
 	sort.Slice(allMarks, func(i, j int) bool { return allMarks[i].ID < allMarks[j].ID })
 
-	payload := map[string]any{"account": acc, "sceneResId": ts.res, "pets": marks, "allPets": allMarks}
-	p.srv.SetLastWildPets(acc, payload)
+	payload := server.WildPayload{Account: acc, SceneResID: ts.res, Pets: marks, AllPets: allMarks}
+	p.srv.SetLastWildPets(acc, &payload)
 	p.srv.Hub().Broadcast("wildpets", acc, payload)
 }

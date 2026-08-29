@@ -4,7 +4,7 @@
 
 /* ---- 顶栏 ---- */
 .topbar {
-  position: sticky; top: 0; z-index: 30;
+  position: sticky; top: 0; z-index: var(--z-bar);
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; background: var(--bar-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
@@ -31,7 +31,7 @@
 .navgroup-pop {
   display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 160px;
   background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; z-index: 40; backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; z-index: var(--z-drawer); backdrop-filter: blur(10px);
 }
 .navgroup:hover .navgroup-pop, .navgroup:focus-within .navgroup-pop { display: block; }
 .navgroup-item {
@@ -79,7 +79,7 @@
 .account-dropdown {
   position: absolute; top: calc(100% + 4px); right: 0; left: 0; min-width: 100%;
   max-height: min(40vh, 320px); overflow-y: auto;
-  list-style: none; margin: 0; padding: 4px; z-index: 50;
+  list-style: none; margin: 0; padding: 4px; z-index: var(--z-popover);
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -129,7 +129,7 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
   .bottomnav {
-    display: flex; position: sticky; bottom: 0; z-index: 30;
+    display: flex; position: sticky; bottom: 0; z-index: var(--z-bar);
     background: var(--bar-bg); backdrop-filter: blur(10px);
     border-top: 1px solid var(--line);
   }
@@ -144,7 +144,7 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .tabgroup-pop {
     position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
     background: var(--bar-bg); border: 1px solid var(--line); border-radius: var(--radius);
-    box-shadow: 0 -8px 24px rgba(0,0,0,.25); padding: 8px; z-index: 40; backdrop-filter: blur(10px);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.25); padding: 8px; z-index: var(--z-drawer); backdrop-filter: blur(10px);
     display: flex; flex-direction: column; gap: 2px;
   }
   .tabgroup-item {

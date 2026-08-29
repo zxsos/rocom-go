@@ -1,0 +1,30 @@
+{
+  "account": "UID:1",
+  "flowers": [
+    {
+      "activityId": 7,
+      "bindEvo": 2,
+      "bindImg": "HeadIcon/3006.webp",
+      "bindName": "火神",
+      "blood": 3,
+      "bloodIcon": "blood/3.webp",
+      "bloodName": "火",
+      "challengeCount": 2,
+      "detail": true,
+      "endTs": 1700086400,
+      "glass": "暗夜拾光",
+      "glassType": 1,
+      "glassValue": 131073,
+      "id": 7001,
+      "img": "HeadIcon/3006.webp",
+      "lv": 60,
+      "medalIcon": "medal/1.webp",
+      "medalName": "大块头",
+      "name": "火神",
+      "npcLogicId": 70010,
+      "ownerUserId": 0,
+      "specSeedId": 0,
+      "star": 7
+    }
+  ]
+}
