@@ -228,11 +228,18 @@ export function useMapEngine(account) {
   // pokeFrame 必须稳定引用:MapViz 的 handlers useMemo 依赖它,每次渲染新建会让 memo 形同虚设。
   const pokeFrame = useCallback(() => rafRef.current?.(), [])
 
+  // clearUiState 清掉一次性交互态(宠物资料卡 / 野生宠悬浮卡 / 距离)。
+  // 引擎提升到 App 层常驻后,它不再随地图页卸载而销毁——若不清,离开时正弹着资料卡,
+  // 下次进地图页会凭空出现上次的卡片(没有对应的点击动作)。
+  const clearUiState = useCallback(() => {
+    setDetailGid(null); setWildTip(null); setWildDist(null)
+  }, [])
+
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, applyFrame,
     pois, wilds, home, paint, routes,
-    detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap,
+    detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap, clearUiState,
     // canvas PiP 用:暴露当前帧的渲染参数(供 renderToCanvas 画到外部 canvas)
     // 这些 ref 在 applyFrame 里每帧更新,canvas 渲染循环直接读,不触发 React 重渲染。
     frameStateRef: dispRef, // { u, v, heading } 当前玩家显示位置
@@ -245,7 +252,8 @@ export function useMapEngine(account) {
 
 // MapViz 地图本体渲染:从 .map-vp 到标记层、控制按钮。
 // engine 由 useMapEngine 产出(内部持有 sceneRef/layerRef/anchorRef 等,这里只读 pos)。
-export function MapViz({ engine, layersActive, onToggleLayers }) {
+// pip 是画中画控制器(见 usePip.js);不传则不显示画中画按钮。
+export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
   const { pos, hasMap, layerError, setImgError, setLayerError,
     view, worldRef, arrowRef, pois, wilds, home, paint, routes,
     detailGid, setDetailGid, wildTip, wildDist,
@@ -279,6 +287,23 @@ export function MapViz({ engine, layersActive, onToggleLayers }) {
         onClick={() => view.zoomAround(1 / 1.4, view.vp.w / 2, view.vp.h / 2)}>－</button>
       <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置"
         disabled={!zoomReady} onClick={() => view.setFollow(true)}>◎</button>
+      {/* 画中画:开启后地图投到系统悬浮窗,切页/切出浏览器都继续更新。
+          不支持的浏览器置灰并说明原因,不静默失败(见 usePip 的 detect)。 */}
+      {pip && (
+        <button className={'map-btn map-pip-toggle' + (pip.active ? ' on' : '')}
+          disabled={!pip.cap.ok}
+          title={pip.cap.ok
+            ? (pip.active ? '关闭画中画' : '画中画:把地图投到系统悬浮窗(切出浏览器也继续更新)')
+            : '画中画不可用:' + pip.cap.why}
+          onClick={pip.toggle}>⧉</button>
+      )}
+      {/* PiP 缩放只在小窗开启时出现:小窗不可交互,缩放只能从主页面调。 */}
+      {pip && pip.active && (<>
+        <button className="map-btn map-pip-zoom" title="画中画放大"
+          onClick={() => pip.zoomBy(1.5)}>＋</button>
+        <button className="map-btn map-pip-zoom" title="画中画缩小"
+          onClick={() => pip.zoomBy(1 / 1.5)}>－</button>
+      </>)}
     </div>
   )
 

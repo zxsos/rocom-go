@@ -2,6 +2,7 @@ import React from 'react'
 import { imgURL } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
 import { WILD_LAYERS, MEDAL_FILTERS } from './wildConfig'
+import ZonePanel from './ZonePanel'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
@@ -10,8 +11,8 @@ import { WILD_LAYERS, MEDAL_FILTERS } from './wildConfig'
 // 跑图路线组(useRoutes.js):B站泽口博士的收集路线,仅卡洛西亚大陆(10003)有数据;
 // 点开才见路线列表,每条可单独开关叠加,选择存 localStorage。
 // 复用宠物列表那套 .filters:所有宽度统一为侧滑抽屉(collapsed 控制开合,桌面也对齐手机端)。
-export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onClose }) {
-  const { kinds, poiOn, togglePoi, collectOn, toggleCollect } = pois
+export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onClose, onFocusZone }) {
+  const { kinds, poiOn, togglePoi, collectOn, toggleCollect, zoneStats } = pois
   const dualNum = wilds.num.dual || 0
   const dualGone = wilds.numStale.dual || 0
   return (
@@ -45,6 +46,10 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             </div>
           ))}
         </div>
+        {/* 区域收集度:数据同源于上面的图层(服务器分区进度),但视角不同——
+            图层是「图上显示什么」,这里是「还差多少、差在哪」,点一行把地图移过去。
+            放在图标图层下面,同属大地图静态收集物一类。 */}
+        <ZonePanel stats={zoneStats} onFocus={onFocusZone} disabled={!onFocusZone} />
         <div className="filter-group">
           <label>野生宠物</label>
           <div className="map-layer-row">

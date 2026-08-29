@@ -607,4 +607,135 @@
   font-variant-numeric: tabular-nums; color: var(--fg);
 }
 
+/* —— 画中画(PiP)——
+   ⧉ 按钮:把地图投到系统悬浮窗(见 pages/map/usePip.js)。开启态高亮,
+   不支持的浏览器由 :disabled 置灰,title 里给出原因(不静默失败)。 */
+.map-pip-toggle { font-size: 15px; }
+/* 小窗开启时才出现的缩放按钮:小窗不可交互,缩放只能从主页面调,故这两个
+   按钮**不属于**地图缩放(那组是 ＋/－/◎),用更小的尺寸与上缩进以示区别。 */
+.map-pip-zoom {
+  width: 30px; height: 30px; font-size: 14px;
+  margin-left: 4px; align-self: flex-end;
+  opacity: .9;
+}
+
+/* 画中画的 video 挂载点:1px 透明,固定在视口角落。
+   为什么不用 display:none —— 部分浏览器不解码隐藏元素,PiP 出来是黑屏;
+   为什么不放地图页内 —— .map-vp 建了自己的层叠上下文,被它困住的 video 进 PiP 后会被裁。 */
+.pip-video-host {
+  position: fixed; right: 0; bottom: 0;
+  width: 1px; height: 1px; overflow: hidden;
+  opacity: 0; pointer-events: none;
+  z-index: var(--z-base);
+}
+.pip-video { width: 1px; height: 1px; display: block; }
+
 /* 右上角图层入口按钮(主页面 .map-ctrl 内的 ☰):复用 .map-btn */
+
+/* ---- 区域收集度(ZonePanel,地图图层栏内)----
+   观感对齐孵蛋页的进度条(--accent 填充 + --bg-3 底),不新造视觉语言;
+   行高与 .map-layer-row 一致,塞在图层栏里不突兀。 */
+
+.map-zone-head {
+  /* 复用 .map-medal-toggle 的样式,这里只补总览数字的排版 */
+  gap: 8px;
+}
+
+.map-zone-total {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.map-zone-total b { font-size: 13px; color: var(--fg); font-weight: 600; }
+.map-zone-total i { font-style: normal; font-size: 12px; }
+.map-zone-total em { font-style: normal; font-size: 11px; margin-left: 4px; }
+
+/* 总进度条(整宽,在总览行下面) */
+.map-zone-bar {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  overflow: hidden;
+  margin: 2px 0 6px;
+}
+.map-zone-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width .35s ease;
+}
+
+/* 「只看未集满」过滤行:沿用奖牌组的行结构 */
+.map-zone-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 6px;
+}
+.map-zone-filter .map-layer-name { flex: 0 0 auto; }
+.map-zone-filter .muted { margin-left: auto; font-size: 12px; }
+
+/* 明细行:名字 / 进度数字 / 缺口 / 迷你进度条 */
+.map-zone-row { display: flex; }
+.map-zone-btn {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "name num"
+    "bar  miss";
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.map-zone-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(76, 141, 255, .08);
+}
+.map-zone-btn:disabled { cursor: default; opacity: .75; }
+
+.map-zone-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.map-zone-num {
+  grid-area: num;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.map-zone-num b { font-weight: 600; }
+.map-zone-num i { font-style: normal; }
+.map-zone-miss {
+  grid-area: miss;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+.map-zone-bar-sm {
+  grid-area: bar;
+  height: 4px;
+  margin: 0;
+}
+
+/* 已集满的区:数字转成功色,整行退到次要层级(仍可点,只是不抢眼) */
+.map-zone-row.done .map-zone-btn { border-style: dashed; }
+.map-zone-row.done .map-zone-num b { color: #3ddc97; }
+.map-zone-row.done .map-zone-miss { color: #3ddc97; }

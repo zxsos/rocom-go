@@ -90,6 +90,40 @@ export function usePois(account, res) {
   const doneZones = useMemo(
     () => new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp)),
     [poi])
+
+  // 区域收集度(给 ZonePanel 展示用):服务器按分区给「已收集/总数」,这里再补两件事——
+  //   1) 汇总成总进度;
+  //   2) 反推每个分区的中心(u/v),让面板能把地图移过去。
+  // 中心取自该分区在本场景的点位坐标均值:一个点的 zone 可能有多个候选区(管辖区重叠带),
+  // 故同一点会计入它所属的每个区。点在跨区边界时中心会略微偏向邻区,对「定位过去」
+  // 这个用途无所谓(真要精确得靠 AREA_FUNC_CONF 的多边形,那边没有现成数据)。
+  // 只统计带 zone 的点(即眠枭之星一类有服务器分区进度的收集物),tot=0 的区不列。
+  const zoneStats = useMemo(() => {
+    const acc = new Map() // camp -> {su, sv, n}
+    for (const p of poi.pois) {
+      if (!p.zone?.length) continue
+      for (const c of p.zone) {
+        const e = acc.get(c) || { su: 0, sv: 0, n: 0 }
+        e.su += p.u; e.sv += p.v; e.n++
+        acc.set(c, e)
+      }
+    }
+    let got = 0, tot = 0
+    const rows = (poi.zones || [])
+      .filter((z) => z.tot > 0)
+      .map((z) => {
+        got += z.got; tot += z.tot
+        const e = acc.get(z.camp)
+        return {
+          camp: z.camp, name: z.name, got: z.got, tot: z.tot, miss: z.tot - z.got,
+          n: e ? e.n : 0,
+          u: e ? e.su / e.n : null,
+          v: e ? e.sv / e.n : null,
+        }
+      })
+      .sort((a, b) => b.miss - a.miss || a.camp - b.camp) // 缺口大的在前
+    return { got, tot, rows }
+  }, [poi])
   // marks 顺带把「已确认还在」(收集模式高亮)的布尔算好挂到副本上(sure):渲染层直接读,
   // 替代每标记每渲染调 isSure。依赖只有 poi/开关/收集状态,位置推送不碰这些。
   const marks = useMemo(() => {
@@ -104,5 +138,5 @@ export function usePois(account, res) {
       .map((p) => ({ ...p, icon: iconOf[p.k], sure: collectOn.has(p.k) && starSt[p.r] === ST_UNCOLLECTED }))
   }, [poi, poiOn, collectOn, starSt, doneZones, iconOf])
 
-  return { kinds, iconOf, marks, poiOn, togglePoi, collectOn, toggleCollect }
+  return { kinds, iconOf, marks, zoneStats, poiOn, togglePoi, collectOn, toggleCollect }
 }

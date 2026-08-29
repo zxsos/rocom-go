@@ -183,9 +183,13 @@ export function usePaint(account, res, layer, paintable) {
 
   // w/h 既是 canvas 的像素尺寸也是 SVG 的 viewBox(都按格子数);edge 是边界路径;
   // ready:位图已到手、可以画了;available:这个场景能不能涂(管开关是否可点)。
+  // bitsRef/gridRef/ver 额外导出给画中画:它要把同一张位图手绘到 canvas,且必须读
+  // **最新**格子(增量只改 ref、不触发重渲染),故导出 ref 本身而非值;ver 是「整张换过」
+  // 的世代号,格子变了但边界恰好没变时靠它判定重绘。三者均为增量,不影响上面的 DOM 路径。
   return {
     on, toggle, reset, attach, edge,
     w: dims.w, h: dims.h,
     ready: dims.w > 0, available: !!paintable,
+    bitsRef, gridRef, ver,
   }
 }
