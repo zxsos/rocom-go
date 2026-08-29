@@ -50,9 +50,13 @@
 .map-filters-backdrop.show { opacity: 1; visibility: visible; }
 /* ✕ 关抽屉按钮的 hover 动效(基础样式由 base.css 全局 .icon-btn 提供) */
 .map-sidebar-close:hover { transform: rotate(90deg); }
-/* 视口:地图软件式窗口,内部地图层可平移缩放;flex:1 填满剩余高度。 */
+/* 视口:地图软件式窗口,内部地图层可平移缩放;flex:1 填满剩余高度。
+   z-index 必须显式给(哪怕只是 0):建立层叠上下文,把整幅地图连同其浮层钉在低层。
+   否则它与顶栏同级(<header> 在 <main> 之前,同级时 DOM 后者胜),地图内的资料卡会
+   连顶栏带二级菜单一起盖住 —— 这是「二级菜单跑到下层区域」的根因。 */
 .map-vp {
   position: relative;
+  z-index: var(--z-vp);
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -102,14 +106,19 @@
 .map-layer-btn.on .map-paint-swatch { opacity: 1; }
 /* 方向箭头:恒定屏幕尺寸,随朝向旋转,不随地图缩放。位置同样只用 transform(逐帧写入,见 MapPage)。
    呼吸式脉冲:配合位置外推的平滑感,玩家在场感更强。 */
-.map-arrow { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); animation: map-arrow-pulse 2.6s ease-in-out infinite; }
+/* z-index 必须显式给:原先只靠 DOM 顺序,被资料卡(--z-bar 30)盖住。
+   箭头是「我在哪」的常驻指示,须优先于临时资料卡 —— 故用 --z-ctrl 而非 --z-tip。 */
+.map-arrow { position: absolute; left: 0; top: 0; z-index: var(--z-ctrl); pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); animation: map-arrow-pulse 2.6s ease-in-out infinite; }
 .map-arrow svg { display: block; }
 @keyframes map-arrow-pulse {
   0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(248, 81, 73, .35)); }
   50%      { filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)) drop-shadow(0 0 9px rgba(248, 81, 73, .65)); }
 }
-/* 控制组(图层侧栏/放大/缩小/回中)浮在视口右上角 */
-.map-ctrl { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px;
+/* 控制组(图层侧栏/放大/缩小/回中)浮在视口右上角。
+   z-index 必须显式给:原先只靠 DOM 顺序,被资料卡(--z-bar 30)盖住,点不到缩放/图层按钮。
+   常驻控件优先于临时气泡,故 --z-ctrl(20) 高于 --z-tip。 */
+.map-ctrl { position: absolute; right: 10px; top: 10px; z-index: var(--z-ctrl);
+  display: flex; flex-direction: column; gap: 6px;
   animation: map-ctrl-in .35s ease-out; }
 @keyframes map-ctrl-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
 .map-btn {
@@ -276,9 +285,12 @@
 
 /* 野生宠物资料卡:点一下标记弹出(触屏没有 hover 时的等价物),悬在该标记正上方。
    内容比悬浮那行全:名称/Lv、标签、体重/嗓音、坐标;pointer-events:none 免得挡住
-   下面标记的点击。按标记中心点定位,整体上移「自身高度 + 12px」。 */
+   下面标记的点击。按标记中心点定位,整体上移「自身高度 + 12px」。
+   层级用 --z-tip(轻量气泡)而非原来的 --z-bar(30):它是临时信息,须让位于常驻的
+   缩放/图层按钮与玩家箭头。原先那档与顶栏同级、且本元素在 <main> 内(DOM 在 <header>
+   之后),导致连顶栏带二级菜单一起盖住 —— 即「二级菜单跑到下层」的现象。 */
 .map-wild-tip {
-  position: absolute; z-index: var(--z-bar);
+  position: absolute; z-index: var(--z-tip);
   transform: translate(-50%, calc(-100% - 12px));
   pointer-events: none; user-select: none; white-space: nowrap;
   display: flex; flex-direction: column; gap: 2px;
