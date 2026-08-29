@@ -51,9 +51,18 @@ type Egg struct {
 }
 
 // Hatching 报告这颗蛋是否正在孵蛋器里。仅作 data 快照内的推断值:孵蛋器状态**只由
-// 0x0312 对账维护**(store.ReconcileHatching),放入/取出/破壳的回包都不再写权威列,
+// 0x0312 / 0x0102 对账维护**(store.ReconcileHatching),放入/取出/破壳的回包都不再写权威列,
 // ListEggs 读取时以列为准覆盖本字段(见 docs/data.md 3.6)。
-func (e Egg) Hatching() bool { return e.StartHatch > 0 }
+//
+// 推断口径:光看 StartHatch > 0 不够 —— 蛋从孵蛋器取出后服务器**不清这个字段**,
+// 只把进度清零(hatched_secs 与 last_hatch_update_sec 一起归 0,与游戏内「精灵蛋被取出后,
+// 孵化进度将不会保留」的提示一致)。故要求**进度也非零**,否则曾经放进去过的蛋
+// 会一直被算在孵蛋器里(页面显示「5/5」而游戏内只有三格)。
+// 只有「刚放进去、进度还是 0」那一瞬会漏判,而客户端放完蛋会紧跟一次 0x0311/0x0312
+// 刷新面板,权威快照随即到货补上。
+func (e Egg) Hatching() bool {
+	return e.StartHatch > 0 && (e.HatchedSec > 0 || e.HatchUpdate > 0)
+}
 
 // ParseBagEggs 从背包分页回包(0x1344)取本页的全部精灵蛋,并返回本页页号与总页数
 // (供调用方判断一轮全量是否已收齐,与宠物列表的分页对账同一套路)。
@@ -124,6 +133,21 @@ func ParseHatchStatus(body []byte) (gids []uint32, secs []int32) {
 		}
 	})
 	return
+}
+
+// BackpackHatchSlots 从登录数据(0x0102)取孵蛋器占用列表 PetBackpackInfo.egg_gid。
+// 与 ParseHatchStatus(0x0312)是同一个权威口径的两处下发点,但登录包里就有 ——
+// 玩家不必打开孵蛋器面板也能把在孵标记对齐。
+//
+// 返回 (gids, true) 表示取到了背包且解析成功;gids 可能为空(孵蛋器是空的),
+// 这也是有效结果:空列表同样要拿去对账,把历史行里残留的在孵标记清掉。
+// 返回 (nil, false) 表示这条消息里没有可信的背包数据,调用方应跳过(不要拿空当"孵蛋器空")。
+func BackpackHatchSlots(body []byte) ([]uint32, bool) {
+	bp := bestBackpack(body)
+	if bp == nil {
+		return nil, false
+	}
+	return bp.GetEggGid(), true
 }
 
 // ParseFlowReason 取奖励通知(0x0243)的 flow_reason(3)。223 = FLOW_REASON_PET_HOME_LAY,

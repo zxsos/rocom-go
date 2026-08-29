@@ -4,7 +4,7 @@
       "gid": 9001,
       "hatchUpdate": 1700000000,
       "hatchedSecs": 600,
-      "hatching": false,
+      "hatching": true,
       "heightM": 0.3,
       "icon": "egg/egg_tongyong.webp",
       "itemId": 5001,
