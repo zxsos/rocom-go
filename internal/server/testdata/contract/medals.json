@@ -216,6 +216,12 @@
     "name": "魔法纹章"
   },
   {
+    "desc": "「花开·卡洛西亚」活动获得",
+    "icon": "medal/img_MedalIcon_LittleRedFlower.webp",
+    "id": 1039,
+    "name": "小红花"
+  },
+  {
     "desc": "在1场「闪耀大赛」或任一对战模式中，指挥{0}首个回合击败敌方精灵",
     "icon": "medal/img_MedalIcon_Pvp_Yiji.webp",
     "id": 2003,

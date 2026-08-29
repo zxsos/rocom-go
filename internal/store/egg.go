@@ -19,15 +19,26 @@ import (
 // 取出(0x0300)回包一律只当普通变化入库,标记在玩家下次打开孵蛋器(0x0312)时全量收敛。
 // 读取时以列为准覆盖 data 里的推断值(见 ListEggs)。
 
-// UpsertEggs 批量写入/更新蛋(不动 parents、first_seen 与 hatching 列)。
+// UpsertEggs 批量写入/更新蛋(不动 parents 与 first_seen)。
 // now 取**消息时刻**而非 time.Now():离线回放的包时间是几小时前的,与挂钟混用会让
 // PruneMissingEggs 的 first_seen<=before 永远不成立,过期的蛋就永远删不掉。
-func (sc *Scoped) UpsertEggs(eggs []*pet.EggView, now int64) error {
+//
+// knownHatch 是可选的权威「在孵」判定(nil = 不知道):
+//   - nil:hatching 恒写 0(新行)且不覆盖旧值 —— 背包快照与放入/取出回包的
+//     start_hatch_time 都不可信,权威状态只由 egg_gid 对账(ReconcileHatching)维护
+//   - 非 nil:逐颗按列表写(1/0)。用于登录数据先到、蛋后入库的时序 —— 那时对账
+//     改不动任何行,只能由入库时直接判定(见 pipeline/eggs.go 的 hatchGids)
+func (sc *Scoped) UpsertEggs(eggs []*pet.EggView, now int64, knownHatch map[uint32]bool) error {
 	if len(eggs) == 0 {
 		return nil
 	}
 	rows := make([][]any, 0, len(eggs))
 	for _, e := range eggs {
+		// 权威列表要连 data 里的推断值一起改:读取时以 hatching 列为准覆盖 data,
+		// 但 data 是整块 JSON,留着不一致的推断值会在别处(如导出)露出来
+		if knownHatch != nil {
+			e.Hatching = knownHatch[e.Gid]
+		}
 		data, err := json.Marshal(e)
 		if err != nil {
 			continue
@@ -39,11 +50,21 @@ func (sc *Scoped) UpsertEggs(eggs []*pet.EggView, now int64) error {
 		if e.WeightPct != nil {
 			wpct = *e.WeightPct
 		}
+		var hatch int
+		if knownHatch != nil && knownHatch[e.Gid] {
+			hatch = 1
+		}
 		rows = append(rows, []any{
 			sc.account, e.Gid, e.ItemID, e.ConfID, e.Name, e.Species,
-			e.HeightM, e.WeightKg, hpct, wpct, e.Src, 0, e.ObtainedAt, // hatching 恒写 0:权威状态只由 0x0312 维护
+			e.HeightM, e.WeightKg, hpct, wpct, e.Src, hatch, e.ObtainedAt,
 			now, now, string(data),
 		})
+	}
+	// knownHatch 非 nil 时,冲突更新也要覆盖 hatching 列(权威列表到货即订正);
+	// 为 nil 则保持原样,免得背包快照把对账结果冲掉。
+	hatchClause := ""
+	if knownHatch != nil {
+		hatchClause = ", hatching=excluded.hatching"
 	}
 	return execBatch(sc.db, `
 INSERT INTO eggs(account, gid, item_id, conf_id, name, species,
@@ -54,7 +75,7 @@ ON CONFLICT(account, gid) DO UPDATE SET
   item_id=excluded.item_id, conf_id=excluded.conf_id, name=excluded.name, species=excluded.species,
   height=excluded.height, weight=excluded.weight,
   height_pct=excluded.height_pct, weight_pct=excluded.weight_pct,
-  src=excluded.src, obtained_at=excluded.obtained_at,
+  src=excluded.src, obtained_at=excluded.obtained_at`+hatchClause+`,
   updated_at=excluded.updated_at, data=excluded.data`, rows)
 }
 

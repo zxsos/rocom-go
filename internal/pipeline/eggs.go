@@ -18,9 +18,12 @@ import (
 //   - 0x0164 用道具(放蛋入孵蛋器)/0x0300 取出回包:都只当普通变化入库,不动 hatching 列
 //   - 0x0312 孵化状态:进度更新 + 顶层 egg_gid[] 权威对账,**hatching 列只由它维护**(见 applyHatchStatus)
 //
-// hatching 列只由 0x0312 全量对账维护:放入/取出/破壳动作与背包快照(0x1344/登录)的
-// start_hatch_time 都不可信(服务器取出蛋时不把它清零),upsert 一律不碰该列、新行初始为 0。
-// 标记在玩家下次打开孵蛋器时收敛;0x0312 孵蛋器空列表 = 本账号所有在孵标记清零。
+// hatching 列只由权威的 egg_gid 列表全量对账维护,两处下发点都收:
+//   - 0x0102 登录数据(PetBackpackInfo.egg_gid):登录就有,不必等玩家打开孵蛋器面板
+//   - 0x0312 开孵蛋器:带逐蛋进度,是最终的收敛点
+// 放入/取出/破壳动作与背包快照(0x1344)的 start_hatch_time 都不可信
+// (服务器取出蛋时不把它清零,只清进度),upsert 一律不碰该列、新行初始为 0。
+// 任一处权威列表为空即表示孵蛋器空,把本账号所有在孵标记清零。
 //   - 0x030b/0x030c 破壳:请求带 egg_gid,回包一到就把这颗蛋从库里删掉(它已不在背包里)
 //
 // 库里存的就是**背包现状**:页面只看背包,破壳/送人的蛋没人回看,故不留历史行。
@@ -46,6 +49,20 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 			p.conn(m.Session).crackEgg = gid // 等回包确认破壳成功再删
 		}
 
+	case m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp:
+		// 登录数据里就带着孵蛋器占用列表:不等玩家打开孵蛋器面板也能把在孵标记对齐。
+		// 与 0x0312 是同一权威口径(见 pet.BackpackHatchSlots),两个下发点都收。
+		if gids, ok := pet.BackpackHatchSlots(m.AppBody); ok {
+			// 先记住:登录包往往先于背包分页到达,此刻库里还没有蛋,下面的对账改不动任何行;
+			// 记住后由 upsertEggs 在蛋入库时逐颗判定(见 hatchGids 的注释)。
+			known := make(map[uint32]bool, len(gids))
+			for _, g := range gids {
+				known[g] = true
+			}
+			p.conn(m.Session).hatchGids = known
+			p.applyHatchSlots(sc, acc, gids, nil, nil, m.Time)
+		}
+
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetBagItemInfoByPageRsp:
 		p.applyEggPage(m, sc, acc)
 
@@ -66,7 +83,9 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		if len(eggs) == 0 {
 			return
 		}
-		p.upsertEggs(sc, acc, eggs, m.Time)
+		// 这几条只当普通变化入库;hatching 不动(权威状态只由 egg_gid 对账维护),
+		// 故 known 传 nil,免得登录列表把刚取出/刚放入的状态盖回去。
+		p.upsertEggs(sc, acc, eggs, m.Time, nil)
 		if m.Opcode == pet.OpGoodsRewardNotify && pet.ParseFlowReason(m.AppBody) == pet.FlowReasonHomeLay {
 			p.recordEggParents(m.Session, sc, eggs, m.Time)
 		}
@@ -87,10 +106,22 @@ func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc str
 		skip[e.Gid] = true
 	}
 	if len(eggs) > 0 {
-		p.upsertEggs(sc, acc, eggs, m.Time)
+		// 0x0312 自带权威列表且随后就要全量对账,这里不必再按登录列表覆盖
+		p.upsertEggs(sc, acc, eggs, m.Time, nil)
 	}
 	gids, secs := pet.ParseHatchStatus(m.AppBody)
-	if changed, err := sc.ReconcileHatching(gids, secs, skip, m.Time.Unix()); err == nil && changed {
+	p.applyHatchSlots(sc, acc, gids, secs, skip, m.Time)
+}
+
+// applyHatchSlots 用权威的孵蛋器占用列表订正在孵标记,有改动就通知前端。
+// gids 为空是有效输入(孵蛋器空)—— 此时会把本账号所有在孵标记清零;故「没解析出
+// 背包」必须与「孵蛋器是空的」区分开,只有 ok==true 才调用本函数。
+//
+// 两处下发点:
+//   - 登录 0x0102:不带逐蛋进度,secs/skip 传 nil → 只对账标记,进度留给随后到的 0x0312
+//   - 开孵蛋器 0x0312:带 secs 与 skip(刚由 ret_info.changes 精确刷新过的蛋跳过)
+func (p *Pipeline) applyHatchSlots(sc *store.Scoped, acc string, gids []uint32, secs []int32, skip map[uint32]bool, now time.Time) {
+	if changed, err := sc.ReconcileHatching(gids, secs, skip, now.Unix()); err == nil && changed {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}
 }
@@ -98,7 +129,9 @@ func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc str
 // applyEggPage 处理背包分页全量:本页的蛋入库,收齐 1..total 后对账。
 func (p *Pipeline) applyEggPage(m capture.Message, sc *store.Scoped, acc string) {
 	eggs, page, total := pet.ParseBagEggs(m.AppBody)
-	p.upsertEggs(sc, acc, eggs, m.Time)
+	// 背包分页是蛋**首次入库**的地方。这里要带上登录时记住的孵蛋器列表:
+	// 登录包先到、此刻库里还没有蛋,登录那次对账改不动任何行,只能由入库时逐颗判定。
+	p.upsertEggs(sc, acc, eggs, m.Time, p.conn(m.Session).hatchGids)
 
 	as := p.acct(acc)
 	sw := as.eggSweep
@@ -129,7 +162,10 @@ func (p *Pipeline) applyEggPage(m capture.Message, sc *store.Scoped, acc string)
 
 // upsertEggs 把解析出的蛋转成展示模型入库,并通知前端刷新。
 // now 是消息时刻(离线回放同样按包走,见 store.UpsertEggs)。
-func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now time.Time) {
+// known 是本连接记住的孵蛋器占用列表(登录数据给的权威口径,可能为 nil);
+// 蛋入库时拿它逐颗判定在孵与否 —— 登录包通常先于背包分页到达,等它到时库里还没有蛋,
+// 光靠登录那一次对账改不动任何行,必须由这里补上。
+func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now time.Time, known map[uint32]bool) {
 	if len(eggs) == 0 {
 		return
 	}
@@ -137,9 +173,10 @@ func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now 
 	for _, e := range eggs {
 		views = append(views, pet.ToEggView(e, p.db))
 	}
-	// UpsertEggs 不碰 hatching 列:权威状态只由 0x0312 对账(ReconcileHatching)维护,
-	// 背包快照与放入/取出动作回包的 start_hatch_time 都不可信。
-	if err := sc.UpsertEggs(views, now.Unix()); err == nil {
+	// known 为 nil 时 UpsertEggs 不碰 hatching 列(权威状态只由 egg_gid 对账维护,
+	// 背包快照与放入/取出动作回包的 start_hatch_time 都不可信——取出时不清零);
+	// 非 nil 即登录数据给的权威列表,逐颗写定。
+	if err := sc.UpsertEggs(views, now.Unix(), known); err == nil {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}
 }

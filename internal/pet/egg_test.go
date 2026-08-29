@@ -175,3 +175,69 @@ func TestSortEggsTie(t *testing.T) {
 		}
 	}
 }
+
+// TestHatchingNeedsProgress 锁住「在孵判定必须同时看进度」:
+// 蛋从孵蛋器取出后服务器**不清 start_hatch_time**,只把进度清零(hatched_secs 与
+// last_hatch_update_sec 一起归 0)。只看 start_hatch_time>0 会把取出过的蛋一直算在孵蛋器里
+// —— 页面显示「孵蛋器 5/5」而游戏内只有三格,即 abd62e6 修的那个 bug。
+func TestHatchingNeedsProgress(t *testing.T) {
+	cases := []struct {
+		name    string
+		e       Egg
+		want    bool
+	}{
+		{"从未入孵", Egg{}, false},
+		{"在孵且进度非零", Egg{StartHatch: 100, HatchedSec: 3600, HatchUpdate: 200}, true},
+		{"在孵但进度为0(刚放入)", Egg{StartHatch: 100}, false},
+		{"取出后:start_hatch 留着、进度清零", Egg{StartHatch: 100, HatchedSec: 0, HatchUpdate: 0}, false},
+		{"只有 hatched_secs 非零", Egg{StartHatch: 100, HatchedSec: 60}, true},
+		{"只有 update 非零", Egg{StartHatch: 100, HatchUpdate: 200}, true},
+		{"进度非零但没入孵时刻", Egg{HatchedSec: 60, HatchUpdate: 200}, false},
+	}
+	for _, c := range cases {
+		if got := c.e.Hatching(); got != c.want {
+			t.Errorf("%s: Hatching() = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// TestBackpackHatchSlots 解析登录数据(0x0102)里的 PetBackpackInfo.egg_gid ——
+// 玩家不必打开孵蛋器面板就能对齐在孵标记。
+func TestBackpackHatchSlots(t *testing.T) {
+	// boxes(3){box_id(1), pet_gid(3)×6}:凑够 5 只以上才被认作真实背包
+	box := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), 1)
+	for _, g := range []uint64{6476, 12335, 11291, 18471, 266, 1503} {
+		box = protowire.AppendVarint(protowire.AppendTag(box, 3, protowire.VarintType), g)
+	}
+	// egg_gid(1)×3
+	bp := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), 3259)
+	bp = protowire.AppendVarint(protowire.AppendTag(bp, 1, protowire.VarintType), 3262)
+	bp = protowire.AppendVarint(protowire.AppendTag(bp, 1, protowire.VarintType), 3264)
+	bp = protowire.AppendBytes(protowire.AppendTag(bp, 3, protowire.BytesType), box)
+	// 实际藏在 player_info(2).pet_info(4).backpack_info(9) 里,故套三层
+	pi := protowire.AppendBytes(protowire.AppendTag(nil, 9, protowire.BytesType), bp)
+	body := protowire.AppendBytes(protowire.AppendTag(nil, 2, protowire.BytesType),
+		protowire.AppendBytes(protowire.AppendTag(nil, 4, protowire.BytesType), pi))
+
+	gids, ok := BackpackHatchSlots(body)
+	if !ok || len(gids) != 3 || gids[0] != 3259 || gids[1] != 3262 || gids[2] != 3264 {
+		t.Fatalf("egg_gid = %v (ok=%v), want [3259 3262 3264]", gids, ok)
+	}
+
+	// 孵蛋器空:背包在、egg_gid 字段整个不下发 → 空列表也是**有效快照**,
+	// 调用方要拿它去清标记。这与「没解析出背包」必须区分开。
+	empty := protowire.AppendBytes(protowire.AppendTag(nil, 3, protowire.BytesType), box)
+	wrap := protowire.AppendBytes(protowire.AppendTag(nil, 2, protowire.BytesType),
+		protowire.AppendBytes(protowire.AppendTag(nil, 4, protowire.BytesType),
+			protowire.AppendBytes(protowire.AppendTag(nil, 9, protowire.BytesType), empty)))
+	gids, ok = BackpackHatchSlots(wrap)
+	if !ok || len(gids) != 0 {
+		t.Errorf("空孵蛋器: gids=%v ok=%v, want 空列表且 ok=true", gids, ok)
+	}
+
+	// 没有背包的消息给不出快照,不能当成「孵蛋器空」去清标记
+	junk := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), 7)
+	if _, ok := BackpackHatchSlots(junk); ok {
+		t.Error("无 PetBackpackInfo 不该判为有效快照")
+	}
+}

@@ -146,11 +146,13 @@ func seedContract(t *testing.T, s *Server) {
 		t.Fatalf("写事件: %v", err)
 	}
 
+	// knownHatch 显式指定在孵:hatching 列平时只由 egg_gid 对账(ReconcileHatching)维护,
+	// 这里是构造契约样本,直接给权威值更直观(等价于登录数据里带着这颗 gid)。
 	if err := sc.UpsertEggs([]*pet.EggView{{
 		Gid: 9001, ItemID: 5001, Name: "友爱天天的蛋", Species: "火神",
 		HeightM: 0.3, WeightKg: 1.2, ObtainedAt: 1700000000, Src: 1, SrcName: "牧场",
 		Hatching: true, HatchedSecs: 600, MaxSecs: 3600, HatchUpdate: 1700000000,
-	}}, 1700000000); err != nil {
+	}}, 1700000000, map[uint32]bool{9001: true}); err != nil {
 		t.Fatalf("写蛋: %v", err)
 	}
 

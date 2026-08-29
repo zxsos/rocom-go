@@ -55,10 +55,11 @@ func boxesToLayout(boxes []*pb.PetBox) (entries []BoxEntry, metas []BoxMeta, ok 
 	return entries, metas, true
 }
 
-// ParseBackpack 在 body 里找最完整的 PetBackpackInfo(登录/整理回包),展开为盒子占用项 +
-// 全量盒子元数据。位置 = 宠物 gid 在 PetBox.pet_gid[] 中的下标(空格为 0,跳过)。取非零 gid 数
-// 最多的候选以排除误解析;少于 5 只视为非真实背包,返回 (nil,nil)。
-func ParseBackpack(body []byte) ([]BoxEntry, []BoxMeta) {
+// bestBackpack 在 body 里找最完整的 PetBackpackInfo(登录/整理回包)。嵌套路径随消息而异,
+// 故递归尝试反序列化,取非零 gid 数最多的候选以排除误解析;少于 5 只视为非真实背包,返回 nil。
+// 返回整个结构体而非只给盒子布局 —— 同一份数据里还带着孵蛋器占用列表(egg_gid),
+// BackpackHatchSlots 要用(见 egg.go)。
+func bestBackpack(body []byte) *pb.PetBackpackInfo {
 	var best *pb.PetBackpackInfo
 	bestN := 0
 	wire.Walk(body, func(v []byte) bool {
@@ -83,7 +84,17 @@ func ParseBackpack(body []byte) ([]BoxEntry, []BoxMeta) {
 		}
 		return true
 	})
-	if best == nil || bestN < 5 {
+	if bestN < 5 {
+		return nil
+	}
+	return best
+}
+
+// ParseBackpack 把 body 里最完整的 PetBackpackInfo 展开为盒子占用项 + 全量盒子元数据。
+// 位置 = 宠物 gid 在 PetBox.pet_gid[] 中的下标(空格为 0,跳过);找不到背包返回 (nil,nil)。
+func ParseBackpack(body []byte) ([]BoxEntry, []BoxMeta) {
+	best := bestBackpack(body)
+	if best == nil {
 		return nil, nil
 	}
 	entries, metas, _ := boxesToLayout(best.GetBoxes())
