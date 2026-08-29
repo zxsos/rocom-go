@@ -316,7 +316,7 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 	}
 	p.st.UpsertAccount(acc, name)
 	if coins, ok := pet.ParseLoginCoins(m.AppBody); ok {
-		log.Printf("登录回包解析金币 [%s] coins=%d", acc, coins)
+		log.Printf("登录回包解析洛克贝 [%s] coins=%d", acc, coins)
 		if err := p.st.SetAccountCoins(acc, coins); err != nil {
 			log.Printf("SetAccountCoins 失败: %v", err)
 		}

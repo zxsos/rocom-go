@@ -217,7 +217,6 @@ case "$ACTION" in
         # (需服务器装 node/npm;未装则报错提示本机 build)。
         # 依赖:go(已装)、git(拉代码)。不需要 zig(那是交叉编译用的)。
         REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-        echo "==> 拉取最新代码 ($REPO_DIR)"
         cd "$REPO_DIR"
         # 拉取远程:默认 github(与项目镜像同步);本机仓库托管在 cnb.cool 时,
         # 用 ROCOM_GIT_REMOTE 覆盖(如 sudo ROCOM_GIT_REMOTE=cnb ./deploy.sh --build,

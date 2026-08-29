@@ -106,9 +106,9 @@ function groupBySlot(items) {
 export default function Merchant() {
   const account = useContext(AccountContext) // 当前登录账号 key(账号下拉切换后自动跟随)
   const [d, setD] = useState(null) // {now,day,status,today,prev}
-  const [coins, setCoins] = useState(null) // 当前账号金币:null=未同步,数字=已同步(含 0)
-  const [curAcc, setCurAcc] = useState('') // 金币/参加按钮实际归属的账号
-  const [join, setJoin] = useState(true) // 是否参加排行榜(默认参加,可在金币旁一键退出)
+  const [coins, setCoins] = useState(null) // 当前账号洛克贝:null=未同步,数字=已同步(含 0)
+  const [curAcc, setCurAcc] = useState('') // 洛克贝/参加按钮实际归属的账号
+  const [join, setJoin] = useState(true) // 是否参加排行榜(默认参加,可在洛克贝旁一键退出)
   const [title, setTitle] = useState('') // 当前账号今日佩戴的称号
   const [busyRank, setBusyRank] = useState(false)
   const [rankErr, setRankErr] = useState('')
@@ -128,9 +128,9 @@ export default function Merchant() {
     }
   }, [])
 
-  // 金币按当前登录账号(AccountContext)取,每个人看到自己的金币:
+  // 洛克贝按当前登录账号(AccountContext)取,每个人看到自己的洛克贝:
   // 先精确匹配当前账号,找不到(未登录/游客)再回退到在线/最近活跃账号。
-  // hasCoins=false 表示该账号从未解析到金币(没重登游戏),显示「待同步」而非隐藏徽标。
+  // hasCoins=false 表示该账号从未解析到洛克贝(没重登游戏),显示「待同步」而非隐藏徽标。
   useEffect(() => {
     let done = false
     getAccounts().then((list) => {
@@ -145,7 +145,7 @@ export default function Merchant() {
     return () => { done = true }
   }, [account])
 
-  // 金币旁的参加/退出按钮(默认参加;退出后不再参与福布斯/盈亏排行与称号评选)
+  // 洛克贝旁的参加/退出按钮(默认参加;退出后不再参与福布斯/盈亏排行与称号评选)
   const toggleRank = async () => {
     if (!curAcc) return
     if (join && !(await confirmDialog({
@@ -199,9 +199,9 @@ export default function Merchant() {
           </div>
           <div className="merchant-hero-side">
             {coins !== null ? (
-              <span className="merchant-coins" title={`${account || '当前'} 金币(每次登录游戏时同步)`}>🪙 {coins.toLocaleString()}</span>
+              <span className="merchant-coins" title={`${account || '当前'} 洛克贝(每次登录游戏时同步)`}>🪙 {coins.toLocaleString()}</span>
             ) : (
-              <span className="merchant-coins merchant-coins-unk" title={`${account || '当前'} 金币尚未同步,请重新登录游戏后刷新`}>🪙 待同步</span>
+              <span className="merchant-coins merchant-coins-unk" title={`${account || '当前'} 洛克贝尚未同步,请重新登录游戏后刷新`}>🪙 待同步</span>
             )}
             <RankTitle title={title} />
             {curAcc && (
@@ -357,7 +357,7 @@ function MerchantItem({ it }) {
         <div className="merchant-item-name" title={it.name}>{it.name}</div>
         {it.kind && <span className="merchant-item-kind">{it.kind}</span>}
         <div className="merchant-item-meta">
-          <span className="merchant-price">{it.price} <span className="merchant-unit">金币</span></span>
+          <span className="merchant-price">{it.price} <span className="merchant-unit">洛克贝</span></span>
           {it.limit > 0 && <span className="merchant-limit">限购 {it.limit}</span>}
         </div>
         {tLabel && (

@@ -580,7 +580,7 @@ var merchantKindTextMap = map[string]string{
 	"fruit": "果实", "food": "食物", "gem": "宝石", "diamond": "钻石",
 	"ticket": "票券", "tool": "工具", "equip": "装备", "consumable": "消耗品",
 	"furniture": "家具", "card": "卡片", "scroll": "卷轴", "key": "钥匙",
-	"medal": "奖牌", "suit": "套装", "decoration": "装饰", "coin": "金币",
+	"medal": "奖牌", "suit": "套装", "decoration": "装饰", "coin": "洛克贝",
 }
 
 func merchantKindText(kind string) string {
@@ -721,7 +721,7 @@ func merchantMailItemRow(b *strings.Builder, it merchantItem, imgs *[]merchantMa
 	if k := merchantKindText(it.Kind); k != "" {
 		meta = append(meta, k)
 	}
-	meta = append(meta, fmt.Sprintf("%d 金币", it.Price))
+	meta = append(meta, fmt.Sprintf("%d 洛克贝", it.Price))
 	if it.Limit > 0 {
 		meta = append(meta, fmt.Sprintf("限购 %d", it.Limit))
 	}

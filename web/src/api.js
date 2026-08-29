@@ -87,7 +87,7 @@ export const getAccounts = () => getJSON('/api/accounts')
 // getLeaderboard 拉取排行榜:
 //   {forbes:[{account,name,coins,hasCoins,baseline,profit,title}], profit:[...],
 //    titles:[{date,account,name,title}], me:{account,name,join,coins,hasCoins,baseline,profit,title}}
-// forbes 按金币降序、profit 按盈亏降序(盈亏=当前金币-首次快照);
+// forbes 按洛克贝降序、profit 按盈亏降序(盈亏=当前洛克贝-首次快照);
 // titles 是今天(佩戴日)每晚 00:05 结算评出的称号;me 是当前账号的参与状态。
 export const getLeaderboard = () => getJSON('/api/leaderboard', { forbes: [], profit: [], titles: [], me: null })
 

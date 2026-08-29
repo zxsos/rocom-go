@@ -152,7 +152,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/account/verify", s.handleAccountVerify)
 	s.mux.HandleFunc("POST /api/account/pin", s.handleAccountPin)
 	s.mux.HandleFunc("DELETE /api/account", s.handleAccountDelete)
-	// 排行榜:福布斯(金币) / 盈亏排行;参与开关(默认参加,可在金币旁一键退出)。
+	// 排行榜:福布斯(洛克贝) / 盈亏排行;参与开关(默认参加,可在洛克贝旁一键退出)。
 	s.mux.HandleFunc("GET /api/leaderboard", s.handleLeaderboard)
 	s.mux.HandleFunc("POST /api/account/rank", s.handleAccountRank)
 	// 管理员(隐式面板,前端导航不显示):首启设置密码 → 登录签发内存令牌 → 校验后使用。

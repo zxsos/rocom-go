@@ -8,7 +8,7 @@ import (
 // AccountInfo 是一个账号的概要(供前端账号下拉)。
 // Online 由 server 层判定后合并(最近 onlineWindow 秒内有流量),store 不持久化。
 // HasPin 由 store 层填(pin_hash 非空即 true),前端据此显示锁标。
-// Coins 是最近一次登录回包解析到的金币数;HasCoins=true 表示已解析过
+// Coins 是最近一次登录回包解析到的洛克贝数;HasCoins=true 表示已解析过
 // (coins 为 0 也是真实值),false 表示从未解析(未知,待玩家重新登录游戏同步)。
 type AccountInfo struct {
 	Account  string `json:"account"`
@@ -18,7 +18,7 @@ type AccountInfo struct {
 	HasPin   bool   `json:"hasPin"`
 	Coins    int64  `json:"coins"`
 	HasCoins bool   `json:"hasCoins"`
-	// Join 表示该账号是否参加排行榜(福布斯/盈亏),默认参加,可在金币旁一键退出。
+	// Join 表示该账号是否参加排行榜(福布斯/盈亏),默认参加,可在洛克贝旁一键退出。
 	Join bool `json:"join"`
 	// Title 是该账号今天佩戴的排行榜称号(大富翁/赚钱王/败家子),无则空串。
 	// 由 server 层在 ListAccounts 后按当日称号合并填充。
@@ -56,9 +56,9 @@ ORDER BY a.updated_at DESC`)
 	return out, rows.Err()
 }
 
-// SetAccountCoins 写入账号的金币数(登录回包解析成功后调用;coins 为 0 也是真实值,
+// SetAccountCoins 写入账号的洛克贝数(登录回包解析成功后调用;coins 为 0 也是真实值,
 // 一并置 has_coins=1 与「从未解析」区分,前端可显示「待同步」)。
-// 同时记一条金币快照(coin_snapshots),排行榜盈亏以首条快照为基线,单事务保证一致。
+// 同时记一条洛克贝快照(coin_snapshots),排行榜盈亏以首条快照为基线,单事务保证一致。
 func (s *Store) SetAccountCoins(account string, coins int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *Store) SetAccountRankJoin(account string, join bool) error {
 }
 
 // RankEntry 是排行榜上单个账号的数据。
-// Baseline 为首次金币快照(起始资金);无快照时退回当前 coins,盈亏为 0。
+// Baseline 为首次洛克贝快照(起始资金);无快照时退回当前 coins,盈亏为 0。
 // Title 由 server 层按当日称号合并填充。
 type RankEntry struct {
 	Account  string `json:"account"`
@@ -95,7 +95,7 @@ type RankEntry struct {
 	Title    string `json:"title"`
 }
 
-// Leaderboard 返回全部参加排行(rank_join=1)的账号,含当前金币、首次快照基线
+// Leaderboard 返回全部参加排行(rank_join=1)的账号,含当前洛克贝、首次快照基线
 // 与盈亏(当前-基线)。调用方自行按福布斯/盈亏排序。
 func (s *Store) Leaderboard() ([]RankEntry, error) {
 	rows, err := s.rdb.Query(`
@@ -141,22 +141,22 @@ type RankTitleRow struct {
 	Title   string `json:"title"`
 }
 
-// accStat 是结算时单个账号的前一日金币状态(见 SettleRankTitles)。
+// accStat 是结算时单个账号的前一日洛克贝状态(见 SettleRankTitles)。
 type accStat struct {
 	hasCoins   bool
-	endCoins   int64 // 前一日结束(最后一条 ts<d0 快照)时的金币
+	endCoins   int64 // 前一日结束(最后一条 ts<d0 快照)时的洛克贝
 	hasData    bool  // 前一日 [p0,d0) 内有快照
 	preDaySet  bool  // 存在 p0 前的快照(带入前一日)
-	preDay     int64 // 最后一条 p0 前快照的金币
-	dayStart   int64 // 前一日起点金币
+	preDay     int64 // 最后一条 p0 前快照的洛克贝
+	dayStart   int64 // 前一日起点洛克贝
 	dayStartOK bool
 	dayChange  int64 // 前一日净变化
 }
 
 // SettleRankTitles 结算某天(归属日 date,yyyy-mm-dd)的排行榜称号并写入 rank_titles,
-// 依据 date 前一日 00:00~date 00:00(北京时间,UTC+8)的金币快照:
+// 依据 date 前一日 00:00~date 00:00(北京时间,UTC+8)的洛克贝快照:
 //
-//	大富翁 = 前一日结束时金币最多(须 >0)
+//	大富翁 = 前一日结束时洛克贝最多(须 >0)
 //	赚钱王 = 前一日净赚最多(须 >0)
 //	败家子 = 前一日净亏最多(须 <0)
 //

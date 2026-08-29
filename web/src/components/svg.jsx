@@ -74,7 +74,7 @@ export const IconFlower = (p) => (
   </S>
 )
 
-// 金币(商店)
+// 洛克贝(商店)
 export const IconCoin = (p) => (
   <S {...p}>
     <circle cx="12" cy="12" r="9" />

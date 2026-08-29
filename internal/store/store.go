@@ -195,7 +195,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON accounts(updated_at DESC);
 
--- 金币快照(排行榜盈亏统计用):每次登录回包解析到金币记一行,
+-- 洛克贝快照(排行榜盈亏统计用):每次登录回包解析到洛克贝记一行,
 -- 首行为「起始资金」基线,最新行即当前 coins;盈亏 = 当前 - 基线。
 CREATE TABLE IF NOT EXISTS coin_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,13 +351,13 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
 	if err != nil {
 		return err
 	}
-	// 老库平滑升级:accounts 补 coins 列(金币)。历史库无此列,直接 ALTER 加列;
+	// 老库平滑升级:accounts 补 coins 列(洛克贝)。历史库无此列,直接 ALTER 加列;
 	// 新库建表已含该列,SQLite 报 duplicate column 可忽略。避免强迫删库(删库会丢 PIN)。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN coins INTEGER NOT NULL DEFAULT 0`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}
-	// 老库补 has_coins 列:区分「从未解析到金币(未知)」与「解析到 0(真没钱)」,
+	// 老库补 has_coins 列:区分「从未解析到洛克贝(未知)」与「解析到 0(真没钱)」,
 	// 前端据此显示「待同步」而非把徽标直接隐藏。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN has_coins INTEGER NOT NULL DEFAULT 0`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {

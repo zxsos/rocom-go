@@ -69,7 +69,7 @@
 .rank-title.t-earner  { background: rgba(40, 167, 69, .14);  color: #28a745; border: 1px solid rgba(40, 167, 69, .45); }
 .rank-title.t-spender { background: rgba(229, 83, 75, .14);  color: #e5534b; border: 1px solid rgba(229, 83, 75, .45); }
 
-/* 数值列:金币 / 盈亏 / 基线 */
+/* 数值列:洛克贝 / 盈亏 / 基线 */
 .rank-num { flex: none; display: flex; align-items: baseline; gap: 10px; }
 .rank-coins { font-weight: 800; font-size: 15px; color: var(--gold, #e0a83c); font-variant-numeric: tabular-nums; }
 .rank-profit { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }

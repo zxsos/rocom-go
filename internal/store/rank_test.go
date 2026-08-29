@@ -6,7 +6,7 @@ import (
 )
 
 // TestSettleRankTitles 验证每日称号结算:
-//   - 大富翁 = 前一日结束金币最多(无快照时退回 accounts.coins)
+//   - 大富翁 = 前一日结束洛克贝最多(无快照时退回 accounts.coins)
 //   - 赚钱王 = 前一日净赚最多(须 >0)
 //   - 败家子 = 前一日净亏最多(须 <0,并列取账号字典序小者)
 //   - 退出排行榜(rank_join=0)与当日未登录者不参与评选
@@ -40,9 +40,9 @@ func TestSettleRankTitles(t *testing.T) {
 	put("UID:3", 900, day(27, 21))
 	mk("UID:4", "阿丁") // 无快照,只有 accounts.coins → 大富翁(兜底路径)
 	if _, err := st.db.Exec(`UPDATE accounts SET coins=3000, has_coins=1 WHERE account='UID:4'`); err != nil {
-		t.Fatalf("设丁的金币: %v", err)
+		t.Fatalf("设丁的洛克贝: %v", err)
 	}
-	mk("UID:5", "阿戊") // 仅结算日前一天之前有快照(当日未登录)→ 不参与盈亏,金币兜底算大富翁候选
+	mk("UID:5", "阿戊") // 仅结算日前一天之前有快照(当日未登录)→ 不参与盈亏,洛克贝兜底算大富翁候选
 	put("UID:5", 2000, day(26, 10))
 	put("UID:5", 2500, day(26, 20))
 	mk("UID:6", "阿己") // 已退出排行榜 → 完全排除
