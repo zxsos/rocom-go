@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react'
 import { getFlowers, getFlowerSlots, deleteFlowerSlot, subscribe } from '../../api'
 import { AccountContext, IconsContext } from '../../context'
-import { fmtTime, maskUid } from '../../utils/format'
+import { fmtTime } from '../../utils/format'
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
 import { ImgAvatar } from '../../components/icons'
 import { GlassChip, MarkIcon } from '../../components/badges'
@@ -13,14 +13,29 @@ import Dropdown from '../../components/Dropdown'
 // (游戏内每打开一次花种面板,服务器就会整组重发 0x0375)。
 // 游戏内点击地图上的花种时,服务器会额外下发 0x0338 单只详情(等级/炫彩/绑定宠物/奖牌),
 // 由后端合并进对应卡片后经同一 SSE 刷新;未点过的花种这些字段为空。
+// 槽名里的 UID 片段:**只挂 .privacy,不做文字脱敏**。
+//
+// 与账号下拉保持一致(AccountSelect.jsx:87 的 account-item-uid 也是 uidOf(...) + .privacy):
+// 本项目的截图防泄规范是「遮罩即保护,不重复脱敏」——默认常驻模糊,点顶栏品牌名
+// 「妙妙屋」才解除。脱敏与遮罩叠着用会废掉这个开关:默认糊着时星号看不见(多余),
+// 而解除后(用户正是想确认「这是哪个好友」)看到的仍是 839***713,还是认不出来。
+//
+// 等宽字体是为了多条槽名的 UID 段宽度一致、下拉里对得齐。
+const SlotUid = ({ uid }) => <span className="privacy slot-uid">{uid}</span>
+
 // 槽展示名:一律由前端按 key 现算,**不用**后端 /api/flowers/slots 返回的 name 字段。
 // 原因:后端 flowerSlotName 拼的是原始 uid(如「好友 UID:10001」未脱敏),而 SSE 广播
 // 的 worlds 由前端自己转换、是脱敏的 —— 同一个下拉里两条路径显示不一致,且删除槽后走
 // REST 重取时,名字会从脱敏突然变成完整 uid(可观察的跳变)。脱敏属展示层职责,故归一到前端。
-const slotName = (key) =>
-  key === 'self' ? '自己世界'
-    : key.startsWith('owner:') ? '好友 UID:' + maskUid(key.slice(6))
-      : key
+const slotLabel = (key, myUID) => {
+  if (key === 'self') return myUID ? <>自己世界 (<SlotUid uid={myUID} />)</> : '自己世界'
+  if (key.startsWith('owner:')) return <>好友 UID:<SlotUid uid={key.slice(6)} /></>
+  return key
+}
+
+// 当前世界的实时项:key 不落在任何槽里时的占位文案。
+const currentLabel = (ownerID) =>
+  ownerID ? <>当前世界 (<SlotUid uid={ownerID} />)</> : '当前世界'
 
 export default function Flowers() {
   const account = useContext(AccountContext)
@@ -52,11 +67,10 @@ export default function Flowers() {
   useEffect(() => subscribe('flowers', (d) => {
     setData(d)
     // 广播带完整 worlds 存档表:本地同步槽列表,选中槽随实时推送保持最新。
-    // name 用前端的 slotName 现算而非后端给的:见下方 slotName 的说明。
+    // 只存 key,展示名在渲染时由 slotLabel 现算(它依赖 myUID,且要用后端给不得的脱敏)。
     const worlds = d && d.worlds
     if (worlds) setSlots(Object.entries(worlds).map(([key, w]) => ({
       key,
-      name: slotName(key),
       ts: (w && w.ts) || 0,
       flowers: (w && w.flowers) || [],
     })))
@@ -89,23 +103,19 @@ export default function Flowers() {
   }, [slots, curKey])
   // 下拉选项:当前世界已有对应槽时不重复显示「当前世界」项(该槽即当前世界,实时数据已同步进槽);
   // 否则(未建档/花全被采完未更新槽)单独显示「当前世界 (id)」实时项。
-  // 槽名一律走 slotName 重算(slots 可能来自 REST,其 name 未脱敏)。
+  // 标签一律走 slotLabel 现算 —— slots 可能来自 REST,其 name 未脱敏(见 slotLabel 的说明)。
   const viewOptions = useMemo(() => {
-    const real = (slots || []).map((s) => ({ ...s, name: slotName(s.key) }))
+    const real = (slots || []).map((s) => ({ ...s, label: slotLabel(s.key, myUID) }))
     if (real.some((s) => s.key === curKey)) return real
-    return [{ key: '__current__', name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }, ...real]
-  }, [slots, curKey, curOwnerID, flowers])
+    return [{ key: '__current__', label: currentLabel(curOwnerID), flowers }, ...real]
+  }, [slots, curKey, curOwnerID, flowers, myUID])
   // 当前视图:__current__=实时当前世界;否则选中的存档槽。花种按特殊(最多 3 只)/普通(最多 20 只)分组展示。
-  // 自己世界的槽名额外附上自己的 uid(便于确认「这是我自己」),其余用 slotName。
   const view = useMemo(() => {
     if (selKey !== '__current__') {
       const sel = slots && slots.find((s) => s.key === selKey)
-      if (sel) return {
-        name: sel.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : slotName(sel.key),
-        flowers: sel.flowers || [],
-      }
+      if (sel) return { label: slotLabel(sel.key, myUID), flowers: sel.flowers || [] }
     }
-    return { name: curOwnerID ? `当前世界 (${maskUid(curOwnerID)})` : '当前世界', flowers }
+    return { label: currentLabel(curOwnerID), flowers }
   }, [selKey, slots, flowers, curOwnerID, myUID])
   const viewSpecials = view.flowers.filter((f) => f.specSeedId > 0)
   const viewNormals = view.flowers.filter((f) => !(f.specSeedId > 0))
@@ -124,7 +134,7 @@ export default function Flowers() {
           className="slot-select"
           options={viewOptions.map((o) => ({
             value: o.key,
-            label: o.key === 'self' && myUID ? `自己世界 (${maskUid(myUID)})` : o.name,
+            label: o.label,
             count: o.flowers.length,
           }))}
           value={selKey}
@@ -143,7 +153,7 @@ export default function Flowers() {
       ) : (
         <>
           <div className="flowers-group">
-            <h4 className="flowers-group-t">{view.name}({view.flowers.length})</h4>
+            <h4 className="flowers-group-t">{view.label}({view.flowers.length})</h4>
           </div>
           {viewSpecials.length > 0 && (
             <section className="flowers-group">

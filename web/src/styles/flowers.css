@@ -13,6 +13,11 @@
 
 /* 槽位下拉:复用通用 Dropdown(见 dropdown.css),此处仅收窄宽度避免撑满工具栏 */
 .slot-select { flex: none; max-width: 280px; }
+/* 槽名里的 UID:等宽字体,让各条的星号段宽度一致、下拉里对得齐
+   (普通比例字体的数字与星号宽度不同,不同槽名之间会跳位)。
+   .privacy 由 SlotUid 组件挂上,复用全局截图防泄(见 shell.css 的 html[data-privacy]),
+   默认模糊,点顶栏品牌名「妙妙屋」解除 —— 与账号下拉里的 UID 同一种处理。 */
+.slot-uid { font-family: ui-monospace, monospace; }
 
 .flowers-group { display: flex; flex-direction: column; gap: 8px; }
 .flowers-group-t {
@@ -48,12 +53,11 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   margin-top: 4px; min-width: 0;
 }
+/* 同样**不加矩形装饰**(原因见 .glass-chip 的注释):素材是椭圆,
+   border-radius / border / box-shadow 会在椭圆外留下一圈毛边。 */
 .flower-glass-chip {
   position: relative; display: block; overflow: hidden;
   width: 100%; max-width: 140px; aspect-ratio: 280 / 154;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, .4);
 }
 .flower-glass-chip > img { width: 100%; height: 100%; object-fit: cover; }
 .flower-glass-t {

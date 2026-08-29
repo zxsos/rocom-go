@@ -55,17 +55,15 @@ export function fmtClock(ts) {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
 }
 
-// maskUid 把 UID 半隐藏显示:保留前 3 后 3,中间以 ＊＊＊ 代替(1234567890 → 123＊＊＊890)。
-// 用于花种页「当前世界/自己世界/好友槽名」等展示位,防止完整 UID 被旁观者直接看到;
-// 位数不足 7 位时整体隐藏意义不大,原样返回。
-export function maskUid(uid) {
-  const s = String(uid || '')
-  if (s.length <= 6) return s
-  return s.slice(0, 3) + '＊＊＊' + s.slice(-3)
-}
-
 // maskEmail 邮箱脱敏:local 保留前 2 与末 1,中间打星;local 过短(≤2)只留首位,域名完整保留。
-// 用于远行商人订阅成功后折叠展示,防旁窥(与 maskUid 同为「脱敏展示」族)。
+// 用于远行商人订阅成功后折叠展示,防旁窥。
+//
+// 注意:**UID 不做这种文字脱敏**。UID 一律显示完整值,防泄靠全局遮罩
+// (见 shell.css 的 html[data-privacy] .privacy,默认开启、点顶栏品牌名「妙妙屋」解除),
+// 与账号下拉一致。脱敏与遮罩叠用会废掉这个开关:默认糊着时星号是多余的,
+// 而解除后(用户正是想看清是哪个好友)看到的却还是打星的残值。
+// 星号一律用半角 `*` 且数量 = 实际隐藏位数;早先的全角 `＊`(U+FF0A)与数字/中文
+// 混排时字形和宽度都不齐,看着像乱码。
 export function maskEmail(email) {
   const s = String(email || '')
   const i = s.indexOf('@')

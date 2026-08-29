@@ -3,7 +3,7 @@ import { subscribe, getPosition } from '../../api'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { useAsyncRun } from '../../hooks/useAsyncData'
-import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU, SMOOTH_CUTOFF, snap, posAt, makeAnchor } from './motion'
+import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU as SMOOTH_TAU_FALLBACK, TAU_CUTOFF, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
 import { usePois } from './usePois'
 import { useRoutes, RouteLayer } from './useRoutes.jsx'
@@ -95,9 +95,13 @@ export function useMapEngine(account) {
     const { zoom: z, follow: fl, vp: v } = stRef.current
     if (!a || !worldRef.current) return
     const dt = (performance.now() - a.t0) / 1000
-    // decay 在 dt 超过 SMOOTH_CUTOFF 后直接归零(不再用 e^(-dt/τ) 的亚像素小数):
+    // decay 在 dt 超过 cutoff 后直接归零(不再用 e^(-dt/τ) 的亚像素小数):
     // 否则玩家静止时 cu/cv 的极小残差经 snap 的 Math.round 在整数边界反复跳,箭头/地图每帧抖 1px。
-    const decay = dt >= SMOOTH_CUTOFF ? 0 : Math.exp(-dt / SMOOTH_TAU)
+    // τ 与 cutoff 取锚点自带值(有轨迹回放时按回放时长放大,见 motion.js 的 glideFor/TAU_RATIO),
+    // 高速大落差时收敛更柔和,不再 0.12s 内猛冲归位。
+    const tau = a.tau || SMOOTH_TAU_FALLBACK
+    const cutoff = tau * TAU_CUTOFF
+    const decay = dt >= cutoff ? 0 : Math.exp(-dt / tau)
     const p = posAt(a, dt)
     const u = p.u + a.cu * decay
     const w = p.v + a.cv * decay
@@ -132,13 +136,14 @@ export function useMapEngine(account) {
       // 续跑 RAF 等 applyPos 写入锚点。否则 const dt = ... - a.t0 直接抛 TypeError,RAF 链断掉,
       // 之后 rafRef.current?.() 重启 tick 又抛——整个 RAF 永远起不来,地图不渲染,页面黑屏。
       if (!a) { raf = requestAnimationFrame(tick); return }
-      // 静止判定:decay 已饱和(误差收敛完毕,dt 超过 SMOOTH_CUTOFF)、且锚点无速度也无轨迹回放。
+      // 静止判定:decay 已饱和(误差收敛完毕,dt 超过 cutoff)、且锚点无速度也无轨迹回放。
       // 满足这三条后画面值不再随 dt 变化,继续跑 RAF 只是无谓计算 + 字符串比较,且亚像素边界
       // 抖动可能被放大。此时停 RAF,等 applyPos 写新锚点后经 rafRef 重启。
-      // 注意:有速度(vu/vv≠0)或轨迹回放(dt<GLIDE)时不能停,否则玩家在动画面会冻住。
+      // 注意:有速度(vu/vv≠0)或轨迹回放(dt<glide)时不能停,否则玩家在动画面会冻住。
+      // 回放时长是锚点自适应的(高速时更长),故这里读 a.glide 而非写死常量。
       const dt = (performance.now() - a.t0) / 1000
-      const moving = (a.vu || 0) !== 0 || (a.vv || 0) !== 0 || (a.cum && dt < 0.45)
-      if (dt >= SMOOTH_CUTOFF && !moving && !draggingRef.current) {
+      const moving = (a.vu || 0) !== 0 || (a.vv || 0) !== 0 || (a.cum && dt < (a.glide || 0))
+      if (dt >= (a.tau || SMOOTH_TAU_FALLBACK) * TAU_CUTOFF && !moving && !draggingRef.current) {
         raf = 0 // 已停,标记给 ensureRaf 知道下次需重启
         return
       }

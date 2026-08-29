@@ -25,12 +25,45 @@ export const defaultZoom = (p) => ZOOM_DEFAULTS[p && p.sceneResId] || ZOOM_FALLB
 // 而不是直线跳过去。转向本身最多晚一个心跳(~3s)才可见,那是游戏的上报节奏决定的,任何画法都提前
 // 不了(实测:此时直线外推仍是各策略中最准的,阻尼/定住/圆弧都更差)。见 docs/protocol.md 6。
 const MAX_EXTRAP = 3.5 // 外推上限(秒):超过心跳间隔仍无新包(抓包中断/掉线)就停住,免得一路飘走
-const GLIDE = 0.45 // 沿真实轨迹追平的时长(秒):这段轨迹本是过去几秒走的,快放一遍即可
+
+// 沿真实轨迹追平的时长(秒)。
+//
+// 回放的**倍速** = (len/glide) / speed,而 len = speed × 心跳间隔,故倍速 = 心跳间隔 / glide
+// —— 与移动速度无关!所以"高速时回放更快"是错觉:固定 0.45s 时无论快慢都是约 6.7 倍速
+// (2.5~3s 的心跳 / 0.45s),只是高速下 6.7 倍速对应的绝对位移更大、看着更冲。
+//
+// 改为按「以真实速度走完这段路所需秒数」(即 len/speed = 心跳间隔)× 压缩系数:
+// 倍速恒定 = 1/GLIDE_RATIO,不再随心跳间隔长短波动,且比原来的 6.7 倍温和。
+const GLIDE_MIN = 0.3
+const GLIDE_MAX = 1.2
+const GLIDE_RATIO = 0.25 // 倍速 = 1/0.25 = 4 倍(原为约 6.7 倍);仍快于实时,免延迟感过重
+
+// glideFor 按轨迹跨度与当前速度算回放时长:len/speed 即「真实速度走完所需秒数」。
+// 速度为 0(停下)或跨度退化(0)时无从计算,回退到最短时长。
+const glideFor = (len, speed) =>
+  (len > 0 && speed > 0) ? clamp((len / speed) * GLIDE_RATIO, GLIDE_MIN, GLIDE_MAX) : GLIDE_MIN
+
 export const SMOOTH_TAU = 0.12 // 误差收敛时间常数(秒):新包与外推位置的落差按 e^(-Δt/τ) 抹平,而非硬跳
-// decay 衰减阈值:dt 超过此值后 decay 直接归零。原因——e^(-dt/τ) 永不为 0,亚像素小数经 snap 的
+// —— 高速移动下真正的"冲刺"来源在这里 ——
+// 指数衰减的**峰值修正速度** = 落差 / τ。τ 固定 0.12s 时:
+//   低速外推准,落差几米 → 峰值几十 m/s,与实际速度同量级,无感;
+//   高速大落差(心跳空窗里转弯,补报落差十几米)→ 峰值上百 m/s,可达实际速度的十几倍,
+//   即箭头猛地一冲再归位。落差与速度成正比,τ 却不变,倍数失控就在所难免。
+//
+// 故 τ 改为按「落差换算成落后了几秒的路」(落差/速度)来定:让追赶耗时 = 落后秒数 / TAU_RATIO,
+// 峰值修正速度恒定 = 实际速度 × TAU_RATIO,与速度快慢无关。
+//   外推准(落后零点几秒)→ τ 小,收敛快,跟手;
+//   补报大落差(落后约一个心跳)→ τ 约 1s,平滑归位而非冲刺。
+const TAU_RATIO = 3 // 峰值修正速度 = 实际速度 × TAU_RATIO
+const TAU_MAX = 1.2
+// tauFor 按落差与速度算收敛时间常数。落差或速度为 0 时回退基准 τ。
+const tauFor = (gap, speed) =>
+  (gap > 0 && speed > 0) ? clamp((gap / speed) / TAU_RATIO, SMOOTH_TAU, TAU_MAX) : SMOOTH_TAU
+// 衰减截止倍数:dt 超过 8τ 后 decay 直接归零。原因——e^(-dt/τ) 永不为 0,亚像素小数经 snap 的
 // Math.round 在整数边界(如 0.4999↔0.5001)反复跳,玩家静止时箭头/地图每帧抖 1px,即典型抽搐。
-// 8τ ≈ 0.96s,此时残差已 < 0.034%,肉眼与像素吸附都无感;此后置零,画面就锁死在收敛值上,稳定不抖。
-export const SMOOTH_CUTOFF = SMOOTH_TAU * 8
+// 8τ 时残差已 < 0.034%,肉眼与像素吸附都无感;此后置零,画面就锁死在收敛值上,稳定不抖。
+// τ 现为逐锚点动态值(见 TAU_RATIO),故由调用方按 a.tau * TAU_CUTOFF 算,不再导出固定常量。
+export const TAU_CUTOFF = 8
 const SNAP_DIST = 0.005 // 落差超过底图边长的 0.5%(几十米)判为传送/换场景:直接跳过去,不做平滑
 const angleDiff = (a, b) => (((a - b) % 360) + 540) % 360 - 180 // a-b 折算到 (-180,180]
 const easeOut = (x) => 1 - (1 - x) * (1 - x)
@@ -59,9 +92,11 @@ const pathAt = (path, cum, r) => {
 }
 
 // posAt 是锚点在其之后 dt 秒的应有位置(不含误差修正):先回放真实轨迹(有的话),再按速度外推。
+// 回放时长取锚点自带的 glide(按跨度自适应,见 glideFor),不再用固定常量。
 export const posAt = (a, dt) => {
-  if (a.cum && dt < GLIDE) return pathAt(a.path, a.cum, easeOut(dt / GLIDE))
-  const t = dt - (a.cum ? GLIDE : 0) // 回放结束时正好停在上报位置,由此继续外推
+  const g = a.glide || GLIDE_MIN
+  if (a.cum && dt < g) return pathAt(a.path, a.cum, easeOut(dt / g))
+  const t = dt - (a.cum ? g : 0) // 回放结束时正好停在上报位置,由此继续外推
   const ex = Math.min(t, MAX_EXTRAP)
   return { u: a.u + a.vu * ex, v: a.v + a.vv * ex }
 }
@@ -73,14 +108,21 @@ export function makeAnchor(p, disp, sceneChanged) {
     u: p.u, v: p.v, vu: p.vu || 0, vv: p.vv || 0, heading: p.heading || 0,
     t0: performance.now(), cu: 0, cv: 0, dh: 0,
   }
+  const speed = Math.hypot(a.vu, a.vv)
   // 心跳空窗后补报的真实轨迹(那几秒实际走过的点,末点即本包位置):预先算好累计弧长供回放取点。
   if (p.path && p.path.length >= 2) {
     const cum = [0]
     for (let i = 1; i < p.path.length; i++) {
       cum.push(cum[i - 1] + Math.hypot(p.path[i].u - p.path[i - 1].u, p.path[i].v - p.path[i - 1].v))
     }
-    if (cum[cum.length - 1] > 0) { a.path = p.path; a.cum = cum }
+    if (cum[cum.length - 1] > 0) {
+      a.path = p.path
+      a.cum = cum
+      a.glide = glideFor(cum[cum.length - 1], speed)
+    }
   }
+  // 无轨迹也给个值:posAt 与静止判定都要读,缺了会退化成 undefined 比较(恒假)。
+  if (a.glide === undefined) a.glide = GLIDE_MIN
   // 与画面当前位置的落差:小落差(外推的正常误差)平滑抹平;换场景/传送这种大落差直接跳过去。
   // 有轨迹时起点是轨迹首点(箭头先并入真实路线),故落差按它算。
   // 注意:带轨迹的包必然是普通走路(传送落点是 onTeleport 合成的无轨迹 MoveReq),其轨迹首点
@@ -93,5 +135,8 @@ export function makeAnchor(p, disp, sceneChanged) {
     a.cv = disp.v - start.v
     a.dh = angleDiff(disp.heading, a.heading) // 转向同样平滑,不硬掰
   }
+  // τ 必须等落差算出来再定:它按「落差 = 落后了几秒的路」缩放,
+  // 使峰值修正速度恒为实际速度的 TAU_RATIO 倍(见 tauFor 的注释)。
+  a.tau = tauFor(Math.hypot(a.cu, a.cv), speed)
   return a
 }

@@ -255,10 +255,13 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 }
 @keyframes glass-zoom-in { from { opacity: 0; } to { opacity: 1; } }
 .glass-zoom { position: relative; max-width: min(560px, 92vw); width: 100%; }
+/* 色卡本体:**不加任何矩形装饰**。
+   素材是**椭圆形**(顶边只有中段不透明、四角全透明,见 internal/gamedata/data/img/dazzling/),
+   而 border / border-radius / box-shadow / background 都是按容器的**矩形**画的 ——
+   套在椭圆外就会在四角露出一圈底色或描边,看着像毛边。
+   故这里只留定位与比例,让素材的透明边缘自然透出后面的半透明遮罩。 */
 .glass-zoom-card {
   position: relative; display: block; width: 100%; aspect-ratio: 280 / 154;
-  border-radius: var(--radius-lg); overflow: hidden;
-  border: 1px solid var(--line); box-shadow: var(--shadow); background: #000;
 }
 .glass-zoom-card > i, .glass-zoom-card > img {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%;
