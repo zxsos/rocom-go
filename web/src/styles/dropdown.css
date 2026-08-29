@@ -1,0 +1,38 @@
+/* 通用自绘下拉(Dropdown,见 components/Dropdown.jsx):替代原生 <select>,
+   浮层用主题变量,与顶栏账号下拉/花种槽位下拉视觉一致。 */
+
+.dropdown { position: relative; }
+.dropdown-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: 100%; text-align: left; cursor: pointer; font: inherit; color: var(--fg);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.dropdown-trigger:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dropdown-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dropdown-trigger:disabled { opacity: .5; cursor: not-allowed; }
+.dropdown-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
+.dropdown.open .dropdown-caret { transform: rotate(180deg); }
+
+/* 浮层:绝对定位贴在 trigger 下方,与 trigger 同宽,最大高度滚动 */
+.dropdown-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 100%;
+  max-height: min(40vh, 320px); overflow-y: auto;
+  list-style: none; margin: 0; padding: 4px; z-index: 60;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  transition: background .12s ease;
+}
+.dropdown-item.hi { background: var(--bg-3); }
+.dropdown-item.cur { color: var(--accent); }
+.dropdown-item.cur.hi { background: var(--accent-soft); }
+
+/* 小尺寸变体(分页条数等紧凑场景) */
+.dropdown.small .dropdown-trigger { padding: 4px 8px; font-size: 12px; border-radius: 8px; }
+.dropdown.small .dropdown-menu { font-size: 12px; }

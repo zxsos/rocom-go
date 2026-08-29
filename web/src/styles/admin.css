@@ -25,7 +25,7 @@
 }
 .admin-card h2 { margin: 0; font-size: 18px; }
 .admin-hint { color: var(--muted); font-size: 13px; margin: 0; }
-.admin-error { color: var(--danger, #e05656); font-size: 13px; margin: 0; }
+.admin-error { color: var(--danger); font-size: 13px; margin: 0; }
 .admin-card form { display: flex; flex-direction: column; gap: 10px; }
 .admin-card .btn { width: 100%; }
 .admin-head {
@@ -47,7 +47,7 @@
 .admin-test-form .btn { white-space: nowrap; }
 
 /* —— 查蛋 API 统计 —— */
-.egg-fail { color: var(--danger, #e05656); font-size: 13px; }
+.egg-fail { color: var(--danger); font-size: 13px; }
 .egg-daily { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 8px; }
 .egg-daily-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .egg-daily-bar {
@@ -55,8 +55,8 @@
   background: var(--bg-1); display: flex; flex-direction: column-reverse; overflow: hidden;
 }
 .egg-daily-fill { width: 100%; }
-.egg-daily-fill.ok { background: #4caf50; }
-.egg-daily-fill.fail { background: #e05656; }
+.egg-daily-fill.ok { background: var(--green); }
+.egg-daily-fill.fail { background: var(--danger); }
 .egg-daily-day { font-size: 11px; color: var(--muted); }
 .admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-rule-list li {
@@ -79,7 +79,7 @@
   background: transparent; border: 1px solid var(--line); color: var(--fg-dim);
   padding: 4px 10px; font-size: 12px;
 }
-.btn.ghost:hover { color: var(--danger, #e05656); border-color: var(--danger, #e05656); }
+.btn.ghost:hover { color: var(--danger); border-color: var(--danger); }
 
 /* —— 成员抓捕图表 —— */
 .admin-stats { display: flex; flex-direction: column; gap: 14px; }
@@ -129,7 +129,7 @@
 .admin-table th, .admin-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
 .admin-table th { color: var(--muted); font-weight: 500; }
 .admin-table td.mono { font-family: ui-monospace, monospace; font-size: 11px; color: var(--fg-dim); }
-.stat-hot { color: var(--danger, #e05656); font-weight: 600; }
+.stat-hot { color: var(--danger); font-weight: 600; }
 .admin-stats .admin-card h3 { margin: 0; font-size: 15px; }
 
 /* —— 投放稀有野生精灵 —— */
@@ -143,7 +143,8 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 8px; background: var(--bg-2); border: 1px dashed var(--line); border-radius: var(--radius);
 }
-.admin-glass-picker .select { width: auto; flex: none; }
+.admin-glass-picker .dropdown { width: auto; flex: none; }
+.admin-glass-picker .dropdown-trigger { width: auto; }
 /* 色卡预览:普通=双色渐变块(280:154 比例),隐藏=整图缩略 */
 .admin-glass-preview {
   flex: none; width: 56px; height: 31px; border-radius: 4px;
@@ -232,7 +233,7 @@
   .admin-inject-form .btn, .admin-rule-form .btn { grid-column: auto; }
   /* 工具栏可换行,筛选下拉弹性占宽(不再钉死 260px) */
   .admin-play-toolbar { flex-wrap: wrap; }
-  .admin-play-toolbar .select { flex: 1 1 auto; max-width: none; min-width: 0; }
+  .admin-play-toolbar .dropdown { flex: 1 1 auto; max-width: none; min-width: 0; }
   /* 统计块自动换行(游玩记录/查蛋各 5 块,三列排不下自然换行) */
   .admin-play-summary { flex-wrap: wrap; }
   .admin-play-stat { flex: 1 1 30%; min-width: 100px; }

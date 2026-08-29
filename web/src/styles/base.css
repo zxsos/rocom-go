@@ -14,6 +14,7 @@
   --gold: #f5b942;
   --green: #3fb950;
   --red: #f85149;
+  --danger: #e5534b;
   --shadow: 0 4px 16px rgba(0, 0, 0, .35);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, .25);
   --radius: 10px;
@@ -41,6 +42,7 @@
   --gold: #b88200;
   --green: #1a7f37;
   --red: #cf222e;
+  --danger: #cf222e;
   --shadow: 0 4px 16px rgba(0, 0, 0, .12);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, .08);
   --bar-bg: rgba(255, 255, 255, .9);
@@ -102,7 +104,10 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .chip.on:hover { background: #5c9aff; border-color: #5c9aff; }
-.pill { padding: 2px 8px; border-radius: 6px; background: #6c6c6c; font-size: 12px; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; line-height: 1.5;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-dim);
+}
 /* 最高档天分「了不起的天分」用金色高亮 */
 .pill-gold { background: var(--gold); color: #1a1400; font-weight: 700; }
 .muted { color: var(--fg-dim); }

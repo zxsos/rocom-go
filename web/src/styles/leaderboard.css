@@ -80,7 +80,7 @@
 
 .rank-empty { padding: 30px 0; text-align: center; color: var(--fg-dim); font-size: 13px; }
 .rank-foot { margin-top: 12px; font-size: 11px; color: var(--fg-dim); text-align: center; }
-.rank-err { padding: 20px; color: var(--danger, #e5534b); font-size: 13px; }
+.rank-err { padding: 20px; color: var(--danger); font-size: 13px; }
 
 /* 窄屏:称号三卡收成单列 */
 @media (max-width: 700px) {

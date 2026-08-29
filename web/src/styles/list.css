@@ -46,7 +46,7 @@ table.pets tr:last-child td { border-bottom: none; }
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
 table.pets tr:hover td { background: var(--bg-2); }
 table.pets tbody tr { cursor: pointer; user-select: none; transition: background .1s ease; }
-table.pets tr.selected td { background: #1c2740; }
+table.pets tr.selected td { background: var(--accent-soft); }
 table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 
 /* 身高/体重两行显示(StatRange stacked):首行数值、次行百分位;

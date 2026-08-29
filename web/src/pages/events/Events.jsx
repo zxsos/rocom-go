@@ -10,6 +10,7 @@ import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
 import { chime, rareChime } from '../../utils/audio'
 import { sanitizeRules, isHighlight, NOTABLE_BLOODS } from './highlight'
 import RulePanel from './RulePanel'
+import Dropdown from '../../components/Dropdown'
 
 export default function Events() {
   const account = useContext(AccountContext)
@@ -188,10 +189,12 @@ export default function Events() {
             <div className="event-pager">
               <label className="muted pager-size">
                 每页
-                <select className="input" value={pageSize}
-                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}>
-                  {[20, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <Dropdown
+                  small
+                  value={pageSize}
+                  options={[20, 50, 100, 200].map((n) => ({ value: n, label: String(n) }))}
+                  onChange={(v) => { setPageSize(Number(v)); setPage(1) }}
+                />
                 条
               </label>
               <button className="btn" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>‹ 上一页</button>
