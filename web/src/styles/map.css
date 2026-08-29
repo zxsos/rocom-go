@@ -108,11 +108,29 @@
    呼吸式脉冲:配合位置外推的平滑感,玩家在场感更强。 */
 /* z-index 必须显式给:原先只靠 DOM 顺序,被资料卡(--z-bar 30)盖住。
    箭头是「我在哪」的常驻指示,须优先于临时资料卡 —— 故用 --z-ctrl 而非 --z-tip。 */
-.map-arrow { position: absolute; left: 0; top: 0; z-index: var(--z-ctrl); pointer-events: none; will-change: transform; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); animation: map-arrow-pulse 2.6s ease-in-out infinite; }
-.map-arrow svg { display: block; }
+.map-arrow { position: absolute; left: 0; top: 0; z-index: var(--z-ctrl); pointer-events: none; will-change: transform; }
+/* 箭头本体:静态投影。刻意**不参与动画** —— 理由见下方 ::before。 */
+.map-arrow svg { display: block; position: relative; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+/* 呼吸光晕:伪元素 + radial-gradient,只动 opacity 与 transform: scale。
+
+   原实现是动画 filter 的 drop-shadow(模糊半径 4px → 9px),而**filter 每帧变化会强制重绘**:
+   跟随模式下地图与箭头本就在逐帧平移(transform),再叠一个每帧重算的 filter,压力叠加,
+   负载高时掉帧 —— 表现就是箭头抽搐。
+
+   改成 opacity + transform 后走 GPU 合成,不触发重绘与重排,与逐帧平移互不干扰。
+   filter 只在 svg 上做静态投影,尺寸/朝向不变时算一次即可缓存。
+
+   视觉上略有差异:原来是沿箭头形状的模糊扩散,现在是圆形径向渐变 —— 箭头本身只有 30px,
+   这个尺度下几乎看不出。颜色取 --red(#f85149) 的分量形式。 */
+.map-arrow::before {
+  content: ''; position: absolute; inset: -50%; z-index: -1;
+  background: radial-gradient(circle, rgba(248, 81, 73, .75) 0%, rgba(248, 81, 73, 0) 70%);
+  animation: map-arrow-pulse 2.6s ease-in-out infinite;
+  will-change: opacity, transform;
+}
 @keyframes map-arrow-pulse {
-  0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(248, 81, 73, .35)); }
-  50%      { filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)) drop-shadow(0 0 9px rgba(248, 81, 73, .65)); }
+  0%, 100% { opacity: .45; transform: scale(.85); }
+  50%      { opacity: .85; transform: scale(1.15); }
 }
 /* 控制组(图层侧栏/放大/缩小/回中)浮在视口右上角。
    z-index 必须显式给:原先只靠 DOM 顺序,被资料卡(--z-bar 30)盖住,点不到缩放/图层按钮。
@@ -313,8 +331,8 @@
    i/img 子层也要显式 absolute + inset:0,否则 inline 空元素塌成 0×0,色卡渲染空白。 */
 .map-wild-tip .map-wild-tip-chip {
   position: relative; display: block; overflow: hidden;
-  width: 140px; height: 77px; border-radius: 5px;
-  margin-top: 3px; box-shadow: 0 1px 5px rgba(0, 0, 0, .4);
+  width: 140px; height: 77px;
+  margin-top: 3px;
 }
 .map-wild-tip .map-wild-tip-chip > i, .map-wild-tip .map-wild-tip-chip > img {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%;

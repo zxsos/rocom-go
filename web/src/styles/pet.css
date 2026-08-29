@@ -45,10 +45,13 @@ img.pet-avatar { object-fit: cover; }
 .mark-colorful { background: #6b2f50; color: #ffb6e0; }
 .mark-form { background: var(--c-form-d); color: var(--c-form); font-weight: 500; }
 /* 炫彩色卡缩略图:普通炫彩 = span 容器内 3 层 CSS mask 合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 →
-   粒子染白,见 badges.jsx GlassChip),隐藏炫彩 = 整图 img;280x154 按约 1.8:1 缩小(与 .mark-img 同高),
-   细描边便于浅色卡在浅底上区分。i/img 子层绝对定位铺满容器。 */
-.glass-chip { position: relative; display: inline-block; height: 18px; width: 33px; border-radius: 3px;
-  margin-left: 4px; vertical-align: middle; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); overflow: hidden; }
+   粒子染白,见 badges.jsx GlassChip),隐藏炫彩 = 整图 img;280x154 按约 1.8:1 缩小(与 .mark-img 同高)。
+   i/img 子层绝对定位铺满容器。
+
+   刻意**不加 border-radius / box-shadow / 背景**:素材是椭圆(四角透明),这些矩形装饰会
+   在椭圆外留下一圈毛边。色卡本身有颜色,浮在卡片底色上已足够可辨。 */
+.glass-chip { position: relative; display: inline-block; height: 18px; width: 33px;
+  margin-left: 4px; vertical-align: middle; }
 .glass-chip > i, .glass-chip > img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .glass-chip > img { object-fit: cover; }
 

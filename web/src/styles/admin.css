@@ -144,10 +144,11 @@
 }
 .admin-glass-picker .dropdown { width: auto; flex: none; }
 .admin-glass-picker .dropdown-trigger { width: auto; }
-/* 色卡预览:普通=双色渐变块(280:154 比例),隐藏=整图缩略 */
+/* 色卡预览:普通=双色渐变块(280:154 比例),隐藏=整图缩略。
+   同样不加 border-radius/border —— 素材是椭圆,矩形装饰会留毛边(见 .glass-chip 注释)。 */
 .admin-glass-preview {
-  flex: none; width: 56px; height: 31px; border-radius: 4px;
-  border: 1px solid var(--line); object-fit: cover; display: inline-block;
+  flex: none; width: 56px; height: 31px;
+  object-fit: cover; display: inline-block;
 }
 /* 网格两列或手机宽度时,投放/规则表单折叠换行 */
 @media (max-width: 1080px) {
