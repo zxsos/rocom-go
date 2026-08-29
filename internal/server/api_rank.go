@@ -43,8 +43,8 @@ func (s *Server) startRankSettlement() {
 }
 
 // handleLeaderboard 返回排行榜数据:
-//   - forbes:按金币降序(未同步过金币的参加者沉底,前端显示「待同步」)
-//   - profit:按盈亏降序(盈亏 = 当前金币 - 首次金币快照)
+//   - forbes:按洛克贝降序(未同步过洛克贝的参加者沉底,前端显示「待同步」)
+//   - profit:按盈亏降序(盈亏 = 当前洛克贝 - 首次洛克贝快照)
 //   - titles:今天(佩戴日)已评出的称号获奖名单(每晚 00:05 结算)
 //   - me:当前账号的参与状态(含 join 开关与今日称号),方便前端高亮/提示参加
 func (s *Server) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (s *Server) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	forbes := append([]store.RankEntry(nil), entries...)
 	sort.SliceStable(forbes, func(i, j int) bool {
 		if forbes[i].HasCoins != forbes[j].HasCoins {
-			return forbes[i].HasCoins // 有金币的排前
+			return forbes[i].HasCoins // 有洛克贝的排前
 		}
 		return forbes[i].Coins > forbes[j].Coins
 	})

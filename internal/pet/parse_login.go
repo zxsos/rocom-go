@@ -29,9 +29,9 @@ func ParseLoginAccount(body []byte) (userID uint64, name string, ok bool) {
 	return id, name, true
 }
 
-// ParseLoginCoins 从 ZoneLoginRsp(opcode 0x0102)取玩家金币数量。
-// 金币位于 player_info.brief_info.vitem_info 的 field3(vitem_list,裸 varint 数组,
-// 下标 1=金币,下标 0 恒 0,实测 19517164 与游戏内一致)。vitem_info 的 field4 是
+// ParseLoginCoins 从 ZoneLoginRsp(opcode 0x0102)取玩家洛克贝数量。
+// 洛克贝位于 player_info.brief_info.vitem_info 的 field3(vitem_list,裸 varint 数组,
+// 下标 1=洛克贝,下标 0 恒 0,实测 19517164 与游戏内一致)。vitem_info 的 field4 是
 // liabilities_num 槽数组(槽数随版本变化,实测 2026-08 为 81 槽),故用
 // 「field3 varint 60~120 个 + field4 varint ≥3 个」的特征在 body 中唯一定位。
 // 注意:真实 wire 与 all.pb 描述符存在版本偏移(字段号 +2),pcapdump 按描述符

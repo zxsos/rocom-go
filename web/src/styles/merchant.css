@@ -15,19 +15,19 @@
 .merchant-sub { color: var(--fg-dim); font-size: 13px; margin-top: 3px; }
 .merchant-hero-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* 金币徽标(顶部横幅:当前账号金币,来自登录回包 0x0102 解析) */
+/* 洛克贝徽标(顶部横幅:当前账号洛克贝,来自登录回包 0x0102 解析) */
 .merchant-coins {
   padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
   background: rgba(212, 175, 55, .16); color: #d4af37; border: 1px solid rgba(212, 175, 55, .45);
   font-variant-numeric: tabular-nums;
 }
-/* 未同步态(该账号从未解析到金币,待玩家重新登录游戏):淡金、虚框、可悬停查看提示 */
+/* 未同步态(该账号从未解析到洛克贝,待玩家重新登录游戏):淡金、虚框、可悬停查看提示 */
 .merchant-coins-unk {
   background: transparent; color: rgba(212, 175, 55, .55); border-style: dashed;
   cursor: help;
 }
 
-/* 金币旁的排行榜参加/退出按钮(默认参加,每晚 00:05 结算称号) */
+/* 洛克贝旁的排行榜参加/退出按钮(默认参加,每晚 00:05 结算称号) */
 .merchant-rank-btn {
   padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
   cursor: pointer; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-dim);

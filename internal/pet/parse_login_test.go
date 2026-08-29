@@ -32,7 +32,7 @@ func buildLoginBody(vitem []byte) []byte {
 }
 
 func TestParseLoginCoins(t *testing.T) {
-	// 实测 vitem_list:下标 1 = 金币 19517164,其余用真实值填充(下标 3/7/10/17 等)。
+	// 实测 vitem_list:下标 1 = 洛克贝 19517164,其余用真实值填充(下标 3/7/10/17 等)。
 	list := make([]uint64, 82)
 	real := map[int]uint64{1: 19517164, 3: 59, 7: 65380, 10: 50, 13: 3, 16: 62, 17: 5855, 20: 3, 46: 108, 50: 206, 51: 2770, 52: 5, 53: 1, 66: 1, 67: 1, 71: 575, 72: 1150, 74: 8, 78: 436, 81: 2318}
 	for i, v := range real {
@@ -43,7 +43,7 @@ func TestParseLoginCoins(t *testing.T) {
 		t.Fatalf("期望解析成功,实际 ok=false")
 	}
 	if coins != 19517164 {
-		t.Fatalf("期望金币 19517164,实际 %d", coins)
+		t.Fatalf("期望洛克贝 19517164,实际 %d", coins)
 	}
 }
 
