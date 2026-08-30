@@ -9,19 +9,22 @@ import { Marks } from '../../components/badges'
 import { hatchProgress } from './hatch'
 import { toast } from '../../components/toast'
 
-// 精灵蛋页面:三段垂直 —— 孵蛋器(在孵且进度未满的蛋)、已孵化蛋(进度满的标记蛋)、
-// 仓库(其余蛋)。不分标签页——在孵的蛋本来就不出现在背包格子里(BagModuleData.IsRemoveEggItem)。
-// 为何按进度分:服务器取出孵蛋器(0x02ff/0x0300)不清 start_hatch_time,背包全量/登录(0x1344)
-// 会把已取出的蛋重新标成在孵;取出时 hatched_secs/last_hatch_update_sec 被清零,前端外推的
-// 进度瞬间顶满(hatchUpdate=0 → elapsed 从 epoch 起算,见 hatch.js)。于是「标记在孵但进度满」
-// 正好圈出这些残留蛋与孵满未破壳的蛋,不再全塞进孵蛋器。
+// 精灵蛋页面:两段垂直 —— 孵蛋器(在孵且进度未满的蛋)、仓库(其余蛋)。不分标签页——在孵的蛋
+// 本来就不出现在背包格子里(BagModuleData.IsRemoveEggItem)。
+//
+// 此前还有第三段「已孵化蛋」(标记在孵但进度满),那是给历史 bug 打的补丁:服务器取出孵蛋器
+// 不清 start_hatch_time,背包全量/登录(0x1344)会把已取出的蛋重新标成在孵,而进度字段被清零
+// 后前端外推瞬间顶满,于是按「在孵且进度满」把它们圈出来隔离。15648bf 改用登录/开孵蛋器时
+// 的权威 egg_gid 判定在孵后,残留标记不再产生,该栏随之作废,进度满的蛋也一并不再显示
+// (孵化倍率是本地估的,见 hatch.js,拿它当「可破壳」的依据并不可靠;且孵蛋器上限 3 格,
+// 孵满了玩家会立刻点掉,不会在页面上看它挂着)。
 // 排序复刻游戏内背包的两种(见 docs/data.md 3.6 与 internal/pet.SortEggs)。
 const SORTS = [
   { k: 'quality', label: '品质' },
   { k: 'obtained', label: '获取时间' },
 ]
 
-// 孵蛋器格子数:实测 3 个(玩家上限可能随等级/道具变,故按实际在孵数取大)。
+// 孵蛋器格子数:游戏内固定 3 格(游戏内上限,不随等级/道具变)。
 const HATCH_SLOTS = 3
 
 // 部分异色形态的蛋配置名自带「的蛋」,后端模板({0}的蛋)再拼一层就成了「XX的蛋的蛋」,
@@ -113,15 +116,11 @@ export default function EggList() {
   // 孵化进度随时间涨:秒级刷新即可。
   useInterval(() => setNow(Date.now()), 1000)
 
-  // 三段分类:孵蛋器=进度未满的标记蛋(保持后端槽位序);已孵化蛋=进度满的标记蛋
-  // (残留标记/孵满未破壳,放入越近越靠前);仓库=其余(后端已排好序,原样保留)。
+  // 两段分类:孵蛋器=标记在孵且进度未满的蛋(保持后端槽位序);仓库=其余(后端已排好序,原样保留)。
+  // 进度满的蛋两处都不显示(见文件头说明)。
   const withP = data.eggs.map((e) => ({ e, p: hatchProgress(e, now) }))
   const incubating = withP.filter((x) => x.e.hatching && (x.p == null || x.p.pct < 100)).map((x) => x.e)
-  const hatched = withP.filter((x) => x.e.hatching && x.p && x.p.pct >= 100)
-    .map((x) => x.e)
-    .sort((a, b) => (b.startHatch || 0) - (a.startHatch || 0))
   const bag = withP.filter((x) => !x.e.hatching).map((x) => x.e)
-  // 孵蛋器固定 3 格(无论实际在孵几颗),每格三等分,同游戏内孵蛋器。
   const slots = HATCH_SLOTS
 
   return (
@@ -135,17 +134,6 @@ export default function EggList() {
               : <div key={'s' + i} className="egg-slot-empty">空格子</div>
           ))}
         </aside>
-
-        <div className="eggs-col-t">已孵化蛋 <span className="muted">{hatched.length} 颗</span></div>
-        <section className="eggs-hatched">
-          {hatched.length === 0
-            ? <div className="empty">没有已孵化蛋(孵满或中途取走的蛋会归到这里,按放入时间排)</div>
-            : (
-              <div className="egg-grid">
-                {hatched.map((e) => <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />)}
-              </div>
-            )}
-        </section>
 
         <div className="eggs-bar">
           <div className="eggs-col-t">仓库 <span className="muted">{bag.length} 颗</span></div>
@@ -177,7 +165,7 @@ export default function EggList() {
 }
 
 // IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
-// 点击弹出半透明气泡,说明计数口径(只算仍在孵化的;进度满的另列「已孵化蛋」)。点气泡外关闭。
+// 点击弹出半透明气泡,说明在孵口径(后端权威快照)与进度是本地外推的估算。点气泡外关闭。
 function IncuTitle({ n, slots }) {
   const ref = useRef(null)
   const [tip, setTip] = useState(false)
@@ -191,9 +179,9 @@ function IncuTitle({ n, slots }) {
     <div className="eggs-col-t">
       孵蛋器 <span className="muted">{n}/{slots}</span>
       <span ref={ref} className="incu-tip">
-        <img className="incu-tip-ic" src="/ps.svg" alt="?" title="只列孵化进度未满的蛋"
+        <img className="incu-tip-ic" src="/ps.svg" alt="?" title="在孵按权威快照判定,进度是本地外推的估算"
           onClick={() => setTip((t) => !t)} draggable={false} />
-        {tip && <span className="incu-tip-bubble">只列孵化进度未满的蛋;已孵满或中途取走的在下方「已孵化蛋」一栏</span>}
+        {tip && <span className="incu-tip-bubble">在孵按后端登录 / 开孵蛋器时的权威快照判定;进度条是本地外推的估算</span>}
       </span>
     </div>
   )

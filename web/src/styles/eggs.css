@@ -1,4 +1,4 @@
-/* 精灵蛋页面:三段垂直 —— 孵蛋器(在孵且进度未满)、已孵化蛋(进度满的标记蛋)、
+/* 精灵蛋页面:两段垂直 —— 孵蛋器(在孵的蛋,进度满的显示「可破壳」)、
    仓库(其余蛋,每行六个,同游戏内布局)。卡片布局固定,缺信息留占位,保证等高。 */
 .eggs-cols { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .eggs-col-t { font-weight: 600; display: flex; align-items: center; gap: 6px; }
@@ -9,7 +9,7 @@
    空格子与卡片同宽补位,不足 3 格时占住后面的坑。 */
 .eggs-incu { display: flex; flex-wrap: wrap; gap: 10px; }
 .eggs-incu .egg-card, .eggs-incu .egg-slot-empty { flex: 1 1 300px; min-width: 260px; }
-.eggs-hatched, .eggs-bag { min-width: 0; }
+.eggs-bag { min-width: 0; }
 
 /* 孵蛋器标题旁的提示图标:比数字(13px)小;深色主题下黑色 svg 反白显示 */
 .incu-tip { position: relative; display: inline-flex; }
