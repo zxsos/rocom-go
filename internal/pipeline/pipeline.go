@@ -156,6 +156,11 @@ const sweepInterval = 30 * time.Second
 // Run 消费 eng.Out 与连接断开通知,直到消息通道关闭(离线回放结束时)。期间定期兜底扫描
 // 游玩会话。所有状态只在当前 goroutine 内读写,故无并发问题。
 func (p *Pipeline) Run(eng *capture.Engine) {
+	// 启动时先结算一次:上次进程若非正常退出(崩溃/强杀),库里会残留 logout_time 为 NULL
+	// 的悬挂会话,管理后台就会一直显示那些玩家「在线中」。此刻内存连接表是空的,
+	// 故这一趟会把它们全部记为已下线 —— 不必等 30s 后的第一轮 sweep。
+	p.settleSessions(time.Now())
+
 	sweep := time.NewTicker(sweepInterval)
 	defer sweep.Stop()
 	for {
@@ -177,33 +182,50 @@ func (p *Pipeline) Run(eng *capture.Engine) {
 	}
 }
 
-// onConnClose 处理一条连接断开(capture 检测到 TCP 结束或空闲超时):结束该连接的游玩会话、
-// 记录下线时间。其余连接状态保留——断线重连/挂后台回前台后,该连接再有消息会在 handle 里
-// 自动重开新会话,游玩时间不丢。
+// onConnClose 处理一条连接断开(capture 检测到 TCP 结束或空闲超时):只标记该连接不再活跃,
+// **不直接结束游玩会话** —— 玩家常同时保持多条连接,关掉其中一条不等于下线。是否记下线
+// 交由 settleSessions 按账号判定(该账号再无活跃连接才算下线)。
+// 判定放在这里而非等下一轮 sweep:否则玩家所有连接都断开后,下线时刻会推迟一轮(最多 30s)。
 func (p *Pipeline) onConnClose(connID string) {
-	if err := p.st.EndPlaySession(connID, time.Now().Unix()); err != nil {
-		log.Printf("EndPlaySession 失败: %v", err)
-	}
 	if cs := p.conns[connID]; cs != nil {
 		cs.sessionOpen = false
 	}
+	p.settleSessions(time.Now())
 }
 
-// sweepOnce 兜底扫描游玩会话:内存里超过 sessionIdleTimeout 无消息的连接补记下线,并对库中
-// 悬挂的进行中会话(登录已超 24h)强制结束,避免管理后台永远显示「在线中」。
-func (p *Pipeline) sweepOnce(now time.Time) {
+// settleSessions 按**账号**重算游玩会话:仍在活跃的账号保持会话,其余一律记下线。
+//
+// 为什么不逐连接判:一个玩家同时开多条 TCP 连接(实测 2~3 条),且重连会换新端口。
+// 逐连接判会把「关掉其中一条」当成下线 —— 于是玩家还在玩,却立刻又开了一条新会话,
+// 表现为游玩记录里一堆几秒/几十秒的碎片,且与长会话时间重叠(用户实测数据即如此);
+// 「今日游玩时长」还会把并行的几条累加,直接翻倍。
+//
+// 活跃判定:该账号名下**任一条**连接仍在 sessionIdleTimeout 内有消息,即算在线。
+func (p *Pipeline) settleSessions(now time.Time) {
+	live := map[string]bool{}
 	for id, cs := range p.conns {
-		if cs.sessionOpen && !cs.last.IsZero() && now.Sub(cs.last) > sessionIdleTimeout {
-			if err := p.st.EndPlaySession(id, now.Unix()); err != nil {
-				log.Printf("EndPlaySession 失败: %v", err)
-			}
-			cs.sessionOpen = false
+		if !cs.sessionOpen || cs.last.IsZero() || now.Sub(cs.last) > sessionIdleTimeout {
+			continue
+		}
+		if acc := p.connAccount[id]; acc != "" {
+			live[acc] = true
 		}
 	}
-	nowTS := now.Unix()
-	if err := p.st.ForceEndStaleSessions(nowTS-24*3600, nowTS); err != nil {
-		log.Printf("ForceEndStaleSessions 失败: %v", err)
+	active := make([]string, 0, len(live))
+	for acc := range live {
+		active = append(active, acc)
 	}
+	// 账号不在 active 中的进行中会话:本轮记下线。同时兜住服务重启后无人认领的悬挂会话
+	// (内存连接表已清空),下一轮 sweep 即回收,无需等到 24h。
+	if err := p.st.EndStalePlaySessions(active, now.Unix()); err != nil {
+		log.Printf("EndStalePlaySessions 失败: %v", err)
+	}
+}
+
+// sweepOnce 兜底扫描:重算游玩会话(连接长时间无消息 → 记下线),并清理过期的花种挑战计数。
+func (p *Pipeline) sweepOnce(now time.Time) {
+	p.settleSessions(now)
+	nowTS := now.Unix()
 	// 花种挑战计数兜底清理:活动结束后花种从分组消失,0x0375 不再触发实时删除,
 	// 这里按记录的 end_ts 统一清掉过期品种的计数(见 boss.go onBossNpcInfo)。
 	if err := p.st.DeleteExpiredFlowerChallenges(nowTS); err != nil {
@@ -304,12 +326,15 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 	}
 	if p.connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志并落盘映射
 		log.Printf("用户 %s (%s) 登录成功 [%s]", acc, nick, m.Session)
-		p.st.SaveSessionAccount(m.Session, acc)
-		// 同一连接切换账号(退出登录换号):结束旧账号的进行中会话,并把 sessionOpen 置 false,
-		// 本消息后续流程(handle 的游玩会话跟踪)会为新账号重新开一条。
-		if err := p.st.EndPlaySession(m.Session, time.Now().Unix()); err != nil {
-			log.Printf("EndPlaySession 失败: %v", err)
+		// 同一连接切换账号(退出登录换号):先让**旧账号**下线。必须按账号结束而非按连接
+		// —— 会话是账号级的(见 store.StartPlaySession),旧账号可能在别的连接上还挂着会话。
+		if old := p.connAccount[m.Session]; old != "" {
+			if err := p.st.EndAccountSessions(old, time.Now().Unix()); err != nil {
+				log.Printf("EndAccountSessions 失败: %v", err)
+			}
 		}
+		p.st.SaveSessionAccount(m.Session, acc)
+		// sessionOpen 置 false:本消息后续流程(handle 的游玩会话跟踪)会为新账号重新开一条。
 		if cs := p.conns[m.Session]; cs != nil {
 			cs.sessionOpen = false
 		}
