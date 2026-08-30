@@ -31,14 +31,20 @@ export default function AccountSelect({ accounts, current, onChange, onManagePin
           <img className="account-state" src={current.online ? '/login.svg' : '/logout.svg'}
             alt="" draggable={false} title={current.online ? '在线' : '离线'} />
         )}
-        {/* 昵称与 UID 分成两个 span:窄屏靠 .acct-uid 把 UID 那截藏掉(见 shell.css)——
-            顶栏就那么宽,一整条塞进去只能省略号收场,而昵称已足够认出是谁。
-            两截都带 .privacy,与全局截图防泄一致(见 shell.css 的 html[data-privacy])。 */}
-        <span className="privacy account-trigger-name">
-          {current ? <><span className="acct-name">{current.name}</span><span className="acct-uid"> (UID:{uidOf(current.account)})</span></> : '选择账号…'}
-        </span>
+        {/* 顺序:称号 → 锁 → 昵称 → UID。
+            两个徽标(称号、PIN 锁)紧跟在状态图标后面、昵称**之前**:它们是不随昵称
+            长短变化的固定标识,放在最左最好认;挤在昵称和 UID 中间则会被伸缩的
+            文本推来推去,窄屏下还可能被挤到第二行去。
+            昵称与 UID 是**并列**的两个元素而不是嵌套在一个里:手机端要靠 flex-wrap
+            把 UID 整条甩到第二行(见 shell.css 的媒体查询),嵌套在昵称容器里就换不了行
+            —— 那正是窄屏省宽度的关键(第一行只留「称号 + 锁 + 昵称」)。
+            昵称与 UID 都带 .privacy,与全局截图防泄一致(见 shell.css 的 html[data-privacy])。 */}
         {current && <RankTitle title={current.title} />}
         {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护"><IconLock size={12} /></span>}
+        <span className="privacy account-trigger-name">
+          {current ? <span className="acct-name">{current.name}</span> : '选择账号…'}
+        </span>
+        {current && <span className="privacy acct-uid">UID:{uidOf(current.account)}</span>}
         <span className="account-caret">▾</span>
       </button>
       {open && (
