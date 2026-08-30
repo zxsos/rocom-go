@@ -10,7 +10,7 @@
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  worldToScreen, mapPxOf, inView, frameSig, parseEdge, edgeToScreen, clampZoom,
+  worldToScreen, mapPxOf, inView, frameSig, parseEdge, edgeToScreen, markerScale,
   SIZES, ROUTE_GRID, ROUTE_TELEPORT,
 } from '../src/pages/map/pipGeom.js'
 
@@ -208,16 +208,43 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps
   } else ok('edgeToScreen:格数为 0 有兜底')
 }
 
-// —— 5) 缩放夹取 ——
+// —— 5) 标记缩放(小窗与主地图像素密度对齐)——
 {
-  if (clampZoom(0) !== 1) fail(`clampZoom(0) 应夹到下限 1,实得 ${clampZoom(0)}`)
-  else if (clampZoom(999) !== 16) fail(`clampZoom(999) 应夹到上限 16,实得 ${clampZoom(999)}`)
-  else if (clampZoom(NaN) !== 1) fail('clampZoom(NaN) 应回退到下限')
-  else if (clampZoom(5) !== 5) fail('clampZoom(5) 应保持 5')
-  else ok('clampZoom 夹取与兜底正确')
+  // 视口短边与小窗同为 512 → 密度相同 → 不缩放
+  if (markerScale(512, 512) !== 1) fail(`视口与小窗同尺寸时应为 1,实得 ${markerScale(512, 512)}`)
+  else ok('markerScale:同密度 → 1(不缩放)')
 
-  if (clampZoom(3, 2, 8) !== 3) fail('clampZoom 自定义区间失效')
-  else ok('clampZoom 支持自定义区间')
+  // 视口比小窗大一倍 → 小窗里标记应减半,才能覆盖同样的地图范围
+  if (!near(markerScale(1024, 512), 0.5)) fail(`视口 1024 / 小窗 512 应为 0.5,实得 ${markerScale(1024, 512)}`)
+  else ok('markerScale:视口大一倍 → 标记减半')
+
+  // 视口比小窗小 → 标记放大(手机窄视口)
+  if (!near(markerScale(341, 512), 1.5, 1e-9)) fail(`视口 341 / 小窗 512 应夹到上限 1.5,实得 ${markerScale(341, 512)}`)
+  else ok('markerScale:窄视口 → 放大并夹到上限 1.5')
+
+  // 4K 屏:视口短边 2160 时照算只剩 0.237,必须被下限兜住,否则小窗里标记看不见
+  if (!near(markerScale(2160, 512), 0.5, 1e-9)) fail(`超大视口应夹到下限 0.5,实得 ${markerScale(2160, 512)}`)
+  else ok('markerScale:超大视口 → 夹到下限 0.5(保可读性)')
+
+  // 视口还没测量(0/NaN)→ 回退 1,不缩放
+  if (markerScale(0, 512) !== 1) fail('视口未测量(0)应回退 1')
+  else if (markerScale(NaN, 512) !== 1) fail('视口 NaN 应回退 1')
+  else ok('markerScale:视口未测量 → 回退 1')
+
+  // —— 核心性质:标记覆盖的「地图归一化范围」在主地图与小窗里必须相等 ——
+  // 主地图: 30 / (vpShort × zoom);小窗: (30 × s) / (512 × zoom)
+  const zoom = 5
+  for (const vpShort of [600, 900, 1200]) {
+    const s = markerScale(vpShort, 512)
+    const mainCover = 30 / (vpShort * zoom)
+    const pipCover = (30 * s) / (512 * zoom)
+    // 被 [0.5,1.5] 夹过的档位允许偏差,未夹的必须严格相等
+    const clamped = s <= 0.5 || s >= 1.5
+    if (!clamped && !near(mainCover, pipCover, 1e-12)) {
+      fail(`视口 ${vpShort}:标记覆盖的地图范围应与主地图一致(主 ${mainCover} vs 小窗 ${pipCover})`)
+    }
+  }
+  ok('markerScale:标记覆盖的地图范围与主地图一致(密度对齐)')
 }
 
 // —— 6) 常量与 map.css / useRoutes 对齐(改了那边忘了这边会直接看出来)——
