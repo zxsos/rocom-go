@@ -81,7 +81,34 @@
 }
 .account-trigger:hover { border-color: var(--accent); background: var(--accent-soft); }
 .account-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.account-trigger-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* flex-basis 给 **0** 而不是 auto,是超长昵称能截断的关键:
+   手机端 .account-trigger 开了 flex-wrap(为了把 UID 甩到第二行),而 wrap 容器里
+   **换行优先于收缩** —— base size 取 auto(= 16 个字的 224px)时,放不下就直接换行,
+   flex-shrink 根本轮不上,于是昵称整条被挤到第二行,省略号永远不出现(实测 16 字时
+   trigger 高从 81 涨到 105、昵称 left 与 UID 齐平,就是被挤下去了)。
+   改成 basis:0 后它不参与换行判定,只按可用空间伸缩,超出部分才由本项的
+   overflow:hidden + text-overflow:ellipsis 收尾。
+   短昵称不受影响:.account-select 是 width:auto,仍按内容撑出「称号 + 5 个字」的基准宽。 */
+.account-trigger-name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 昵称**至少占 5 个字**的宽,更长的才自适应增长。
+   inline-block 是必需的:span 默认 inline,min-width 对 inline 元素无效。
+   用 em 而非 px:实测本环境 1 个汉字正好 1em(14px 字号 → 14px 字宽),字号若变基准
+   自动跟着变;写死 70px 会在字号调整后失准。
+   基准必须落在**昵称**上而不是外层 .account-trigger-name —— 桌面端那层还含 UID
+   那截(「 (UID:100000002)」约 114px),给它设 5em 等于把 UID 也算进 5 个字里,
+   短昵称照样一档一档变宽(实测 1/2/3/5 字分别 239/253/267/295,仍不一致)。
+   落在昵称上之后:总宽 = 装饰 + max(5em, 昵称实宽) + UID,短昵称同档即一致,
+   切换账号时下拉宽度也不再跳变。 */
+/* inline-block 是必需的:span 默认 inline,min-width 对 inline 元素无效。
+   但**别给它加 max-width/overflow** —— 它是 inline-block,宽度随内容自然增长,
+   加截断没用(实测 16 字照样撑开,外层都换行了也没见省略号)。
+   截断交给外层 .account-trigger-name:它是 flex 项(min-width:0 + overflow:hidden
+   + ellipsis),能收缩并负责收尾。故昵称超长时**由它**把昵称压出省略号。 */
+.acct-name { display: inline-block; min-width: 5em; }
+/* UID 现在是 **与昵称并列** 的独立元素(见 AccountSelect 的 JSX):
+   桌面端跟在昵称后面同排,gap 由 .account-trigger 的 gap:6px 给(故不带前导空格);
+   手机端整条甩到第二行(见下方媒体查询)。 */
+.acct-uid { flex: none; font-size: 12px; color: var(--fg-dim); }
 .account-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
 .account-trigger.open .account-caret { transform: rotate(180deg); }
 
@@ -138,11 +165,28 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .brand { font-size: 10px; max-width: none; }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
-  /* 窄屏只留昵称:UID 那截占的宽度比昵称还多,留着只能省略号收场,而昵称已足够认出是谁。
-     (下拉**条目**不在此列——浮层不占顶栏宽度,UID 照常显示。) */
-  .acct-uid { display: none; }
-  /* 没有导航要让位,上限交还给剩余空间(超长昵称就缩到剩多少显示多少) */
-  .account-select { max-width: none; }
+  /* 窄屏把 UID **换到第二行**,不再整个藏掉。
+     藏掉(原做法)虽然最省宽度,但 UID 是认人的关键信息,丢了就得展开下拉才知道是谁;
+     横着塞(桌面做法)又会把「称号 + 5 个字」这点基准宽挤没。换行的代价只是顶栏高一点,
+     换来第一行只留「称号 + 昵称」、UID 仍可见,是三者里最划算的。
+     靠 flex-wrap + flex-basis:100% 实现:UID 要求占满一整行,自然被挤到下一行。
+     (下拉**条目**不在此列——浮层不占顶栏宽度,UID 照常同排显示。) */
+  .account-trigger { flex-wrap: wrap; }
+  .acct-uid { flex: 0 0 100%; }
+  /* 宽度**按内容**走,基准即「称号 + 5 个字」(5em 见 .acct-name),更长的才自适应增长;
+     上限 55vw 是「不要太长」的那道闸 —— 再长就要吃掉 brand 与右侧按钮的空间了。
+     超出部分由 .account-trigger-name 的 ellipsis 收尾(它自带 overflow:hidden +
+     text-overflow:ellipsis),不会把顶栏撑破。
+     注意别写回 width:100% —— 那会让短昵称也撑满整条(实测 213px),不符合「按内容」。 */
+  .account-select { max-width: 55vw; width: auto; }
+  /* 账号下拉**吃掉顶栏剩余空间**。
+     实测(360/390/414 三个手机视口):顶栏里除它之外的元素加起来才 ~110px,
+     而它 width:auto 只按内容撑到 82px,**剩下的一百多像素一直空着** ——
+     于是昵称稍长就先吃省略号,而空间其实根本没用完。
+     给 .account-wrap 加 flex:1 接管剩余空间(其余项仍是 flex:0 1 auto 的固有宽,
+     不会被挤),配合上面 .account-select 的 width:100% 撑满,长昵称能多显示出好几个字,
+     点击区域也跟着变大——手机上端端这个按钮本来就该是大热区。 */
+  .account-wrap { flex: 1; }
   /* 同 .topbar:backdrop-filter 创建层叠上下文,故本栏层级须高于内容区全部浮层。 */
   .bottomnav {
     display: flex; position: sticky; bottom: 0; z-index: var(--z-shell);

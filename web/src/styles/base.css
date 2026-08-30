@@ -270,6 +270,19 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .glass-zoom-close {
   position: absolute; top: -10px; right: -10px; z-index: var(--z-raised); width: 26px; height: 26px;
 }
+/* 放大预览里的 rkpet 按钮:跳过去看同一套炫彩的 3D 效果(见 rkpetURL)。
+   **复用 .btn 的既有视觉**(边框/圆角/hover 变主色/focus 描边/按下回弹),只补定位:
+   卡片**下方居中**、宽度贴合内容 —— 卡片那块是点一下关遮罩的,按钮压在上面会被误认成
+   卡片的一部分(且点它不该关遮罩,已 stopPropagation)。
+   做成按钮而非一行文字,是因为它和「关闭」同属这层浮层的操作项,视觉权重该对等;
+   纯文字混在半透明遮罩上既看不出可点,也压不住色卡的存在感。
+   ↗ 是外链标识,让人先知道会跳到新窗口;本工具是局域网的,没网时点了只是打不开。 */
+.glass-zoom-rkpet {
+  /* .btn 是 inline-flex,margin:auto 居中不了 —— 改成块级 flex 并让宽度贴合内容 */
+  display: flex; width: fit-content; margin: 10px auto 0;
+  font-size: 12px; color: var(--fg-dim); text-decoration: none;
+}
+.glass-zoom-rkpet:hover { color: var(--accent); background: var(--accent-soft); }
 
 /* ---- 系别色 ---- */
 .type {
