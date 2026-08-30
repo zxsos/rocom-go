@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_FALLBACK, clamp } from './motion'
 
 // tapSlop 是「按下到抬起」还算点一下的位移上限(px):超过就当在拖地图。
@@ -8,12 +8,14 @@ const tapSlop = 6
 // 指针拖动(单指/鼠标)平移、双指捏合与滚轮缩放。
 // 视口中心对应的地图归一化坐标放 focusRef(跟随时每帧跟着玩家走,不进 state,否则每帧重渲染整页);
 // zoom/follow/vp 同时放进 stRef 供指针回调与逐帧循环即时读取,避免闭包过期。
-// active=视口元素当前是否渲染(随 hasMap 出现/消失,重挂 ResizeObserver)。
+// 尺寸的测量不依赖任何外部标志位:视口元素的挂载/卸载由 MapViz(当前是否在地图页、
+// 有没有底图)决定,与本 hook 解耦,故这里用回调 ref 跟着元素本身走(见 attachVp)。
 // onTap(target) = 在地图上点了一下(没拖动)时回调,target 是**按下那一刻**的元素:
 // 地图内的标记不能用普通 onClick——平移要 setPointerCapture,pointerup 被重定向到视口后
 // 浏览器就不再往标记上派发 click 了(桌面端点头像没反应正是这个原因),故这里自己判点击。
-export function usePanZoom(active, onTap) {
+export function usePanZoom(onTap) {
   const vpRef = useRef(null)
+  const [vpEl, setVpEl] = useState(null) // 视口元素本身:它随路由挂载/卸载,与引擎状态无关
   const [vp, setVp] = useState({ w: 0, h: 0 }) // 视口尺寸(归一化坐标 → 像素;地图边长 = min(w,h)*zoom)
   const [zoom, setZoom] = useState(ZOOM_FALLBACK)
   const [follow, setFollow] = useState(true)
@@ -21,15 +23,28 @@ export function usePanZoom(active, onTap) {
   const stRef = useRef({ zoom, follow, vp })
   stRef.current = { zoom, follow, vp }
 
-  // 测量视口尺寸(视口元素随 active 出现/消失)。
-  useEffect(() => {
-    const el = vpRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setVp({ w: el.clientWidth, h: el.clientHeight }))
-    ro.observe(el)
-    setVp({ w: el.clientWidth, h: el.clientHeight })
+  // 测量必须跟着**元素**走,不能跟着 active 走。
+  //
+  // 引擎常驻在 App 层(画中画要跨页面存活),位置数据常在用户还不在地图页时就已到货 ——
+  // 那时 .map-vp 尚未挂载,以 [active] 为依赖的 effect 拿不到元素便空转;等用户切到 /map,
+  // 元素挂上了,而 active 早已是 true、不再变化,effect 永远不重挂 ResizeObserver,
+  // vp 恒为 {0,0}。后果:mapPx = (min(0,0)||1) * zoom ≈ 5px,**所有图标挤在左上角、
+  // 底图缩成几像素即黑色背景**;手动刷新能好,是因为刷新时人已在 /map,active 翻转那一刻
+  // 元素就在,一次挂上。故这里用回调 ref 把元素本身收进 state,以它为依赖重挂。
+  const attachVp = useCallback((el) => {
+    vpRef.current = el
+    setVpEl(el)
+  }, [])
+
+  // 用 layout effect 而非 effect:首帧就该带着真实尺寸出图,否则会先闪一帧塌掉的地图。
+  useLayoutEffect(() => {
+    if (!vpEl) return
+    const measure = () => setVp({ w: vpEl.clientWidth, h: vpEl.clientHeight })
+    const ro = new ResizeObserver(measure)
+    ro.observe(vpEl)
+    measure()
     return () => ro.disconnect()
-  }, [active])
+  }, [vpEl])
 
   // 以视口某点(px,py,相对视口左上)为锚缩放:保持该点下的地图坐标不动。
   const zoomAround = useCallback((factor, px, py) => {
@@ -115,7 +130,7 @@ export function usePanZoom(active, onTap) {
   }), [onPointerDown, onPointerMove, onPointerUp, onWheel])
 
   return {
-    vpRef, vp, zoom, setZoom, follow, setFollow, focusRef, stRef, zoomAround,
+    vpRef, attachVp, vp, zoom, setZoom, follow, setFollow, focusRef, stRef, zoomAround,
     handlers,
   }
 }

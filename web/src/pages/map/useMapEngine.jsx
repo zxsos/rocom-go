@@ -68,7 +68,7 @@ export function useMapEngine(account) {
   // 不 setPos 的纯位置推送也由 applyPos 中手动赋(见 needRender 判断)。
   // 不在此行赋值 posRef.current = pos——否则其它重渲染(如 wilds 刷新)会覆盖 applyPos
   // 中赋的最新位置,导致 onTap 距离计算用到旧坐标。
-  const view = usePanZoom(hasMap, onTap)
+  const view = usePanZoom(onTap)
   const { focusRef, stRef } = view
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
@@ -307,7 +307,7 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
     <>
       {!pos && <div className="empty">等待位置数据…(需后端正在抓包/回放,且玩家已登录并移动过)</div>}
       {pos && (hasMap ? (
-        <div className="map-vp" ref={view.vpRef} {...handlers}>
+        <div className="map-vp" ref={view.attachVp} {...handlers}>
           <div className="map-world" ref={worldRef} style={{ width: mapPx, height: mapPx }}>
             <img className="map-base" src={imgURL(`bigmap/${pos.img}.webp`)} alt={pos.sceneName}
               draggable={false} onError={() => setImgError(true)} />
