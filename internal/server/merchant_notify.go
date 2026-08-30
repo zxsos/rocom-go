@@ -18,8 +18,50 @@ type merchantItem struct {
 	Image     string `json:"image"` // 商品图:http(s) 外链原样;否则为本站 /img/ 相对路径(邮件里 CID 内嵌)
 }
 
+// merchantClaimCooldown 是同一槽两次认领之间的最小间隔。
+//
+// 取 10 分钟(小于 merchantResend 的 15 分钟 tick):并发撞到同一槽的两个触发源
+// (回源后的异步发信 + 同 tick 补扫)间隔只有毫秒级,必然被拦住;而发信失败的槽
+// 下一次补扫(≥15 分钟后)仍能重试,补扫兜底能力不受影响。
+const merchantClaimCooldown = 10 * time.Minute
+
+// merchantClaim 认领某槽的「本轮发信权」,已被认领且在冷却内时返回 false(调用方应直接返回)。
+//
+// 存在理由:merchant_notified 只在**发信成功之后**才 Mark(发信失败要留给 merchantResend
+// 补扫重试),而一次 SMTP 往返是秒级。于是两个触发源撞到同一槽时,后到者读到的必然是
+// 「未 Mark」,于是各发一封 —— 表现为订阅者收到两份一模一样的邮件。8/12/16/20 每档首次
+// 回源必撞:merchantEnsure 回源后在 goroutine 里异步发信,merchantLoop 同一次 tick 紧接着
+// 又跑 merchantResend 补扫,补扫读缓存命中「有货且未 Mark」便再发一轮。
+//
+// 认领带冷却而非「认领后永久占用」:永久占用会把发信失败的槽一并锁死,补扫重试就失效了;
+// 冷却内拦重、冷却后放行,两个诉求都满足。跨进程/重启由 merchant_notified 兜底(已发成功
+// 的槽在库里有记录,重启后也不会重发)。
+// 表只按当前营业日使用,认领时顺手清掉往日与过冷却的条目,不会长驻增长。
+func (s *Server) merchantClaim(slotStart time.Time) bool {
+	now := time.Now()
+	s.merchantClaimMu.Lock()
+	defer s.merchantClaimMu.Unlock()
+	if s.merchantClaimed == nil {
+		s.merchantClaimed = map[int64]time.Time{}
+	}
+	yesterday := merchantDayStart(now).AddDate(0, 0, -1).Unix()
+	for slot, at := range s.merchantClaimed {
+		if slot < yesterday || now.Sub(at) >= merchantClaimCooldown {
+			delete(s.merchantClaimed, slot)
+		}
+	}
+	key := slotStart.Unix()
+	if at, ok := s.merchantClaimed[key]; ok && now.Sub(at) < merchantClaimCooldown {
+		return false
+	}
+	s.merchantClaimed[key] = now
+	return true
+}
+
 // merchantNotify 槽缓存写好且判定有货后调用:对比本营业日更早轮的商品,找出「新增」部分,
-// 对关键词命中的订阅者发邮件;同一槽对同一邮箱只发一次(merchant_notified 去重)。
+// 对关键词命中的订阅者发邮件;同一槽对同一邮箱只发一次。
+// 去重两层:库表 merchant_notified 挡跨进程/重启(发信成功后才 Mark,失败留给补扫重试),
+// merchantClaim 挡同进程内并发触发(见该函数注释)。
 // SMTP 未配置(发件邮箱为空)时静默返回,不影响商家数据本身。
 func (s *Server) merchantNotify(slotStart time.Time) {
 	if !s.smtp.configured() {
@@ -69,6 +111,10 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 	}
 	if len(news) == 0 {
 		return // 本轮与更早轮商品相同,不打扰订阅者
+	}
+	// 认领本槽发信权:拦住并发触发的重复发信(同一槽每档都会被回源与补扫各触发一次)。
+	if !s.merchantClaim(slotStart) {
+		return
 	}
 
 	subs, err := s.store.ListMerchantSubs()

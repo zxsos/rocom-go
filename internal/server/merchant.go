@@ -100,8 +100,9 @@ func (s *Server) merchantLoop() {
 
 // merchantResend 补扫本营业日已开始的有货槽,对「未通知且关键词命中」的订阅重发提醒。
 // 用于兜底首次发信失败(SMTP 瞬断/授权码过期/被限流)与事后补发(如服务 8 点后才启动、
-// 当天漏看)。幂等:merchantNotify 内部按 merchant_notified 去重,已发过的槽自动跳过,
-// 不会重复打扰;SMTP 未配置或打烊(0-8 点)时直接返回。
+// 当天漏看)。幂等:merchantNotify 内部按 merchant_notified 去重(已发成功的槽自动跳过),
+// 且同一槽在冷却内只认领一次(见 merchant_notify.go 的 merchantClaim),故本函数与
+// merchantEnsure 的异步发信撞到同一槽也不会重复打扰;SMTP 未配置或打烊(0-8 点)时直接返回。
 func (s *Server) merchantResend(now time.Time) {
 	if !s.smtp.configured() {
 		return

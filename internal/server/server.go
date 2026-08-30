@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/store"
@@ -48,6 +49,11 @@ type Server struct {
 	eggAPIKey string // 第三方图鉴 API 令牌(-egg-api-key),查随机蛋可能物种用;空=不启用
 
 	merchantMu sync.Mutex // 远行商人回源互斥:并发请求/定时任务同时缺缓存时,只放行一次回源(见 merchant.go)
+
+	// 远行商人订阅提醒的进程内认领:槽开始时间戳 → 上一次认领时刻(见 merchant_notify.go)。
+	// 用途:同一槽被并发触发时只放行一个调用去发信,避免订阅者收到两份一模一样的邮件。
+	merchantClaimMu sync.Mutex
+	merchantClaimed map[int64]time.Time
 
 	// 远行商人订阅邮件提醒:发件 QQ 邮箱与 SMTP 授权码(-merchant-smtp-user/-merchant-smtp-pass),
 	// 空=订阅提醒不可用(前端提示,商家数据仍正常)。串行发信,避免 QQ 邮箱并发触发限流(见 state.go)。
