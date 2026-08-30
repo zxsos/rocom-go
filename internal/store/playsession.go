@@ -7,7 +7,12 @@ import (
 // PlaySession 是一次游玩会话(玩家上线 → 下线的完整时间段),管理后台「游玩记录」展示用。
 // LogoutTime 为 nil 表示会话进行中(玩家在线);Duration 是下线时写入的游玩时长(秒),
 // 进行中的会话按「现在-登录时刻」由汇总侧折算,明细里以 Online 区分。
+//
+// ID 是 play_sessions 的自增主键,前端列表的 React key **必须用它**:
+// 早期用 account+loginTime 拼 key,而同一账号同一秒内可能有多条会话(实测存在),
+// key 撞车会让翻页时旧行不被回收 —— 表现为第 2 页混进第 1 页的残留行。
 type PlaySession struct {
+	ID         int64  `json:"id"`
 	Account    string `json:"account"`
 	Name       string `json:"name"`
 	LoginTime  int64  `json:"loginTime"`
@@ -66,17 +71,18 @@ WHERE logout_time IS NULL AND login_time < ?`,
 	return err
 }
 
-// ListPlaySessions 列出游玩会话记录(管理后台),按上线时间倒序,可选账号过滤。
-func (s *Store) ListPlaySessions(account string, limit int) ([]PlaySession, error) {
-	q := `SELECT ps.account, COALESCE(a.name, ''), ps.login_time, ps.logout_time, COALESCE(ps.duration, 0)
+// ListPlaySessions 列出一页游玩会话记录(管理后台),按上线时间倒序,可选账号过滤。
+// limit/offset 供管理后台分页:offset 是跳过的条数,limit 是本页取几条(由 handler 校验范围)。
+func (s *Store) ListPlaySessions(account string, limit, offset int) ([]PlaySession, error) {
+	q := `SELECT ps.id, ps.account, COALESCE(a.name, ''), ps.login_time, ps.logout_time, COALESCE(ps.duration, 0)
 FROM play_sessions ps LEFT JOIN accounts a ON a.account = ps.account`
 	var args []any
 	if account != "" {
 		q += ` WHERE ps.account = ?`
 		args = append(args, account)
 	}
-	q += ` ORDER BY ps.login_time DESC LIMIT ?`
-	args = append(args, limit)
+	q += ` ORDER BY ps.login_time DESC LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
 	rows, err := s.rdb.Query(q, args...)
 	if err != nil {
 		return nil, err
@@ -85,13 +91,29 @@ FROM play_sessions ps LEFT JOIN accounts a ON a.account = ps.account`
 	out := []PlaySession{}
 	for rows.Next() {
 		var ps PlaySession
-		if err := rows.Scan(&ps.Account, &ps.Name, &ps.LoginTime, &ps.LogoutTime, &ps.Duration); err != nil {
+		if err := rows.Scan(&ps.ID, &ps.Account, &ps.Name, &ps.LoginTime, &ps.LogoutTime, &ps.Duration); err != nil {
 			return nil, err
 		}
 		ps.Online = ps.LogoutTime == nil
 		out = append(out, ps)
 	}
 	return out, rows.Err()
+}
+
+// CountPlaySessions 返回满足筛选的会话总条数(管理后台分页算总页数用)。
+// 与 ListPlaySessions 共用同一套筛选口径,否则会出现「最后一页翻到空」这类错位。
+func (s *Store) CountPlaySessions(account string) (int, error) {
+	q := `SELECT COUNT(*) FROM play_sessions`
+	var args []any
+	if account != "" {
+		q += ` WHERE account = ?`
+		args = append(args, account)
+	}
+	var n int
+	if err := s.rdb.QueryRow(q, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 // PlaySessionSummary 返回游玩记录汇总:当前在线数、今日会话数/时长、近 14 天每日聚合。

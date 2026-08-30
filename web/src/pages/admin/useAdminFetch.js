@@ -11,7 +11,10 @@ export function useAdminFetch(fetcher, onUnauthed, reloadKey) {
   const kickRef = useRef(onUnauthed)
   kickRef.current = onUnauthed
   useEffect(() => {
-    if (error && error.status === 401) kickRef.current?.()
+    // 必须把 error 传给上层:Admin 的 kickIfUnauthed(err) 要读 err.status 判断是不是 401。
+    // 漏传会在「令牌失效」这条路上抛 TypeError —— 又因没有 error boundary,整棵树被卸载,
+    // 面板闪一下就黑屏,且刷新也回不来(token 还在 localStorage),等于把管理员永久锁死。
+    if (error && error.status === 401) kickRef.current?.(error)
   }, [error])
   return { data, error, loading, refresh }
 }

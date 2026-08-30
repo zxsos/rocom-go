@@ -21,19 +21,27 @@ func (s *Server) handleAdminStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAdminPlaySessions 返回游玩记录(管理后台「游玩记录」):会话明细列表 + 汇总
-// (当前在线/今日/近14天每日)。查询参数:account=账号过滤、limit=条数(默认200,上限1000)。
+// (当前在线/今日/近14天每日)。明细分页:limit=每页条数(默认50,上限200)、
+// offset=跳过条数(默认0);total 是同一筛选下的总条数,供前端算总页数。
+// 汇总始终按全量计算,不随分页变化。
 func (s *Server) handleAdminPlaySessions(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
 		return
 	}
 	acc := strings.TrimSpace(r.URL.Query().Get("account"))
-	limit := 200
+	limit := 50
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
 			limit = n
 		}
 	}
-	sessions, err := s.store.ListPlaySessions(acc, limit)
+	offset := 0
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			offset = n
+		}
+	}
+	sessions, err := s.store.ListPlaySessions(acc, limit, offset)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -43,7 +51,12 @@ func (s *Server) handleAdminPlaySessions(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	writeJSON(w, map[string]any{"sessions": sessions, "summary": summary})
+	total, err := s.store.CountPlaySessions(acc)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"sessions": sessions, "summary": summary, "total": total})
 }
 
 // handleAdminEggStats 返回查蛋 API(第三方图鉴)使用统计:累计/今日次数、成功率、
