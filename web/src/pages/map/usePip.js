@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useStoredJSON } from '../../hooks/useStoredState'
 import { renderToCanvas, readPalette } from './pipDraw'
-import { frameSig, clampZoom } from './pipGeom'
+import { frameSig, markerScale } from './pipGeom'
 
 // —— 画中画(PiP)生命周期 ——
 // 把地图实时画到一张离屏 canvas,经 captureStream → video → requestPictureInPicture
@@ -45,15 +44,26 @@ function detect() {
 // buildSnap 从引擎读一份本帧的绘制快照。全部读 ref/当前值,不触发重渲染。
 // 引擎对象每次渲染都是新字面量,故必须读**最新的 engineRef.current**,
 // 否则闭包里永远是首帧那份引擎、图层数据永不更新。
-function buildSnap(engine, zoom, palette, icons) {
+//
+// 视野策略:**缩放跟随主地图,中心恒为玩家**。
+//   - zoom 直接取主地图的 view.zoom(stRef),主地图放大/缩小小窗同步;
+//   - 中心只跟玩家走,不跟主地图的 focus —— 小窗不可交互,若跟着主地图的拖动跑,
+//     你在主地图查看别处时小窗就飘走了,而开小窗通常就是为了盯自己周围(抓稀有宠)。
+function buildSnap(engine, palette, icons) {
   const pos = engine.pos
   const paint = engine.paint
   const grid = paint?.gridRef?.current || { w: 0, h: 0 }
   const player = engine.frameStateRef.current // { u, v, heading }
   const hasMap = engine.hasMap && pos && pos.img
+  // 主地图视图状态:{ zoom, follow, vp }。vp 未必测到(首帧),取 0 时 markerScale 回退 1。
+  const st = engine.stRef?.current || {}
+  const vpShort = Math.min(st.vp?.w || 0, st.vp?.h || 0)
 
   const snap = {
-    w: SIZE, h: SIZE, zoom,
+    w: SIZE, h: SIZE,
+    zoom: st.zoom || 1,
+    // 标记缩放:让小窗与主地图的像素密度对齐(推导见 pipGeom 的 markerScale)。
+    scale: markerScale(vpShort, SIZE),
     // 焦点:优先玩家当前位置(PiP 常跟随玩家);没有位置数据时退回地图中心。
     focus: player ? { u: player.u, v: player.v } : { u: 0.5, v: 0.5 },
     palette, icons,
@@ -78,7 +88,6 @@ function buildSnap(engine, zoom, palette, icons) {
 export function usePip(engine, theme) {
   const [cap] = useState(detect)
   const [active, setActive] = useState(false)
-  const [zoom, setZoomState] = useStoredJSON(localStorage, 'map.pipZoom', 5, (v) => clampZoom(v))
 
   // 引擎与主题的最新值:绘制循环要在 interval 里读最新的,不能闭包到首帧。
   const engineRef = useRef(engine)
@@ -161,7 +170,7 @@ export function usePip(engine, theme) {
     const eng = engineRef.current
     if (!cv || !eng) return
     if (!paletteRef.current) paletteRef.current = readPalette()
-    const snap = buildSnap(eng, zoom, paletteRef.current, iconsRef.current)
+    const snap = buildSnap(eng, paletteRef.current, iconsRef.current)
     const sig = frameSig(snap)
     if (sig === sigRef.current) { idleRef.current++; return }
     sigRef.current = sig
@@ -174,7 +183,7 @@ export function usePip(engine, theme) {
     if (track && typeof track.requestFrame === 'function') {
       try { track.requestFrame() } catch { /* stream 已停,忽略 */ }
     }
-  }, [zoom])
+  }, [])
 
   // 帧循环:按当前是否静止在快慢两档之间切换;静止时几乎不耗 CPU。
   useEffect(() => {
@@ -252,15 +261,10 @@ export function usePip(engine, theme) {
 
   const toggle = useCallback(() => (active ? stop() : start()), [active, start, stop])
 
-  // 缩放:PiP 窗口不可交互,故缩放只能从主页面调,存 localStorage 下次沿用。
-  const zoomBy = useCallback((factor) => {
-    setZoomState((z) => clampZoom(z * factor))
-    // 强制重画一帧:只改缩放而内容签名没变时,画面不会自己更新。
-    sigRef.current = ''
-  }, [setZoomState])
-
   // 图标(异色/炫彩角标)由 App 从 IconsContext 拿到后注入。
   const setIcons = useCallback((icons) => { iconsRef.current = icons || {} }, [])
 
-  return { cap, active, start, stop, toggle, zoom, zoomBy, hostRef, setIcons }
+  // 不再导出 zoom/zoomBy:小窗缩放跟随主地图,小窗不可交互,没有独立缩放的必要
+  // (原先那对 ＋/－ 按钮已随此移除)。
+  return { cap, active, start, stop, toggle, hostRef, setIcons }
 }

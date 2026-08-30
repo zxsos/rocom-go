@@ -48,9 +48,13 @@ export default function ZonePanel({ stats, onFocus, disabled }) {
       <button className="map-medal-toggle map-zone-head" onClick={toggle} aria-expanded={open}
         title="各分区的眠枭之星收集进度(服务器口径);点开看明细,点某区可把地图移过去">
         <span>眠枭之星</span>
+        {/* 进度数字不能带 .muted:下面的旋转动画是 .map-medal-toggle .muted 选中的,
+            带上就会被当成展开箭头一起转(收起时侧倒 90°,见 map.css 的
+            .map-medal-toggle:not([aria-expanded]) .muted)。与跑图路线的
+            .map-route-count 同一处理:只有 ▾ 该转。 */}
         <span className="map-zone-total">
           <b>{stats.got}</b><i>/{stats.tot}</i>
-          <em className="muted">{pct.toFixed(pct < 10 ? 1 : 0)}%</em>
+          <em>{pct.toFixed(pct < 10 ? 1 : 0)}%</em>
         </span>
         <span className="muted">▾</span>
       </button>

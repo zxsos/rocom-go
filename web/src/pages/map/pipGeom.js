@@ -146,9 +146,23 @@ export function edgeToScreen(seg, left, top, mapPx, gw, gh) {
   return { x: left + nx * mapPx, y: top + ny * mapPx }
 }
 
-// clampZoom 把 PiP 缩放夹到合法区间。下限 1(整张底图铺满小窗),上限比主地图低:
-// 小窗只有 512px,放大到 32 倍时可见范围只剩几米,且底图纹理已糊,没有意义。
-export function clampZoom(z, min = 1, max = 16) {
-  if (!Number.isFinite(z)) return min
-  return Math.max(min, Math.min(max, z))
+// markerScale 算小窗里标记该画多大。
+//
+// PiP 与主地图**用同一个 zoom**,但画布尺寸不同(小窗 512px vs 主地图视口短边),
+// 同样的标记像素数在小窗里会覆盖更大的地图范围 —— 缩小看全图时标记就会糊成一片。
+// 故按像素密度比缩放:标记尺寸 × (小窗边长 / 主地图视口短边),
+// 使小窗里每个标记覆盖的**地图范围**与主地图一致,视觉上小窗就是主地图的缩小版。
+//
+//   推导:标记覆盖的地图归一化的量 = 尺寸 / mapPx = 尺寸 / (边长 × zoom)
+//     主地图: 30 / (vp短 × zoom)
+//     小窗  : (30 × s) / (512 × zoom)   令两者相等 → s = 512 / vp短
+//
+// 再夹到 [0.5, 1.5]:4K 屏视口短边可达 2000+,照算标记只剩 7px,小窗里根本看不见;
+// 手机上视口短边 340 时又放大到 1.5 倍,标记会挤爆小窗。两端各留一档,
+// 宁可牺牲一点「严格等比」,也要保证小窗可读。
+// vpShort 为 0(视口尚未测量)时回退 1,即不缩放。
+export function markerScale(vpShort, pipSize) {
+  if (!Number.isFinite(vpShort) || vpShort <= 0) return 1
+  const s = pipSize / vpShort
+  return Math.max(0.5, Math.min(1.5, s))
 }

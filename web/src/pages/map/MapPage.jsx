@@ -17,7 +17,14 @@ export default function MapPage() {
 
   // 引擎常驻后,交互态(资料卡/野生宠悬浮卡)不会随本页卸载而清掉——
   // 若离开时正弹着卡片,下次进地图页会凭空出现上次的卡片,没有对应的点击动作。
-  useEffect(() => () => engine?.clearUiState?.(), [engine])
+  //
+  // 依赖**必须取函数本身而非 engine**:engine 是 useMapEngine 每次渲染返回的新对象,
+  // 直接依赖它会让 cleanup 在**每次重渲染**时都跑一遍 —— 而点击标记本身就是一次
+  // setState 触发的重渲染,于是刚设好的 wildTip 立刻被 clearUiState 清掉,
+  // 表现为「点一下资料卡闪一下就没了」。clearUiState 是 useCallback([]) 的稳定引用,
+  // 依赖它才等价于「仅卸载时清理」。
+  const clearUiState = engine?.clearUiState
+  useEffect(() => () => clearUiState?.(), [clearUiState])
 
   const toggleLayers = () => setCollapsed((c) => !c)
 

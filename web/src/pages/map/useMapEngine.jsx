@@ -288,22 +288,18 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
       <button className={'map-btn' + (view.follow ? ' on' : '')} title="回到当前位置"
         disabled={!zoomReady} onClick={() => view.setFollow(true)}>◎</button>
       {/* 画中画:开启后地图投到系统悬浮窗,切页/切出浏览器都继续更新。
-          不支持的浏览器置灰并说明原因,不静默失败(见 usePip 的 detect)。 */}
+          不支持的浏览器置灰并说明原因,不静默失败(见 usePip 的 detect)。
+          小窗缩放跟随主地图(即上面那组 ＋/－),故没有独立的缩放按钮——
+          小窗不可交互,再给一对按钮只是徒增困惑。 */}
       {pip && (
         <button className={'map-btn map-pip-toggle' + (pip.active ? ' on' : '')}
           disabled={!pip.cap.ok}
           title={pip.cap.ok
-            ? (pip.active ? '关闭画中画' : '画中画:把地图投到系统悬浮窗(切出浏览器也继续更新)')
+            ? (pip.active ? '关闭画中画' : '画中画:把地图投到系统悬浮窗(切出浏览器也继续更新)' +
+              '。小窗缩放跟随本页地图的 ＋/－,始终以你为中心')
             : '画中画不可用:' + pip.cap.why}
           onClick={pip.toggle}>⧉</button>
       )}
-      {/* PiP 缩放只在小窗开启时出现:小窗不可交互,缩放只能从主页面调。 */}
-      {pip && pip.active && (<>
-        <button className="map-btn map-pip-zoom" title="画中画放大"
-          onClick={() => pip.zoomBy(1.5)}>＋</button>
-        <button className="map-btn map-pip-zoom" title="画中画缩小"
-          onClick={() => pip.zoomBy(1 / 1.5)}>－</button>
-      </>)}
     </div>
   )
 
