@@ -53,14 +53,9 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		// 登录数据里就带着孵蛋器占用列表:不等玩家打开孵蛋器面板也能把在孵标记对齐。
 		// 与 0x0312 是同一权威口径(见 pet.BackpackHatchSlots),两个下发点都收。
 		if gids, ok := pet.BackpackHatchSlots(m.AppBody); ok {
-			// 先记住:登录包往往先于背包分页到达,此刻库里还没有蛋,下面的对账改不动任何行;
-			// 记住后由 upsertEggs 在蛋入库时逐颗判定(见 hatchGids 的注释)。
-			known := make(map[uint32]bool, len(gids))
-			for _, g := range gids {
-				known[g] = true
-			}
-			p.conn(m.Session).hatchGids = known
-			p.applyHatchSlots(sc, acc, gids, nil, nil, m.Time)
+			// 登录包往往先于背包分页到达,此刻库里还没有蛋,对账改不动任何行 ——
+			// 故把列表记住(applyHatchSlots 内),等蛋入库时逐颗判定(见 hatchGids)。
+			p.applyHatchSlots(m.Session, sc, acc, gids, nil, nil, m.Time)
 		}
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetBagItemInfoByPageRsp:
@@ -74,17 +69,25 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 			p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 		}
 
+	case m.Direction == gcp.S2C && m.Opcode == pet.OpUseBagItemRsp:
+		// 在**背包**里点「孵化」走这条。服务器回包带回这颗蛋,start_hatch_time 已置位 ——
+		// 这是「刚放进去」的当场证据,故直接按它写定在孵,不等 0x0312。
+		// 必须当场写:从背包入孵时孵蛋器面板并未打开,0x0311/0x0312 未必会来,
+		// 那样孵蛋器栏会一直少这颗蛋(见 TestPutEggIntoIncubatorShowsIt)。
+		p.applyEggAction(sc, acc, m, true)
+
+	case m.Direction == gcp.S2C && m.Opcode == pet.OpStopHatchRsp:
+		// 取出:同一套动作回包,方向相反 —— 这颗蛋不再在孵蛋器里。
+		p.applyEggAction(sc, acc, m, false)
+
 	case m.Direction == gcp.S2C && (m.Opcode == pet.OpGoodsRewardNotify ||
-		m.Opcode == pet.OpShopBuyItemRsp || m.Opcode == pet.OpUseBagItemRsp ||
-		m.Opcode == pet.OpStopHatchRsp):
-		// 收蛋 0x0243、购买 0x0262、放入孵蛋器 0x0164、取出 0x0300 都只当普通变化入库,
-		// hatching 列不在这里动(权威状态只由 0x0312 对账维护,见 applyHatchStatus)。
+		m.Opcode == pet.OpShopBuyItemRsp):
+		// 收蛋 0x0243、购买 0x0262:新蛋入包,与孵蛋器无关,只当普通变化入库。
+		// known 传 nil(不碰 hatching 列),权威状态仍由 egg_gid 列表对账维护。
 		eggs := pet.ParseChangedEggs(m.AppBody)
 		if len(eggs) == 0 {
 			return
 		}
-		// 这几条只当普通变化入库;hatching 不动(权威状态只由 egg_gid 对账维护),
-		// 故 known 传 nil,免得登录列表把刚取出/刚放入的状态盖回去。
 		p.upsertEggs(sc, acc, eggs, m.Time, nil)
 		if m.Opcode == pet.OpGoodsRewardNotify && pet.ParseFlowReason(m.AppBody) == pet.FlowReasonHomeLay {
 			p.recordEggParents(m.Session, sc, eggs, m.Time)
@@ -93,6 +96,51 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetAllHatchStatusRsp:
 		p.applyHatchStatus(m, sc, acc)
 	}
+}
+
+// applyEggAction 处理「放入 / 取出孵蛋器」的动作回包(0x0164 / 0x0300):入库并当场写定
+// 在孵标记,不等 0x0312 收敛。
+//
+// 为何必须当场写:只等 0x0312 有个前提——玩家得去**打开孵蛋器面板**(客户端才发 0x0311
+// 请求状态)。但从背包里点「孵化」时面板并未打开,0x0311/0x0312 未必会来,这一等就是永远,
+// 孵蛋器栏永远少这颗新放进去的蛋(见 TestPutEggIntoIncubatorShowsIt)。
+//
+// 这类回包**同时**带两样东西(2026-08-30 抓包实测,见 TestEggActionUsesAuthoritativeList):
+//   - changes[].bag_item.egg_data:受影响的那颗蛋(gid + 时刻/进度)
+//   - backpack_info.egg_gid[]:**动作之后**的完整孵蛋器占用列表,与登录 0x0102、
+//     开孵蛋器 0x0312 是同一个权威口径(pet.BackpackHatchSlots)
+//
+// 有权威列表就以它为准全量对账:它是全量的、不必判断动作方向(取出后那颗自然就不在列里),
+// 也不会被 start_hatch_time 的残留值误导 —— 实测取出回包里那个字段**不清零**
+// (取出 4313 时仍是 1788082293),照它判断会把刚取出的蛋又标回在孵。
+//
+// 没有权威列表时退回按 opcode 定方向:bestBackpack 要求 boxes 里至少 5 个非零 pet_gid
+// (见 pet/parse_box.go),宠物少的账号解不出背包,这条兜底是必需的而非理论分支。
+// 此时放入才要求 start_hatch_time 非零,当作「这颗确实进了孵蛋器」的确认。
+func (p *Pipeline) applyEggAction(sc *store.Scoped, acc string, m capture.Message, intoIncubator bool) {
+	eggs := pet.ParseChangedEggs(m.AppBody)
+	if gids, ok := pet.BackpackHatchSlots(m.AppBody); ok {
+		// 先对账(它顺带记住最新权威列表),再入库:新入孵的蛋可能此刻才第一次出现,
+		// 对账改不到它,随后的 upsert 会拿刚记住的列表把它标上。
+		p.applyHatchSlots(m.Session, sc, acc, gids, nil, nil, m.Time)
+		if len(eggs) > 0 {
+			p.upsertEggs(sc, acc, eggs, m.Time, p.conn(m.Session).hatchGids)
+		}
+		return
+	}
+	if len(eggs) == 0 {
+		return
+	}
+	known := p.conn(m.Session).hatchGids
+	if known == nil {
+		known = map[uint32]bool{}
+		p.conn(m.Session).hatchGids = known
+	}
+	for _, e := range eggs {
+		// 放入:以 start_hatch_time 非零当作确认;取出:一律置否。
+		known[e.Gid] = intoIncubator && e.StartHatch > 0
+	}
+	p.upsertEggs(sc, acc, eggs, m.Time, known)
 }
 
 // applyHatchStatus 处理孵化状态回包(0x0312):ret_info.changes 里的蛋先按常规入库
@@ -110,7 +158,7 @@ func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc str
 		p.upsertEggs(sc, acc, eggs, m.Time, nil)
 	}
 	gids, secs := pet.ParseHatchStatus(m.AppBody)
-	p.applyHatchSlots(sc, acc, gids, secs, skip, m.Time)
+	p.applyHatchSlots(m.Session, sc, acc, gids, secs, skip, m.Time)
 }
 
 // applyHatchSlots 用权威的孵蛋器占用列表订正在孵标记,有改动就通知前端。
@@ -120,7 +168,16 @@ func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc str
 // 两处下发点:
 //   - 登录 0x0102:不带逐蛋进度,secs/skip 传 nil → 只对账标记,进度留给随后到的 0x0312
 //   - 开孵蛋器 0x0312:带 secs 与 skip(刚由 ret_info.changes 精确刷新过的蛋跳过)
-func (p *Pipeline) applyHatchSlots(sc *store.Scoped, acc string, gids []uint32, secs []int32, skip map[uint32]bool, now time.Time) {
+//
+// 权威列表到货还要**记住**:hatchGids 是登录那一刻的旧快照,此后每开一次背包(0x1344)
+// 都会拿它把 hatching 列整体覆盖回去。不随权威列表更新的话,新入孵的蛋会在下次开背包时
+// 被打回登录时的状态(见 TestHatchStatusNotClobberByStaleLoginList)。
+func (p *Pipeline) applyHatchSlots(conn string, sc *store.Scoped, acc string, gids []uint32, secs []int32, skip map[uint32]bool, now time.Time) {
+	known := make(map[uint32]bool, len(gids))
+	for _, g := range gids {
+		known[g] = true
+	}
+	p.conn(conn).hatchGids = known
 	if changed, err := sc.ReconcileHatching(gids, secs, skip, now.Unix()); err == nil && changed {
 		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 	}
