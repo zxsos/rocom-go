@@ -45,10 +45,6 @@
       "natureId": 3,
       "partnerMark": "首领",
       "shiny": true,
-      "skillIds": [
-        101,
-        102
-      ],
       "spAttack": {
         "nature": 0,
         "talentLv": 7,
@@ -130,7 +126,6 @@
       "natureId": 0,
       "partnerMark": "",
       "shiny": false,
-      "skillIds": null,
       "spAttack": {
         "nature": 0,
         "talentLv": 0,

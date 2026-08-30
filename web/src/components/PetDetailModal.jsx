@@ -124,15 +124,6 @@ export function PetDetailModal({ gid, onClose }) {
               </div>
             </div>
           )}
-
-          {pet.skillIds?.length > 0 && (
-            <details className="skills">
-              <summary className="muted">技能（{pet.skillIds.length}）</summary>
-              <div className="medals">
-                {pet.skillIds.map((id, i) => <div className="medal" key={i}>技能 #{id}</div>)}
-              </div>
-            </details>
-          )}
         </div>
       </div>
       </div>

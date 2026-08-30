@@ -113,7 +113,6 @@ func seedContract(t *testing.T, s *Server) {
 		SpAttack:  pet.Stat{Value: 210, TalentLv: 7},
 		SpDefense: pet.Stat{Value: 160, TalentLv: 4},
 		Speed:     pet.Stat{Value: 190, TalentLv: 6},
-		SkillIDs:  []uint32{101, 102},
 	}
 	// 最小一只:只填主键,其余留零值,用于锁定 omitempty 的行为。
 	min := &pet.Pet{Gid: 1002, ConfID: 3001, BaseConfID: 3001, Species: "水蓝蓝", Name: "小水", Level: 1}

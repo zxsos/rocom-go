@@ -207,3 +207,64 @@ func TestPetHeadsBothBranches(t *testing.T) {
 		t.Fatalf("两类用例宠物头像相同(%q),分不出取图是否正确", scan["1"])
 	}
 }
+
+// TestBoxTeamSwapClearsStaleSide 复现「宠物盒 ↔ 大世界队伍拖动交换后位置不同步」。
+//
+// 互换回包(0x1888)里:
+//   - 「挤进盒子」那只走 box_pet_change 增量落库,ApplyBoxMoves 顺带清它残留的 pet_team 行;
+//   - 「挤进队伍」那只**只**出现在同包的完整队伍快照里,走 ReplacePetTeams 全量替换 pet_team。
+//
+// 镜像关系:ApplyBoxMoves 清的是 pet_team,那 ReplacePetTeams 就该清 pet_box —— 否则
+// 从盒子拖进队伍的那只会同时挂在两张表下,列表页仍显示它占着原盒位,看起来像
+// 「盒子 → 队伍」这个方向没同步。(在队宠物不可能同时在盒子里,见 pet.Pet 的 Box/Team。)
+//
+// 反方向**没做**:ReplacePetBoxes 不清 pet_team。实测登录包 0x0102 的盒位(857 个 gid)与
+// 队位(18 个 gid)**交集为 0** —— 游戏把在队宠物排除在盒快照外,故那一步永远删不到行,
+// 是死代码。理由与复审提示见 docs/data.md 同名小节。
+func TestBoxTeamSwapClearsStaleSide(t *testing.T) {
+	st := newTestStore(t)
+	sc := st.For(testAcc)
+
+	team := mkPet(st.gd, 12, 2000672, 3006)    // 初始在大世界队伍
+	boxed := mkPet(st.gd, 6476, 2000672, 3006) // 初始在宠物盒
+	for _, p := range []*pet.Pet{team, boxed} {
+		if _, err := sc.UpsertPet(p); err != nil {
+			t.Fatalf("写入 gid=%d: %v", p.Gid, err)
+		}
+	}
+	if err := sc.ReplacePetTeams([]pet.TeamEntry{{Gid: 12, TeamIdx: 0, Pos: 0}}); err != nil {
+		t.Fatalf("初始化队伍: %v", err)
+	}
+	if err := sc.ReplacePetBoxes([]pet.BoxEntry{{Gid: 6476, BoxID: 1, Slot: 0}}); err != nil {
+		t.Fatalf("初始化盒子: %v", err)
+	}
+
+	// 拖动交换:12 队伍→盒子、6476 盒子→队伍。顺序与 pipeline 处理回包一致:
+	// 先按完整队伍快照替换 pet_team,再按 box_pet_change 增量落 12 的新盒位。
+	if err := sc.ReplacePetTeams([]pet.TeamEntry{{Gid: 6476, TeamIdx: 0, Pos: 0}}); err != nil {
+		t.Fatalf("替换队伍快照: %v", err)
+	}
+	if err := sc.ApplyBoxMoves([]pet.BoxEntry{{Gid: 12, BoxID: 1, Slot: 0}}); err != nil {
+		t.Fatalf("应用盒位移动: %v", err)
+	}
+
+	pets, _, err := sc.ListPets(Filter{})
+	if err != nil {
+		t.Fatalf("查询宠物列表: %v", err)
+	}
+	byGid := map[uint32]*pet.Pet{}
+	for _, p := range pets {
+		byGid[p.Gid] = p
+	}
+
+	if p := byGid[6476]; p.Box != nil {
+		t.Errorf("gid=6476 已移入队伍,盒子位置应清空,实得 %+v", p.Box)
+	} else if p.Team == nil || p.Team.TeamIdx != 0 || p.Team.Pos != 0 {
+		t.Errorf("gid=6476 队伍位置不对: %+v", p.Team)
+	}
+	if p := byGid[12]; p.Team != nil {
+		t.Errorf("gid=12 已移入盒子,队伍位置应清空,实得 %+v", p.Team)
+	} else if p.Box == nil || p.Box.BoxID != 1 || p.Box.Slot != 0 {
+		t.Errorf("gid=12 盒子位置不对: %+v", p.Box)
+	}
+}

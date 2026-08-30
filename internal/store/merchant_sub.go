@@ -1,7 +1,7 @@
-// 远行商人订阅与已通知记录(表结构见 store.go 的 merchant_subs / merchant_notified)。
+// 远行商人订阅记录(表结构见 store.go 的 merchant_subs;已通知记录 merchant_notified 见 merchant.go)。
 // 订阅按登录账号绑定:一个账号只绑一个收件邮箱,换设备登录同一账号也能识别已订阅;
-// 收件邮箱 + 逗号分隔的商品名关键词(空=全部);每槽每邮箱只发一次,
-// 去重记录也随 merchant_slots 的 2 天清理节奏一并清掉。
+// 收件邮箱 + 逗号分隔的商品名关键词(空=全部)。
+// 去重粒度是**每槽每商品一次**(而非每槽一次):一轮内可能回源多次,每次都可能带来新商品。
 package store
 
 import "time"
@@ -61,18 +61,3 @@ func (s *Store) DeleteMerchantSubByEmail(email string) error {
 	return err
 }
 
-// MerchantNotified 判断某槽是否已给该邮箱发过提醒。
-func (s *Store) MerchantNotified(slot int64, email string) bool {
-	var one int
-	err := s.rdb.QueryRow(`SELECT 1 FROM merchant_notified WHERE slot=? AND email=?`, slot, email).Scan(&one)
-	return err == nil
-}
-
-// MarkMerchantNotified 记录某槽已通知该邮箱,顺带清理 2 天前的去重记录(与槽缓存同节奏)。
-func (s *Store) MarkMerchantNotified(slot int64, email string) error {
-	if _, err := s.db.Exec(`INSERT OR IGNORE INTO merchant_notified(slot, email) VALUES(?,?)`, slot, email); err != nil {
-		return err
-	}
-	_, err := s.db.Exec(`DELETE FROM merchant_notified WHERE slot < ?`, time.Now().Add(-merchantRetain).Unix())
-	return err
-}

@@ -7,8 +7,10 @@
 #     export PATH=$$PWD/zig-x86_64-linux-0.16.0:$$PATH
 # 前端产物已提交到 internal/server/web,无需在此 npm build。
 
-PKG     := ./cmd/rocom-capture
-BIN     := rocom-capture
+# 二进制清单:与 ./cmd/ 下的目录同名,加一个新命令只需往这里添个名字。
+# 注意 cmd/ 下还有 movean / pcapdump / pbdump_descr —— 它们是**开发期工具**,不打进发布产物,
+# 故这里只列 rocom-capture。要一起发布就往 BINS 里加。
+BINS    := rocom-capture
 DIST    := dist
 # -extldflags=-Wl,-s 让 zig 外部链接器真正 strip(仅 -s -w 对 zig 不完全生效)
 LDFLAGS := -s -w -extldflags=-Wl,-s
@@ -17,20 +19,21 @@ LDFLAGS := -s -w -extldflags=-Wl,-s
 
 all: release
 
-release: $(DIST)/$(BIN)-linux-amd64 $(DIST)/$(BIN)-linux-arm64
+release: $(foreach b,$(BINS),$(DIST)/$(b)-linux-amd64 $(DIST)/$(b)-linux-arm64)
 	@echo "==> 完成:" && ls -lh $(DIST)
 
-$(DIST)/$(BIN)-linux-amd64:
+# % 即二进制名,与 ./cmd/ 下的目录同名
+$(DIST)/%-linux-amd64:
 	@mkdir -p $(DIST)
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
 		CC="zig cc -target x86_64-linux-musl" \
-		go build -trimpath -ldflags "$(LDFLAGS)" -o $@ $(PKG)
+		go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd/$*
 
-$(DIST)/$(BIN)-linux-arm64:
+$(DIST)/%-linux-arm64:
 	@mkdir -p $(DIST)
 	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
 		CC="zig cc -target aarch64-linux-musl" \
-		go build -trimpath -ldflags "$(LDFLAGS)" -o $@ $(PKG)
+		go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd/$*
 
 clean:
 	rm -rf $(DIST)

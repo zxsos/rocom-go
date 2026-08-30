@@ -61,9 +61,14 @@
 .topbar-fs:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .topbar-fs.on { color: var(--accent); }
 .topbar-fs.on:hover { border-color: var(--accent); background: var(--accent-soft); }
-.account-wrap { margin-left: auto; position: relative; max-width: 240px; }
+/* 宽度按内容走,不再钉死一个常数:昵称 + UID 一共多宽事先不知道,钉死了稍长就吃省略号
+   (实测「测试测试名字 (UID:123456789)」约 226px,而原先 .account-select 卡在 220px)。
+   仍留一个随视口走的上限,免得超长昵称把导航挤没;窄屏另有 .acct-uid 那条兜着。
+   min-width:0(连同 .account-select)让它在真挤不下时**先缩自己** —— flex 项的自动最小
+   尺寸是内容宽,不给 0 的话挤的是旁边的兄弟,顶栏会被撑高。 */
+.account-wrap { margin-left: auto; position: relative; min-width: 0; }
 .account-state { width: 14px; height: 14px; flex: none; }
-.account-select { max-width: 220px; }
+.account-select { width: auto; min-width: 0; max-width: min(420px, 42vw); }
 
 /* 自定义账号下拉(替代原生 <select>):原生 <option> 不能内嵌 <img>,
    改用 button + ul 浮层,以便在下拉里也显示用户上传的 login.svg/logout.svg 状态图标。 */
@@ -133,6 +138,11 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   .brand { font-size: 10px; max-width: none; }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
+  /* 窄屏只留昵称:UID 那截占的宽度比昵称还多,留着只能省略号收场,而昵称已足够认出是谁。
+     (下拉**条目**不在此列——浮层不占顶栏宽度,UID 照常显示。) */
+  .acct-uid { display: none; }
+  /* 没有导航要让位,上限交还给剩余空间(超长昵称就缩到剩多少显示多少) */
+  .account-select { max-width: none; }
   /* 同 .topbar:backdrop-filter 创建层叠上下文,故本栏层级须高于内容区全部浮层。 */
   .bottomnav {
     display: flex; position: sticky; bottom: 0; z-index: var(--z-shell);

@@ -301,11 +301,15 @@ CREATE TABLE IF NOT EXISTS merchant_subs (
   keywords TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
 );
--- 已通知记录:同一槽(4h)对同一邮箱只发一次提醒,防止强制刷新/重复回源时重复发信;
+-- 已通知记录:同一槽(4h)对同一邮箱,**每个商品只提醒一次**(见 server/merchant_notify.go)。
+-- items 是已通知过的商品名清单(逗号分隔),空串 = 该槽对他还一封都没发过。
+-- 去重粒度细化到商品(而非整槽)是因为第三方会滞后补货:同一轮要回源多次,
+-- 每次都可能带来新商品,只按槽去重会把后到的商品永久挡住(订阅者收不到提醒)。
 -- 记录随槽缓存一起在写入时清理 2 天前的。
 CREATE TABLE IF NOT EXISTS merchant_notified (
   slot INTEGER NOT NULL,
   email TEXT NOT NULL,
+  items TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(slot, email)
 );
 
@@ -365,6 +369,14 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
 	}
 	// 老库补 rank_join 列(排行榜参与开关):DEFAULT 1 = 默认参加。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN rank_join INTEGER NOT NULL DEFAULT 1`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	// 老库补 merchant_notified.items 列(已通知商品清单):订阅去重从「每槽一次」细化到
+	// 「每槽每商品一次」时老表无此列,直接 ALTER 加列;新库建表已含该列,报 duplicate
+	// column 可忽略。已有行的 items 为空串 = 该槽尚未通知过任何商品,与旧语义一致
+	// (旧表里「有行」只说明发过信,商品清单无从还原,最坏情况是补发一次)。
+	if _, err := s.db.Exec(`ALTER TABLE merchant_notified ADD COLUMN items TEXT NOT NULL DEFAULT ''`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}

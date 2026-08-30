@@ -163,12 +163,26 @@ pcapdump 用它 + `dynamicpb` 解出带字段名/枚举名的树(`cmd/pcapdump/t
 ## 3. 名称表 → JSON(`scripts/gen_gamedata.py`)
 
 从上述表提取精简 `id → 中文名` 写入 `internal/gamedata/data/names.json`(已提交)，
-`internal/gamedata` 包编译期 `embed` 加载。包含维度：
+`internal/gamedata` 包编译期 `embed` 加载。**共 36 个维度**(此前这里只列了 11 个)，
+按用途分五组；括号里是条目数，随游戏版本变，要当前值直接查：
 
+```python
+python3 -c "import json;d=json.load(open('internal/gamedata/data/names.json'));print(len(d),{k:len(v) for k,v in d.items()})"
 ```
-species  nature  nature_effect  skill_dam_type  talent_rate
-partner_mark  speciality  medal  images  image_base  opcodes
-```
+
+- **宠物本体**:`species`(20485)种类名、`petbase`(1136)形态、`images`(1112)宠物图索引、
+  `image_base`(19954)底图 conf 索引、`nature`(31)性格、`nature_effect`(31)性格效果、
+  `talent_rate`(4)天分档、`speciality`(12)特长、`partner_mark`(10)伙伴标记、
+  `skill_dam_type`(18)技能系别
+- **奖牌/血脉/炫彩**:`medal`(56)与 `medal_icons`(56)、`blood_names`(24)与
+  `blood_icons`(24)、`glass_names`(4) / `glass_colors`(39) / `glass_particles`(4)
+- **精灵蛋与家园**:`egg_conf`(917)物种蛋、`egg_items`(936)背包蛋物品、
+  `egg_types`(9)蛋品类、`egg_group`(15)蛋组、`nest_furniture`(1)小窝家具
+- **场景与地图**:`scenes`(112)、`scene_res`(152)、`scene_default_res`(112)默认层、
+  `layers`(16)分层、`maps`(4)大地图底图、`zones`(43)区域、`pois`(3)POI、
+  `poi_kinds`(9)POI 图层键
+- **杂项**:`opcodes`(1382) opcode→消息名、`npc_pets`(1483)野生宠形态名、
+  `npc_bosses`(116)BOSS、`filter_icons`(3) / `static_icons`(5) 图标索引
 
 名称表由 `bin2json.py` 解出的 Bin JSON 得到;系别/天分/标记的整数值通过解析 `all.pb`
 枚举(名→整数)再 join `PET_FILTER_CONF` 的(枚举名→中文)得到。种类合并 MONSTER_CONF+
@@ -268,8 +282,11 @@ webp 转码确定性,默认跳过已存在、`--force` 重编。
 
 | 字段 | 表 | names.json |
 | --- | --- | --- |
-| `scene_cfg_id` | `SCENE_CONF`(85 行) | `scenes`: id → 场景名 |
-| `scene_res_cfg_id` | `SCENE_RES_CONF`(119 行) | `scene_res`: id → `{n:名称, s:所属 scene_cfg_id}` |
+| `scene_cfg_id` | `SCENE_CONF`(112 行) | `scenes`: id → 场景名 |
+| `scene_res_cfg_id` | `SCENE_RES_CONF`(152 行) | `scene_res`: id → `{n:名称, s:所属 scene_cfg_id}` |
+
+（这两个行数按 `names.json` 的 `scenes` / `scene_res` 实际条目数校正过；游戏更新后还会变，
+　以 `python3 -c "import json;d=json.load(open('internal/gamedata/data/names.json'));print(len(d['scenes']),len(d['scene_res']))"` 为准。曾长期写成 85/119，是上一版解包的旧数。）
 
 **大地图底图只有 4 个场景配了**(`WORLD_MAP_BLOCK_CONF`:10003 卡洛西亚大陆、10018 魔法学院、
 30001 家园室内、30002 家园种植园)→ `maps` 索引。其余场景(副本/洞穴/室内)无底图,只能显示
@@ -342,8 +359,12 @@ u = (world_x − ox) / side      v = (world_y − oy) / side  # [0,1],直接乘�
 
 层的 `res`:优先 LAYERED 表 `scene_res_id`,家园层(表内为空)从其区域行(`area_func_id` →
 `AREA_FUNC_CONF.area_id` → `AREA_CONF.scene_res_id`)补齐(=30001),否则 `LayerIn(30001,..)` 会漏掉家园
-楼层。`AREA_CONF`(8.1MB/35592 行)与 `AREA_FUNC_CONF` 同在解包 Bin 目录(为 3.3 的 POI 坐标一并
-入库),`gen_gamedata.py` 直接读取。
+楼层。`AREA_CONF`(早期记录为 8.1MB/35592 行)与 `AREA_FUNC_CONF` 同在解包 Bin 目录(为 3.3 的
+POI 坐标一并入库),`gen_gamedata.py` 直接读取。
+
+> **这两个体积/行数是随游戏版本变的快照,别当常量引用** —— 它只作「这张表很大、值得单独
+> 提一句」的量级说明。要当前值直接量解包目录:
+> `find "$ROCOM_PARSED" -name 'AREA_CONF.json' -exec ls -lh {} \; -exec wc -l {} \;`
 
 **叠加渲染**:层世界范围 `[OX,OX+Side]×[OY,OY+Side]` 投影为底图归一化矩形(u0,v0)-(u1,v1)放进 payload
 的 `layer{img,u0,v0,u1,v1}`,前端把切片图(`.map-layer`)按该矩形定位在 `.map-world` 内(透明处透出
@@ -1399,7 +1420,26 @@ s2c 0x1346 DATA 明文 body
     **仅在 0x1888 解析**(其他 opcode 的子消息易误判为 PetBoxPetChange)。
   - **队位**:队伍变更/盒子操作回包(`CarriesTeam`:登录/6272-6292/524-527)常一并刷新完整队伍快照,
     复用 `ParseTeams` 整体 `ReplacePetTeams`。
+  - **两表必须互清**(在队宠物不在盒子里,二者互斥,见 `internal/pet/model.go` 的 `Pet.Team` 注释):
+    - `ApplyBoxMoves`(盒位增量)清 `pet_team` —— 宠物入盒即离队;
+    - `ReplacePetTeams`(队伍快照)清 `pet_box` —— 宠物入队即离盒。
+    缺任一方向会让宠物同时挂两张表。**实际踩到的就是这个**:`0x1888` 拖动交换时,
+    「挤进盒子」那只走 `box_pet_change` 增量(带出其新盒位,并清它残留的队位),
+    而「挤进队伍」那只的新队位**只**出现在同包的完整队伍快照里 ——
+    `ReplacePetTeams` 若不顺手清 `pet_box`,它就仍占着原盒位,表现为
+    「盒子 → 队伍」这个方向拖完不同步(列表与盒子示意图都还显示它在盒里)。
+  - **只清这一个方向,镜像方向刻意不做**:给 `ReplacePetBoxes`(全量盒快照)也加清 `pet_team`
+    看着对称,但实测下来是**空操作**:登录包 `0x0102`(同时带两种快照)实测盒位 857 个 gid、
+    队位 18 个 gid,**交集 0 个** —— 游戏把在队宠物排除在盒快照外。故按盒快照 gid 去删
+    `pet_team` 永远删不到行,加它只是徒增一段没人走得到的分支与维护负担。
+    (顺带这也说明「清 `pet_box`」同样是安全的:登录时它删 0 行,不存在误删。)
+    **若将来某 opcode 的盒快照开始含在队宠物,这里要重新评估** —— 那种情况下镜像清理会
+    因为 `CarriesTeam` ⊇ `CarriesBackpack`(盒子 opcode 也可能带队伍快照)而在
+    `ParseTeams` 解不出队伍的那类包上抹掉整支队伍。故不做,不是因为懒,是因为它现在是死代码
+    且将来可能是危险的死代码。
   - 实测 pcap(交换队首两位 + 盒内 1→30 移位 + 盒内 2/3 互换):三处变更均正确落库。
+    另实测「宠物盒 ↔ 大世界队伍拖动交换」(`TestBoxTeamSwapClearsStaleSide`):修复前 gid=6476
+    拖进队伍后盒子位置仍在,修复后两向都同步。
 - **宠物奖牌墙**(每只宠物拥有的全部奖牌):数据在 **登录 `0x0102`** 的 `PlayerSvrDataInfo.pet_medal_info`
   → `PlayerPetMedalInfo.medal_infos[]`(`PetMedalInfo`:#1 medal_conf_id / #2 medal_type / #3 owner 组[]),
   组内 #2 记录里宠物 gid = `#8(obtain_pet_gid) ?? #6 ?? #2`。**注:该消息线上 wire 格式与 all.pb 的

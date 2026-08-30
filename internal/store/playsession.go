@@ -68,7 +68,7 @@ WHERE logout_time IS NULL AND login_time < ?`,
 
 // ListPlaySessions 列出游玩会话记录(管理后台),按上线时间倒序,可选账号过滤。
 func (s *Store) ListPlaySessions(account string, limit int) ([]PlaySession, error) {
-	q := `SELECT ps.account, COALESCE(a.name, ''), ps.login_time, ps.logout_time, ps.duration
+	q := `SELECT ps.account, COALESCE(a.name, ''), ps.login_time, ps.logout_time, COALESCE(ps.duration, 0)
 FROM play_sessions ps LEFT JOIN accounts a ON a.account = ps.account`
 	var args []any
 	if account != "" {
