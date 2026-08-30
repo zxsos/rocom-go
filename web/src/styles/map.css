@@ -199,8 +199,13 @@
    看起来仍是一整块不透明的圆片,而不是渐隐进底图。 */
 .map-wild-face {
   width: 100%; height: 100%; object-fit: cover; display: block;
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
-  mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
+  /* 边缘羽化:中心 60% 保持全实,往外渐变到**圆周处 alpha .5**(半透),
+     让头像边缘化进底图而不是硬生生一个圆片。终点保留 .5 而非 transparent:
+     全透会让边缘彻底消失、头像显得发虚且不成型,半透既透出地形又留得住轮廓。
+     改这个值记得同步 pipGeom 的 SIZES.featherEdge(画中画是同一套视觉的
+     canvas 平行实现,见 pipDraw.featheredAvatar)。 */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, rgba(0, 0, 0, .5) 100%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 60%, rgba(0, 0, 0, .5) 100%);
 }
 .map-wild-face-fallback { font-size: 16px; line-height: 1; }
 
@@ -549,8 +554,9 @@
    **蛋图标除外**:它只有 20px,且是「窝上有没有蛋」的标识,羽化会糊成一团,
    必须保持清晰可辨——注意它靠 :not() 排除,不能反过来写成「给某类加」。 */
 .map-nest img:not(.map-nest-egg) {
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
-  mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 100%);
+  /* 与 .map-wild-face 同一套羽化参数(外缘 alpha .5),改一处记得改另一处。 */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, rgba(0, 0, 0, .5) 100%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 60%, rgba(0, 0, 0, .5) 100%);
 }
 /* 空窝:虚线圈 + 一个「空」字。背景**半透明**——相邻两窝在地图上只隔几十像素,
    实心底色会糊成一团黑;小一圈也是为了不抢住户的注意力。 */

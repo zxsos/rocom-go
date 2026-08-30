@@ -119,11 +119,13 @@ function featheredAvatar(im, scale) {
   c.beginPath(); c.arc(r, r, r, 0, TAU); c.clip()
   const dw = FEATHER * scale
   c.drawImage(im, (FEATHER - dw) / 2, (FEATHER - dw) / 2, dw, dw)
-  // 擦边缘:内圈(60% 半径)alpha 0 不擦,到圆周 alpha 1 全擦,中间线性过渡
+  // 擦边缘:内圈(60% 半径)alpha 0 不擦,到圆周只擦到 SIZES.featherEdge,中间线性过渡。
+  // 圆周处**不留全擦**(即不擦到 0):与 .map-wild-face 的 mask 一致,边缘保留 50% 不透明,
+  // 完全擦净会让头像边缘彻底消失、显得发虚不成型。
   c.globalCompositeOperation = 'destination-out'
   const g = c.createRadialGradient(r, r, r * 0.6, r, r, r)
   g.addColorStop(0, 'rgba(0,0,0,0)')
-  g.addColorStop(1, 'rgba(0,0,0,1)')
+  g.addColorStop(1, 'rgba(0,0,0,' + (1 - SIZES.featherEdge) + ')')
   c.fillStyle = g
   c.fillRect(0, 0, FEATHER, FEATHER) // 被 clip 限制在圆内,圆外本就透明
   c.restore()
@@ -522,6 +524,11 @@ function drawArrow(ctx, snap, focus, mapPx, w, h, palette, scale) {
   // 原 svg 是 24×24 视口里的 30px 图形
   const k = arrowSize / 24
   ctx.scale(k, k)
+  // 把 24×24 视口的中心移到旋转中心 —— 对应 DOM 版 .map-arrow 的 translate(-50%,-50%)
+  // (见 useMapEngine.applyFrame 的 arrow transform)。少了这一步,图形的 (0,0) 会被
+  // 对齐到玩家坐标,而箭头画在视口中央(12,12)附近,于是整体偏移 (12,12)×k
+  // (scale=1 时约 22px);且偏移随 heading 一起转,表现为「箭头绕着中心打转、不在中心」。
+  ctx.translate(-12, -12)
   ctx.beginPath()
   ctx.moveTo(12, 2); ctx.lineTo(20, 21); ctx.lineTo(12, 16); ctx.lineTo(4, 21)
   ctx.closePath()

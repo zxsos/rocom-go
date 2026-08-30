@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"time"
 )
 
@@ -36,38 +37,59 @@ type PlaySummary struct {
 	Daily         []PlayDaily `json:"daily"`
 }
 
-// StartPlaySession 开启一次游玩会话(幂等):同一连接已有进行中会话时不重复开。
-// 登录后首条可归属消息、挂后台回前台、断线重连等场景都会走到这里;库里已有进行中
-// 会话(如服务重启时玩家一直在线)时 NOT EXISTS 挡住,不会重复记。
+// StartPlaySession 开启一次游玩会话(幂等,**按账号**):该账号已有进行中会话时不重复开。
+//
+// 为什么按账号而不是按连接:一个玩家常同时保持**多条 TCP 连接**(实测同一账号有
+// 2~3 条),且重连会换新端口(= 新 conn_id)。按连接记会把一次在线拆成好几条
+// 时间重叠的会话 —— 管理后台里就是「好几条并行的在线中」+ 一堆几秒的碎片,
+// 而「今日游玩时长」把并行的几条都累加进去,直接翻倍。
+// conn_id 仍落库,记的是**开这条会话的那条连接**,仅用于溯源;会话存续期间该连接
+// 断开不代表下线(见 pipeline 的 settleSessions)。
 func (s *Store) StartPlaySession(connID, account string, ts int64) error {
 	_, err := s.db.Exec(`
 INSERT INTO play_sessions(conn_id, account, login_time)
 SELECT ?, ?, ?
-WHERE NOT EXISTS (SELECT 1 FROM play_sessions WHERE conn_id = ? AND logout_time IS NULL)`,
-		connID, account, ts, connID)
+WHERE NOT EXISTS (SELECT 1 FROM play_sessions WHERE account = ? AND logout_time IS NULL)`,
+		connID, account, ts, account)
 	return err
 }
 
-// EndPlaySession 关闭某连接的全部进行中会话,写入下线时间与时长(时长=下线-登录,秒)。
-// 重复调用安全(没有进行中会话时无效果)。
-func (s *Store) EndPlaySession(connID string, ts int64) error {
+// EndAccountSessions 结束某账号的全部进行中会话,写入下线时间与时长(时长=下线-登录,秒)。
+// 没有进行中会话时无效果。用于玩家换号(旧账号立即下线)。
+func (s *Store) EndAccountSessions(account string, ts int64) error {
+	if account == "" {
+		return nil
+	}
 	_, err := s.db.Exec(`
 UPDATE play_sessions
 SET logout_time = ?, duration = MAX(0, ? - login_time)
-WHERE conn_id = ? AND logout_time IS NULL`,
-		ts, ts, connID)
+WHERE account = ? AND logout_time IS NULL`,
+		ts, ts, account)
 	return err
 }
 
-// ForceEndStaleSessions 强制结束所有 login_time 早于 cutoff 的进行中会话(悬挂清理)。
-// 覆盖极端场景:如服务重启时连接已断开且未留场景现场、关闭通知缓冲丢失等,避免管理后台
-// 永远显示某玩家「在线中」。
-func (s *Store) ForceEndStaleSessions(cutoff, now int64) error {
-	_, err := s.db.Exec(`
-UPDATE play_sessions
+// EndStalePlaySessions 结束「账号已不再活跃」的进行中会话:active 之外的账号一律记下线。
+//
+// active 由调用方(pipeline)按内存里的连接状态给出:只要该账号还有**任意一条**连接
+// 在近期有消息,就算活跃 —— 玩家同时开多条连接,关掉其中一条不等于下线,这正是
+// 逐连接判定时产生碎片会话的原因。
+//
+// 它同时覆盖了原先 ForceEndStaleSessions 想兜住的场景(服务重启后内存连接表清空,
+// 库里的会话无人认领),而且**及时**:下一轮 sweep 就清掉,不必像按 login_time 判
+// 定时那样挂 24 小时才被回收、还被记成 24 小时时长。
+// active 为空表示当前无人在线,此时结束全部进行中会话。
+func (s *Store) EndStalePlaySessions(active []string, ts int64) error {
+	q := `UPDATE play_sessions
 SET logout_time = ?, duration = MAX(0, ? - login_time)
-WHERE logout_time IS NULL AND login_time < ?`,
-		now, now, cutoff)
+WHERE logout_time IS NULL`
+	args := []any{ts, ts}
+	if len(active) > 0 {
+		q += ` AND account NOT IN (?` + strings.Repeat(",?", len(active)-1) + `)`
+		for _, a := range active {
+			args = append(args, a)
+		}
+	}
+	_, err := s.db.Exec(q, args...)
 	return err
 }
 

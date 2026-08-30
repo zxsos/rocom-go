@@ -33,6 +33,10 @@ export const SIZES = {
   routeEnd: 5,       // 终点圆
   routeTeleport: 10, // 传送落点菱形(10×10 rotate 45)
   paintEdge: 1.2,    // .map-paint-edge path stroke-width(non-scaling-stroke)
+  // 头像边缘羽化到圆周处**保留**的不透明度(照抄 .map-wild-face 的 mask 终点 alpha):
+  // 中心 60% 全实,往外渐隐到这里就不再继续变透。0.5 = 周围那圈是 50% 半透明,
+  // 既透出底图又留得住轮廓;取 0 则是彻底渐隐、边缘会消失。
+  featherEdge: 0.5,
 }
 
 // 跑图路线专用常量(见 useRoutes.jsx):路线数据是 8192×8192 画布,除 GRID 即归一化坐标;

@@ -7,6 +7,116 @@ import (
 	"time"
 )
 
+// TestStartPlaySessionPerAccount 校验会话是**账号级**而非连接级的。
+//
+// 背景(用户实测的游玩记录):一个玩家会同时保持多条 TCP 连接(2~3 条),重连还换端口。
+// 按连接记一次在线会被拆成多条时间重叠的会话 —— 管理后台就是「好几条并行的在线中」
+// 加一堆几秒的碎片,「今日游玩时长」还会把并行的几条累加,直接翻倍。
+// 这条测试锁住:同一账号无论多少条连接、开多少次,进行中会话恒定只有一条。
+func TestStartPlaySessionPerAccount(t *testing.T) {
+	st := newTestStore(t)
+	now := time.Now().Unix()
+
+	// 模拟三条连接几乎同时到达(重连/多连接)
+	for _, c := range []string{"conn-A", "conn-B", "conn-C"} {
+		if err := st.StartPlaySession(c, testAcc, now); err != nil {
+			t.Fatalf("开启会话 %s: %v", c, err)
+		}
+	}
+	if n := st.countOpen(testAcc); n != 1 {
+		t.Fatalf("同一账号 3 条连接后, 进行中会话 = %d, 期望 1", n)
+	}
+
+	// 另一账号不受影响(不能误把别人的会话挡掉)
+	if err := st.StartPlaySession("conn-D", "UID:2", now); err != nil {
+		t.Fatalf("开启另一账号会话: %v", err)
+	}
+	if n := st.countOpen("UID:2"); n != 1 {
+		t.Fatalf("另一账号进行中会话 = %d, 期望 1", n)
+	}
+
+	// 结束其中一条连接所在的会话 → 按账号结束,该账号的会话关闭,另一账号不受影响
+	if err := st.EndAccountSessions(testAcc, now+60); err != nil {
+		t.Fatalf("结束账号会话: %v", err)
+	}
+	if n := st.countOpen(testAcc); n != 0 {
+		t.Errorf("%s 结束后仍有 %d 条进行中会话", testAcc, n)
+	}
+	if n := st.countOpen("UID:2"); n != 1 {
+		t.Errorf("UID:2 被误伤, 进行中会话 = %d, 期望 1", n)
+	}
+
+	// 关掉后重新上线 → 新会话(不复用已结束的)
+	if err := st.StartPlaySession("conn-E", testAcc, now+120); err != nil {
+		t.Fatalf("重新开启会话: %v", err)
+	}
+	if n := st.countOpen(testAcc); n != 1 {
+		t.Fatalf("重新上线后进行中会话 = %d, 期望 1", n)
+	}
+}
+
+// TestEndStalePlaySessions 校验「账号已不活跃 → 记下线」的判定。
+// 这是离线判定的核心:只要该账号还有**任意一条**连接活跃,就不能判下线
+// (关掉其中一条不等于下线,正是碎片会话的来源);反之必须及时记下线,
+// 包括服务重启后内存连接表清空、库里无人认领的悬挂会话。
+func TestEndStalePlaySessions(t *testing.T) {
+	st := newTestStore(t)
+	now := time.Now().Unix()
+
+	for _, acc := range []string{testAcc, "UID:2"} {
+		if err := st.StartPlaySession("c-"+acc, acc, now); err != nil {
+			t.Fatalf("开启 %s: %v", acc, err)
+		}
+	}
+
+	// 两个账号都活跃 → 一个都不结束
+	if err := st.EndStalePlaySessions([]string{testAcc, "UID:2"}, now+10); err != nil {
+		t.Fatalf("扫活跃账号: %v", err)
+	}
+	if n := st.countOpen(testAcc); n != 1 {
+		t.Errorf("活跃账号被误判下线: %s 进行中 = %d", testAcc, n)
+	}
+
+	// 只有 UID:2 还活跃 → testAcc 记下线,下线时刻与时长都要对
+	if err := st.EndStalePlaySessions([]string{"UID:2"}, now+100); err != nil {
+		t.Fatalf("扫部分活跃: %v", err)
+	}
+	if n := st.countOpen(testAcc); n != 0 {
+		t.Fatalf("不活跃账号未记下线: %s 进行中 = %d", testAcc, n)
+	}
+	got, err := st.ListPlaySessions(testAcc, 10, 0)
+	if err != nil {
+		t.Fatalf("列出: %v", err)
+	}
+	if len(got) != 1 || got[0].LogoutTime == nil || *got[0].LogoutTime != now+100 {
+		t.Errorf("下线时刻不对: %+v", got)
+	} else if got[0].Duration != 100 {
+		t.Errorf("时长 = %d, 期望 100", got[0].Duration)
+	}
+	if n := st.countOpen("UID:2"); n != 1 {
+		t.Errorf("活跃账号被误伤: UID:2 进行中 = %d", n)
+	}
+
+	// 空活跃集合(服务重启后内存连接表为空)→ 全部记下线,不留悬挂
+	if err := st.EndStalePlaySessions(nil, now+200); err != nil {
+		t.Fatalf("扫空活跃集合: %v", err)
+	}
+	if n := st.countOpen("UID:2"); n != 0 {
+		t.Errorf("重启后悬挂会话未清理: UID:2 进行中 = %d", n)
+	}
+}
+
+// countOpen 数某账号进行中(logout_time IS NULL)的会话条数。
+func (s *Store) countOpen(account string) int {
+	var n int
+	if err := s.rdb.QueryRow(
+		`SELECT COUNT(*) FROM play_sessions WHERE account=? AND logout_time IS NULL`,
+		account).Scan(&n); err != nil {
+		return -1
+	}
+	return n
+}
+
 // TestListPlaySessionsWithNullDuration 复现「管理页面登录统计」的扫错:进行中会话的
 // duration 列为 NULL(下线时才写入),直接扫入 int64 会报
 // "converting NULL to int64 is unsupported"。修复后应正常返回,Online=true、Duration=0。
@@ -14,13 +124,15 @@ func TestListPlaySessionsWithNullDuration(t *testing.T) {
 	st := newTestStore(t)
 	now := time.Now().Unix()
 
+	// 会话是账号级的:同一账号再开一条只会被幂等挡住,故这里用两个账号造出
+	// 「一进行中 + 一已结束」两种形态(见 TestStartPlaySessionPerAccount)。
 	if err := st.StartPlaySession("conn-1", testAcc, now); err != nil {
 		t.Fatalf("开启进行中会话: %v", err)
 	}
-	if err := st.StartPlaySession("conn-2", testAcc, now); err != nil {
+	if err := st.StartPlaySession("conn-2", "UID:2", now); err != nil {
 		t.Fatalf("开启已结束会话: %v", err)
 	}
-	if err := st.EndPlaySession("conn-2", now+120); err != nil {
+	if err := st.EndAccountSessions("UID:2", now+120); err != nil {
 		t.Fatalf("结束会话: %v", err)
 	}
 
@@ -74,6 +186,9 @@ func TestListPlaySessionsPaging(t *testing.T) {
 	// 两个账号各 5 条,登录时间**不重叠**(第二个账号整体后移一小时):
 	// 全局严格有序,倒序后每条的期望位置唯一 —— 若用交错/相同的时间戳,同刻内的先后
 	// 由 SQLite 决定,期望序列就写不准,测试会变成噪音而非护栏。
+	//
+	// 每条必须「上线→下线」成对造:会话是账号级的,同一账号连续 StartPlaySession
+	// 会被幂等挡住(见 TestStartPlaySessionPerAccount),只造得出一条。
 	const per = 5
 	type row struct {
 		acc string
@@ -85,6 +200,9 @@ func TestListPlaySessionsPaging(t *testing.T) {
 			ts := base + int64(k)*3600 + int64(i)*60
 			if err := st.StartPlaySession("c-"+acc+"-"+strconv.Itoa(i), acc, ts); err != nil {
 				t.Fatalf("开启会话 %s#%d: %v", acc, i, err)
+			}
+			if err := st.EndAccountSessions(acc, ts+30); err != nil {
+				t.Fatalf("结束会话 %s#%d: %v", acc, i, err)
 			}
 			all = append(all, row{acc, ts})
 		}
