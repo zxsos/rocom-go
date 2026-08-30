@@ -363,10 +363,10 @@ function drawNests(ctx, snap, focus, mapPx, w, h, palette, scale) {
       ctx.textBaseline = 'middle'
       ctx.fillText('空', s.x, s.y)
     } else {
-      // 住户头像:裁圆后铺满(canvas 没有 object-fit,手动 clip)
+      // 住户头像:裁圆后铺满(canvas 没有 object-fit,手动 clip)。
+      // **不铺实心底色**(与 map.css 的 .map-nest 一致):头像由 featheredAvatar 羽化
+      // 边缘,底色会把它糊回一块不透明圆片,掩盖住羽化效果。
       const im = n.pet.img ? loadIcon(n.pet.img) : null
-      ctx.fillStyle = palette.bg1
-      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill()
       if (im) {
         // 头像资源四周自带透明留白,放大 1.3 撑满内圆(与 .map-wild.rare 的头像同处理);
         // 羽化同样作用于住户头像(与 CSS 一致),蛋图标不在此列(它是单独画的)。
@@ -415,9 +415,8 @@ function drawWilds(ctx, snap, focus, mapPx, w, h, palette, scale) {
     if (p.stale) { ctx.globalAlpha = all ? 0.25 : 0.4; ctx.filter = 'grayscale(.6)' }
 
     // 头像:裁圆铺满。稀有宠的头像再放大 1.3 裁掉资源留白。
+    // **不铺实心底色**(与 map.css 的 .map-wild 一致):羽化边缘要能透出底图。
     const im = p.img ? loadIcon(p.img) : null
-    ctx.fillStyle = palette.bg1
-    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill()
     const clipR = rare ? r : r - 2 * scale
     ctx.save()
     ctx.beginPath(); ctx.arc(s.x, s.y, clipR, 0, TAU); ctx.clip()

@@ -45,4 +45,28 @@ export default [
       globals: globals.node,
     },
   },
+  {
+    // 用 playwright 的验收脚本是**双环境**:顶层跑 Node,而 page.evaluate / addInitScript
+    // 的回调体是序列化后放进浏览器执行的 —— 里面用的 window / document / location 是
+    // 浏览器的。故两套全局都要给,否则这些浏览器侧代码会被误报 no-undef。
+    // 上面那套的三个脚本(改名时记得同步这里的清单):
+    //   - verify-map-vp-browser.mjs     视口尺寸测量时机
+    //   - verify-map-browser.mjs        地图页最终渲染
+    //   - verify-map-motion-browser.mjs 移动平滑度(RAF 逐帧)
+    //   - verify-pip-canvas.mjs         画中画 canvas 像素
+    //   - motion-report.mjs             偏差可视化报告
+    // 判定方法:顶层 import 'playwright' 的脚本就是双环境的,加进来即可。
+    files: [
+      'scripts/verify-map-vp-browser.mjs',
+      'scripts/verify-map-browser.mjs',
+      'scripts/verify-map-motion-browser.mjs',
+      'scripts/verify-pip-canvas.mjs',
+      'scripts/motion-report.mjs',
+    ],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 ]
