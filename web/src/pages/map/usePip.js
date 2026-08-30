@@ -227,16 +227,27 @@ export function usePip(engine, theme) {
       v.srcObject = streamRef.current
     }
     v.play().catch(() => {}) // 自动播放被拒不影响 PiP(悬浮窗会自己播)
-    v.requestPictureInPicture().then(() => {
-      setActive(true)
-    }).catch(() => {
-      // 手势过期/被拒:清掉流,下次点击重新建,不残留半开状态。
-      if (streamRef.current) {
-        for (const t of streamRef.current.getTracks()) t.stop()
-        streamRef.current = null
-        v.srcObject = null
-      }
-    })
+
+    // —— 必须等元数据就绪才能进 PiP,否则浏览器直接拒绝 ——
+    // 实测(Chromium):刚把 captureStream 挂到 srcObject 就调 requestPictureInPicture,
+    // video.readyState 还是 0,抛 InvalidStateError "Metadata for the video element are
+    // not loaded yet" —— 表现为「点了按钮没反应」。
+    // 修复:先等 loadedmetadata。用户手势已在本次 click 中消耗,而手势的「粘性」
+    // 允许在同步发起的异步回调里继续调该方法,故等一帧是安全的。
+    const enter = () => {
+      v.requestPictureInPicture().then(() => {
+        setActive(true)
+      }).catch(() => {
+        // 手势过期/被拒:清掉流,下次点击重新建,不残留半开状态。
+        if (streamRef.current) {
+          for (const t of streamRef.current.getTracks()) t.stop()
+          streamRef.current = null
+          v.srcObject = null
+        }
+      })
+    }
+    if (v.readyState >= 1) enter()
+    else v.addEventListener('loadedmetadata', enter, { once: true })
   }, [cap.ok, drawFrame])
 
   const toggle = useCallback(() => (active ? stop() : start()), [active, start, stop])
