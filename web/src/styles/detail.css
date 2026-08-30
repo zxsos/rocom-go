@@ -89,9 +89,6 @@ img.evo-avatar { object-fit: cover; }
 .medal-tip:hover { z-index: var(--z-popover-top); }
 /* 详情奖牌墙内的奖牌图标适当增大(仅 .medals 容器内,不影响列表/事件的行内奖牌) */
 .medals .medal-ic { width: 40px; height: 40px; }
-/* 技能列表默认折叠(<details>);summary 可点击展开 */
-.skills > summary { cursor: pointer; user-select: none; }
-.skills > .medals { margin-top: 6px; }
 
 /* 身高/体重范围 tooltip:由 StatRange 经 portal 渲染到 body、fixed 定位(避开 .table-wrap
    的 overflow 裁剪与常驻滚动条问题);定位由 JS 计算(默认上方/自动翻转)。 */

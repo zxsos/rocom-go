@@ -65,7 +65,6 @@
 | `box` | obj? | `{boxId, slot, boxName?, mark?}`（在盒中） |
 | `team` | obj? | `{teamIdx, pos}`（在队中；与 `box` **互斥**） |
 | `hp` `attack` `defense` `spAttack` `spDefense` `speed` | obj | `{value, talentLv, nature}` |
-| `skillIds` | int[] | 技能 id |
 
 > `image` 取图优先 `baseConfId` 回退 `confId` —— 只按 `confId` 取会拿到进化线一阶的图。
 

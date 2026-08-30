@@ -98,7 +98,9 @@ type Pet struct {
 	SpDefense Stat `json:"spDefense"` // 魔防
 	Speed     Stat `json:"speed"`
 
-	SkillIDs []uint32 `json:"skillIds"`
+	// 技能列表(SkillIDs)已整条移除 —— 见 git 提交「移除技能列表」的原因:
+	// 它是**可换的配置**而非个体属性,本地化没梳理只能显示裸编号,任何筛选/排序都用不上,
+	// 却要往每只宠物的 data JSON 里塞十来个编号进库(上游实测 983 只:1357 → 1220 KiB)。
 }
 
 // ToPet 把解码后的 PetData 结合名称库转成业务模型。
@@ -238,11 +240,6 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		}
 	}
 
-	if sk := p.GetSkill(); sk != nil {
-		for _, s := range sk.GetSkillData() {
-			out.SkillIDs = append(out.SkillIDs, s.GetId())
-		}
-	}
 	return out
 }
 

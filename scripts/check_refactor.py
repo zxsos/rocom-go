@@ -69,6 +69,9 @@ REFACTORS = {
 # 连同其文档注释与函数体一并从期望中剔除(否则它们会被报成「丢失」)。
 ALLOWED_REMOVED_FUNCS = {
     "handleAdminPlaceholder": "孤儿路由,前端已删唯一调用者",
+    # fix:第三方滞后补货。缓存判定由「是否有记录」升级为「是否该回源」,该函数被
+    # merchantShouldFetch 取代(多了进行中窗口/冷却两个维度,不是原地改写)。
+    "merchantCached": "fix:被 merchantShouldFetch 取代(当前槽需按冷却重查)",
 }
 
 # 重构后新增的函数:函数名 -> 新增理由。
@@ -76,6 +79,10 @@ ALLOWED_REMOVED_FUNCS = {
 # 报「函数多出」,噪音一起,真正未登记的改动就没人看了。
 ALLOWED_NEW_FUNCS = {
     "merchantClaim": "fix:同一槽并发触发重复发信,新增进程内认领(带冷却,不锁死失败重试)",
+    # fix:第三方滞后补货导致整轮漏商品 —— 当前槽要能按冷却重查,已结束的槽必须永不回源
+    "merchantSlotLive": "fix:槽是否仍在进行中(已结束的槽拿回来的是当前货单,不能回源)",
+    "merchantShouldFetch": "fix:回源判定(未查过→补查;进行中且过冷却→重查;已结束/过窗口→不查)",
+    "merchantCurrentSlot": "fix:从 merchantEnsure 抽出「当前轮」下标,便于无竞争地单测",
 }
 
 # 有意删除的零散代码行(正则,匹配归一化后的行)。两侧都剔除后再比对。
@@ -85,6 +92,26 @@ ALLOWED_LINE_PATTERNS = [
     r"_=todo",
     # 阶段 3:injectEntry.mark 的类型由 map[string]any 改为 *WildMark(字段声明行本身)
     r"markmap\[string\]any//广播给前端的标记载荷\(花种注入仅作记录,不广播wildpets\)",
+    # fix:第三方滞后补货导致整轮漏商品(2026-08-30 实测)。常量 merchantFetchURL 由 const
+    # 改为 var —— 单元测试要用 httptest 把它换掉,const 换不了,不换就会真打到线上烧 token。
+    r"merchantFetchURL=\"https://apii\.xianyuw\.cn/api/v1/rocom-merchant\"",
+    # 同上那个 fix:文件头业务模型注释里被改写的 5 行(旧描述「命中缓存不再回源」已不成立)。
+    # 只挑不含正则元字符的片段,免得满屏转义。
+    r"命中缓存不再回源,防止反复烧第三方token;",
+    r"缓存保留2天,写入时顺手清理更早记录;",
+    r"按当前时间补查缺失的槽;",
+    r"有货槽写入后对比本营业日更早轮找出「新增商品」",
+    r"每槽每邮箱只发一次",
+]
+
+# 有意改写的注释块(正则,匹配归一化后的注释块文本)。
+#
+# 与 ALLOWED_REMOVED_FUNCS 同理:脚本的价值是「除登记在案者外不许变」,而**修 bug 时注释
+# 本来就该跟着改** —— 把已经不成立的描述留在原地,比删掉更危险(后来人会照着错的注释改代码)。
+# 故这里登记旧文案的标志性片段 + 理由,而不是为了过校验而保留过时注释。
+ALLOWED_REMOVED_COMMENTS = [
+    # fix:当前槽改为按冷却重查(第三方滞后补货),旧文案「命中缓存不再回源」已不成立
+    r"命中缓存不再回源,防止反复烧第三方token",
 ]
 
 # 阶段 2(拆 Server 上帝对象)有意改写的函数。
@@ -101,8 +128,16 @@ INTENTIONALLY_CHANGED = {
     "sendMerchantMail": "阶段2:接收者改为 *smtpSender",
     "sendMerchantMailHTML": "阶段2:接收者改为 *smtpSender",
     # 阶段 2:调用点改为 s.snap.* / s.smtp.*
-    "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*",
+    "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*;fix:去重粒度由整槽改为每商品(补货要能补发)",
     "merchantResend": "阶段2:发信调用点改为 s.smtp.send*",
+    # fix:第三方滞后补货。改为只回源当前轮(更早的轮永不回源,拿回来的是当前货单=伪造历史),
+    # 并按 merchantShouldFetch 判定(取代原先「有缓存就跳过」)。
+    "merchantEnsure": "fix:只回源当前轮,判定改走 merchantShouldFetch(支持按冷却重查)",
+    # fix:同上。新增「第三方返回空但库里已有货单时保留旧数据,只推回源时刻」的保护,
+    # 否则重查一撞上限流就把页面上明明还有的货单清成空。
+    "merchantFetch": "fix:空响应保护(保留既有货单,只刷 fetched_at 以免冷却失效)",
+    "merchantLoop": "fix:注释随回源规则变更(当前槽会按冷却重查)",
+    "merchantSlotsOfDay": "fix:GetMerchantSlot 新增返回 fetched_at,调用点随之改",
     # fix:raw string 不转义,写在模板里的 \r\n 是四个字面字符,收件端可见 —— 改回真 CRLF 拼接
     "merchantMailGroup": "fix:分组标题行的 \\r\\n 原本写在 raw string 里,是四个字面字符",
     "handleMerchantSub": "阶段2:发信调用点改为 s.smtp.send*,配置判定改为 s.smtp.configured()",
@@ -312,6 +347,9 @@ def main():
         # 4. 注释块完整性(残余部分,即类型/常量/变量的文档注释)
         oc, nc = block_comments(ores), block_comments(nres)
         for c in sorted(oc - nc):
+            if any(re.search(p, c) for p in ALLOWED_REMOVED_COMMENTS):
+                print(f"   注释块已改写(允许): {c[:40]}…")
+                continue
             print(f"   ✗ 注释块消失: {c[:70]}")
             failed = True
 

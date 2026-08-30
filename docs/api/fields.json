@@ -93,9 +93,6 @@
           "natureId": "int",
           "partnerMark": "str",
           "shiny": "bool",
-          "skillIds": [
-            {}
-          ],
           "spAttack": {
             "nature": "int",
             "talentLv": "int",
@@ -454,9 +451,6 @@
       "natureId": "int",
       "partnerMark": "str",
       "shiny": "bool",
-      "skillIds": [
-        {}
-      ],
       "spAttack": {
         "nature": "int",
         "talentLv": "int",
@@ -558,9 +552,6 @@
           "natureId": "int",
           "partnerMark": "str",
           "shiny": "bool",
-          "skillIds": [
-            {}
-          ],
           "spAttack": {
             "nature": "int",
             "talentLv": "int",

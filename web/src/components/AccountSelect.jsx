@@ -31,8 +31,11 @@ export default function AccountSelect({ accounts, current, onChange, onManagePin
           <img className="account-state" src={current.online ? '/login.svg' : '/logout.svg'}
             alt="" draggable={false} title={current.online ? '在线' : '离线'} />
         )}
+        {/* 昵称与 UID 分成两个 span:窄屏靠 .acct-uid 把 UID 那截藏掉(见 shell.css)——
+            顶栏就那么宽,一整条塞进去只能省略号收场,而昵称已足够认出是谁。
+            两截都带 .privacy,与全局截图防泄一致(见 shell.css 的 html[data-privacy])。 */}
         <span className="privacy account-trigger-name">
-          {current ? `${current.name} (UID:${uidOf(current.account)})` : '选择账号…'}
+          {current ? <><span className="acct-name">{current.name}</span><span className="acct-uid"> (UID:{uidOf(current.account)})</span></> : '选择账号…'}
         </span>
         {current && <RankTitle title={current.title} />}
         {current?.hasPin && <span className="account-pin-mark" title="已设 PIN 保护"><IconLock size={12} /></span>}

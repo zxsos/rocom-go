@@ -30,14 +30,35 @@ func (sc *Scoped) ReplacePetBoxMetas(metas []pet.BoxMeta) error {
 		`INSERT OR REPLACE INTO pet_boxes(account,box_id,name,mark,lock) VALUES(?,?,?,?,?)`, rows)
 }
 
-// ReplacePetTeams 用一份大世界队伍快照替换本账号所有宠物队伍位置。
+// ReplacePetTeams 用一份大世界队伍快照替换本账号所有宠物队伍位置,并清掉这些 gid 残留的
+// 盒子位置——与 ApplyBoxMoves 反向清 pet_team 互为镜像(在队宠物不可能同时在盒子里)。
+//
+// 为什么要清:宠物盒 ↔ 大世界队伍**拖动交换**时,回包(ZONE_PET_BOX_CHANGE_PET_RSP 0x1888)
+// 只用 box_pet_change 增量带出「挤进盒子」那只的新盒位(ApplyBoxMoves 据此清它残留的
+// pet_team),而「挤进队伍」那只的新队位**只**出现在同包的完整队伍快照里,走本函数全量
+// 替换 pet_team。若这里不清 pet_box,那只宠就同时挂在两张表下,列表页仍显示它占着原盒位
+// ——表现为「盒子 → 队伍」这个方向拖完没同步。
 func (sc *Scoped) ReplacePetTeams(entries []pet.TeamEntry) error {
 	rows := make([][]any, 0, len(entries))
 	for _, e := range entries {
 		rows = append(rows, []any{sc.account, e.Gid, e.TeamIdx, e.Pos})
 	}
-	return sc.replaceAll("pet_team",
-		`INSERT OR REPLACE INTO pet_team(account,gid,team_idx,pos) VALUES(?,?,?,?)`, rows)
+	if err := sc.replaceAll("pet_team",
+		`INSERT OR REPLACE INTO pet_team(account,gid,team_idx,pos) VALUES(?,?,?,?)`, rows); err != nil {
+		return err
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	ph := make([]string, len(entries))
+	args := make([]any, 0, len(entries)+1)
+	args = append(args, sc.account)
+	for i, e := range entries {
+		ph[i] = "?"
+		args = append(args, e.Gid)
+	}
+	_, err := sc.db.Exec(`DELETE FROM pet_box WHERE account=? AND gid IN (`+strings.Join(ph, ",")+`)`, args...)
+	return err
 }
 
 // ReplacePetMedals 用一份登录快照替换本账号所有宠物拥有的奖牌(gid↔medal 多对多)。
