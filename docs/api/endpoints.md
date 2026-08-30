@@ -113,7 +113,7 @@
 | `POST /api/admin/rules` | admin | 新增/更新规则（body: `account`, `mode`, `note`） |
 | `DELETE /api/admin/rules` | admin | 删除规则（`?account=`） |
 | `GET /api/admin/stats` | admin | 全部成员抓捕统计 |
-| `GET /api/admin/play-sessions` | admin | 游玩记录（`?account=&limit=`） |
+| `GET /api/admin/play-sessions` | admin | 游玩记录明细分页 + 汇总（`?account=&limit=&offset=`，返回 `total` 为同筛选下总条数） |
 | `GET /api/admin/egg-stats` | admin | 查蛋 API 使用统计 |
 | `GET /api/admin/wild-pets` | admin | 可投放的野生宠物形态 |
 | `GET /api/admin/injects` | admin | 当前注入中的精灵列表 |

@@ -208,6 +208,16 @@
 .admin-play-toolbar { display: flex; gap: 8px; margin: 8px 0 4px; }
 .admin-play-toolbar .select { flex: none; max-width: 260px; }
 
+/* 游玩记录分页:每页条数 + 页码 + 上/下一页,居中一行(窄屏换行)。
+   与捕获事件页的 .event-pager 同构,只是作用域在管理面板内,故不复用其类名。 */
+.admin-pager {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px 0 2px; flex-wrap: wrap;
+}
+.admin-pager .pager-size { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
+.admin-pager .pager-size .dropdown { display: inline-flex; }
+.admin-pager .pager-size .dropdown-trigger { width: auto; min-width: 56px; padding: 4px 6px; font-size: 12px; }
+
 .admin-play-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 13px; }
 .admin-play-table th, .admin-play-table td {
   text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);

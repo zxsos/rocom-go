@@ -389,11 +389,12 @@ export const adminStats = () => adminFetch('/api/admin/stats').then(async (r) =>
   return r.json()
 })
 
-// adminPlaySessions 游玩记录:{sessions:[{account,name,loginTime,logoutTime,duration,online}],
-// summary:{online,todaySessions,todayDuration,daily:[{day,sessions,duration}]}}。
-// account=账号过滤(空=全部);limit=明细条数(默认200)。
-export const adminPlaySessions = (account = '', limit = 200) =>
-  adminFetch('/api/admin/play-sessions?account=' + encodeURIComponent(account) + '&limit=' + limit)
+// adminPlaySessions 游玩记录(分页):{sessions:[{account,name,loginTime,logoutTime,duration,online}],
+// summary:{online,todaySessions,todayDuration,daily:[{day,sessions,duration}]}, total:总条数}。
+// account=账号过滤(空=全部);limit=每页条数(默认50,上限200);offset=跳过条数(默认0)。
+// total 与 sessions 同一筛选口径,供前端算总页数;summary 始终按全量计算,不随分页变化。
+export const adminPlaySessions = (account = '', limit = 50, offset = 0) =>
+  adminFetch('/api/admin/play-sessions?account=' + encodeURIComponent(account) + '&limit=' + limit + '&offset=' + offset)
     .then(async (r) => {
       if (!r.ok) throw await adminError(r, '拉取游玩记录失败')
       return r.json()
