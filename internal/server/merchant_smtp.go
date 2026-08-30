@@ -34,6 +34,9 @@ func (m *smtpSender) sendMerchantMailHTML(to, subject, htmlBody string, imgs []m
 func (m *smtpSender) smtpSendMail(to, subject, html string, imgs []merchantMailImg) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.sendFn != nil { // 测试注入,不真发信
+		return m.sendFn(to, subject, html, imgs)
+	}
 
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	conn, err := tls.DialWithDialer(dialer, "tcp", merchantSmtpHost+":465", &tls.Config{ServerName: merchantSmtpHost})

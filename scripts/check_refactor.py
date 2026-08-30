@@ -71,6 +71,13 @@ ALLOWED_REMOVED_FUNCS = {
     "handleAdminPlaceholder": "孤儿路由,前端已删唯一调用者",
 }
 
+# 重构后新增的函数:函数名 -> 新增理由。
+# 脚本的价值是「除登记在案者外不许变」,新增同样要登记 —— 否则每次新功能都会
+# 报「函数多出」,噪音一起,真正未登记的改动就没人看了。
+ALLOWED_NEW_FUNCS = {
+    "merchantClaim": "fix:同一槽并发触发重复发信,新增进程内认领(带冷却,不锁死失败重试)",
+}
+
 # 有意删除的零散代码行(正则,匹配归一化后的行)。两侧都剔除后再比对。
 ALLOWED_LINE_PATTERNS = [
     r"typesnapstruct\{",   # sweepInjects 里的死代码 type snap struct{...}
@@ -96,6 +103,8 @@ INTENTIONALLY_CHANGED = {
     # 阶段 2:调用点改为 s.snap.* / s.smtp.*
     "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*",
     "merchantResend": "阶段2:发信调用点改为 s.smtp.send*",
+    # fix:raw string 不转义,写在模板里的 \r\n 是四个字面字符,收件端可见 —— 改回真 CRLF 拼接
+    "merchantMailGroup": "fix:分组标题行的 \\r\\n 原本写在 raw string 里,是四个字面字符",
     "handleMerchantSub": "阶段2:发信调用点改为 s.smtp.send*,配置判定改为 s.smtp.configured()",
     "handleAdminMerchantSubs": "阶段2:配置判定改为 s.smtp.configured()",
     "handleAdminMerchantTestMail": "阶段2:发信调用点改为 s.smtp.send*",
@@ -264,6 +273,9 @@ def main():
             print(f"   ✗ 函数缺失: {name}")
             failed = True
         for name in sorted(set(nf) - set(of)):
+            if name in ALLOWED_NEW_FUNCS:
+                print(f"   已新增(允许): {name} —— {ALLOWED_NEW_FUNCS[name]}")
+                continue
             print(f"   ✗ 函数多出: {name}")
             failed = True
 

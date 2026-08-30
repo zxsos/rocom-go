@@ -394,6 +394,9 @@ type smtpSender struct {
 	mu   sync.Mutex
 	user string // 发件 QQ 邮箱;空=订阅提醒不可用
 	pass string // SMTP 授权码
+
+	// 测试注入:非 nil 时 smtpSendMail 改走它而不真连 QQ SMTP(见 merchant_notify_test.go)。
+	sendFn func(to, subject, html string, imgs []merchantMailImg) error
 }
 
 func newSMTPSender(user, pass string) *smtpSender {

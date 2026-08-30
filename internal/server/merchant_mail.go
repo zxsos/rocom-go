@@ -276,7 +276,9 @@ func merchantMailGroup(b *strings.Builder, title string, items []merchantItem, i
 	if len(items) == 0 {
 		return
 	}
-	fmt.Fprintf(b, `<div style="font-size:13px;font-weight:700;color:#a06a10;margin:16px 0 8px;padding-left:8px;border-left:3px solid #f0b429;">%s</div>\r\n`, html.EscapeString(title))
+	// 断行必须写成 `...` + "\r\n" 拼接:raw string(反引号)不做转义,直接写进
+	// 模板里的 \r\n 是四个字面字符,收件端会把它当文本显示出来。
+	fmt.Fprintf(b, `<div style="font-size:13px;font-weight:700;color:#a06a10;margin:16px 0 8px;padding-left:8px;border-left:3px solid #f0b429;">%s</div>`+"\r\n", html.EscapeString(title))
 	for _, it := range items {
 		merchantMailItemRow(b, it, imgs)
 	}
