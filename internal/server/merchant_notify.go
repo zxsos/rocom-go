@@ -38,14 +38,6 @@ const merchantClaimCooldown = 10 * time.Minute
 // 的槽在库里有记录,重启后也不会重发)。
 // 表只按当前营业日使用,认领时顺手清掉往日与过冷却的条目,不会长驻增长。
 func (s *Server) merchantClaim(slotStart time.Time) bool {
-	// 测试模式(临时):不认领、不冷却,每次调用都放行。
-	//
-	// 探测期间每分钟回源 8 次,货单切换后陆续补到的商品若被 10 分钟冷却挡住,
-	// 就观测不到「补货分批到达」这一现象 —— 探测的目的正是看清它。
-	// 删除测试模式时把这三行一并删掉(清单见仓库根目录 AI_merchant_probe.md)。
-	if merchantProbeOn.Load() {
-		return true
-	}
 	now := time.Now()
 	s.merchantClaimMu.Lock()
 	defer s.merchantClaimMu.Unlock()

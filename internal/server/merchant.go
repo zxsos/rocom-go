@@ -160,15 +160,6 @@ func (s *Server) merchantEnsure(now time.Time, force ...bool) {
 	if s.eggAPIKey == "" {
 		return
 	}
-	// 测试模式(临时):回源交给探测循环独占,免得 15 分钟一次的定时补查混进探测日志、
-	// 让「货单在哪一刻切换」变得说不清。仅管理面板的「强制刷新」放行,便于人工干预。
-	//
-	// 判据必须是 force 的**值**而不是 len(force):handleMerchant 每次都传 force 参数
-	// (?force=1 决定真假),玩家开一次页面就绕过短路了,探测定时被污染还查不出原因。
-	// 删除测试模式时把这一段一并删掉(清单见仓库根目录 AI_merchant_probe.md)。
-	if merchantProbeOn.Load() && (len(force) == 0 || !force[0]) {
-		return
-	}
 	if merchantDayStatus(now) == "idle" {
 		return
 	}

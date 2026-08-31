@@ -22,6 +22,14 @@ import {
 
 const TAU = Math.PI * 2
 
+// 跑图路线的三层描边(casing)与端点深色外环,照抄 styles/map.css 与 useRoutes.jsx
+// 的 RouteLayer:底图地形色不可控,靠深色外圈在亮背景(雪地/沙地)上勾边、
+// 白色内圈在暗背景(洞穴)上勾边,路线色始终浮在地形之上。
+const CASING_DARK = 'rgba(0,0,0,.5)'
+const CASING_LIGHT = 'rgba(255,255,255,.85)'
+const HALO = 'rgba(0,0,0,.5)'
+const HALO_W = 1.6
+
 // —— 图标缓存 ——
 // 图标与底图都是 /img/... 同域静态资源(见 components/icons.jsx 的 imgURL),
 // 画进 canvas 不会有 CORS 污染。缓存按 URL 复用 Image 对象,避免每帧新建。
@@ -232,8 +240,14 @@ function drawPaint(ctx, snap, origin, mapPx, scale) {
 }
 
 // 跑图路线:折线 + 起终点/到达点/下一目标/传送落点。几何口径照抄 RouteLayer
-// (useRoutes.jsx:331-394):路线点是 8192 画布坐标,除 GRID 得归一化坐标。
+// (useRoutes.jsx 的 RouteLayer):路线点是 8192 画布坐标,除 GRID 得归一化坐标。
+//
+// 与主地图一样走三层描边(casing),且**分三趟全量描**(所有路线的深色 → 所有路线的
+// 白色 → 所有路线的彩色):若按「一条路线画完三层再画下一条」,后画路线的深色描边
+// 会压在先画路线的彩线上,交叉处看着像被切断。
 function drawRoutes(ctx, snap, focus, mapPx, w, h, scale) {
+  // 先算好每条路线的屏幕折线(含断点标记),供三趟描边复用——避免重复投影。
+  const lines = []
   for (const r of snap.routes) {
     const pts = r.points
     if (!pts || pts.length < 2) continue
@@ -245,56 +259,97 @@ function drawRoutes(ctx, snap, focus, mapPx, w, h, scale) {
       if (Math.hypot(rest[i].x - rest[i - 1].x, rest[i].y - rest[i - 1].y) > ROUTE_TELEPORT) tele.add(i)
     }
     const at = (p) => worldToScreen(p.x / ROUTE_GRID, p.y / ROUTE_GRID, focus, mapPx, w, h)
+    // br = 从此点重起一条(首点或传送落点)
+    const path = rest.map((p, i) => ({ p: at(p), br: i === 0 || tele.has(i) }))
+    lines.push({ r, tele, path, from })
+  }
+  if (!lines.length) return
 
-    ctx.save()
-    ctx.strokeStyle = r.color
-    ctx.lineWidth = SIZES.routeWidth * scale
-    ctx.globalAlpha = 0.9
-    ctx.lineJoin = 'round'
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    let pen = false
-    for (let i = 0; i < rest.length; i++) {
-      const p = at(rest[i])
-      // 断点处重起一条:只在大概率可见时才画,长线即便完全出界也只是一段直线。
-      if (i === 0 || tele.has(i)) { ctx.moveTo(p.x, p.y); pen = true }
-      else if (pen) ctx.lineTo(p.x, p.y)
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  const strokePass = (width, alpha, colorOf) => {
+    for (const l of lines) {
+      ctx.strokeStyle = colorOf(l.r)
+      ctx.lineWidth = width * scale
+      ctx.globalAlpha = alpha
+      ctx.beginPath()
+      let pen = false
+      for (const it of l.path) {
+        if (it.br) { ctx.moveTo(it.p.x, it.p.y); pen = true }
+        else if (pen) ctx.lineTo(it.p.x, it.p.y)
+      }
+      ctx.stroke()
     }
-    ctx.stroke()
-    ctx.globalAlpha = 1
+  }
+  strokePass(SIZES.routeCasingDark, 1, () => CASING_DARK)
+  strokePass(SIZES.routeCasingLight, 1, () => CASING_LIGHT)
+  strokePass(SIZES.routeWidth, 0.9, (r) => r.color)
+  ctx.globalAlpha = 1
 
-    // 传送落点:路线色菱形(10×10 rotate 45)+ 白描边 + 白心
+  for (const { r, tele, path, from } of lines) {
+    // 传送落点:路线色菱形(10×10 rotate 45)+ 深色外环 + 白描边 + 白心
     for (const i of tele) {
-      const p = at(rest[i])
+      const p = path[i].p
       if (!inView(p.x, p.y, w, h)) continue
-      dot(ctx, p.x, p.y, SIZES.routeTeleport * scale, r.color, '#fff', 1.8 * scale, true)
+      node(ctx, p.x, p.y, SIZES.routeTeleport * scale, r.color, 1.8 * scale, scale, true)
       dot(ctx, p.x, p.y, 3 * scale, '#fff', null, 0)
     }
 
-    const s = at(rest[0])
-    const e = at(rest[rest.length - 1])
-    // 跟走开始后起点圆消失,改由「已到达点」(路线色)标记;否则画白心起点圆。
+    const s = path[0].p
+    const e = path[path.length - 1].p
+    // 跟走开始后起点圆消失,改由「已到达点」(路线色)标记;否则画白心起点圆
+    // (白+黑本身就是双色,任何底图上都看得见,故不套外环)。
     const showStart = !r.follow || r.progress < 0
     if (showStart && inView(s.x, s.y, w, h)) {
       dot(ctx, s.x, s.y, SIZES.routeStart * scale, '#fff', '#000', 1.5 * scale)
     }
     if (!showStart && inView(s.x, s.y, w, h)) {
-      dot(ctx, s.x, s.y, SIZES.routeArrived * scale, r.color, '#fff', 1.5 * scale)
+      node(ctx, s.x, s.y, SIZES.routeArrived * scale, r.color, 1.5 * scale, scale)
     }
     if (inView(e.x, e.y, w, h)) {
-      dot(ctx, e.x, e.y, SIZES.routeEnd * scale, r.color, '#fff', 1.2 * scale)
+      node(ctx, e.x, e.y, SIZES.routeEnd * scale, r.color, 1.2 * scale, scale)
     }
 
-    // 下一目标点:路线色大圆 + 白描边 + 白心(跟走模式下才存在)
-    if (r.follow && r.progress >= 0 && r.progress + 1 < pts.length) {
-      const nx = at(pts[r.progress + 1])
+    // 下一目标点:路线色大圆 + 深色外环 + 白描边 + 白心(跟走模式下才存在)。
+    // path 是 rest(从 from 起)的投影,故下标要减掉 from。
+    const ni = r.progress + 1 - from
+    if (r.follow && r.progress >= 0 && r.progress + 1 < r.points.length && ni >= 0 && ni < path.length) {
+      const nx = path[ni].p
       if (inView(nx.x, nx.y, w, h)) {
-        dot(ctx, nx.x, nx.y, SIZES.routeNext * scale, r.color, '#fff', 2 * scale)
+        node(ctx, nx.x, nx.y, SIZES.routeNext * scale, r.color, 2 * scale, scale)
         dot(ctx, nx.x, nx.y, SIZES.routeNextCore * scale, '#fff', null, 0)
       }
     }
-    ctx.restore()
   }
+  ctx.restore()
+}
+
+// node 画一个路线端点:深色外环 + 白描边 + 填充色。亮底图(雪地/沙地)靠深色外环勾边,
+// 暗底图靠白描边,路线色始终浮在地形之上 —— 与主地图 RouteLayer 的端点三层描边一致。
+// r 是圆半径(菱形时是边长),sw 是白描边宽;两者均由调用方乘过 scale。
+function node(ctx, x, y, r, fill, sw, scale, diamond = false) {
+  if (r <= 0) return
+  const hw = HALO_W * scale
+  if (diamond) {
+    const side = r + sw + hw // 紧贴菱形 + 白描边的外沿
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(Math.PI / 4)
+    ctx.beginPath()
+    ctx.rect(-side / 2, -side / 2, side, side)
+    ctx.strokeStyle = HALO
+    ctx.lineWidth = hw
+    ctx.stroke()
+    ctx.restore()
+  } else {
+    ctx.beginPath()
+    ctx.arc(x, y, r + (sw + hw) / 2, 0, TAU)
+    ctx.strokeStyle = HALO
+    ctx.lineWidth = hw
+    ctx.stroke()
+  }
+  dot(ctx, x, y, r, fill, '#fff', sw, diamond)
 }
 
 // dot 画一个带描边的圆点(路线图的各种端点共用)。diamond=true 时画菱形(传送落点)。

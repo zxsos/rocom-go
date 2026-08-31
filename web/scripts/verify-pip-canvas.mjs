@@ -21,6 +21,10 @@
 // 到圆周只渐隐到 50% 而非全透。中心必须仍为全实这条尤其要紧 —— 曾有次改动
 // 直接给头像整体加 opacity:.5,那会让**中心也变半透**(把主体也弄虚了),
 // 与本需求「只改周围那圈」不符;断言中心 = 1.0 正好能把两种改法区分开。
+//
+// DOM 侧的同一套判据见 FEATHER 段末尾:主地图走 CSS(map.css 的 .map-wild-face),
+// 是**独立于 canvas 的另一条渲染链**,两边参数靠注释互指同步,注释会失效 ——
+// 故用真实 CSS 渲染一个标记、截图逐像素量一遍,把「两条链一致」变成断言。
 
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
@@ -216,6 +220,91 @@ try {
     check('头像中心仍是全实(未被整体弄半透)', feather.center > 250,
       `中心 alpha=${feather.center}, 期望 255`)
   }
+
+  // —— DOM 侧头像羽化:与上面 canvas 段同一套判据,但走真实 CSS ——
+  // 上面那组只证明 canvas 版画对了,DOM 版(map.css 的 .map-wild-face)是**另一条
+  // 渲染链**,改错了它照样错。二者的参数靠注释互指保持同步,而注释会失效 —— 故直接
+  // 用真实 CSS 渲染一个标记、截图逐像素量一遍,把「两条链一致」变成可执行断言。
+  //
+  // 这条尤其要紧:mask 写 radial-gradient(circle at 50% 50%, ...) 时,circle 默认按
+  // **farthest-corner** 定尺寸,而头像是正方形 —— 渐变 100% 落在角上(距中心 1.414×
+  // 半径),可见圆边只在 0.707 处,半透明那一段大半落在被 border-radius 裁掉的角里,
+  // 实测圆周 alpha 只剩 .83,需求「周围那圈半透」等于没生效。必须 closest-side。
+  //
+  // 量法:纯红实心图叠在**白底**上截图,红叠白后 G = 255×(1-alpha),故
+  // alpha = 1 − G/255。沿水平中线从中心扫到圆周,取归一化半径 0.6 / 1.0 两点。
+  const FBOX = 60 // 放大到 60px 采样,与 30px 几何比例一致
+  await page.evaluate(async ({ size, img }) => {
+    // 清掉 app 自己渲染的 UI:取样框就放在 (0,0),顶栏/图标会盖上去,截图会把
+    // 别人的像素一起拍进来。只清 body、保留 <head> —— map.css 是 app 在 <head>
+    // 里注入的(vite dev 把 CSS 转成 JS 注入样式表),连 head 一起换掉就量不到真样式了
+    // (试过 setContent 空页再 import('/src/styles/map.css'),样式表数为 0,没生效)。
+    document.body.innerHTML = ''
+    document.body.style.cssText = 'margin:0;background:#fff'
+    const box = document.createElement('div')
+    box.id = '__feather_dom__'
+    box.className = 'map-wild'
+    // 去掉 translate(-50%,-50%) 与描边:前者会把标记挪出视口,后者的灰色环
+    // 会混进边缘采样。这里只关心 .map-wild-face 的遮罩,不关心外框装饰。
+    box.style.cssText = `position:absolute;left:0;top:0;width:${size}px;height:${size}px;
+      transform:none;border:0;filter:none`
+    const face = document.createElement('img')
+    face.id = '__feather_face__'
+    face.className = 'map-wild-face'
+    // min-width/height:0 不能省:.map-wild 是 flex 容器,而 flex 子项的自动最小尺寸
+    // 是**内容固有尺寸** —— img 会撑到测试图的固有 64px 而不吃 width:100%,
+    // 取样就不再是正方形。(真实页面有全局 img 重置兜着,这里空页面没有。)
+    face.style.cssText = 'min-width:0;min-height:0'
+    face.src = img
+    box.appendChild(face)
+    document.body.appendChild(box)
+    await face.decode()
+  }, { size: FBOX, img: SOLID_PATH })
+
+  const shotBuf = await page.locator('#__feather_face__').screenshot()
+  if (process.env.DUMP_FEATHER) {
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(process.env.DUMP_FEATHER, shotBuf)
+  }
+  const shot = shotBuf.toString('base64')
+  const domProfile = await page.evaluate(async (b64) => {
+    const im = new Image()
+    im.src = 'data:image/png;base64,' + b64
+    await im.decode()
+    const c = document.createElement('canvas')
+    c.width = im.width; c.height = im.height
+    const ctx = c.getContext('2d', { willReadFrequently: true })
+    ctx.drawImage(im, 0, 0)
+    const d = ctx.getImageData(0, 0, im.width, im.height).data
+    const y = Math.floor(im.height / 2)
+    const cx = im.width / 2
+    const r = im.width / 2 // 内切圆半径 = 半边长
+    const at = (t) => { // t 为归一化半径,取最接近的那一列
+      const x = Math.min(im.width - 1, Math.round(cx + t * r) - 1)
+      const i = (y * im.width + x) * 4
+      // 红叠白:R 恒 255,G = 255×(1-alpha)
+      return { a: d[i + 3] === 0 ? 0 : 1 - d[i + 1] / 255, rgba: [d[i], d[i + 1], d[i + 2], d[i + 3]] }
+    }
+    const c0 = at(0), e0 = at(0.97)
+    return {
+      center: c0.a, inner: at(0.55).a, edge: e0.a, w: im.width, h: im.height,
+    }
+  }, shot)
+
+  if (domProfile.w !== FBOX) {
+    check('DOM 头像羽化可测量', false, `截图尺寸 ${domProfile.w},期望 ${FBOX}`)
+  } else {
+    check('DOM 头像边缘羽化到 50%(圆周处半透)',
+      Math.abs(domProfile.edge - 0.5) < 0.12,
+      `圆周 alpha=${domProfile.edge.toFixed(3)},期望 0.5±0.12`)
+    check('DOM 头像中心仍是全实(未被整体弄半透)', domProfile.center > 0.97,
+      `中心 alpha=${domProfile.center.toFixed(3)},期望 1.0`)
+    // 与 canvas 侧对齐:两条渲染链同一套视觉,差太多就说明有一边改漏了
+    check('DOM 与 canvas 羽化一致(两条渲染链)',
+      feather.error ? false : Math.abs(domProfile.edge - feather.edge / 255) < 0.12,
+      feather.error ? 'canvas 侧未测出,无法比对' : `DOM ${domProfile.edge.toFixed(3)} vs canvas ${(feather.edge / 255).toFixed(3)}`)
+  }
+  await page.evaluate(() => document.getElementById('__feather_dom__')?.remove())
 
   check('绘制过程无 JS 错误', errors.length === 0, errors.slice(0, 2).join(' | '))
 } catch (e) {
