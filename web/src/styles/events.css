@@ -21,7 +21,10 @@
   transition: border-color .15s ease;
 }
 .stat-card:hover { border-color: var(--accent); }
-.stat-num { font-size: 18px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+/* 展示数字用 --font-num:这些是整个页面最该被一眼看到的数。
+   tabular-nums 仍需保留 —— Bricolage 的比例数字不等宽,等宽靠这个属性打开;
+   字体加载失败回退系统字体时,也靠它保证各位对齐。 */
+.stat-num { font-size: 18px; font-weight: 700; line-height: 1.2; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 12px; color: var(--fg-dim); }
 .stat-chart {
   display: flex; align-items: flex-end; gap: 2px; height: 100%; min-height: 72px; padding: 8px 8px 4px;
@@ -51,9 +54,38 @@
 .event {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line);
   border-radius: var(--radius); background: var(--bg-1);
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
 }
-.event:hover { border-color: var(--accent); background: var(--bg-2); }
+/* hover 三件套:变色 + 抬升 + 投影。只有「变色」时,行与背景是同色系,
+   指针停在两行之间很难确认到底选中的是哪一行;抬 1px 给出的是**位置**反馈,
+   与颜色无关,暗色亮色都成立。
+   包在 (hover:hover) 里:触屏上 :hover 会在点完后**粘住**直到点别处,
+   抬起来的行一直不落回去,看着像卡住了。 */
+@media (hover: hover) {
+  .event:hover {
+    border-color: var(--accent); background: var(--bg-2);
+    transform: translateY(var(--lift)); box-shadow: var(--shadow-lift);
+  }
+}
+/* 事件入场:逐条上浮(前 8 项递增 30ms,之后不再加延迟 —— 一屏几十条,
+   每项都加延迟会让末尾那条晚一秒才出现,像是卡了)。
+   新事件由 SSE 从顶部推入时也会播这一条:那正是想要的效果 ——
+   「刚抓到一只」这件事被看见,而不是无声地出现在列表顶端。
+   用 both:动画结束前的首帧也是 from 态,不会先闪一下不透明的元素。 */
+@keyframes event-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.event-list > * { animation: event-in .28s ease-out both; }
+.event-list > *:nth-child(1) { animation-delay: 0s; }
+.event-list > *:nth-child(2) { animation-delay: .03s; }
+.event-list > *:nth-child(3) { animation-delay: .06s; }
+.event-list > *:nth-child(4) { animation-delay: .09s; }
+.event-list > *:nth-child(5) { animation-delay: .12s; }
+.event-list > *:nth-child(6) { animation-delay: .15s; }
+.event-list > *:nth-child(7) { animation-delay: .18s; }
+.event-list > *:nth-child(8) { animation-delay: .21s; }
+/* 高亮命中(hl)的事件本来就有金边 + 金色底,再叠位移会把它和相邻行的
+   对齐关系打乱(列表是竖着扫的,一行凸出来反而割裂);故只保留淡入。 */
+.event-list > .event.hl { animation-name: event-fade-in; }
+@keyframes event-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* 序号/名称/时间同一行,时间靠右;空间不足时时间换行到下一行仍靠右 */
 .event-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }

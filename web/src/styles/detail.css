@@ -80,7 +80,10 @@ img.evo-avatar { object-fit: cover; }
   content: attr(data-tip);
   position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
   margin-bottom: 6px; padding: 6px 10px; border-radius: 8px;
-  background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
+  /* 底色/字色/描边走 --tip-* 一组变量(见 base.css):气泡在明暗主题下都是反白的
+     深底浅字(它是浮在内容之上的第三层,跟着主题翻浅会失去边界),
+     原先写死 #0b0e13 时描边却取 --line —— 亮色主题下那是浅灰,近黑底配浅灰边很脏。 */
+  background: var(--tip-bg); color: var(--tip-fg); border: 1px solid var(--tip-line);
   font-size: 12px; font-weight: 400; line-height: 1.4;
   width: max-content; max-width: 220px; white-space: normal; text-align: left;
   opacity: 0; pointer-events: none; transition: opacity .12s; z-index: var(--z-popover); box-shadow: var(--shadow);
@@ -94,7 +97,7 @@ img.evo-avatar { object-fit: cover; }
    的 overflow 裁剪与常驻滚动条问题);定位由 JS 计算(默认上方/自动翻转)。 */
 .tip-pop {
   position: fixed; padding: 6px 10px; border-radius: 8px;
-  background: #0b0e13; color: #e6edf3; border: 1px solid var(--line);
+  background: var(--tip-bg); color: var(--tip-fg); border: 1px solid var(--tip-line);
   font-size: 12px; font-weight: 400; line-height: 1.5;
   white-space: nowrap; text-align: left;
   pointer-events: none; z-index: var(--z-modal); box-shadow: var(--shadow);

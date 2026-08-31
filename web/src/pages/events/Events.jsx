@@ -8,6 +8,7 @@ import { useAsyncData } from '../../hooks/useAsyncData'
 import { Avatar } from '../../components/avatar'
 import { Marks, Blood, Gender } from '../../components/badges'
 import { PetDetailModal } from '../../components/PetDetailModal'
+import { TweenNumber } from '../../components/TweenNumber'
 import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
 import { chime, rareChime } from '../../utils/audio'
 import { sanitizeRules, isHighlight, NOTABLE_BLOODS } from './highlight'
@@ -137,22 +138,24 @@ export default function Events() {
         {statsOpen && stats && (
           <div className="event-stats">
             <div className="stat-cards">
+              {/* 统计数字用 TweenNumber:新事件推入时这些数会 +1,
+                  滚动一下让「刚抓住一只」这件事被看见(组件注释见 components/TweenNumber.jsx)。 */}
               <div className="stat-card">
-                <div className="stat-num">{stats.total}</div>
+                <div className="stat-num"><TweenNumber value={stats.total} /></div>
                 <div className="stat-label">累计获得</div>
               </div>
               {['捕捉', '孵蛋', '赠送获得', '获得'].map((k) => (stats.bySubKind[k] || 0) > 0 && (
                 <div className="stat-card" key={k}>
-                  <div className="stat-num">{stats.bySubKind[k]}</div>
+                  <div className="stat-num"><TweenNumber value={stats.bySubKind[k]} /></div>
                   <div className="stat-label">{k}</div>
                 </div>
               ))}
               <div className="stat-card">
-                <div className="stat-num">{stats.shiny}</div>
+                <div className="stat-num"><TweenNumber value={stats.shiny} /></div>
                 <div className="stat-label">异色</div>
               </div>
               <div className="stat-card">
-                <div className="stat-num">{stats.colorful}</div>
+                <div className="stat-num"><TweenNumber value={stats.colorful} /></div>
                 <div className="stat-label">炫彩</div>
               </div>
             </div>

@@ -13,7 +13,7 @@
 }
 .boxmap-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .boxmap-btn:active:not(:disabled) { transform: scale(.94); }
-.boxmap-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.boxmap-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .boxmap-btn:disabled { opacity: 0.35; cursor: default; }
 /* 预留 6 排高度(队伍 6×3 最高),切换容器时下方筛选条件不上下抖动 */
 .boxmap-grid { display: grid; gap: 4px; justify-content: center; align-content: start; min-height: 260px; }
@@ -44,6 +44,12 @@ table.pets .pet-name, table.pets .pet-sub {
 }
 table.pets tr:last-child td { border-bottom: none; }
 table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
+/* 表格行的 hover **只用底色,不用抬升**,两条原因:
+   1. transform 作用在 display:table-row 上是未定义行为(规范未要求),
+      各浏览器表现不一致,且会让它脱离表格的渲染流程、破坏上面 sticky 的 thead;
+   2. 表格是「一整片一起看」的,抬一行出来会打断列与列的对齐关系 ——
+      而这里恰恰要逐列对比(六维、身高体重百分位)。
+   底色已经够解决「指针在哪一行」了(一行 10 列,横向扫读需要这条引导)。 */
 table.pets tr:hover td { background: var(--bg-2); }
 table.pets tbody tr { cursor: pointer; user-select: none; transition: background .1s ease; }
 table.pets tr.selected td { background: var(--accent-soft); }
@@ -56,6 +62,11 @@ table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent);
 
 /* 移动卡片(默认隐藏) */
 .cards { display: none; }
+/* 卡片 hover:可点(有下面的 :active 佐证),故走三件套。
+   与桌面表格行的处理不同 —— 见下面 table.pets tbody tr:hover 处的注释。 */
+@media (hover: hover) {
+  .card:hover { border-color: var(--accent); transform: translateY(var(--lift)); box-shadow: var(--shadow-lift); }
+}
 .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 
 /* 分页 */

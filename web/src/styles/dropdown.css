@@ -9,7 +9,7 @@
   transition: border-color .15s ease, background .15s ease;
 }
 .dropdown-trigger:hover { border-color: var(--accent); background: var(--accent-soft); }
-.dropdown-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dropdown-trigger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .dropdown-trigger:disabled { opacity: .5; cursor: not-allowed; }
 .dropdown-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 触发按钮上的弱化副文本(如花种槽位数量) */

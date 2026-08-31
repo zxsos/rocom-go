@@ -21,9 +21,11 @@ const initialOf = (name) => {
   return ch.length === 1 && ch >= 'a' && ch <= 'z' ? ch.toUpperCase() : ch
 }
 
-// 头像尺寸位:**只有微信头像域名** thirdwx.qlogo.cn 的直链末段才是尺寸
-// (0/46/64/96/132,见 docs/api/schemas.md)。原样用 132 在触发条上是 5 倍过采样 ——
-// 最大的一处是手机 sheet 的 36px,2x 屏也只要 72px,故降到 96。
+// 头像尺寸位:**只有 qlogo.cn 平台头像域名**的直链末段才是尺寸。
+// 两个域名的可用尺寸位不同(实测探测,不可互换):
+//   - 微信 thirdwx.qlogo.cn(https):0/46/64/96/132 → 降到 96(触发条最大 36px,2x 屏 72px)
+//   - QQ   thirdqq.qlogo.cn(http):  40/100/140/640 → 回包就是 100(3.4KB),原样用
+//     ⚠️ 把它改成 /96 会 400,整图请求直接失败 → 头像破图。
 //
 // ⚠️ 必须**按域名限定**,不能只判「末段是纯数字」:实测登录回包里还有另一类地址
 // photo-prod.nrc.qq.com/<uid>/card/<一串数字>,末段那个是**图片 ID 而不是尺寸** ——
@@ -37,6 +39,7 @@ const sized = (url) => {
   } catch {
     return url // 解析不了就别动,让 <img> 自己去失败
   }
+  if (host === 'thirdqq.qlogo.cn') return url
   if (host !== 'thirdwx.qlogo.cn') return url
   return /^https:\/\/\S+\/\d+$/.test(url) ? url.replace(/\/\d+$/, '/' + AVATAR_SIZE) : url
 }

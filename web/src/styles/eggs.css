@@ -22,19 +22,23 @@
 .incu-tip-bubble {
   position: absolute; left: 50%; bottom: calc(100% + 7px); transform: translateX(-50%);
   padding: 6px 10px; border-radius: 8px;
-  background: rgba(11, 14, 19, .94); color: #e6edf3;
-  border: 1px solid var(--line); box-shadow: var(--shadow);
+  background: rgba(var(--tip-bg-rgb), .94); color: var(--tip-fg);
+  border: 1px solid var(--tip-line); box-shadow: var(--shadow);
   font-size: 12px; font-weight: 400; line-height: 1.5; white-space: nowrap;
   z-index: var(--z-tip); pointer-events: auto;
 }
 .incu-tip-bubble::after {
   content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border: 5px solid transparent; border-top-color: rgba(11, 14, 19, .94);
+  /* 小箭头的颜色必须与气泡底色**同一个变量**:原先这里写死 rgba(11,14,19,.94),
+     改气泡底色时箭头不会跟着变,会留下一条颜色对不上的三角。
+     注意它不能直接用 var(--tip-bg) —— 气泡是半透明的(.94),箭头若用实心
+     变量会在与气泡相接处露出一条更实的色差,故同样取 rgb 分量 + .94。 */
+  border: 5px solid transparent; border-top-color: rgba(var(--tip-bg-rgb), .94);
 }
 /* 窄屏:气泡改在图标下方弹出,避免顶到视口上沿 */
 @media (max-width: 560px) {
   .incu-tip-bubble { bottom: auto; top: calc(100% + 7px); }
-  .incu-tip-bubble::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(11, 14, 19, .94); }
+  .incu-tip-bubble::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(var(--tip-bg-rgb), .94); }
 }
 
 /* 孵蛋器空格子:虚线框,与卡片同宽,占位说明「这一格还能放一颗」 */
@@ -76,9 +80,19 @@
 .egg-card {
   border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1);
   padding: 10px; display: flex; flex-direction: column; gap: 8px;
-  box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
-.egg-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(var(--c-accent-rgb), .12); }
+/* 蛋卡的 hover 补上抬升(三件套的第三件)。
+   投影**保留蓝色调**不走 --shadow-lift:这张卡的静态影子是中性黑(--shadow-sm),
+   换成蓝等于「影子变了颜色」,反而突兀;而这里的蓝本就与边框的 accent 同色,
+   是「发光的边」而不是「浮起的卡」,与中性投影是两种语言,故不强行统一。 */
+@media (hover: hover) {
+  .egg-card:hover {
+    border-color: var(--accent);
+    transform: translateY(var(--lift)); box-shadow: 0 4px 14px rgba(var(--c-accent-rgb), .12);
+  }
+}
 
 /* 头部:蛋图 | 名称+奖牌标签 | 品类角标+孵出物种头像 */
 .egg-head { display: flex; align-items: flex-start; gap: 8px; }
