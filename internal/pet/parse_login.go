@@ -1,6 +1,8 @@
 package pet
 
 import (
+	"bytes"
+
 	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/whoisnian/rocom-capture/internal/wire"
@@ -54,6 +56,47 @@ func ParseLoginCoins(body []byte) (coins int64, ok bool) {
 		return false
 	})
 	return coins, ok
+}
+
+// avatarURLPrefix / avatarMinLen / avatarMaxLen 是识别头像 URL 的特征。
+//
+// 只认 https:// 开头:平台头像一律 https,顺带挡掉 javascript: 之类的伪协议
+// (URL 会经 /api/accounts 下发到前端,前端可能直接塞进 <img src>)。
+const (
+	avatarURLPrefix = "https://"
+	avatarMinLen    = 32
+	avatarMaxLen    = 512
+)
+
+// ParseLoginAvatar 从 ZoneLoginRsp(0x0102)取玩家平台头像 URL。
+//
+// 目标字段是 player_info.brief_info.additional_data.plat_avatar_url(实测微信直链
+// https://thirdwx.qlogo.cn/mmopen/.../132,末段换成 0/46/64/96/132 可取不同尺寸)。
+// 与 ParseLoginCoins 同理:**真实 wire 与 all.pb 描述符存在版本偏移,字段号不可信**,
+// 故不按字段号下钻,而在全包内按「以 https:// 开头、长度适中、纯可打印 ASCII 的短串」
+// 唯一定位 —— 实测整条登录回包只有这一处 URL(pcapdump 转储核对,见 0x0102.md)。
+// 将来若包里出现第二个 https URL(如公告 CDN),需在这里加域名白名单收紧。
+//
+// 取不到(游客号/未绑定平台/版本变更)返回 ok=false,调用方据此**保留旧头像**而非清空。
+func ParseLoginAvatar(body []byte) (url string, ok bool) {
+	wire.Walk(body, func(v []byte) bool {
+		if ok || len(v) < avatarMinLen || len(v) > avatarMaxLen {
+			return true
+		}
+		if !bytes.HasPrefix(v, []byte(avatarURLPrefix)) {
+			return true
+		}
+		for _, c := range v {
+			// 空白/控制字符/非 ASCII:URL 里不该出现(空格会编码成 %20)。出现即说明这是
+			// 误命中的二进制 —— 拼进 <img src> 会破坏属性、写进日志会污染行结构。
+			if c <= 0x20 || c >= 0x7f {
+				return true
+			}
+		}
+		url, ok = string(v), true
+		return false // 已命中,不必再下钻该值内部
+	})
+	return url, ok
 }
 
 // MedalOwn 是一只宠物拥有的一枚奖牌(来自登录数据的 PetMedalInfo)。

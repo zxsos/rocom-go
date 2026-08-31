@@ -1,6 +1,7 @@
 package pet
 
 import (
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -44,6 +45,52 @@ func TestParseLoginCoins(t *testing.T) {
 	}
 	if coins != 19517164 {
 		t.Fatalf("期望洛克贝 19517164,实际 %d", coins)
+	}
+}
+
+// realAvatarURL 是实测登录回包里的 plat_avatar_url(见 0x0102.md / docs/data.md),
+// 用它做正例比自造串更有说服力:长度、域名、末段尺寸位都是线上真实形态。
+const realAvatarURL = "https://thirdwx.qlogo.cn/mmopen/vi_32/WQeT2Lics9YRUhcrGicibpbPbvtK7Pqr5LFX1jWsG2rPXK1DLa6NujQdYLqmzkxWGvl5XDMtK5Xey47IJlGAvm14lWfNsvd2QXicNOehwH9BBBo/132"
+
+// buildLoginAvatarBody 拼登录 body:{ #2: LoginData{ #1: base{ #7: addi{ #3: <payload> } } } }。
+// 解析按特征定位而非字段号(真实 wire 与描述符有版本偏移),故这里字段号随便取 ——
+// 只要嵌套在 bytes 里就该被 Walk 翻到。base 内另塞昵称 bytes,确认它不会被误当 URL。
+func buildLoginAvatarBody(payload string) []byte {
+	base := protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), []byte("示例玩家"))
+	addi := protowire.AppendBytes(protowire.AppendTag(nil, 3, protowire.BytesType), []byte(payload))
+	base = protowire.AppendBytes(protowire.AppendTag(base, 7, protowire.BytesType), addi)
+	data := protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), base)
+	return protowire.AppendBytes(protowire.AppendTag(nil, 2, protowire.BytesType), data)
+}
+
+func TestParseLoginAvatar(t *testing.T) {
+	got, ok := ParseLoginAvatar(buildLoginAvatarBody(realAvatarURL))
+	if !ok {
+		t.Fatalf("期望解析成功,实际 ok=false")
+	}
+	if got != realAvatarURL {
+		t.Fatalf("期望 %q,实际 %q", realAvatarURL, got)
+	}
+}
+
+func TestParseLoginAvatarRejects(t *testing.T) {
+	long := "https://thirdwx.qlogo.cn/mmopen/vi_32/" + strings.Repeat("a", 80)
+	cases := []struct {
+		name    string
+		payload string
+	}{
+		{"无 URL", "示例玩家"},
+		{"http 明文", strings.Replace(long, "https://", "http://", 1)},
+		{"过短", "https://a.cn"},
+		{"含空格", strings.Replace(long, "mmopen", "mm open", 1)},
+		{"含换行(日志注入)", long + "\nSetAccountAvatar 失败"},
+		{"含非 ASCII", long + "头像"},
+		{"超长", "https://thirdwx.qlogo.cn/" + strings.Repeat("a", 600)},
+	}
+	for _, c := range cases {
+		if got, ok := ParseLoginAvatar(buildLoginAvatarBody(c.payload)); ok {
+			t.Errorf("%s: 期望解析失败,实际 ok=true url=%q", c.name, got)
+		}
 	}
 }
 

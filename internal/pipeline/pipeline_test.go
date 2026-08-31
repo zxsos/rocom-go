@@ -290,6 +290,35 @@ func TestWhitelistBlocks(t *testing.T) {
 	}
 }
 
+// TestRegisterLoginAvatar 端到端验证头像:登录回包里的头像 URL 落到 accounts.avatar
+// 并出现在 /api/accounts 的响应里(前端消费的就是这一条)。
+//
+// 只测解析 + 落盘 + 读出的接线;URL 形态的边界由 pet 包的用例覆盖。
+func TestRegisterLoginAvatar(t *testing.T) {
+	const url = "https://thirdwx.qlogo.cn/mmopen/vi_32/WQeT2Lics9YRUhcrGicibpbPbvtK7Pqr5LFX1jWsG2rPXK1DLa6NujQdYLqmzkxWGvl5XDMtK5Xey47IJlGAvm14lWfNsvd2QXicNOehwH9BBBo/132"
+	p, _ := newTestPipeline(t)
+
+	// 把头像 bytes 挂在登录包顶层:解析按特征定位(见 pet.ParseLoginAvatar),
+	// 层级无关,不必复刻真实的嵌套路径。
+	withAvatar := append(loginBody(1, "测试"), protowire.AppendTag(nil, 9, protowire.BytesType)...)
+	withAvatar = protowire.AppendBytes(withAvatar, []byte(url))
+	p.handle(msg(gcp.S2C, pet.OpLoginRsp, withAvatar))
+
+	accs, err := p.st.ListAccounts()
+	if err != nil {
+		t.Fatalf("ListAccounts: %v", err)
+	}
+	var got string
+	for _, a := range accs {
+		if a.Account == testAcc {
+			got = a.Avatar
+		}
+	}
+	if got != url {
+		t.Fatalf("accounts.avatar = %q, 期望 %q", got, url)
+	}
+}
+
 func abs(f float64) float64 {
 	if f < 0 {
 		return -f

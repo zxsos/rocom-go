@@ -1452,6 +1452,21 @@ s2c 0x1346 DATA 明文 body
   (`pet.ParseLoginAccount`,实测两用户 10001/100000004)。按 user_id 而非客户端 IP 归属
   (多台设备常经 NAT 共用同一 IP,无法区分);各账号数据在同库内按 `account` 列隔离,
   详见 [服务架构](architecture.md) 第 5 节「多账号隔离」。
+- **玩家平台头像**:同在 `0x0102`,字段 `plat_avatar_url`(微信直链
+  `https://thirdwx.qlogo.cn/mmopen/vi_32/.../132`,末段为尺寸位,换 `0`/`46`/`64`/`96`
+  取不同分辨率),存 `accounts.avatar`,经 `/api/accounts` 下发。
+  **定位方式:不按字段号下钻,而在全包内按「`https://` 开头 + 长度 32~512 + 纯可打印
+  ASCII(无空白/非 ASCII)」特征唯一命中**(`pet.ParseLoginAvatar`)—— 与洛克贝同理,
+  真实 wire 与 all.pb 描述符存在版本偏移,字段号不可信。实测整条登录回包只有这一处 URL。
+  两个硬约束,改代码时务必保留:
+  1. **只认 `https://`**:顺带挡掉 `javascript:` 等伪协议 —— 该串会被前端直接塞进
+     `<img src>`;非 ASCII/空白一并拒绝,否则拼进属性会破坏结构、写进日志会注入换行。
+  2. **取不到时保留旧值**(`store.SetAccountAvatar` 忽略空串):快速登录回包不带头像,
+     若空串覆盖,玩家头像会莫明消失。
+  ⚠️ **隐私**:真人社交账号头像,敏感度高于昵称与 UID。后端原样下发 = 局域网内可见,
+  **勿公网部署**;前端渲染必须挂 `.privacy` 纳入截图防泄(约束双写于
+  `docs/api/schemas.md` 与 `internal/store/account.go` 的 `Avatar` 注释)。
+  将来若登录包出现第二个 `https://` URL(如公告 CDN),需在此处加域名白单收紧。
 - **宠物减少途径已覆盖**:游戏内无「删除宠物」操作入口,玩家能主动减少宠物的途径只有放生
   (`ZONE_PET_FREE_RSP(0x01c5)`)与赠送(共同捕捉转赠 `0x1808`),二者均已接入(见上)。
   协议里虽存在 `DELETE_REQ(397)`,但无对应 UI 入口、玩家不可触发,故无需接入。

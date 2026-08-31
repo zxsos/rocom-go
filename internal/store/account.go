@@ -23,6 +23,17 @@ type AccountInfo struct {
 	// Title 是该账号今天佩戴的排行榜称号(大富翁/赚钱王/败家子),无则空串。
 	// 由 server 层在 ListAccounts 后按当日称号合并填充。
 	Title string `json:"title"`
+	// Avatar 是玩家平台头像 URL(登录回包 plat_avatar_url,微信直链,可直接 <img src>);
+	// 空串表示尚未取到(游客号/未绑平台),故带 omitempty。
+	//
+	// ⚠️ 隐私(改这里前先读):这是**真人社交账号头像**,敏感度高于昵称与 UID ——
+	// 看图认人比看昵称还准。两层约束,缺一不可:
+	//   1. 后端:/api/accounts 原样下发,能打开页面的人就能看到,与昵称/洛克贝同级的
+	//      暴露面。本服务面向局域网自建,**不要外放到公网**。
+	//   2. 前端:渲染时必须挂 `.privacy`(全局截图防泄,见 web/src/styles/shell.css),
+	//      否则截图防泄形同虚设 —— 昵称首字都被判定为需遮罩的敏感信息(见
+	//      web/src/components/AccountAvatar.jsx),真人头像更没有豁免的道理。
+	Avatar string `json:"avatar,omitempty"`
 }
 
 // UpsertAccount 登记/更新一个账号的展示名与活跃时间。
@@ -37,9 +48,9 @@ ON CONFLICT(account) DO UPDATE SET name=excluded.name, updated_at=excluded.updat
 // ListAccounts 返回已知账号(按最近活跃倒序),petCount 含零宠物账号(LEFT JOIN)。
 func (s *Store) ListAccounts() ([]AccountInfo, error) {
 	rows, err := s.rdb.Query(`
-SELECT a.account, a.name, COUNT(p.gid), a.pin_hash IS NOT NULL AND a.pin_hash != '', a.coins, a.has_coins, a.rank_join
+SELECT a.account, a.name, COUNT(p.gid), a.pin_hash IS NOT NULL AND a.pin_hash != '', a.coins, a.has_coins, a.rank_join, a.avatar
 FROM accounts a LEFT JOIN pets p ON p.account = a.account
-GROUP BY a.account, a.name, a.pin_hash, a.coins, a.has_coins, a.rank_join
+GROUP BY a.account, a.name, a.pin_hash, a.coins, a.has_coins, a.rank_join, a.avatar
 ORDER BY a.updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -48,12 +59,22 @@ ORDER BY a.updated_at DESC`)
 	var out []AccountInfo
 	for rows.Next() {
 		var a AccountInfo
-		if err := rows.Scan(&a.Account, &a.Name, &a.PetCount, &a.HasPin, &a.Coins, &a.HasCoins, &a.Join); err != nil {
+		if err := rows.Scan(&a.Account, &a.Name, &a.PetCount, &a.HasPin, &a.Coins, &a.HasCoins, &a.Join, &a.Avatar); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// SetAccountAvatar 写入账号的平台头像 URL(登录回包解析到时调用)。
+// 空 URL 直接忽略:快速登录等回包不带头像,不能因此把已存头像清掉。
+func (s *Store) SetAccountAvatar(account, url string) error {
+	if url == "" {
+		return nil
+	}
+	_, err := s.db.Exec(`UPDATE accounts SET avatar=? WHERE account=?`, url, account)
+	return err
 }
 
 // SetAccountCoins 写入账号的洛克贝数(登录回包解析成功后调用;coins 为 0 也是真实值,

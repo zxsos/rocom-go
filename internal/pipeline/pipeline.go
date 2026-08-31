@@ -350,6 +350,12 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 			log.Printf("SetAccountCoins 失败: %v", err)
 		}
 	}
+	// 头像只在解析到时覆盖(SetAccountAvatar 忽略空串):拿不到比清掉旧值更好。
+	if avatar, ok := pet.ParseLoginAvatar(m.AppBody); ok {
+		if err := p.st.SetAccountAvatar(acc, avatar); err != nil {
+			log.Printf("SetAccountAvatar 失败: %v", err)
+		}
+	}
 }
 
 // PetTotal 返回全部账号的宠物数合计(离线回放结束时的汇总日志用)。
