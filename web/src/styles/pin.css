@@ -18,8 +18,4 @@
 .pin-input { text-align: center; font-size: 18px; letter-spacing: .3em; }
 .pin-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .pin-submit { flex: 1; }
-.pin-clear-btn { color: var(--fg-dim); }
-.pin-danger-btn { background: var(--red); border-color: var(--red); color: #fff; flex: 1; }
-/* hover 变亮一档。原写法里 `background` 被声明了两次(后者覆盖前者),
-   故 #ff625a 那次从未生效——现将亮色收进 --red-hi 变量,语义清晰且不再有死声明。 */
-.pin-danger-btn:hover { background: var(--red-hi); border-color: var(--red-hi); }
+.pin-danger-btn { flex: 1; } /* 红色外观由 base 的 .btn.danger 提供,这里只留布局 */

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react'
 import { toPng } from 'html-to-image'
 import { getPet, getMedals, getEvolution, subscribe } from '../api'
 import { InlineIcon, ImgAvatar } from './icons'
+import { Skeleton } from './Skeleton'
 import { Types, Marks, Gender, Form, Blood, EggGroups } from './badges'
 import { Portrait } from './avatar'
 import { toast } from './toast'
+import { useDialog } from '../hooks/useDialog'
 import { StatRadar, StatRange } from './stats'
 import { locTag, fmtTime, voiceHot, pctHot } from '../utils/format'
 
@@ -16,6 +18,9 @@ export function PetDetailModal({ gid, onClose }) {
   const [medals, setMedals] = useState([])
   const [chain, setChain] = useState([])
   const cardRef = useRef(null)
+  // 焦点管理(P5.4.3):打开即聚焦弹窗内第一个可聚焦元素(「← 返回」按钮),
+  // Tab 圈在弹窗内,关闭后焦点还给点开它的那张卡片。
+  const { ref: dialogRef, dialogProps } = useDialog(pet?.name || pet?.species || '宠物详情')
 
   useEffect(() => {
     setPet(null)
@@ -61,15 +66,32 @@ export function PetDetailModal({ gid, onClose }) {
   }
 
   if (err || !pet) return (
-    <div className="detail-backdrop" onClick={onClose}>
-      <div className="detail-wrap"><div className="empty">{err ? '未找到该宠物' : '加载中…'}</div></div>
+    <div className="detail-backdrop" ref={dialogRef} {...dialogProps} onClick={onClose}>
+      {/* 骨架屏(P5.4.2):复用 .detail-card / .detail-body / .kv 的真实布局类搭出同构骨架
+          (卡片圆角、16px 内边距、kv 两列网格都由它们给),数据到位即就地填色。 */}
+      <div className="detail-wrap">
+        {err
+          ? <div className="empty">未找到该宠物</div>
+          : (
+            <div className="detail-card">
+              <div className="detail-body" role="status" aria-label="加载中">
+                <Skeleton h={18} w={170} />
+                <Skeleton h={200} />
+                <Skeleton h={29} w={210} />
+                <div className="kv">
+                  {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} h={50} />)}
+                </div>
+              </div>
+            </div>
+          )}
+      </div>
     </div>
   )
 
   const ownedMedals = medals.filter((m) => (pet.medalIds || []).includes(m.id))
 
   return (
-    <div className="detail-backdrop" onClick={onBackdrop}>
+    <div className="detail-backdrop" ref={dialogRef} {...dialogProps} onClick={onBackdrop}>
       <div className="detail-wrap">
       <div className="toolbar">
         <button className="btn" onClick={onClose}>← 返回</button>

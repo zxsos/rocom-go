@@ -60,7 +60,7 @@
     max-height: none; margin: 0; z-index: var(--z-drawer); border-radius: 0;
     border: none; border-right: 1px solid var(--line); box-shadow: var(--shadow);
     overflow-y: auto; padding: 0 14px 14px;
-    transform: translateX(-100%); transition: transform .25s ease;
+    transform: translateX(-100%); transition: transform var(--dur-slow) var(--ease-out);
   }
   .filters:not(.collapsed) { transform: none; }
   /* 标题栏吸顶、底部条吸底,长面板滚动时始终可见 */

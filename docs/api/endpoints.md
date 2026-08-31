@@ -61,6 +61,7 @@
 | `GET /api/paint` | — | ✓ | 涂地覆盖位图（`?res=&layer=`，cells 为 base64 位图） |
 | `DELETE /api/paint` | — | ✓ | 清空涂地，并广播 `{reset:true}` |
 | `GET /api/home` | — | ✓ | 最近一次家园小窝图层 |
+| `GET /api/trial` | — | ✓ | 最近一次草系徽章试炼状态（进行中的一局 + 账号档案） |
 
 ## 花种
 

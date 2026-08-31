@@ -3,6 +3,7 @@ import { getHandbookGlasses } from '../../api'
 import { AccountContext, AccountNameContext, IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { GlassChip } from '../../components/badges'
+import { Skeleton } from '../../components/Skeleton'
 import { toast } from '../../components/toast'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../../data/glassConf'
@@ -182,7 +183,20 @@ export default function HandbookGlasses() {
       </div>
 
       {data === null ? (
-        <div className="muted">加载中…</div>
+        // 骨架屏(P5.4.2):直接复用 .hb-major-group / .hb-major-cards 等真实布局类,
+        // 由它们提供确切的盒模型(内边距、换行、42×23 的色卡格),骨架只负责填色 ——
+        // 这样骨架与内容是**结构上同构**的,数据到位时不产生布局位移。
+        <div role="status" aria-label="加载中">
+          <Skeleton h={20} w={280} style={{ marginBottom: 12 }} />
+          {[0, 1, 2].map((g) => (
+            <div className="hb-major-group" key={g} aria-hidden="true">
+              <div className="hb-major-head"><Skeleton h={16} w={150} /></div>
+              <div className="hb-major-cards">
+                {Array.from({ length: 18 }, (_, i) => <Skeleton key={i} w={42} h={23} />)}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           {stats.species > 0 && (

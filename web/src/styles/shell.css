@@ -16,7 +16,7 @@
    无边框/底色/图标,站名还带 .privacy 与昵称/UID 一起被糊掉。
    曾拆成过独立的盾牌图标按钮 + 顶栏金色状态条,已按原设计退回;
    这块的价值就在于「看起来不像开关」,做显著了反而失去意义。 */
-.brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
+.brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; font-family: var(--font-display); cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
 .brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; }
 .topnav { display: flex; gap: 4px; }
 .navlink {

@@ -3,6 +3,7 @@ import { AccountContext } from '../../context'
 import { getLeaderboard, setAccountRank } from '../../api'
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
 import { TweenNumber } from '../../components/TweenNumber'
+import { SkeletonRows } from '../../components/Skeleton'
 
 // 称号展示配置:大富翁👑 / 赚钱王💹 / 败家子💸(每晚 00:05 结算,当天佩戴一天)
 const TITLES = [
@@ -131,7 +132,11 @@ export default function Leaderboard() {
       </div>
 
       <div className="rank-list">
-        {list.length === 0 && <div className="rank-empty">暂无参加者,在洛克贝旁点击「参加」即可上榜。</div>}
+        {/* 首屏加载(data 还没到)时铺骨架:「暂无参加者」是**结论**,加载中报结论
+            会让人以为榜单空着。刷新时 useAsyncData 保留旧数据,骨架只在首次出现。 */}
+        {list.length === 0 && (loading && !data
+          ? <SkeletonRows rows={6} h={52} gap={8} />
+          : <div className="rank-empty">暂无参加者,在洛克贝旁点击「参加」即可上榜。</div>)}
         {list.map((e, i) => <RankRow key={e.account} entry={e} rank={i + 1} account={account} mode={tab} />)}
       </div>
       <div className="rank-foot">

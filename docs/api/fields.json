@@ -663,6 +663,149 @@
       ]
     }
   },
+  "trial": {
+    "desc": "最近一次草系徽章试炼状态",
+    "endpoint": "GET /api/trial",
+    "sample": "internal/server/testdata/contract/trial.json",
+    "shape": {
+      "account": "str",
+      "active": "bool",
+      "history": {
+        "challengeInc": "int",
+        "cleared": [
+          {}
+        ],
+        "logs": [
+          {
+            "discovered": "int",
+            "logConfId": "int",
+            "total": "int",
+            "unlocked": "bool"
+          }
+        ],
+        "recent": [
+          {
+            "duration": "int",
+            "petBaseId": "int",
+            "petLevel": "int",
+            "petName": "str",
+            "settleAt": "int",
+            "slotId": "int",
+            "trialId": "int",
+            "victory": "bool"
+          }
+        ],
+        "slots": [
+          {
+            "cleared": "int",
+            "damName": "str",
+            "damType": "int",
+            "slotId": "int"
+          }
+        ],
+        "topPets": [
+          {
+            "count": "int",
+            "img": "str",
+            "name": "str",
+            "petBaseId": "int"
+          }
+        ],
+        "total": "int",
+        "wins": "int"
+      },
+      "run": {
+        "chapterId": "int",
+        "chapterIdx": "int",
+        "chapters": [
+          {}
+        ],
+        "coin": "int",
+        "effects": [
+          {}
+        ],
+        "log": [
+          {
+            "action": "int",
+            "ids": [
+              {}
+            ],
+            "kind": "str",
+            "label": "str",
+            "ts": "int"
+          }
+        ],
+        "nodeIndex": "int",
+        "options": [
+          {
+            "event": "int",
+            "eventCost": "int",
+            "extra": [
+              {}
+            ],
+            "level": "int",
+            "reward": "int",
+            "rewardCost": "int",
+            "slot": "int"
+          }
+        ],
+        "pet": {
+          "energy": "int",
+          "equipped": [
+            {}
+          ],
+          "features": [
+            {}
+          ],
+          "gid": "int",
+          "growth": "int",
+          "hp": "int",
+          "img": "str",
+          "level": "int",
+          "maxHp": "int",
+          "name": "str",
+          "shards": [
+            {}
+          ],
+          "skills": [
+            {
+              "cost": "int",
+              "fusion": "int",
+              "id": "int",
+              "merged": [
+                {}
+              ],
+              "power": "int",
+              "slot": "int"
+            }
+          ],
+          "species": "str"
+        },
+        "refreshCost": "int",
+        "reward": {
+          "coin": "int",
+          "event": "int",
+          "extra": [
+            {}
+          ],
+          "id": "int"
+        },
+        "shop": [
+          {
+            "bought": "bool",
+            "id": "int",
+            "index": "int",
+            "price": "int",
+            "type": "int"
+          }
+        ],
+        "slotId": "int",
+        "slotName": "str",
+        "trialId": "int"
+      },
+      "ts": "int"
+    }
+  },
   "wildpets": {
     "desc": "最近一次野生宠物标记",
     "endpoint": "GET /api/wildpets",

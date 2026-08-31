@@ -39,6 +39,7 @@ ENDPOINTS = {
     "home": ("GET /api/home", "最近一次家园小窝图层"),
     "flowers": ("GET /api/flowers", "最近一次花种分组(已剥 cur/worlds)"),
     "flowers-slots": ("GET /api/flowers/slots", "花种世界存档槽位列表"),
+    "trial": ("GET /api/trial", "最近一次草系徽章试炼状态"),
 }
 
 

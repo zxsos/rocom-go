@@ -125,7 +125,7 @@ export default function SubCard() {
               {cfg && cfg.subscribed ? '更新订阅' : '订阅'}
             </button>
             {cfg && cfg.subscribed && (
-              <button type="button" className="btn btn-ghost" onClick={unsub} disabled={busy}>退订</button>
+              <button type="button" className="btn ghost" onClick={unsub} disabled={busy}>退订</button>
             )}
           </form>
         </>

@@ -74,6 +74,17 @@ export const IconFlower = (p) => (
   </S>
 )
 
+// 草系徽章试炼:三章节点连成的路径(章末带一个旗点)
+export const IconTrail = (p) => (
+  <S {...p}>
+    <path d="M5 19c3-6 6-8 7-8s2 4 4 4 3-3 3-3" />
+    <circle cx="5" cy="19" r="1.8" />
+    <circle cx="12" cy="11" r="1.8" />
+    <path d="M19 4v7" />
+    <path d="M19 4l3.2 2L19 8" />
+  </S>
+)
+
 // 洛克贝(商店)
 export const IconCoin = (p) => (
   <S {...p}>

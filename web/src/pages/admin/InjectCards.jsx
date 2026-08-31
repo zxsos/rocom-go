@@ -114,7 +114,7 @@ export function InjectWildCard({ accounts, wildOptions, injects, onInjectsChange
                 <span className="admin-inject-kind">{(it.kinds || []).join('/') || '普通'}</span>
                 {it.kind === 'flower' && <span className="admin-inject-flower">花种</span>}
                 {it.kind !== 'flower' && <span className="muted admin-inject-scene">{it.sceneRes || '无底图'}</span>}
-                <button className="btn ghost" onClick={() => revokeInject(it.account, it.id)}>撤销</button>
+                <button className="btn ghost danger" onClick={() => revokeInject(it.account, it.id)}>撤销</button>
               </li>
             ))}
           </ul>

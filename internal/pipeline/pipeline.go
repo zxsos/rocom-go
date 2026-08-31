@@ -87,6 +87,9 @@ type acctState struct {
 	// lastSeen: 最近一条可归属消息的应用层时间戳(秒)。与 server 在线表同步时按秒去重,
 	// 免得移动包 8 条/秒高频刷锁——在线判定只认 30s 窗口,同秒内的更新没有意义。
 	lastSeen int64
+	// tr 是草系徽章试炼的状态(见 trial.go)。按账号而非连接存:一局跨传送/换场景,
+	// 断线重连时服务器还会用 0x1960 把整局续回来。
+	tr *trialState
 }
 
 // New 创建消费管线并从库中预热连接归属/场景状态(抓包服务重启后无缝续接)。
@@ -231,6 +234,7 @@ func (p *Pipeline) sweepOnce(now time.Time) {
 	if err := p.st.DeleteExpiredFlowerChallenges(nowTS); err != nil {
 		log.Printf("DeleteExpiredFlowerChallenges 失败: %v", err)
 	}
+	p.sweepTrial(now)
 }
 
 func (p *Pipeline) handle(m capture.Message) {
@@ -287,6 +291,7 @@ func (p *Pipeline) handle(m capture.Message) {
 	// 精灵蛋与宠物、场景都相关(破壳回包同时带新宠物,收蛋通知也走奖励通道),
 	// 故不参与「消费即返回」的分发,单独过一遍。
 	p.handleEgg(m, acc)
+	p.handleTrial(m, acc)
 
 	if p.handleScene(m, acc) {
 		// 0x132c 战斗结束通知同时是「场景」与「宠物」两路消息:场景侧清野怪标记

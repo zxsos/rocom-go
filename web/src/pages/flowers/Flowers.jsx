@@ -143,7 +143,7 @@ export default function Flowers() {
           placeholder="加载中…"
           title="切换视图:当前世界 / 世界存档槽"
         />
-        <button className="btn ghost" onClick={handleDeleteSlot} disabled={!selKey.startsWith('owner:')}>
+        <button className="btn ghost danger" onClick={handleDeleteSlot} disabled={!selKey.startsWith('owner:')}>
           删除该槽
         </button>
         {slotMsg && <span className={'slot-msg' + (slotMsg.startsWith('已') ? '' : ' slot-msg-err')}>{slotMsg}</span>}

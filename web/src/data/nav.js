@@ -1,6 +1,6 @@
 import {
   IconBag, IconPaw, IconEgg, IconSparkle, IconBell,
-  IconMap, IconFlower, IconCoin, IconSuitcase, IconTrophy,
+  IconMap, IconFlower, IconCoin, IconSuitcase, IconTrophy, IconTrail,
 } from '../components/svg'
 
 // 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
@@ -20,6 +20,7 @@ export const NAV = [
     children: [
       { to: '/map', label: '实时地图', icon: IconMap },
       { to: '/flowers', label: '花种', icon: IconFlower },
+      { to: '/trial', label: '草系试炼', icon: IconTrail },
     ],
   },
   {

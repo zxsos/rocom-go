@@ -90,6 +90,10 @@ table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent);
     border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1); padding: 12px;
     display: flex; flex-direction: column; gap: 8px; user-select: none;
     box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
+    /* 长列表滚动性能:视口外卡片跳过布局/绘制(卡片是独立块级,无表格布局风险)。
+       contain-intrinsic-size: auto 让浏览器记住已渲染尺寸,滚动条不跳。 */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 220px;
   }
   .card:active { transform: scale(.995); }
   .card-head { display: flex; align-items: center; gap: 10px; }

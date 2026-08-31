@@ -1,0 +1,187 @@
+/* 草系徽章试炼页:上半是「本局」的实时镜像(进度/宠物/节点/商店/流水),
+   下半是账号档案(战绩/常用形态/各系进度/见闻录)。数据由 SSE trial 整份覆盖。 */
+
+.trial-page { display: flex; flex-direction: column; gap: 12px; }
+.trial-page .toolbar-hint { font-size: 13px; }
+.trial-page .spacer { flex: 1; }
+
+/* 本局 / 档案 切换:与页面其它胶囊同一套视觉,只做选中态 */
+.trial-tabs { display: inline-flex; gap: 4px; }
+.trial-tab {
+  font: inherit; font-size: 13px; line-height: 1.9; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg-1); color: var(--fg-dim); cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.trial-tab.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+.trial-group { display: flex; flex-direction: column; gap: 8px; }
+.trial-group-t {
+  margin: 0; font-size: 14px; font-weight: 600; color: var(--fg-dim);
+}
+
+/* —— 进度条 —— */
+.trial-progress {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); padding: 12px; box-shadow: var(--shadow-sm);
+}
+.trial-progress-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* 进行中的呼吸点:不依赖文字也能看出「还活着」 */
+.trial-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--fg-dim); flex: none;
+}
+.trial-dot.on { background: var(--green, var(--accent)); animation: trial-pulse 1.6s ease-in-out infinite; }
+@keyframes trial-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+
+.trial-bar {
+  height: 8px; border-radius: 999px; background: var(--bg-3); overflow: hidden;
+}
+.trial-bar-fill {
+  height: 100%; border-radius: 999px; background: var(--accent);
+  transition: width .3s var(--ease-out, ease);
+}
+
+.trial-meta {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px;
+}
+.trial-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; line-height: 1.8; padding: 0 8px; border-radius: 999px;
+  background: var(--bg-3); color: var(--fg); border: 1px solid var(--line);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.trial-coin { color: var(--gold); border-color: var(--gold); }
+.trial-boss {
+  color: var(--red); border-color: var(--red); font-weight: 600;
+  background: color-mix(in srgb, var(--red) 12%, var(--bg-3));
+}
+.trial-bless { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.trial-reward { color: var(--green, var(--accent)); border-color: var(--green, var(--accent)); }
+.trial-note { font-size: 12px; }
+
+/* —— 结算 —— */
+.trial-result {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); padding: 10px 12px; font-size: 13px;
+}
+.trial-result.win { border-color: var(--green, var(--accent)); }
+.trial-result.win strong { color: var(--green, var(--accent)); }
+.trial-result.lose { opacity: .8; }
+
+/* —— 试炼宠物 —— */
+.trial-pet { display: flex; gap: 12px; align-items: flex-start; }
+.trial-pet-img {
+  width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none;
+}
+.trial-pet-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.trial-pet-name {
+  font-weight: 600; font-size: 15px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 血条:数字压在条上,不另占一行(省高度,且一眼能读出比值) */
+.trial-hp {
+  position: relative; height: 18px; border-radius: 999px;
+  background: var(--bg-3); overflow: hidden; max-width: 260px;
+}
+.trial-hp-fill {
+  height: 100%; background: linear-gradient(90deg, var(--green, var(--accent)), var(--accent));
+  transition: width .3s var(--ease-out, ease);
+}
+.trial-hp-t {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--fg); text-shadow: 0 1px 2px var(--bg-1);
+}
+
+/* 技能卡:出战槽(equipped)高亮,融合过的给出融合次数与被融合技能 */
+.trial-skills {
+  display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.trial-skill {
+  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+  background: var(--bg-1); padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
+}
+.trial-skill.on { border-color: var(--accent); background: var(--accent-soft); }
+.trial-skill-head { display: flex; align-items: baseline; gap: 6px; }
+.trial-skill-slot { font-size: 11px; color: var(--fg-dim); }
+.trial-skill-id {
+  font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.trial-skill-meta {
+  display: flex; gap: 8px; font-size: 12px; color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.trial-skill-fusion { color: var(--accent); font-weight: 600; }
+.trial-skill-merged {
+  font-size: 11px; color: var(--fg-dim); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* —— 节点事件 / 商店 —— */
+.trial-grid {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.trial-card {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); padding: 10px; display: flex; flex-direction: column; gap: 4px;
+  box-shadow: var(--shadow-sm);
+}
+.trial-card-bought { opacity: .55; }
+.trial-card-t { font-size: 12px; color: var(--fg-dim); }
+.trial-card-id {
+  font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.trial-card-meta {
+  display: flex; gap: 8px; font-size: 12px; color: var(--fg-dim); flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— 操作流水 —— */
+.trial-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.trial-log-item {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 5px 2px; border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.trial-log-item:last-child { border-bottom: none; }
+.trial-log-ts {
+  font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; flex: none;
+  min-width: 4.5em;
+}
+.trial-log-kind { font-weight: 600; flex: none; }
+.trial-log-win, .trial-log-settle { color: var(--green, var(--accent)); }
+.trial-log-lose { color: var(--red); }
+.trial-log-boss { color: var(--red); }
+.trial-log-shop, .trial-log-reward { color: var(--accent); }
+.trial-log-refresh { color: var(--gold); }
+
+/* —— 档案 —— */
+.trial-pets { display: flex; gap: 10px; flex-wrap: wrap; }
+.trial-pet-mini {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 76px; font-size: 12px;
+}
+.trial-pet-mini-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.trial-pet-mini-n {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.trial-slots {
+  display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.trial-slot {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+  background: var(--bg-1); padding: 5px 8px; font-size: 12px;
+}
+.trial-slot.full { border-color: var(--green, var(--accent)); }
+.trial-slot.full .trial-slot-c { color: var(--green, var(--accent)); font-weight: 600; }
+.trial-slot-c { font-variant-numeric: tabular-nums; color: var(--fg-dim); }
+
+@media (max-width: 640px) {
+  .trial-pet-img { width: 52px; height: 52px; }
+  .trial-skills { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}

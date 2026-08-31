@@ -1,7 +1,7 @@
 /* ---- 炫彩图鉴页(HandbookGlasses) ---- */
 .hb-page { padding: 4px 0 16px; }
 .hb-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.hb-title { font-size: 17px; font-weight: 700; margin: 0; }
+.hb-title { font-weight: 700; margin: 0; } /* 字号走全局 --text-h2(20px,3.2 统一) */
 .hb-note { font-size: 12px; color: var(--fg-dim); }
 
 .hb-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }

@@ -107,9 +107,6 @@
 .merchant-sub-input:focus { border-color: var(--accent); }
 .merchant-sub-input:disabled { opacity: .5; cursor: not-allowed; }
 .merchant-sub-form .btn { padding: 6px 14px; font-size: 13px; }
-.merchant-sub-form .btn-ghost {
-  background: transparent; border-color: var(--line); color: var(--fg-dim);
-}
 .merchant-sub-msg { margin-top: 8px; font-size: 12px; }
 .merchant-sub-msg.ok { color: var(--c-earn); }
 .merchant-sub-msg.err { color: var(--danger); }

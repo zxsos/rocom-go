@@ -78,7 +78,7 @@ export default function RulesCard({ onUnauthed }) {
                   <span className={'rule-badge ' + r.mode}>{r.mode === 'black' ? '黑' : '白'}</span>
                   <code className="rule-account">{r.account}</code>
                   {r.note && <span className="rule-note">{r.note}</span>}
-                  <button className="btn ghost" onClick={() => removeRule(r.account)}>删除</button>
+                  <button className="btn ghost danger" onClick={() => removeRule(r.account)}>删除</button>
                 </li>
               ))}
             </ul>
