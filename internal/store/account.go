@@ -23,8 +23,8 @@ type AccountInfo struct {
 	// Title 是该账号今天佩戴的排行榜称号(大富翁/赚钱王/败家子),无则空串。
 	// 由 server 层在 ListAccounts 后按当日称号合并填充。
 	Title string `json:"title"`
-	// Avatar 是玩家平台头像 URL(登录回包 plat_avatar_url,微信直链,可直接 <img src>);
-	// 空串表示尚未取到(游客号/未绑平台),故带 omitempty。
+	// Avatar 是玩家平台头像 URL(登录回包 plat_avatar_url,微信/QQ 的 qlogo.cn 直链,
+	// 可直接 <img src>);空串表示尚未取到(游客号/未绑平台),故带 omitempty。
 	//
 	// ⚠️ 隐私(改这里前先读):这是**真人社交账号头像**,敏感度高于昵称与 UID ——
 	// 看图认人比看昵称还准。两层约束,缺一不可:

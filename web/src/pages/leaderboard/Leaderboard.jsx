@@ -2,6 +2,7 @@ import React, { useCallback, useState, useContext } from 'react'
 import { AccountContext } from '../../context'
 import { getLeaderboard, setAccountRank } from '../../api'
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
+import { TweenNumber } from '../../components/TweenNumber'
 
 // 称号展示配置:大富翁👑 / 赚钱王💹 / 败家子💸(每晚 00:05 结算,当天佩戴一天)
 const TITLES = [
@@ -11,6 +12,10 @@ const TITLES = [
 ]
 
 const fmt = (n) => (n == null ? '—' : n.toLocaleString('zh-CN'))
+// 盈亏带正负号:盈利前加 +,亏损由 toLocaleString 自带 -。
+// 定义在模块级(而非组件内)以保证引用稳定 —— TweenNumber 把 format 存进 ref,
+// 虽然不进 effect 依赖,但每次渲染换一个新函数仍是白费。
+const profitFmt = (v) => (v == null ? '—' : (v > 0 ? '+' : '') + v.toLocaleString('zh-CN'))
 const isMe = (a, account) => a.account === account
 
 // 排行榜行:前三名奖牌,当前账号高亮;称号徽标(若有)
@@ -27,14 +32,16 @@ function RankRow({ entry, rank, account, mode }) {
       </span>
       {mode === 'forbes' ? (
         <span className="rank-num">
-          {entry.hasCoins ? <span className="rank-coins">🪙 {fmt(entry.coins)}</span> : <span className="rank-unknown">待同步</span>}
+          {entry.hasCoins
+            ? <span className="rank-coins">🪙 <TweenNumber value={entry.coins} format={fmt} /></span>
+            : <span className="rank-unknown">待同步</span>}
         </span>
       ) : (
         <span className="rank-num">
           {entry.hasCoins ? (
             <>
               <span className={`rank-profit ${entry.profit >= 0 ? 'pos' : 'neg'}`}>
-                {entry.profit > 0 ? '+' : ''}{fmt(entry.profit)}
+                <TweenNumber value={entry.profit} format={profitFmt} />
               </span>
               <span className="rank-sub">{fmt(entry.coins)} / 基线 {fmt(entry.baseline)}</span>
             </>

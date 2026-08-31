@@ -15,11 +15,13 @@
 .merchant-sub { color: var(--fg-dim); font-size: 13px; margin-top: 3px; }
 .merchant-hero-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* 洛克贝徽标(顶部横幅:当前账号洛克贝,来自登录回包 0x0102 解析) */
+/* 洛克贝徽标(顶部横幅:当前账号洛克贝,来自登录回包 0x0102 解析)
+   数字走 --font-num:这是玩家最关心的那个数(「我还有多少洛克贝」),
+   给一套自己的字形。🪙 是 emoji,由系统字体渲染,不进子集也不影响。 */
 .merchant-coins {
   padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.4;
   background: rgba(var(--c-wealth-rgb), .16); color: var(--c-wealth); border: 1px solid rgba(var(--c-wealth-rgb), .45);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 /* 未同步态(该账号从未解析到洛克贝,待玩家重新登录游戏):淡金、虚框、可悬停查看提示 */
 .merchant-coins-unk {

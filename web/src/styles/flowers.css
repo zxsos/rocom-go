@@ -74,7 +74,14 @@
   box-shadow: 0 0 8px rgba(var(--c-seed-rgb), .75), var(--shadow-sm);
 }
 .flower-corner-plain { background: var(--bg-2); color: var(--fg-dim); }
-.flower-card:hover { border-color: var(--accent); }
+/* 花种卡 hover 补抬升。
+   只加位移、不动颜色:下面的 .flower-special(金边)与 .flower-card-colorful(粉紫边)
+   与这里特异性相同(都是两个类/伪类)但**排在后面**,故它们的边框色在 hover 时
+   照样胜出 —— 那两种边是在传达「这只花种特殊 / 有炫彩」,是最有价值的信息,
+   不该被 accent 蓝盖掉。普通卡则由这条给到蓝色 hover 边。 */
+@media (hover: hover) {
+  .flower-card:hover { border-color: var(--accent); transform: translateY(var(--lift)); }
+}
 .flower-card.flower-special { border-color: var(--gold); }
 
 /* 查看状态:已点过(=有 0x0338 详情)——无炫彩置灰(已查看);

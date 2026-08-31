@@ -47,6 +47,16 @@
   display: flex; align-items: center; gap: 12px; padding: 10px 14px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1);
   box-shadow: var(--shadow-sm); min-width: 0;
+  transition: background .15s ease, border-color .15s ease;
+}
+/* 排行行的 hover:**只做行高亮,不抬升**。
+   这些行是纯展示的 <div>(无 onClick、无 cursor:pointer),抬升是「可点」的语言,
+   用在这里等于骗用户去点一个点不动的东西 —— 比没有反馈更糟。
+   行高亮解决的是另一个问题:一行里有名次/昵称/称号/洛克贝/盈亏五段,
+   横向扫读时容易串行,给指针所在行铺个底色即可对齐视线。
+   .is-me(自己)已有蓝色描边环,是「这是你」的常驻标识,故连底色都不改,免得弱化它。 */
+@media (hover: hover) {
+  .rank-row:not(.is-me):hover { background: var(--bg-2); border-color: var(--accent); }
 }
 .rank-row.is-me { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent), var(--shadow-sm); }
 .rank-row.is-unknown { opacity: .65; }
@@ -71,8 +81,11 @@
 
 /* 数值列:洛克贝 / 盈亏 / 基线 */
 .rank-num { flex: none; display: flex; align-items: baseline; gap: 10px; }
-.rank-coins { font-weight: 800; font-size: 15px; color: var(--gold, #e0a83c); font-variant-numeric: tabular-nums; }
-.rank-profit { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+/* 字重由 800 降到 700:子集里只有 700 一个字重,写 800 浏览器会做**合成加粗**
+   (把轮廓描粗一圈),比真 700 更糊也更胖。字号保持 15px 不动 —— 换字体后字面
+   大小会变,但那属于观感微调,不该在这里凭猜测改。 */
+.rank-coins { font-weight: 700; font-size: 15px; color: var(--gold, #e0a83c); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.rank-profit { font-weight: 700; font-size: 15px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .rank-profit.pos { color: var(--c-earn); }
 .rank-profit.neg { color: var(--c-spend); }
 .rank-sub { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }

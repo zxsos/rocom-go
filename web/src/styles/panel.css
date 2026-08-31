@@ -1,7 +1,12 @@
 /* 侧栏面板与页面工具条:宠物列表筛选/事件规则/地图图层共用同一套
    「桌面常驻左列 + 移动端侧滑抽屉」结构(.list-layout / .filters / .filter-group)。 */
 
-.list-layout { display: grid; grid-template-columns: 312px 1fr; gap: 16px; align-items: start; min-width: 0; }
+/* 侧栏宽度自适应:clamp(260px, 20vw, 312px)。
+   原先钉死 312px —— 1024~1200 的笔记本上主区只剩 ~660px,而宠物表格需要 ~1160px,
+   横向滚动条必然出现。窄屏收到下限 260px 能匀出 50px 给主区;宽屏封顶 312px,
+   免得侧栏跟着视口无限变宽(筛选控件是 chips + 下拉,宽了也没更多内容可放)。
+   用 clamp 而非加断点:侧栏宽是连续变量,断点的那几档跳变没有依据。 */
+.list-layout { display: grid; grid-template-columns: clamp(260px, 20vw, 312px) minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
 /* grid 项默认 min-width: auto,会被内部宽内容(1160px 的宠物表格)撑破,
    导致 1fr 列实际宽到 1160px、整个 .list-layout 超出 .content/视口,
    顶栏账号栏被挤出屏幕、.table-wrap 的 overflow-x:auto 也因父级无固定宽而失效。

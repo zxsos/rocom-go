@@ -48,9 +48,12 @@ func TestParseLoginCoins(t *testing.T) {
 	}
 }
 
-// realAvatarURL 是实测登录回包里的 plat_avatar_url(见 0x0102.md / docs/data.md),
-// 用它做正例比自造串更有说服力:长度、域名、末段尺寸位都是线上真实形态。
-const realAvatarURL = "https://thirdwx.qlogo.cn/mmopen/vi_32/WQeT2Lics9YRUhcrGicibpbPbvtK7Pqr5LFX1jWsG2rPXK1DLa6NujQdYLqmzkxWGvl5XDMtK5Xey47IJlGAvm14lWfNsvd2QXicNOehwH9BBBo/132"
+// realAvatarURL / realAvatarURLQQ 是实测登录回包里的 plat_avatar_url(见 0x0102.md):
+// 微信渠道 https(末段 132)与 QQ 渠道 http(末段 100)各一条,域名、末段尺寸位都是线上真实形态。
+const (
+	realAvatarURL = "https://thirdwx.qlogo.cn/mmopen/vi_32/WQeT2Lics9YRUhcrGicibpbPbvtK7Pqr5LFX1jWsG2rPXK1DLa6NujQdYLqmzkxWGvl5XDMtK5Xey47IJlGAvm14lWfNsvd2QXicNOehwH9BBBo/132"
+	realAvatarURLQQ = "http://thirdqq.qlogo.cn/ek_qqapp/AQMD9W5crlDB8liaj3YHgPHqtIVzZBnrR7OibvFicaiaCZTfTx4Ny56xnjZrvfKcYibPSaLVIJ9Ry8rOn9rrgdKu5GhKE5PfppZ3Ek64GKiazMlsyMwia8k6Gk/100"
+)
 
 // buildLoginAvatarBody 拼登录 body:{ #2: LoginData{ #1: base{ #7: addi{ #3: <payload> } } } }。
 // 解析按特征定位而非字段号(真实 wire 与描述符有版本偏移),故这里字段号随便取 ——
@@ -64,12 +67,17 @@ func buildLoginAvatarBody(payload string) []byte {
 }
 
 func TestParseLoginAvatar(t *testing.T) {
-	got, ok := ParseLoginAvatar(buildLoginAvatarBody(realAvatarURL))
-	if !ok {
-		t.Fatalf("期望解析成功,实际 ok=false")
-	}
-	if got != realAvatarURL {
-		t.Fatalf("期望 %q,实际 %q", realAvatarURL, got)
+	for name, url := range map[string]string{
+		"微信渠道 https": realAvatarURL,
+		"QQ 渠道 http":  realAvatarURLQQ,
+	} {
+		got, ok := ParseLoginAvatar(buildLoginAvatarBody(url))
+		if !ok {
+			t.Fatalf("%s: 期望解析成功,实际 ok=false", name)
+		}
+		if got != url {
+			t.Fatalf("%s: 期望 %q,实际 %q", name, url, got)
+		}
 	}
 }
 
@@ -80,7 +88,8 @@ func TestParseLoginAvatarRejects(t *testing.T) {
 		payload string
 	}{
 		{"无 URL", "示例玩家"},
-		{"http 明文", strings.Replace(long, "https://", "http://", 1)},
+		{"非白名单 http 域名", strings.Replace(long, "https://thirdwx.qlogo.cn", "http://thirdwx.example.com", 1)},
+		{"资料页名片照非头像", "https://photo-prod.nrc.qq.com/100000002/card/1000000021785331836626"},
 		{"过短", "https://a.cn"},
 		{"含空格", strings.Replace(long, "mmopen", "mm open", 1)},
 		{"含换行(日志注入)", long + "\nSetAccountAvatar 失败"},

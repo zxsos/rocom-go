@@ -58,24 +58,33 @@ func ParseLoginCoins(body []byte) (coins int64, ok bool) {
 	return coins, ok
 }
 
-// avatarURLPrefix / avatarMinLen / avatarMaxLen 是识别头像 URL 的特征。
+// avatarURLHosts 是平台头像域名白名单(qlogo.cn 系腾讯平台头像 CDN):
+//   - 微信渠道 https://thirdwx.qlogo.cn/  (直链末段 0/46/64/96/132 是尺寸位)
+//   - QQ 渠道   http://thirdqq.qlogo.cn/   (实测 2026-08 就是 http 明文,
+//     直链末段 40/100 等是尺寸位)
 //
-// 只认 https:// 开头:平台头像一律 https,顺带挡掉 javascript: 之类的伪协议
+// 必须**白名单收紧**而不是「全包唯一 https 短串」:登录回包里还有
+// https://photo-prod.nrc.qq.com/<uid>/card/<pic_id> 资料页名片照,它也是合法
+// https URL,但**不是头像** —— 旧逻辑把它当成头像下发,前端画出来是一张横版卡图。
+//
+// 带 scheme 前缀匹配还有一个好处:天然挡掉 javascript: 等伪协议
 // (URL 会经 /api/accounts 下发到前端,前端可能直接塞进 <img src>)。
+var avatarURLHosts = []string{
+	"https://thirdwx.qlogo.cn/",
+	"http://thirdqq.qlogo.cn/",
+}
+
 const (
-	avatarURLPrefix = "https://"
-	avatarMinLen    = 32
-	avatarMaxLen    = 512
+	avatarMinLen = 32
+	avatarMaxLen = 512
 )
 
 // ParseLoginAvatar 从 ZoneLoginRsp(0x0102)取玩家平台头像 URL。
 //
-// 目标字段是 player_info.brief_info.additional_data.plat_avatar_url(实测微信直链
-// https://thirdwx.qlogo.cn/mmopen/.../132,末段换成 0/46/64/96/132 可取不同尺寸)。
+// 目标字段是 player_info.brief_info.additional_data.plat_avatar_url。
 // 与 ParseLoginCoins 同理:**真实 wire 与 all.pb 描述符存在版本偏移,字段号不可信**,
-// 故不按字段号下钻,而在全包内按「以 https:// 开头、长度适中、纯可打印 ASCII 的短串」
-// 唯一定位 —— 实测整条登录回包只有这一处 URL(pcapdump 转储核对,见 0x0102.md)。
-// 将来若包里出现第二个 https URL(如公告 CDN),需在这里加域名白名单收紧。
+// 故不按字段号下钻,而在全包内按「qlogo.cn 平台头像域名白名单 + 长度适中 +
+// 纯可打印 ASCII」定位。pcapdump 精确解码核对见 0x0102.md。
 //
 // 取不到(游客号/未绑定平台/版本变更)返回 ok=false,调用方据此**保留旧头像**而非清空。
 func ParseLoginAvatar(body []byte) (url string, ok bool) {
@@ -83,7 +92,14 @@ func ParseLoginAvatar(body []byte) (url string, ok bool) {
 		if ok || len(v) < avatarMinLen || len(v) > avatarMaxLen {
 			return true
 		}
-		if !bytes.HasPrefix(v, []byte(avatarURLPrefix)) {
+		matched := false
+		for _, h := range avatarURLHosts {
+			if bytes.HasPrefix(v, []byte(h)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return true
 		}
 		for _, c := range v {

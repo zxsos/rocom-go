@@ -42,7 +42,9 @@ img.pet-avatar { object-fit: cover; }
 /* 异色/炫彩标记图(取代文字徽标;缺图时组件自动退回 .mark 文字),与血脉图标同大小 */
 .mark-img { width: 18px; height: 18px; object-fit: contain; margin-left: 4px; vertical-align: middle; }
 .mark-shiny { background: var(--c-shiny-d); color: var(--c-shiny); }
-.mark-colorful { background: #6b2f50; color: #ffb6e0; }
+/* 炫彩标记:原先写死 #6b2f50 / #ffb6e0,与 --c-flower-d / --c-flower **同值**却各写一份
+   —— 改花种粉时会漏掉这里,两个地方标的是同一件事(炫彩=粉紫系)。改成引用变量。 */
+.mark-colorful { background: var(--c-flower-d); color: var(--c-flower); }
 .mark-form { background: var(--c-form-d); color: var(--c-form); font-weight: 500; }
 /* 炫彩色卡缩略图:普通炫彩 = span 容器内 3 层 CSS mask 合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 →
    粒子染白,见 badges.jsx GlassChip),隐藏炫彩 = 整图 img;280x154 按约 1.8:1 缩小(与 .mark-img 同高)。
@@ -58,4 +60,4 @@ img.pet-avatar { object-fit: cover; }
 /* 蛋组(繁殖组)标签:多个组名并排,hover 显示官方描述 */
 .egg-groups { display: inline-flex; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
 .egg-group { font-size: 11px; padding: 0 6px; border-radius: 5px; line-height: 18px;
-  background: #2f3f57; color: #b9ccef; white-space: nowrap; cursor: default; }
+  background: var(--c-egggroup-d); color: var(--c-egggroup); white-space: nowrap; cursor: default; }
