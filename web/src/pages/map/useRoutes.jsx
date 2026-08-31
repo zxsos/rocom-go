@@ -94,47 +94,78 @@ const hueDist = (a, b) => {
   return Math.min(d, 360 - d)
 }
 const rgbToHex = (r, g, b) => '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
-// 采样地图底图主色(缩到 8x8 取平均),全局缓存。失败/无图返回 null,评分退化为只用旧色/它色对比。
-let mapHslCache = null
-let mapHslPromise = null
-const sampleMapHsl = (img) => {
-  if (mapHslCache || !img) return Promise.resolve(mapHslCache)
-  if (!mapHslPromise) {
-    mapHslPromise = new Promise((resolve) => {
-      const im = new Image()
-      im.crossOrigin = 'anonymous'
-      im.onload = () => {
-        try {
-          const S = 8
-          const c = document.createElement('canvas')
-          c.width = S; c.height = S
-          const ctx = c.getContext('2d', { willReadFrequently: true })
-          ctx.drawImage(im, 0, 0, S, S)
-          const d = ctx.getImageData(0, 0, S, S).data
-          let r = 0, g = 0, b = 0, n = 0
-          for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++ }
-          mapHslCache = hexHsl(rgbToHex(Math.round(r / n), Math.round(g / n), Math.round(b / n)))
-        } catch { mapHslCache = null }
-        resolve(mapHslCache)
-      }
-      im.onerror = () => { mapHslCache = null; resolve(null) }
-      im.src = imgURL(`bigmap/${img}.webp`)
-    })
-  }
-  return mapHslPromise
+// —— 底图采样:整图缩到 SAMPLE×SAMPLE 存一份像素,按归一化 uv 取色 ——
+// 为什么不采「整图平均色」:一条路线横跨草原/雪地/沙漠/水面,整图平均是个谁都不像的
+// 中间色,拿它选色等于没选,换完照样撞背景。故改成**沿路线折线采样**:只统计这条路线
+// 真正压过去的像素,得到它自己的背景色,再挑与它对比最大的颜色。
+const SAMPLE = 256
+const SAMPLES_PER_ROUTE = 96
+let sampleCache = null   // { img, px: Uint8ClampedArray }
+let samplePromise = null
+const loadSample = (img) => {
+  if (!img) return Promise.resolve(null)
+  if (sampleCache && sampleCache.img === img) return Promise.resolve(sampleCache)
+  if (sampleCache && sampleCache.img !== img) samplePromise = null // 换场景:旧采样作废
+  if (samplePromise) return samplePromise
+  samplePromise = new Promise((resolve) => {
+    const im = new Image()
+    im.crossOrigin = 'anonymous'
+    im.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = SAMPLE; c.height = SAMPLE
+        const ctx = c.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(im, 0, 0, SAMPLE, SAMPLE)
+        sampleCache = { img, px: ctx.getImageData(0, 0, SAMPLE, SAMPLE).data }
+      } catch { sampleCache = null } // 解码失败/跨域:退化成只用旧色与它色对比
+      resolve(sampleCache)
+    }
+    im.onerror = () => { sampleCache = null; resolve(null) }
+    im.src = imgURL(`bigmap/${img}.webp`)
+  })
+  return samplePromise
 }
-// 从候选池挑换色目标:评分 = 与地图背景色相/亮度对比(权重最高,防背景相近)
+// 沿路线折线按**等弧长**取 SAMPLES_PER_ROUTE 个点读底图像素,平均成该路线自己的背景色。
+// 等弧长而非逐点:路线点疏密不均(转弯密、直道稀),逐点平均会被密处的地形带偏。
+// 传送段(相邻点跳变 > TELEPORT)不计入——那是瞬移,玩家并不从中间地上走过。
+const routeBgHsl = (sample, points) => {
+  if (!sample || !points || points.length < 2) return null
+  const seg = []
+  let total = 0
+  for (let i = 1; i < points.length; i++) {
+    const d = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
+    seg.push(d > TELEPORT ? 0 : d) // 0 = 传送段,不在其上取样
+    total += seg[seg.length - 1]
+  }
+  if (total <= 0) return null
+  const px = sample.px
+  const step = total / (SAMPLES_PER_ROUTE - 1)
+  let r = 0, g = 0, b = 0, n = 0
+  let si = 0, acc = 0 // 当前段下标、该段起点之前的累计弧长
+  for (let k = 0; k < SAMPLES_PER_ROUTE; k++) {
+    const target = k * step
+    while (si < seg.length - 1 && acc + seg[si] < target) { acc += seg[si]; si++ }
+    const t = seg[si] > 0 ? (target - acc) / seg[si] : 0
+    const p0 = points[si], p1 = points[si + 1]
+    const x = Math.min(SAMPLE - 1, Math.max(0, Math.round((p0.x + (p1.x - p0.x) * t) / GRID * SAMPLE)))
+    const y = Math.min(SAMPLE - 1, Math.max(0, Math.round((p0.y + (p1.y - p0.y) * t) / GRID * SAMPLE)))
+    const i = (y * SAMPLE + x) * 4
+    r += px[i]; g += px[i + 1]; b += px[i + 2]; n++
+  }
+  return n ? hexHsl(rgbToHex(Math.round(r / n), Math.round(g / n), Math.round(b / n))) : null
+}
+// 从候选池挑色:评分 = 与该路线背景的色相/亮度对比(权重最高,防背景相近)
 //  + 与旧色对比(换色后明显不同) + 与其它已开路线的最小色相距离(路线间可区分)。
 // 取 top3 随机,避免固定两个色反复横跳。
-const pickColor = (candidates, { oldColor, others, mapHsl }) => {
+const pickColor = (candidates, { oldColor, others, bgHsl }) => {
   const old = oldColor ? hexHsl(oldColor) : null
   const othersHsl = others.map(hexHsl).filter(Boolean)
   const scored = candidates.map((c) => {
     const h = hexHsl(c)
     let score = 0
-    if (mapHsl && h && h.h >= 0) {
-      score += hueDist(h.h, mapHsl.h) / 180 * 1.5
-      score += Math.abs(h.l - mapHsl.l) * 1.0
+    if (bgHsl && h && h.h >= 0) {
+      score += hueDist(h.h, bgHsl.h) / 180 * 1.5
+      score += Math.abs(h.l - bgHsl.l) * 1.0
     }
     if (h && old && old.h >= 0) score += hueDist(h.h, old.h) / 180 * 0.8
     if (h) {
@@ -180,6 +211,7 @@ export function useRoutes(account, pos) {
   const onRef = useRef(loadKeys())
   const lastCheckRef = useRef(0) // 上次判定时间戳,时间节流用
 
+  const img = pos && pos.img // 底图名:用于采样路线沿途地形色
   useEffect(() => {
     onRef.current = loadKeys() // 每次进场景重新读一次用户记忆
     lastCheckRef.current = 0
@@ -188,24 +220,37 @@ export function useRoutes(account, pos) {
     fetch('/route-map/data/index.json', { cache: 'no-store' })
       .then((r) => r.json())
       .then(async (names) => {
-        const colors = shuffle(ROUTE_COLORS) // 每次进场景随机色序,避免固定分配
-        const savedColors = loadJSON(COLORS_LS_KEY, {}) || {} // 用户换过色的路线优先沿用
-        const list = await Promise.all(names.map(async (name, i) => {
+        const list = await Promise.all(names.map(async (name) => {
           const d = await fetch('/route-map/data/' + encodeURIComponent(name), { cache: 'no-store' }).then((r) => r.json())
           return {
             name,
             short: name.replace(/\.json$/, ''),
             count: d.points.length,
             points: d.points,
-            color: savedColors[name] || colors[i % colors.length],
+            color: '',
             on: onRef.current.has(name),
           }
         }))
+        // 配色:用户手动换过色的沿用;其余按「这条路线沿途的地形色 + 已分出去的色」
+        // 逐条贪心挑对比最大的。候选池先洗牌再评分(sort 稳定),保留进场景的随机性,
+        // 又不至于像纯随机那样分到与地形同色的号。
+        const savedColors = loadJSON(COLORS_LS_KEY, {}) || {}
+        const sample = await loadSample(img)
+        const used = []
+        for (const r of list) {
+          if (savedColors[r.name]) { r.color = savedColors[r.name]; used.push(r.color); continue }
+          const avail = shuffle(ROUTE_COLORS.filter((c) => !used.includes(c)))
+          r.color = pickColor(avail.length ? avail : shuffle(ROUTE_COLORS), {
+            others: used,
+            bgHsl: routeBgHsl(sample, r.points),
+          })
+          used.push(r.color)
+        }
         if (alive) setRoutes(list)
       })
       .catch(() => {})
     return () => { alive = false }
-  }, [res, account])
+  }, [res, account, img])
 
   // 跟走进度:玩家位置变化时,对每条开启路线做「顺序推进 + 前瞻窗口」判定。
   // 只进不退:从 cur+1 起往后扫 LOOKAHEAD 个点,遇到第一个距离 < NEAR 的点就推进到那,
@@ -258,15 +303,15 @@ export function useRoutes(account, pos) {
     })
   }, [])
 
-  // 换色:点击路线色点触发。采样地图底图主色后,从池中选「与背景/旧色/其它路线
-  // 对比明显」的新色,更新状态并持久化(map.routeColors),刷新后沿用。
+  // 换色:点击路线色点触发。采样**这条路线沿途**的底图色后,从池中选「与该背景、
+  // 旧色、其它路线对比明显」的新色,更新状态并持久化(map.routeColors),刷新后沿用。
   const cycleColor = useCallback((name) => {
     const r = routes.find((x) => x.name === name)
     if (!r) return
     const others = routes.filter((x) => x.on && x.name !== name).map((x) => x.color)
-    const candidates = ROUTE_COLORS.filter((c) => c !== r.color)
-    sampleMapHsl(pos && pos.img).then((mapHsl) => {
-      const color = pickColor(candidates, { oldColor: r.color, others, mapHsl })
+    const candidates = shuffle(ROUTE_COLORS.filter((c) => c !== r.color))
+    loadSample(pos && pos.img).then((sample) => {
+      const color = pickColor(candidates, { oldColor: r.color, others, bgHsl: routeBgHsl(sample, r.points) })
       setRoutes((prev) => prev.map((x) => (x.name === name ? { ...x, color } : x)))
     })
   }, [routes, pos])
@@ -323,11 +368,25 @@ export function useRoutes(account, pos) {
   return { kinds, marks, open, toggleOpen: () => setOpen((o) => !o), toggle, setAll, cycleColor, follow, toggleFollow, resetProgress, nearM, setNearM }
 }
 
+// 端点/线共用的深色外环。底图地形色不可控(草原绿 / 雪地白 / 沙漠黄 / 洞穴暗),
+// 单靠路线色总有一段糊进背景;外环保证亮背景上也有轮廓(暗背景靠白描边那道)。
+const HALO = 'rgba(0, 0, 0, .5)'
+const HALO_W = 1.6
+
 // RouteLayer 把路线画进 .map-world:一条路线一个折线 <path> + 起终点圆。
 // SVG 无 viewBox,width/height=mapPx,用户坐标即底图像素(与其它标记同一坐标系)。
 // 跟走模式下只画 progress 之后的线:起点圆换成「已到达点」,下一目标点画高亮大圆。
 // 传送打断:相邻点距离 > TELEPORT 判定为直接传送(不画那条笔直长线),在传送落点用
 // 路线同色画一个「下一起点」菱形标记,提示从这里继续走。
+//
+// —— 可见性:三层描边(casing)——
+// 颜色再怎么挑也扛不住地形:一条路线横穿草原/雪地/水面,总有某段与背景同色。
+// 故不指望单色解决,改给线加 casing:深色外圈 + 白色内圈 + 彩色线,三趟画
+// (宽度见 styles/map.css 的 .map-route-casing-*;改那里记得改 pipGeom.js 的
+// SIZES.routeCasingDark/Light)。亮背景靠深色外圈勾边,暗背景靠白色内圈,
+// 路线色始终浮在地形之上。端点同理:白描边外再套一圈深色环。
+// 三趟按「全部深色 → 全部白色 → 全部彩色」而非「一条路线画完三层再画下一条」——
+// 否则后画路线的深色描边会压在先画路线的彩线上,交叉处看着像被切断。
 export const RouteLayer = React.memo(({ marks, mapPx }) => {
   const geo = React.useMemo(() => marks.map((r) => {
     const from = r.follow && r.progress >= 0 ? Math.min(r.progress, r.points.length - 1) : 0
@@ -358,34 +417,47 @@ export const RouteLayer = React.memo(({ marks, mapPx }) => {
   if (!geo.length) return null
   return (
     <svg className="map-routes" width={mapPx} height={mapPx}>
+      {/* 三层描边按「全部深色 → 全部白色 → 全部彩色」分趟画,见文件头说明 */}
+      <g className="map-route-casing-dark">
+        {geo.map((g) => g.d && <path key={g.key} d={g.d} />)}
+      </g>
+      <g className="map-route-casing-light">
+        {geo.map((g) => g.d && <path key={g.key} d={g.d} />)}
+      </g>
+      <g className="map-route-line">
+        {geo.map((g) => g.d && <path key={g.key} d={g.d} stroke={g.color} />)}
+      </g>
       {geo.map((g) => (
         <g key={g.key}>
-          {g.d && (
-            <path d={g.d} fill="none" stroke={g.color} strokeWidth={2.5}
-              strokeLinejoin="round" strokeLinecap="round" opacity={0.9} />
-          )}
           {/* 传送落点:路线色菱形 + 白描边 + 白点,表示「从上一段直接传送到此,从这继续走」 */}
           {g.teleports.map((t, i) => (
             <g key={i} transform={`translate(${t.x} ${t.y}) rotate(45)`}>
+              <rect x={-6.7} y={-6.7} width={13.4} height={13.4} fill="none" stroke={HALO} strokeWidth={HALO_W} />
               <rect x={-5} y={-5} width={10} height={10} fill={g.color} stroke="#fff" strokeWidth={1.8} opacity={0.95} />
               <rect x={-1.5} y={-1.5} width={3} height={3} fill="#fff" />
             </g>
           ))}
           {g.showStart && (
+            /* 起点:白心 + 黑描边,本身就是双色,任何底图上都看得见 */
             <circle cx={g.sx} cy={g.sy} r={6} fill="#fff" stroke="#000" strokeWidth={1.5} />
           )}
           {!g.showStart && (
-            /* 已到达点:路线色圆 + 白描边 */
-            <circle cx={g.sx} cy={g.sy} r={5.5} fill={g.color} stroke="#fff" strokeWidth={1.5} />
+            /* 已到达点:深色外环 + 路线色圆 + 白描边 */
+            <>
+              <circle cx={g.sx} cy={g.sy} r={7.05} fill="none" stroke={HALO} strokeWidth={HALO_W} />
+              <circle cx={g.sx} cy={g.sy} r={5.5} fill={g.color} stroke="#fff" strokeWidth={1.5} />
+            </>
           )}
           {g.nx && (
-            /* 下一目标点:路线色大圆 + 白描边 + 白心 */
+            /* 下一目标点:深色外环 + 路线色大圆 + 白描边 + 白心 */
             <g>
+              <circle cx={g.nx.x} cy={g.nx.y} r={10.9} fill="none" stroke={HALO} strokeWidth={1.8} />
               <circle cx={g.nx.x} cy={g.nx.y} r={9} fill={g.color} stroke="#fff" strokeWidth={2} opacity={0.95} />
               <circle cx={g.nx.x} cy={g.nx.y} r={3} fill="#fff" />
             </g>
           )}
-          {/* 终点:路线色圆 + 白描边 */}
+          {/* 终点:深色外环 + 路线色圆 + 白描边 */}
+          <circle cx={g.ex} cy={g.ey} r={6.4} fill="none" stroke={HALO} strokeWidth={HALO_W} />
           <circle cx={g.ex} cy={g.ey} r={5} fill={g.color} stroke="#fff" strokeWidth={1.2} />
         </g>
       ))}
