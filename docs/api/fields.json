@@ -415,6 +415,16 @@
       "baseConfId": "int",
       "blood": "str",
       "bloodId": "int",
+      "bloodline": [
+        {
+          "cost": "str",
+          "effect": "str",
+          "elem": "str",
+          "name": "str",
+          "power": "str",
+          "skillId": "int"
+        }
+      ],
       "catchTime": "int",
       "colorful": "bool",
       "confId": "int",
@@ -440,6 +450,16 @@
         "portrait": "str",
         "portraitSmall": "str"
       },
+      "learnable": [
+        {
+          "cost": "str",
+          "effect": "str",
+          "elem": "str",
+          "name": "str",
+          "power": "str",
+          "skillId": "int"
+        }
+      ],
       "level": "int",
       "medal": "str",
       "medalDesc": "str",
@@ -451,6 +471,17 @@
       "natureId": "int",
       "partnerMark": "str",
       "shiny": "bool",
+      "skills": [
+        {
+          "cost": "str",
+          "effect": "str",
+          "elem": "str",
+          "level": "int",
+          "name": "str",
+          "power": "str",
+          "skillId": "int"
+        }
+      ],
       "spAttack": {
         "nature": "int",
         "talentLv": "int",
@@ -775,6 +806,7 @@
               "merged": [
                 {}
               ],
+              "name": "str",
               "power": "int",
               "slot": "int"
             }

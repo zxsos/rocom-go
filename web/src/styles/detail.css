@@ -93,6 +93,35 @@ img.evo-avatar { object-fit: cover; }
 /* 详情奖牌墙内的奖牌图标适当增大(仅 .medals 容器内,不影响列表/事件的行内奖牌) */
 .medals .medal-ic { width: 40px; height: 40px; }
 
+/* 天生技能表:每行「等级 · 技能名 · 属性 · 威力/能耗」,整行悬浮出效果描述。
+   技能名可长可短(「光合作用」vs「山火」),故用 grid 而非 flex,列才对得齐。 */
+.skills { display: flex; flex-direction: column; gap: 2px; }
+.skill-row {
+  display: grid; grid-template-columns: 3.2em 1fr auto auto;
+  align-items: baseline; gap: 8px;
+  padding: 3px 6px; border-radius: var(--radius-sm, 6px);
+  font-size: 13px; line-height: 1.7; cursor: help;
+}
+.skill-row:hover { background: var(--bg-2); }
+.skill-lv { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.skill-name {
+  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 属性小胶囊:与六维/系别标签同一套视觉,只缩小字号免得抢技能名 */
+.skill-elem {
+  font-size: 11px; line-height: 1.6; padding: 0 6px; border-radius: 999px;
+  background: var(--bg-3); color: var(--fg-dim); border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.skill-num {
+  color: var(--fg-dim); font-size: 12px; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* 「非当前携带」的注脚:比标题暗一档,说明这不是个体当前技能 */
+.skills-note { font-size: 11px; opacity: .75; margin-left: 4px; }
+/* 可学/血脉两个区块没有等级,但行内仍渲染一个空的 .skill-lv 占位 ——
+   grid 首列固定 3.2em,占位后三个区块的技能名起止位置一致,扫读不错位。 */
+
 /* 身高/体重范围 tooltip:由 StatRange 经 portal 渲染到 body、fixed 定位(避开 .table-wrap
    的 overflow 裁剪与常驻滚动条问题);定位由 JS 计算(默认上方/自动翻转)。 */
 .tip-pop {

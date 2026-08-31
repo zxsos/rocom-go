@@ -602,10 +602,17 @@ func (p *Pipeline) trialPetPayload(tp *trial.Pet) *server.TrialPet {
 		out.Name = out.Species
 	}
 	for _, s := range tp.Skills {
-		out.Skills = append(out.Skills, server.TrialSkill{
+		sk := server.TrialSkill{
 			ID: s.BaseID, Power: s.Power, Cost: s.EnergyCost,
 			Fusion: s.FusionCount, Slot: s.SlotPos, Merged: s.Merged,
-		})
+		}
+		// 技能名按 base_skill_id 查。融合**不会**改变 base_skill_id(只改威力与
+		// fusion_count),故融合态技能同样能查到名。查不到即资料站未收录,
+		// name 缺失、前端回退显示 id。
+		if n := p.db.SkillName(s.BaseID); n != "" {
+			sk.Name = n
+		}
+		out.Skills = append(out.Skills, sk)
 	}
 	return out
 }

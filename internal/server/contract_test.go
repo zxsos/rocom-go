@@ -329,8 +329,12 @@ func contractTrial() *TrialPayload {
 				Gid: 133, Name: "黑猫巫师", Species: "黑猫巫师", Img: "HeadIcon/3569.webp",
 				Level: 60, HP: 264, MaxHP: 389, Energy: 10, Growth: 2,
 				Skills: []TrialSkill{
-					{ID: 7020500, Power: 25, Cost: 4, Fusion: 1, Slot: 2, Merged: []uint32{7090100}},
-					{ID: 7880058, Power: 20, Cost: 0, Slot: 2},
+					{ID: 7020500, Name: "乱打", Power: 25, Cost: 4, Fusion: 1, Slot: 2, Merged: []uint32{7090100}},
+					// 7880058 是魔能爆的**试炼态 id**(开局零融合时就存在,融合也不改 id),
+					// 见 gen_skills.py 的 EXTRA_SKILL_IDS
+					{ID: 7880058, Name: "魔能爆", Power: 20, Cost: 0, Slot: 2},
+					// 资料站未收录的新技能:查不到名,name 缺失,前端回退显示 id
+					{ID: 7999999, Power: 10, Cost: 1, Slot: 3},
 				},
 				Features: []uint32{288135, 288001},
 				Shards:   []uint32{2016, 3005},

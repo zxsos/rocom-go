@@ -275,12 +275,16 @@ type TrialPet struct {
 // TrialSkill 是试炼宠物的一个技能槽(融合体)。
 type TrialSkill struct {
 	ID     uint32   `json:"id"`               // base_skill_id
+	Name   string   `json:"name,omitempty"`   // 技能中文名;查不到时缺失(见下)
 	Power  uint32   `json:"power"`            // 融合后威力
 	Cost   uint32   `json:"cost"`             // 融合后能耗
 	Fusion uint32   `json:"fusion,omitempty"` // 融合次数(0=未融合)
 	Slot   uint32   `json:"slot"`             // 槽位(1 起)
 	Merged []uint32 `json:"merged,omitempty"` // 被融合进来的技能 id
 }
+
+// TrialReward 的 id 也有中文名(技能/特性),但特性(id 288xxx)目前无名称表,
+// 故只在能查到时才带 name —— 前端回退显示 id。
 
 // TrialOption 是当前节点的一个候选事件。
 type TrialOption struct {
