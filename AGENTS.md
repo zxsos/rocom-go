@@ -68,6 +68,11 @@
   CSS mask 三层填色合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 顶部对齐 → 粒子染白最上层),
   隐藏炫彩直接引用整图;渲染组件 web/src/components/badges.jsx 的 GlassChip)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
+  `uv run python scripts/fetch_skill_ids.py`(刮 aismile.dev 技能图鉴 26 页 →
+  `~/Downloads/rocom/skillIds.json`:**skill_id → 技能中文名** 604 条;站点无 JSON 接口,
+  靠 HTML class 正则提取,改版后抓不到会报错退出)、`uv run python scripts/gen_skills.py`
+  (skillIds.json + arkmeng.cn 的 skillGuideData.json → internal/gamedata/data/skills.json:
+  技能 id→名 供试炼页、形态→天生技能 供宠物详情;**两份互补缺一不可,见 docs/data.md「技能名」**);
   抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
   (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq
   查数据、也是 gen_gamedata/gen_icons 的输入(它们直接读这些 JSON,不再自行解 .bytes)。

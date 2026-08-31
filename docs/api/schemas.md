@@ -65,8 +65,43 @@
 | `box` | obj? | `{boxId, slot, boxName?, mark?}`（在盒中） |
 | `team` | obj? | `{teamIdx, pos}`（在队中；与 `box` **互斥**） |
 | `hp` `attack` `defense` `spAttack` `spDefense` `speed` | obj | `{value, talentLv, nature}` |
+| `skills` | obj[]? | **仅详情接口有**：当前形态天生会的技能，见下 |
+| `learnable` | obj[]? | **仅详情接口有**：技能石可学的技能，见下 |
+| `bloodline` | obj[]? | **仅详情接口有**：血脉可获得的技能，见下 |
 
 > `image` 取图优先 `baseConfId` 回退 `confId` —— 只按 `confId` 取会拿到进化线一阶的图。
+
+#### 三类技能 `skills` / `learnable` / `bloodline`（仅 `GET /api/pets/{gid}`）
+
+```json
+{ "skills":    [{ "name": "山火", "level": 48, "elem": "火", "skillId": 7040250,
+                  "power": "15", "cost": "3", "effect": "造成物伤，…" }],
+  "learnable": [{ "name": "乘风", "elem": "翼", "skillId": 7150120,
+                  "power": "—", "cost": "2", "effect": "自己获得速度+120。" }],
+  "bloodline": [{ "name": "冰爪", "elem": "冰", "skillId": 7090250,
+                  "power": "80", "cost": "2", "effect": "对敌方精灵造成物理伤害。" }] }
+```
+
+按 `baseConfId`（当前形态）分别查 `gamedata.InnateSkills` / `LearnableSkills` /
+`BloodlineSkills`。三类按**获取途径**划分，实测几乎互斥（天生 6518 条中与技能石
+重叠 3 条、与血脉 0 条），故并列展示、不去重。七点约束：
+
+1. **这些是「该形态可获得的技能」，不是某只宠物当前携带的**。技能是可换配置
+   （见 `git 0762eb6` 移除 `Pet.SkillIDs` 的理由），后端不存个体技能。
+2. **只有详情接口带**，`GET /api/pets` 列表不带 —— 避免给每只宠物都序列化一份。
+3. **`level` 只有 `skills` 有**：技能石与血脉在资料站里没有等级、也没有解锁条件
+   （只有精灵与进化链），不要想当然地补一个等级出来。
+4. `skills` 按学会等级降序；`learnable` / `bloodline` 按技能名升序。
+5. `power` / `cost` 是**字符串**：变化类技能无威力，值为 `"—"`（如「防御」），整数表达不了。
+6. **该形态无资料时整键缺失**（`omitempty`），不是空数组 —— 见下「数据来源」。
+7. **`skillId` 可能为 0**：该技能在资料站是重名的（借用/取念/复写各有 4 个变体，
+   愿力冲击有 15 个精灵专属版），无从判断这个形态会的是哪一个。
+
+> ⚠️ **数据来源是第三方资料站（过渡方案）**，不是游戏解包：
+> 见 `scripts/fetch_skill_ids.py`、`scripts/gen_skills.py` 与 `internal/gamedata/skills.go`。
+> 它覆盖 462 个形态；权威映射是解包的 `SKILL_CONF`
+> （`base_skill_id` → 中文名，与协议同源），解出后应替换。
+> 完整背景与局限见 `docs/data.md`「技能名」。
 
 ### `GET /api/stats` ✅
 ```json
@@ -365,9 +400,12 @@
 
 - `active` 恒在下发（是否正在打一局）；`run` 只在握有某一局时出现，`history` 只在收到过
   0x1975 账号档案后出现。
-- `run` 里技能/特性/碎片/事件/奖励**只有 id**：游戏技能名表尚未接入本项目
-  （`names.json` 里没有），一律原样展示。奖励 id 的类别按区间可判（7xxxxx=技能、
-  288xxx=特性、20xx-30xx=碎片），前端已内置该映射。
+- `run.pet.skills[]` 的**技能有 `name`**（按 `id` 查第三方资料的 `skill_id → 中文名`，
+  见 `docs/data.md`「技能名」）。**融合不改变 `base_skill_id`**（只改威力与融合次数），
+  故融合态技能同样有 `name`。仅当资料站未收录该 id 时 `name` 缺失，前端回退显示 `id`。
+  试炼给少数技能换了 id（如魔能爆 `7020550` → 试炼态 `7880058`），这些已单独登记。
+- 其余（特性 `288xxx`、碎片 `20xx-30xx`、事件、奖励）**只有 id，无名称表**，一律原样展示。
+  奖励 id 的类别按区间可判（7xxxxx=技能、288xxx=特性、20xx-30xx=碎片），前端已内置该映射。
 - `log` 是操作流水（最新在前，最多 40 条），`kind` 取值 `start/node/refresh/bless/reward/
   shop/boss/settle`；`ids` 随 kind 而异（如 `node` 是 [章节号, 节点号]）。
 - 一局结束有两条路径收敛：0x196a 结算通知，或档案 0x1975 里最新战绩的补判

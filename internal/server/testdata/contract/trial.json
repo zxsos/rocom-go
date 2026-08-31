@@ -129,14 +129,22 @@
           "merged": [
             7090100
           ],
+          "name": "乱打",
           "power": 25,
           "slot": 2
         },
         {
           "cost": 0,
           "id": 7880058,
+          "name": "魔能爆",
           "power": 20,
           "slot": 2
+        },
+        {
+          "cost": 1,
+          "id": 7999999,
+          "power": 10,
+          "slot": 3
         }
       ],
       "species": "黑猫巫师"

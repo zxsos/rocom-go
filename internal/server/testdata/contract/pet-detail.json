@@ -7,6 +7,152 @@
   "baseConfId": 3006,
   "blood": "火",
   "bloodId": 3,
+  "bloodline": [
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "冰",
+      "name": "冰爪",
+      "power": "80",
+      "skillId": 7090250
+    },
+    {
+      "cost": "3",
+      "effect": "蓄力，对敌方造成魔法伤害。",
+      "elem": "龙",
+      "name": "升龙咆哮",
+      "power": "200",
+      "skillId": 7100150
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "虫",
+      "name": "噬心",
+      "power": "60",
+      "skillId": 7130260
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "恶",
+      "name": "恶能量",
+      "power": "60",
+      "skillId": 7180080
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "幻",
+      "name": "星云漩涡",
+      "power": "60",
+      "skillId": 7190360
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成魔法伤害。",
+      "elem": "普通",
+      "name": "星星撞击",
+      "power": "90",
+      "skillId": 7020910
+    },
+    {
+      "cost": "1",
+      "effect": "造成物伤，本技能位于1号位时威力+60，传动1。",
+      "elem": "机械",
+      "name": "械斗",
+      "power": "45",
+      "skillId": 7070010
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "毒",
+      "name": "毒沼",
+      "power": "80",
+      "skillId": 7120200
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "水",
+      "name": "泡沫",
+      "power": "60",
+      "skillId": 7050330
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "火",
+      "name": "火焰箭",
+      "power": "80",
+      "skillId": 7040370
+    },
+    {
+      "cost": "3",
+      "effect": "对敌方精灵造成魔法伤害。",
+      "elem": "幽",
+      "name": "灵媒",
+      "power": "100",
+      "skillId": 7170220
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "电",
+      "name": "球状闪电",
+      "power": "60",
+      "skillId": 7110300
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "萌",
+      "name": "碰爪",
+      "power": "60",
+      "skillId": 7160240
+    },
+    {
+      "cost": "1",
+      "effect": "造成物伤，2连击。",
+      "elem": "武",
+      "name": "缠丝劲",
+      "power": "25",
+      "skillId": 7140230
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成魔法伤害。",
+      "elem": "草",
+      "name": "花香",
+      "power": "60",
+      "skillId": 7030430
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "地",
+      "name": "跺地",
+      "power": "80",
+      "skillId": 7080120
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "光",
+      "name": "透射",
+      "power": "60",
+      "skillId": 7060230
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "翼",
+      "name": "鹰爪",
+      "power": "60",
+      "skillId": 7150190
+    }
+  ],
   "catchTime": 1700000000,
   "colorful": false,
   "confId": 2000672,
@@ -32,6 +178,111 @@
     "portrait": "Pet1024/JL_huoshen.webp",
     "portraitSmall": "Pet256/JL_huoshen.webp"
   },
+  "learnable": [
+    {
+      "cost": "2",
+      "effect": "自己获得速度+120。",
+      "elem": "翼",
+      "name": "乘风",
+      "power": "—",
+      "skillId": 7150120
+    },
+    {
+      "cost": "4",
+      "effect": "敌方获得全技能威力-20，自己获得全技能威力+20。",
+      "elem": "恶",
+      "name": "力量吞噬",
+      "power": "—",
+      "skillId": 7180170
+    },
+    {
+      "cost": "5",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "普通",
+      "name": "压扁",
+      "power": "155",
+      "skillId": 7020930
+    },
+    {
+      "cost": "0",
+      "effect": "每回合随机变成自己未携带的技能，且该技能能耗-2。",
+      "elem": "普通",
+      "name": "复写",
+      "power": "—"
+    },
+    {
+      "cost": "3",
+      "effect": "造成物伤，若先于敌方攻击，本次技能威力+50%。",
+      "elem": "翼",
+      "name": "扇风",
+      "power": "75",
+      "skillId": 7150060
+    },
+    {
+      "cost": "4",
+      "effect": "造成物伤，吸血50%，应对状态：本次技能威力翻倍。",
+      "elem": "恶",
+      "name": "暗突袭",
+      "power": "70",
+      "skillId": 7180120
+    },
+    {
+      "cost": "0",
+      "effect": "敌方获得全技能能耗+1，应对防御：改为能耗+3。",
+      "elem": "普通",
+      "name": "精神扰乱",
+      "power": "—",
+      "skillId": 7020760
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "恶",
+      "name": "诋毁",
+      "power": "80",
+      "skillId": 7180270
+    },
+    {
+      "cost": "2",
+      "effect": "敌方获得物防和魔防-120%。",
+      "elem": "普通",
+      "name": "锐利眼神",
+      "power": "—",
+      "skillId": 7020680
+    },
+    {
+      "cost": "2",
+      "effect": "造成魔伤，应对状态：额外打断被应对技能。",
+      "elem": "普通",
+      "name": "阻断",
+      "power": "75",
+      "skillId": 7020520
+    },
+    {
+      "cost": "2",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "翼",
+      "name": "风矢",
+      "power": "80",
+      "skillId": 7150210
+    },
+    {
+      "cost": "3",
+      "effect": "蓄力，造成物伤并吸血50%。",
+      "elem": "龙",
+      "name": "龙之利爪",
+      "power": "130",
+      "skillId": 7100160
+    },
+    {
+      "cost": "5",
+      "effect": "造成物伤，迅捷，应对状态：本次技能威力变为1.5倍。",
+      "elem": "翼",
+      "name": "龙卷风",
+      "power": "70",
+      "skillId": 7150110
+    }
+  ],
   "level": 60,
   "medal": "大块头",
   "medalDesc": "",
@@ -43,6 +294,125 @@
   "natureId": 3,
   "partnerMark": "首领",
   "shiny": true,
+  "skills": [
+    {
+      "cost": "3",
+      "effect": "造成物伤，每使用1次其他火系技能，本技能威力永久翻倍。",
+      "elem": "火",
+      "level": 48,
+      "name": "山火",
+      "power": "15",
+      "skillId": 7040250
+    },
+    {
+      "cost": "1",
+      "effect": "造成物伤，应对状态：本次技能威力变为4倍。",
+      "elem": "火",
+      "level": 42,
+      "name": "闪燃",
+      "power": "40",
+      "skillId": 7040180
+    },
+    {
+      "cost": "1",
+      "effect": "下一次攻击时，技能威力翻倍，应对防御：改为威力变为4倍。",
+      "elem": "火",
+      "level": 36,
+      "name": "热身",
+      "power": "—",
+      "skillId": 7040270
+    },
+    {
+      "cost": "5",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "火",
+      "level": 30,
+      "name": "火云车",
+      "power": "140",
+      "skillId": 7040320
+    },
+    {
+      "cost": "2",
+      "effect": "造成魔伤，应对状态：下次攻击技能威力翻倍。",
+      "elem": "火",
+      "level": 29,
+      "name": "持续高温",
+      "power": "70",
+      "skillId": 7040220
+    },
+    {
+      "cost": "1",
+      "effect": "自己获得双攻+120%和双防-40%。",
+      "elem": "火",
+      "level": 21,
+      "name": "怒火",
+      "power": "—",
+      "skillId": 7040440
+    },
+    {
+      "cost": "1",
+      "effect": "驱散敌方所有增益。",
+      "elem": "普通",
+      "level": 17,
+      "name": "晒太阳",
+      "power": "—",
+      "skillId": 7021100
+    },
+    {
+      "cost": "1",
+      "effect": "造成物伤，每次使用后，本技能威力永久+20。",
+      "elem": "火",
+      "level": 12,
+      "name": "吹火",
+      "power": "50",
+      "skillId": 7040200
+    },
+    {
+      "cost": "1",
+      "effect": "减伤70%，应对攻击。",
+      "elem": "普通",
+      "level": 10,
+      "name": "防御",
+      "power": "—",
+      "skillId": 7020780
+    },
+    {
+      "cost": "3",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "火",
+      "level": 8,
+      "name": "火焰切割",
+      "power": "100",
+      "skillId": 7040390
+    },
+    {
+      "cost": "1",
+      "effect": "自己获得物攻+100%。",
+      "elem": "普通",
+      "level": 6,
+      "name": "力量增效",
+      "power": "—",
+      "skillId": 7020620
+    },
+    {
+      "cost": "0",
+      "effect": "造成物伤，自己回复1能量。",
+      "elem": "火",
+      "level": 1,
+      "name": "火苗",
+      "power": "30",
+      "skillId": 7040170
+    },
+    {
+      "cost": "1",
+      "effect": "对敌方精灵造成物理伤害。",
+      "elem": "普通",
+      "level": 1,
+      "name": "猛烈撞击",
+      "power": "65",
+      "skillId": 7020370
+    }
+  ],
   "spAttack": {
     "nature": 0,
     "talentLv": 7,

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { getTrial, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useAsyncData } from '../../hooks/useAsyncData'
@@ -14,6 +14,26 @@ import { fmtTime } from '../../utils/format'
 //
 // 技能/特性/碎片**只有 id**:游戏技能名表尚未接入本项目(names.json 里没有,
 // 见 docs/data.md「待校准」),故一律按 id 原样展示 —— 编一个名字比留 id 更糟。
+
+// 草系徽章试炼的语义映射(来自 BWIKI「草系徽章试炼」攻略页,仅名称,无协议 id):
+//   - 三章主题名:服务器只下发 chapter_id(3000/3001/3002),名字见 wiki。
+//   - 三档难度:trial_conf_id 10000/10001/10002 对应 基础/进阶1/进阶2。
+// 放前端而非 names.json:这些是 wiki 内容而非游戏解包数据,且只有 6 个条目,硬编码即可。
+const CHAPTER_NAMES = {
+  3000: '记忆中的索米亚草原',
+  3001: '记忆中的巨石阵',
+  3002: '记忆中的普拉塔草原',
+}
+const TRIAL_NAMES = {
+  10000: '草系徽章试炼',
+  10001: '进阶 1',
+  10002: '进阶 2',
+}
+
+// 每层结构(来自 wiki):1-3 层普通池、4 层首领池、5 层普通池、6 层无精灵(商人/魔力之源)、
+// 7 层 NPC 阵容。试炼实际是「3 章 × 8 节点」,与这里的层数是两套口径,此处仅作参考注释,
+// 不参与进度计算(进度仍按实测的每章 8 节点推)。
+
 export default function Trial() {
   const account = useContext(AccountContext)
   const { data, setData } = useAsyncData(useCallback(() => getTrial(), []), { reloadKey: account })
@@ -82,8 +102,12 @@ function RunView({ run, active }) {
           <span className={'trial-dot' + (active ? ' on' : '')} />
           <strong>{active ? '进行中' : '已结束'}</strong>
           {run.slotName && <span className="trial-chip">{run.slotName}</span>}
-          <span className="trial-chip">难度 {run.trialId}</span>
-          <span className="trial-chip">第 {run.chapterIdx || 1} 章</span>
+          <span className="trial-chip" title={'难度 id ' + run.trialId}>
+            {TRIAL_NAMES[run.trialId] || ('难度 ' + run.trialId)}
+          </span>
+          <span className="trial-chip" title={'章节 id ' + run.chapterId}>
+            第 {run.chapterIdx || 1} 章 · {CHAPTER_NAMES[run.chapterId] || '未知章节'}
+          </span>
           <span className="trial-chip">节点 {run.nodeIndex + 1}</span>
           <span className="trial-chip trial-coin" title="试炼金币">🪙 {run.coin}</span>
           {run.boss && <span className="trial-chip trial-boss">BOSS</span>}
@@ -250,7 +274,11 @@ function PetCard({ pet }) {
             <div key={s.slot} className={'trial-skill' + (pet.equipped && pet.equipped.includes(s.slot) ? ' on' : '')}>
               <div className="trial-skill-head">
                 <span className="trial-skill-slot">槽 {s.slot}</span>
-                <span className="trial-skill-id">{s.id}</span>
+                {/* 技能名按 id 查(融合不改 id,故融合态也有名);
+                    资料站未收录的新技能查不到,回退显示 id */}
+                <span className="trial-skill-id" title={`技能 id ${s.id}`}>
+                  {s.name || s.id}
+                </span>
               </div>
               <div className="trial-skill-meta">
                 <span title="融合后威力">威力 {s.power}</span>
@@ -379,7 +407,7 @@ function HistoryView({ history }) {
                   {r.victory ? '通关' : '失败'}
                 </span>
                 <span className="muted">
-                  {r.petName || r.petBaseId} · Lv {r.petLevel} · 难度 {r.trialId} · 用时 {fmtDuration(r.duration)}
+                  {r.petName || r.petBaseId} · Lv {r.petLevel} · {TRIAL_NAMES[r.trialId] || ('难度 ' + r.trialId)} · 用时 {fmtDuration(r.duration)}
                 </span>
               </li>
             ))}

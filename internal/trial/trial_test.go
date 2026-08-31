@@ -127,6 +127,64 @@ func TestParseSlotProgress(t *testing.T) {
 	}
 }
 
+// TestParseReviewSkills 断言历史战绩里带出了技能明细(字段 9 review_skills)。
+//
+// 这个字段是「试炼专属 id(788 段)」的**唯一已知来源**:当前局只见过 7880058,
+// 而 7880000~7880071 共 27 个 id 只在历史战绩里出现。早先没解析它,才把它们
+// 当成「资料站没收录」而漏掉 —— 有了字段 9,现在能拿到每个技能的融合后威力/
+// 能耗/类型/槽位,足以人工在游戏里核对出真身。
+func TestParseReviewSkills(t *testing.T) {
+	// 一个攻击技能(威力 85 能耗 3 type 1 槽 5)+ 一个状态技能(威力 0 能耗 4 type 2 槽 7)
+	var atk, buf []byte
+	atk = protowire.AppendTag(atk, 1, protowire.VarintType) // base_skill_id
+	atk = protowire.AppendVarint(atk, 7880056)
+	atk = protowire.AppendTag(atk, 2, protowire.VarintType) // fused_power
+	atk = protowire.AppendVarint(atk, 85)
+	atk = protowire.AppendTag(atk, 3, protowire.VarintType) // fused_energy_cost
+	atk = protowire.AppendVarint(atk, 3)
+	atk = protowire.AppendTag(atk, 5, protowire.VarintType) // skill_type
+	atk = protowire.AppendVarint(atk, 1)
+	atk = protowire.AppendTag(atk, 7, protowire.VarintType) // slot_pos
+	atk = protowire.AppendVarint(atk, 5)
+
+	var st []byte
+	st = protowire.AppendTag(st, 1, protowire.VarintType)
+	st = protowire.AppendVarint(st, 7880062)
+	st = protowire.AppendTag(st, 3, protowire.VarintType)
+	st = protowire.AppendVarint(st, 4)
+	st = protowire.AppendTag(st, 5, protowire.VarintType)
+	st = protowire.AppendVarint(st, 2)
+	st = protowire.AppendTag(st, 7, protowire.VarintType)
+	st = protowire.AppendVarint(st, 7)
+
+	buf = protowire.AppendTag(buf, 2, protowire.VarintType) // petbase_conf_id
+	buf = protowire.AppendVarint(buf, 3569)
+	buf = protowire.AppendTag(buf, 9, protowire.BytesType) // review_skills
+	buf = protowire.AppendBytes(buf, atk)
+	buf = protowire.AppendTag(buf, 9, protowire.BytesType)
+	buf = protowire.AppendBytes(buf, st)
+
+	r := ParseReview(buf)
+	if r.PetBaseID != 3569 {
+		t.Fatalf("PetBaseID = %d, 期望 3569", r.PetBaseID)
+	}
+	if len(r.Skills) != 2 {
+		t.Fatalf("解析出 %d 个技能, 期望 2", len(r.Skills))
+	}
+	want := []Skill{
+		{BaseID: 7880056, Power: 85, EnergyCost: 3, SkillType: 1, SlotPos: 5},
+		{BaseID: 7880062, Power: 0, EnergyCost: 4, SkillType: 2, SlotPos: 7},
+	}
+	for i, w := range want {
+		got := r.Skills[i]
+		// Skill 含 slice(Merged),不能直接用 == 比较
+		if got.BaseID != w.BaseID || got.Power != w.Power ||
+			got.EnergyCost != w.EnergyCost || got.SkillType != w.SkillType || got.SlotPos != w.SlotPos {
+			t.Errorf("Skills[%d] = %+v, 期望 %+v", i, got, w)
+		}
+	}
+}
+
 // TestParseLogRecord 断言见闻录的 discovered 计数兼容 packed 与非 packed 两种编码。
 // 实测字段 3 是非 packed(392 个独立 tag),但协议允许 packed,两种都要对。
 func TestParseLogRecord(t *testing.T) {

@@ -134,6 +134,23 @@ export function PetDetailModal({ gid, onClose }) {
 
           {chain.length > 1 && <EvoChain chain={chain} current={pet.baseConfId} form={pet.form} />}
 
+          <SkillBlock
+            title="天生技能"
+            note="（升级习得）"
+            skills={pet.skills}
+            withLevel
+          />
+          <SkillBlock
+            title="可学技能"
+            note="（技能石）"
+            skills={pet.learnable}
+          />
+          <SkillBlock
+            title="血脉技能"
+            note="（血脉获得）"
+            skills={pet.bloodline}
+          />
+
           {ownedMedals.length > 0 && (
             <div>
               <div className="muted" style={{ marginBottom: 6 }}>奖牌墙</div>
@@ -163,6 +180,50 @@ function evoStages(chain) {
     else stages.push([s])
   }
   return stages
+}
+
+// SkillRow 一行技能:「技能名 · 属性 · 威力/能耗」,悬浮出完整效果描述。
+// 天生技能额外在左侧显示学会等级(其余两类没有等级这个概念)。
+function SkillRow({ s, level }) {
+  return (
+    <div className="skill-row" title={s.effect || ''}>
+      {level !== undefined ? (
+        <span className="skill-lv">Lv{level}</span>
+      ) : (
+        <span className="skill-lv" />
+      )}
+      <span className="skill-name">{s.name}</span>
+      {s.elem && <span className="skill-elem">{s.elem}</span>}
+      <span className="skill-num">
+        {s.power && s.power !== '—' ? `威力 ${s.power}` : '—'}
+        {s.cost !== '' && s.cost !== undefined ? ` · 能耗 ${s.cost}` : ''}
+      </span>
+    </div>
+  )
+}
+
+// SkillBlock 一个技能区块(天生 / 可学 / 血脉)。
+//
+// 三点要说清,免得被误读成「这只宠物当前带的技能」:
+//   - 这些是**该形态可获得的技能**(可换配置),不是个体当前携带的 —— 后端不存
+//     个体技能(见 git 0762eb6),技能也可经技能石等途径更换。
+//   - 三类按获取途径划分,几乎互斥(天生∩技能石 3 条、与血脉 0 条),故并列不去重。
+//   - 数据来自第三方资料站(过渡方案),只覆盖部分形态;没数据时整块不显示。
+function SkillBlock({ title, note, skills, withLevel }) {
+  if (!skills || !skills.length) return null
+  return (
+    <div>
+      <div className="muted" style={{ marginBottom: 6 }}>
+        {title}
+        <span className="skills-note">{note}</span>
+      </div>
+      <div className="skills">
+        {skills.map((s, i) => (
+          <SkillRow key={i} s={s} level={withLevel ? s.level : undefined} />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // EvoChain 进化链:各阶段头像横向排列,当前形态高亮;同阶段多形态=分支进化,纵向并列。

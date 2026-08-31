@@ -203,6 +203,13 @@ type ReviewRecord struct {
 	SlotID    uint32
 	Mutation  uint32
 	FirstWin  bool
+	// Skills 是结算快照里的技能(字段 9,repeated GrassTrialFusedSkillData)。
+	// 与试炼槽里的技能同结构,含融合后的威力 —— 历史战绩只能看到融合态。
+	//
+	// 它是「试炼专属 id」(788 段)的唯一已知来源:当前局只见过 7880058,
+	// 而 7880000~7880071 共 27 个只在历史战绩里出现。要还原它们的真身,
+	// 只能靠这里的 fused_power/fused_energy_cost/skill_type 反查。
+	Skills []Skill
 }
 
 // SlotProgress 是图鉴里某属性系槽位的通关情况(18 个系 × 3 个难度)。
@@ -517,8 +524,10 @@ func ParseSlotProgress(b []byte) SlotProgress {
 // ParseReview 解析 GrassTrialReviewRecord。
 func ParseReview(b []byte) ReviewRecord {
 	var r ReviewRecord
-	wire.ScanFields(b, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+	wire.ScanFields(b, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
 		switch {
+		case num == 9 && typ == protowire.BytesType:
+			r.Skills = append(r.Skills, ParseSkill(val))
 		case num == 1 && typ == protowire.VarintType:
 			r.SettleAt = v
 		case num == 2 && typ == protowire.VarintType:

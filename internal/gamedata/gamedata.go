@@ -72,6 +72,8 @@ type DB struct {
 	eggTypes   map[int32]EggType  // 蛋品类 precious_egg_type -> 名称/排序号/角标
 	sizeMedals []SizeMedal        // 按百分位自动授予的奖牌(体重两枚 + 嗓音两枚)
 	nestFurn   map[uint32]string  // 小窝家具 config_id -> 家具名(实测仅 1001071 精灵小窝)
+	// 天生技能表(独立于 names.json,数据源是第三方资料站的过渡方案,见 skills.go)。
+	skills *skillsDB
 }
 
 // Load 加载 embed 的名称表。
@@ -293,6 +295,7 @@ func Load() (*DB, error) {
 		eggTypes:       eggTypes,
 		sizeMedals:     raw.SizeMedals,
 		nestFurn:       nestFurn,
+		skills:         loadSkills(),
 	}, nil
 }
 

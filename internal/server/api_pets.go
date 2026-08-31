@@ -74,6 +74,25 @@ func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"total": total, "pets": pets})
 }
 
+// petDetailView 是单只宠物详情的响应形状:宠物本体字段平铺 + 该形态的三类技能。
+//
+// 为什么用包装而非给 pet.Pet 加字段:Pet 会被整个序列化进 pets.data 列,
+// 加字段等于给每只宠物都存一份技能(体积 × 宠物数)—— 正是 git 0762eb6 移除
+// Pet.SkillIDs 的理由之一。故技能只在**详情接口读取时**按形态注入,不进库。
+// 内嵌 *pet.Pet 让 JSON 字段平铺,前端拿到的结构与改造前一致,只多出技能字段。
+type petDetailView struct {
+	*pet.Pet
+	// 以下三项都是**该形态可获得的技能**(可换配置),不是这只宠物当前携带的。
+	// 三者按获取途径划分,几乎互斥(天生∩技能石 3 条、与血脉 0 条),故并列不去重:
+	//   Skills     天生:升级自然学会,带 level
+	//   Learnable  技能石:需消耗技能石才能学
+	//   Bloodline  血脉:通过血脉获得(资料站无等级/条件,故只有技能本身)
+	// 第三方资料没覆盖该形态时为 nil,键不出现 —— 见 gamedata.InnateSkills 等。
+	Skills    []gamedata.InnateSkill `json:"skills,omitempty"`
+	Learnable []gamedata.Skill       `json:"learnable,omitempty"`
+	Bloodline []gamedata.Skill       `json:"bloodline,omitempty"`
+}
+
 func (s *Server) handlePet(w http.ResponseWriter, r *http.Request) {
 	gid, _ := strconv.ParseUint(r.PathValue("gid"), 10, 32)
 	p, err := s.store.For(s.acct(r)).GetPet(uint32(gid))
@@ -86,7 +105,19 @@ func (s *Server) handlePet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pet.FillSizePercentile(s.db, p)
-	writeJSON(w, p)
+	// 技能按**当前形态**取(base_conf_id);它比 conf_id(进化线一阶)更准,
+	// 已进化的宠物才能看到本形态的技能。
+	v := &petDetailView{Pet: p}
+	if sk := s.db.InnateSkills(p.BaseConfID); len(sk) > 0 {
+		v.Skills = sk
+	}
+	if sk := s.db.LearnableSkills(p.BaseConfID); len(sk) > 0 {
+		v.Learnable = sk
+	}
+	if sk := s.db.BloodlineSkills(p.BaseConfID); len(sk) > 0 {
+		v.Bloodline = sk
+	}
+	writeJSON(w, v)
 }
 
 // handlePetPage 返回某宠物在当前筛选+排序下所处的页码,供盒子示意图点击跳页。
