@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { count, groupBySlot, imgSrc, kindText, msTime, unwrap } from './format'
+import { count, groupBySlot, imgSrc, kindText, msTime, parseSlots, unwrap } from './format'
 
 // 远行商人的纯展示组件:轮次步骤条、单个轮次、商品卡片。都不持有业务状态,
 // 只依赖传入的数据(商品图加载失败是唯一的局部状态)。
@@ -37,7 +37,6 @@ export function MerchantTurn({ r, cur }) {
       <div className="merchant-turn-head">
         <span className="merchant-turn-time">{time} 上架</span>
         {cur && <span className="merchant-turn-cur">当前售卖中</span>}
-        <span className="merchant-turn-range muted">{r.label}</span>
         <span className="merchant-turn-count">{count(m)} 件</span>
       </div>
       {has ? (
@@ -49,7 +48,7 @@ export function MerchantTurn({ r, cur }) {
                 <span className="merchant-slot-count">{allDay.length} 件</span>
               </div>
               <div className="merchant-grid">
-                {allDay.map((it, i) => <MerchantItem key={it.name + i} it={it} />)}
+                {allDay.map((it, i) => <MerchantItem key={it.name + i} it={it} slot="all" />)}
               </div>
             </div>
           )}
@@ -60,7 +59,7 @@ export function MerchantTurn({ r, cur }) {
                 <span className="merchant-slot-count">{g.items.length} 件</span>
               </div>
               <div className="merchant-grid">
-                {g.items.map((it, i) => <MerchantItem key={it.name + i} it={it} />)}
+                {g.items.map((it, i) => <MerchantItem key={it.name + i} it={it} slot={g.slot} />)}
               </div>
             </div>
           ))}
@@ -71,7 +70,7 @@ export function MerchantTurn({ r, cur }) {
                 <span className="merchant-slot-count">{other.length} 件</span>
               </div>
               <div className="merchant-grid">
-                {other.map((it, i) => <MerchantItem key={it.name + i} it={it} />)}
+                {other.map((it, i) => <MerchantItem key={it.name + i} it={it} slot="" />)}
               </div>
             </div>
           )}
@@ -83,12 +82,19 @@ export function MerchantTurn({ r, cur }) {
   )
 }
 
-// MerchantItem 单个商品卡片:大图 + 名称/类别 + 价格/限购/售卖时间。
-export function MerchantItem({ it }) {
+// MerchantItem 单个商品卡片:大图 + 名称/类别 + 价格/限购。
+// 售卖时段由所在栏的徽标统一展示;仅当商品时段与该栏不一致时才在卡片上补真实时段
+// (跨多个时段 / 归入「其他时段」栏),避免每张卡重复同一行时间。
+export function MerchantItem({ it, slot }) {
   const [imgBad, setImgBad] = useState(false)
   const src = imgSrc(it)
   const range = it.start_time && it.end_time ? `${msTime(it.start_time)} ~ ${msTime(it.end_time)}` : ''
   const tLabel = it.time_label || range
+  // slot 是卡片所处栏:标准时段串 / 'all'=全天栏 / ''=其他栏。
+  // 商品唯一时段与栏一致(或全天栏)时不再提醒,其余情况展示真实时段。
+  const slots = parseSlots(it)
+  const dup = slot === 'all' || (!!slot && slots.length === 1 && slots[0] === slot)
+  const showTime = tLabel && !dup
   return (
     <div className="merchant-item">
       <div className="merchant-item-img-wrap">
@@ -106,7 +112,7 @@ export function MerchantItem({ it }) {
           <span className="merchant-price">{it.price} <span className="merchant-unit">洛克贝</span></span>
           {it.limit > 0 && <span className="merchant-limit">限购 {it.limit}</span>}
         </div>
-        {tLabel && (
+        {showTime && (
           <div className="merchant-item-time" title={range || tLabel}>{tLabel}</div>
         )}
       </div>

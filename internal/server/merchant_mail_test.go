@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // 本文件守住「邮件正文不出现字面 \r\n」。
@@ -26,7 +27,8 @@ var mailTestItems = []merchantItem{
 // TestMerchantMailContentNoLiteralCRLF 内容区 HTML:分组标题后不能有字面 \r\n。
 func TestMerchantMailContentNoLiteralCRLF(t *testing.T) {
 	var imgs []merchantMailImg
-	body := merchantMailContent("远行商人「云上仙岛」", "2026-08-30", "08:00 ~ 12:00", mailTestItems, &imgs)
+	// 后两个 time.Time 传零值 = 不输出「数据获取时间」行(生产路径必传,见 merchant_notify.go)。
+	body := merchantMailContent("远行商人「云上仙岛」", "2026-08-30", "08:00 ~ 12:00", time.Time{}, time.Time{}, mailTestItems, &imgs)
 
 	for _, want := range []string{"全天售卖", "08:00-12:00", "其他时段"} {
 		if !strings.Contains(body, want) {
@@ -51,7 +53,7 @@ func TestMerchantMailDeliveredNoLiteralCRLF(t *testing.T) {
 	}{
 		{"新货提醒", func() string {
 			var imgs []merchantMailImg
-			content := merchantMailContent("远行商人「云上仙岛」", "2026-08-30", "08:00 ~ 12:00", mailTestItems, &imgs)
+			content := merchantMailContent("远行商人「云上仙岛」", "2026-08-30", "08:00 ~ 12:00", time.Time{}, time.Time{}, mailTestItems, &imgs)
 			var got string
 			s.smtp = newSMTPSender("from@qq.com", "pass")
 			s.smtp.sendFn = func(to, subject, html string, imgs []merchantMailImg) error {
