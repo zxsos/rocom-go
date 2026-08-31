@@ -268,3 +268,41 @@ func TestBoxTeamSwapClearsStaleSide(t *testing.T) {
 		t.Errorf("gid=12 盒子位置不对: %+v", p.Box)
 	}
 }
+
+// TestAccountAvatar 锁定头像的存取语义:登录解析到就写入,解析不到(空串)保留旧值。
+// 后者是真实场景 —— 快速登录回包不带头像,若空串覆盖,玩家头像会莫明消失。
+func TestAccountAvatar(t *testing.T) {
+	st := newTestStore(t)
+	if err := st.UpsertAccount(testAcc, "测试账号"); err != nil {
+		t.Fatalf("建账号: %v", err)
+	}
+	avatarOf := func() string {
+		accs, err := st.ListAccounts()
+		if err != nil {
+			t.Fatalf("ListAccounts: %v", err)
+		}
+		for _, a := range accs {
+			if a.Account == testAcc {
+				return a.Avatar
+			}
+		}
+		t.Fatalf("账号 %s 未出现在列表里", testAcc)
+		return ""
+	}
+	const url = "https://thirdwx.qlogo.cn/mmopen/vi_32/abc/132"
+	if got := avatarOf(); got != "" {
+		t.Fatalf("新账号头像应为空,实得 %q", got)
+	}
+	if err := st.SetAccountAvatar(testAcc, url); err != nil {
+		t.Fatalf("SetAccountAvatar: %v", err)
+	}
+	if got := avatarOf(); got != url {
+		t.Fatalf("期望 %q,实得 %q", url, got)
+	}
+	if err := st.SetAccountAvatar(testAcc, ""); err != nil {
+		t.Fatalf("SetAccountAvatar(空): %v", err)
+	}
+	if got := avatarOf(); got != url {
+		t.Fatalf("空 URL 不应覆盖已有头像,实得 %q", got)
+	}
+}

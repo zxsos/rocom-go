@@ -154,9 +154,36 @@
 
 ### `GET /api/accounts` ⚠️
 ```json
-[{ "account": "UID:1", "name": "...", "petCount": 12, "title": "大富翁", "hasPin": true, "online": true }]
+[{ "account": "UID:1", "name": "...", "petCount": 12, "title": "大富翁", "hasPin": true,
+   "online": true, "avatar": "https://thirdwx.qlogo.cn/mmopen/vi_32/.../132" }]
 ```
 `online` 由内存表判定（最近 30s 有流量），不落库；`title` 是当日排行榜称号。
+
+`avatar` 是玩家**平台头像 URL**（登录回包 `plat_avatar_url`，可直接 `<img src>`）。
+实测回包里出现过两类地址，**URL 形态完全不同**：
+
+- `https://thirdwx.qlogo.cn/mmopen/.../132` —— 微信头像。末段是**尺寸位**，
+  `0`/`46`/`64`/`96`/`132` 可取不同分辨率；前端统一取 `96`（最大的一处是手机端
+  sheet 的 36px，2x 屏也只要 72px）。
+- `https://photo-prod.nrc.qq.com/<uid>/card/<一串数字>` —— 游戏内名片照。**末段是图片
+  ID 而非尺寸**，没有尺寸位可用，必须原样请求（实测原图 200 返回 ~400KB png，
+  把它当尺寸位改写成 `/96` 会直接 404）。
+
+> ⚠️ **别按「末段是不是纯数字」来猜尺寸位**：这两类地址都会命中该判据，后者会被改坏
+> 成破图。前端的改写规则按**域名白名单**收紧（见 `AccountAvatar.jsx` 的 `sized`）。
+> 将来再出现新的头像域名，先确认它有没有尺寸位，再决定要不要加进白名单。
+
+- **`avatar` 可能整个键缺席**：游客号、未绑平台、或版本变更后解析失败时取不到，
+  此时字段带 `omitempty` 不下发。前端**必须**回退到占位（如昵称首字徽章），
+  不要直接渲染 `<img src="">`——那会打出破图并发一次无谓请求。
+- **取到后不会被清空**：解析失败时后端保留旧值（`SetAccountAvatar` 忽略空串），
+  故快速登录等不带头像的回包不会让头像凭空消失。
+
+> ⚠️ **隐私：这是真人社交账号头像，敏感度高于昵称与 UID。**
+> 后端原样下发（能打开页面的人就能看到，与昵称/洛克贝同级暴露面，**不要公网部署**）；
+> 前端渲染时**必须挂 `.privacy`** 纳入全局截图防泄（见 `web/src/styles/shell.css`）——
+> 昵称首字都已被判定为需遮罩的敏感信息（见 `web/src/components/AccountAvatar.jsx`），
+> 真人头像更没有豁免的道理。
 
 ### `GET /api/leaderboard` ⚠️
 ```json

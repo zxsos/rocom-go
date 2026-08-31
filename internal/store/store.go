@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS pet_medal (
 CREATE TABLE IF NOT EXISTS accounts (
   account TEXT PRIMARY KEY, name TEXT, updated_at INTEGER, pin_hash TEXT,
   coins INTEGER NOT NULL DEFAULT 0, has_coins INTEGER NOT NULL DEFAULT 0,
-  rank_join INTEGER NOT NULL DEFAULT 1
+  rank_join INTEGER NOT NULL DEFAULT 1, avatar TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON accounts(updated_at DESC);
 
@@ -369,6 +369,12 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
 	}
 	// 老库补 rank_join 列(排行榜参与开关):DEFAULT 1 = 默认参加。
 	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN rank_join INTEGER NOT NULL DEFAULT 1`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	// 老库补 avatar 列(玩家平台头像 URL):空串 = 未取到(游客号/未绑平台),
+	// 前端据此回退到昵称首字占位,不要显示破图。
+	if _, err := s.db.Exec(`ALTER TABLE accounts ADD COLUMN avatar TEXT NOT NULL DEFAULT ''`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}

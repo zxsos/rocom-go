@@ -57,6 +57,7 @@ export default [
     //   - motion-report.mjs             偏差可视化报告
     //   - verify-admin-browser.mjs      管理面板失效令牌不黑屏
     //   - verify-admin-paging.mjs       游玩记录分页
+    //   - verify-account-width.mjs      顶栏账号下拉宽度(5 字基准 + 自适应)
     // 判定方法:顶层 import 'playwright' 的脚本就是双环境的,加进来即可。
     files: [
       'scripts/verify-map-vp-browser.mjs',
@@ -66,6 +67,7 @@ export default [
       'scripts/motion-report.mjs',
       'scripts/verify-admin-browser.mjs',
       'scripts/verify-admin-paging.mjs',
+      'scripts/verify-account-width.mjs',
     ],
     languageOptions: {
       ecmaVersion: 'latest',

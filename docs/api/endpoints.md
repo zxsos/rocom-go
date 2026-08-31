@@ -48,7 +48,7 @@
 | `GET /api/medals` | — | — | 全部奖牌（id/name/desc/icon） |
 | `GET /api/name-options` | — | — | 全量特长名 |
 | `GET /api/icons` | — | — | 六维属性小图 + 异色/炫彩/污染标记图 |
-| `GET /api/accounts` | — | — | 已知账号列表（含在线态、今日称号） |
+| `GET /api/accounts` | — | — | 已知账号列表（含在线态、今日称号、平台头像 URL） |
 | `GET /api/leaderboard` | — | — | 排行榜（福布斯/盈亏/今日称号/我） |
 
 ## 实时地图
