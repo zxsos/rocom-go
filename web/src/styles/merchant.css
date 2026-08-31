@@ -165,7 +165,6 @@
   font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
   background: rgba(var(--c-earn-rgb), .14); color: var(--c-earn); border: 1px solid rgba(var(--c-earn-rgb), .4);
 }
-.merchant-turn-range { font-size: 12px; }
 .merchant-turn-count { margin-left: auto; font-size: 12px; color: var(--fg-dim); }
 
 /* 按售卖时段分栏:全天栏 + 各 4h 时段栏(栏间用虚线分隔) */
@@ -213,9 +212,13 @@
 .merchant-price { font-weight: 800; color: var(--gold, #e0a83c); font-size: 16px; font-variant-numeric: tabular-nums; }
 .merchant-unit { font-size: 11px; font-weight: 500; opacity: .8; }
 .merchant-limit { font-size: 12px; color: var(--fg-dim); flex: none; }
+/* 卡片上的时段标注:只在跨时段/其他栏等需要补充信息时出现,做成小徽标样式
+   (虚线框弱化存在感,与常规信息行区分) */
 .merchant-item-time {
-  font-size: 11px; color: var(--fg-dim);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  align-self: flex-start; font-size: 11px; line-height: 1;
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px dashed var(--line); color: var(--fg-dim);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* 错误条 */

@@ -255,13 +255,27 @@ func merchantGroupItems(items []merchantItem) (allDay []merchantItem, groups []m
 // merchantMailContent 构造新货提醒的内容区 HTML(嵌入 merchantMailHTMLTpl 的 %s):
 // 商人名大标题 + 营业日/本轮,商品按「全天 / 标准时段 / 其他」分组展示。
 // 全天商品不打具体时间点(组标题已表达),商品图以 CID 引用收集到 imgs。
-func merchantMailContent(name, day, slot string, items []merchantItem, imgs *[]merchantMailImg) string {
+//
+// slotStart/fetchedAt 用于展示「数据获取时间」及其相对档期整点的滞后 —— 探测第三方
+// 货单刷新延迟期间(临时,见 merchant_probe.go)这是邮件里最要紧的一行,收件人把邮件
+// 转给他人分析时无需再去翻日志。两者任一是零值时该行不输出(单测走这条路径)。
+func merchantMailContent(name, day, slot string, slotStart, fetchedAt time.Time, items []merchantItem, imgs *[]merchantMailImg) string {
 	var b strings.Builder
 	// 每行以 CRLF 结尾:HTML 里裸 CRLF 渲染为空白,不产生可见换行,但保证
 	// 任何单行(组标题/商品行)都不超过 RFC 5321 的 998 字节限制。
 	b.WriteString(`<div style="text-align:center;padding:2px 0 0;">` + "\r\n")
 	b.WriteString(`<span style="font-size:22px;font-weight:800;color:#3a2505;">` + html.EscapeString(name) + `</span></div>` + "\r\n")
 	b.WriteString(`<div style="text-align:center;font-size:12px;color:#8a6d3b;margin:4px 0 2px;">营业日 ` + html.EscapeString(day) + ` · 本轮 ` + html.EscapeString(slot) + `</div>` + "\r\n")
+	if !slotStart.IsZero() && !fetchedAt.IsZero() {
+		lag := fetchedAt.Sub(slotStart)
+		txt := "数据获取于 " + fetchedAt.In(merchantLoc).Format("15:04:05") + " (整点后 " + fmtDuration(lag) + ")"
+		// 滞后超过 1 分钟时标红:这正是要抓的现象,让它在邮件里一眼可见。
+		color := "#8a6d3b"
+		if lag >= time.Minute {
+			color = "#c0392b"
+		}
+		b.WriteString(`<div style="text-align:center;font-size:12px;color:` + color + `;margin:2px 0 2px;">` + html.EscapeString(txt) + `</div>` + "\r\n")
+	}
 	allDay, groups, other := merchantGroupItems(items)
 	merchantMailGroup(&b, "全天售卖", allDay, imgs)
 	for _, g := range groups {
@@ -308,6 +322,18 @@ func merchantMailItemRow(b *strings.Builder, it merchantItem, imgs *[]merchantMa
 		b.WriteString(`<div style="font-size:12px;color:#8a6d3b;margin-top:2px;">` + html.EscapeString(strings.Join(meta, " · ")) + `</div>` + "\r\n")
 	}
 	b.WriteString(`</div></div>` + "\r\n")
+}
+
+// fmtDuration 把时长写成「3 分 20 秒」(不足 1 分只给秒,如「12 秒」)。
+// 负数归零:回源时刻理论上不该早于档期整点,真出现了也不让邮件里显示负滞后。
+func fmtDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.0f 秒", d.Seconds())
+	}
+	return fmt.Sprintf("%d 分 %d 秒", int(d.Minutes()), int(d.Seconds())%60)
 }
 
 // merchantMailItemImg 商品图 URL:http(s) 外链原样;本地 embed 路径读 webp 以 CID 收集。
