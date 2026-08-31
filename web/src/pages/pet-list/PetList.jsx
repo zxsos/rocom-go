@@ -4,6 +4,7 @@ import { AccountContext } from '../../context'
 import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { PetDetailModal } from '../../components/PetDetailModal'
+import { SkeletonRows } from '../../components/Skeleton'
 import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter } from './filters'
 import FilterPanel from './FilterPanel'
 import BoxMap from './BoxMap'
@@ -48,7 +49,7 @@ export default function PetList() {
   const syncRef = useRef(sync)      // 供 SSE 回调读取最新同步开关(避免闭包旧值)
 
   // 列表随筛选条件重取;SSE 防抖重载复用同一个 refresh(内部读最新 fetcher,拿到的就是最新筛选)。
-  const { data, refresh: load } = useAsyncData(
+  const { data, loading, refresh: load } = useAsyncData(
     useCallback(() => getPets(withCatch(filter)), [filter]),
     { fallback: NO_PETS, reloadKey: account },
   )
@@ -242,7 +243,12 @@ export default function PetList() {
         <PetTable pets={data.pets} selected={selected} sort={filter.sort} order={filter.order} onSort={sortBy} itemProps={itemProps} />
         <PetCards pets={data.pets} selected={selected} itemProps={itemProps} />
 
-        {data.pets.length === 0 && <div className="empty">没有匹配的宠物</div>}
+        {/* 首次加载(还没有任何宠物数据)时铺骨架而不是「没有匹配的宠物」——
+            后者是**结果**,加载中报结果会把空列表误读成「筛了个寂寞」。
+            换筛选条件时 useAsyncData 保留旧数据,故只有真正从零开始那一次会见到骨架。 */}
+        {data.pets.length === 0 && (loading
+          ? <SkeletonRows rows={6} h={44} gap={8} />
+          : <div className="empty">没有匹配的宠物</div>)}
 
         <div className="pager">
           <button className="btn" disabled={filter.page <= 1} onClick={() => set({ page: 1 })}>首页</button>

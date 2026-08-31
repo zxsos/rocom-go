@@ -80,8 +80,8 @@ export default function PinCard({ accounts, onAccountsChanged }) {
                 <button className="btn small" onClick={() => { setPinEditing(a.account); setPinValue(''); setPinErr(''); setPinMsg('') }}>
                   {a.hasPin ? '改 PIN' : '设 PIN'}
                 </button>
-                {a.hasPin && <button className="btn ghost" onClick={() => adminClearPin(a.account)}>清 PIN</button>}
-                <button className="btn ghost" onClick={() => adminDelete(a.account)}>删除账号</button>
+                {a.hasPin && <button className="btn ghost danger" onClick={() => adminClearPin(a.account)}>清 PIN</button>}
+                <button className="btn ghost danger" onClick={() => adminDelete(a.account)}>删除账号</button>
               </>
             )}
           </li>

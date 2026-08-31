@@ -326,6 +326,53 @@
 
 `self` 槽排在前，好友槽按 key 升序。`self` 槽不可删。
 
+### `GET /api/trial` ✅
+
+> 结构见 `internal/server/payload.go` 的 `TrialPayload`（已强类型化）。
+> 从未收到试炼报文时返回 `null`。玩法与报文时序见 `docs/pcap-20260831-grass-trial.md`。
+
+```json
+{ "account": "UID:1", "ts": 1700000000, "active": true,
+  "run": {
+    "trialId": 10002, "slotId": 1000, "slotName": "普系",
+    "chapterId": 3001, "chapterIdx": 2, "nodeIndex": 3, "coin": 12,
+    "chapters": [3000, 3001, 3002], "effects": [1001, 1008], "boss": false,
+    "pet": { "gid": 133, "name": "黑猫巫师", "species": "黑猫巫师", "img": "HeadIcon/3569.webp",
+             "level": 60, "hp": 264, "maxHp": 389, "energy": 10, "growth": 2,
+             "skills": [{ "id": 7020500, "power": 25, "cost": 4, "fusion": 1, "slot": 2, "merged": [7090100] }],
+             "features": [288135], "shards": [2016], "equipped": [1, 2] },
+    "options": [{ "slot": 1, "event": 110061, "reward": 7110340, "level": 40,
+                  "eventCost": 1, "rewardCost": 4, "extra": [2016] }],
+    "refreshCost": 2,
+    "bless": { "event": 500001, "options": [100], "effect": 0, "candidates": [7120100] },
+    "reward": { "event": 110005, "id": 288001, "extra": [2016], "coin": 10 },
+    "shop": [{ "type": 2, "id": 288154, "price": 6, "index": 4, "bought": false }],
+    "result": { "victory": true, "duration": 1439, "petBaseId": 3569, "petLevel": 60,
+                "settleAt": 1699999999, "score": 100 },
+    "log": [{ "ts": 1700000000, "kind": "node", "label": "推进节点", "ids": [3001, 3] }]
+  },
+  "history": {
+    "challengeInc": 251, "total": 251, "wins": 23, "cleared": [10000, 10001, 10002],
+    "recent": [{ "settleAt": 1699999999, "petBaseId": 3569, "petName": "黑猫巫师",
+                 "petLevel": 60, "trialId": 10002, "victory": true, "duration": 1439, "slotId": 1000 }],
+    "topPets": [{ "petBaseId": 3141, "name": "花衣蝶", "img": "HeadIcon/3141.webp", "count": 56 }],
+    "slots": [{ "slotId": 1000, "damType": 2, "damName": "普", "cleared": 3 }],
+    "logs": [{ "logConfId": 100, "discovered": 167, "total": 210, "unlocked": true }]
+  } }
+```
+
+要点：
+
+- `active` 恒在下发（是否正在打一局）；`run` 只在握有某一局时出现，`history` 只在收到过
+  0x1975 账号档案后出现。
+- `run` 里技能/特性/碎片/事件/奖励**只有 id**：游戏技能名表尚未接入本项目
+  （`names.json` 里没有），一律原样展示。奖励 id 的类别按区间可判（7xxxxx=技能、
+  288xxx=特性、20xx-30xx=碎片），前端已内置该映射。
+- `log` 是操作流水（最新在前，最多 40 条），`kind` 取值 `start/node/refresh/bless/reward/
+  shop/boss/settle`；`ids` 随 kind 而异（如 `node` 是 [章节号, 节点号]）。
+- 一局结束有两条路径收敛：0x196a 结算通知，或档案 0x1975 里最新战绩的补判
+  （服务器未必发结算通知，见 `docs/pcap-20260831-grass-trial.md` 第 5 节）。
+
 ---
 
 ## 其它有快照的接口

@@ -134,11 +134,13 @@ type snapshotStore struct {
 	wildMu   sync.Mutex
 	homeMu   sync.Mutex
 	flowerMu sync.Mutex
+	trialMu  sync.Mutex
 
 	pos    map[string]*PositionPayload // 账号 -> 最近一次位置
 	wild   map[string]*WildPayload     // 账号 -> 最近一次野生宠物标记
 	home   map[string]*HomePayload     // 账号 -> 最近一次家园小窝图层
 	flower map[string]*FlowerPayload   // 账号 -> 最近一次花种 BOSS 分组
+	trial  map[string]*TrialPayload    // 账号 -> 最近一次草系试炼状态
 }
 
 func newSnapshotStore() *snapshotStore {
@@ -147,6 +149,7 @@ func newSnapshotStore() *snapshotStore {
 		wild:   map[string]*WildPayload{},
 		home:   map[string]*HomePayload{},
 		flower: map[string]*FlowerPayload{},
+		trial:  map[string]*TrialPayload{},
 	}
 }
 
@@ -209,6 +212,21 @@ func (sn *snapshotStore) getFlower(acc string) *FlowerPayload {
 	sn.flowerMu.Lock()
 	defer sn.flowerMu.Unlock()
 	return sn.flower[acc]
+}
+
+func (sn *snapshotStore) setTrial(acc string, v *TrialPayload) {
+	if acc == "" || v == nil {
+		return
+	}
+	sn.trialMu.Lock()
+	sn.trial[acc] = v
+	sn.trialMu.Unlock()
+}
+
+func (sn *snapshotStore) getTrial(acc string) *TrialPayload {
+	sn.trialMu.Lock()
+	defer sn.trialMu.Unlock()
+	return sn.trial[acc]
 }
 
 // injectFlower 在锁内把一个花种插入某账号快照的「当前分组」与「自己世界」槽,
@@ -385,6 +403,9 @@ func (sn *snapshotStore) forget(acc string) {
 	sn.flowerMu.Lock()
 	delete(sn.flower, acc)
 	sn.flowerMu.Unlock()
+	sn.trialMu.Lock()
+	delete(sn.trial, acc)
+	sn.trialMu.Unlock()
 }
 
 // smtpSender 串行发送远行商人订阅邮件。

@@ -307,6 +307,68 @@ func contractFlowers() *FlowerPayload {
 	}
 }
 
+func TestContractTrial(t *testing.T) {
+	s := newTestServer(t)
+	s.SetLastTrial(contractAcc, contractTrial())
+	checkGolden(t, "trial", get(t, s, "/api/trial?account="+contractAcc), nil)
+}
+
+// contractTrial 造一份试炼快照:进行中的一局 + 账号档案。
+func contractTrial() *TrialPayload {
+	return &TrialPayload{
+		Account: contractAcc,
+		Ts:      1700000000,
+		Active:  true,
+		Run: &TrialRun{
+			TrialID: 10002, SlotID: 1000, SlotName: "普系",
+			ChapterID: 3001, ChapterIdx: 2, NodeIndex: 3, Coin: 12,
+			Chapters: []uint32{3000, 3001, 3002},
+			Effects:  []uint32{1001, 1008},
+			Boss:     false,
+			Pet: &TrialPet{
+				Gid: 133, Name: "黑猫巫师", Species: "黑猫巫师", Img: "HeadIcon/3569.webp",
+				Level: 60, HP: 264, MaxHP: 389, Energy: 10, Growth: 2,
+				Skills: []TrialSkill{
+					{ID: 7020500, Power: 25, Cost: 4, Fusion: 1, Slot: 2, Merged: []uint32{7090100}},
+					{ID: 7880058, Power: 20, Cost: 0, Slot: 2},
+				},
+				Features: []uint32{288135, 288001},
+				Shards:   []uint32{2016, 3005},
+				Equipped: []uint32{1, 2},
+			},
+			Options: []TrialOption{
+				{Slot: 1, Event: 110061, Reward: 7110340, Level: 40, EventCost: 1, RewardCost: 4, Extra: []uint32{2016}},
+				{Slot: 2, Event: 100017, Reward: 7040220, Level: 40},
+			},
+			RefreshCost: 2,
+			Reward:      &TrialReward{Event: 110005, ID: 288001, Extra: []uint32{2016}, Coin: 10},
+			Shop: []TrialShopItem{
+				{Type: 2, ID: 288154, Price: 6, Index: 4},
+				{Type: 3, ID: 2016, Price: 4, Index: 5, Bought: true},
+			},
+			Log: []TrialLogEntry{
+				{Ts: 1700000000, Kind: "node", Label: "推进节点", IDs: []uint32{3001, 3}},
+				{Ts: 1700000001, Kind: "reward", Label: "直接收下", IDs: []uint32{288001}, Action: 2},
+			},
+		},
+		History: &TrialHistory{
+			ChallengeInc: 251, Total: 251, Wins: 23, Cleared: []uint32{10000, 10001, 10002},
+			Recent: []TrialReview{
+				{SettleAt: 1699999999, PetBaseID: 3569, PetName: "黑猫巫师", PetLevel: 60, TrialID: 10002, Victory: true, Duration: 1439, SlotID: 1000},
+			},
+			TopPets: []TrialTopPet{
+				{PetBaseID: 3141, Name: "花衣蝶", Img: "HeadIcon/3141.webp", Count: 56},
+			},
+			Slots: []TrialSlot{
+				{SlotID: 1000, DamType: 2, DamName: "普", Cleared: 3},
+			},
+			Logs: []TrialLogBook{
+				{LogConfID: 100, Discovered: 167, Total: 210, Unlocked: true},
+			},
+		},
+	}
+}
+
 func TestContractFlowers(t *testing.T) {
 	s := newTestServer(t)
 	s.SetLastFlowers(contractAcc, contractFlowers())

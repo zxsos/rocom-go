@@ -1,0 +1,174 @@
+{
+  "account": "UID:1",
+  "active": true,
+  "history": {
+    "challengeInc": 251,
+    "cleared": [
+      10000,
+      10001,
+      10002
+    ],
+    "logs": [
+      {
+        "discovered": 167,
+        "logConfId": 100,
+        "total": 210,
+        "unlocked": true
+      }
+    ],
+    "recent": [
+      {
+        "duration": 1439,
+        "petBaseId": 3569,
+        "petLevel": 60,
+        "petName": "黑猫巫师",
+        "settleAt": 1699999999,
+        "slotId": 1000,
+        "trialId": 10002,
+        "victory": true
+      }
+    ],
+    "slots": [
+      {
+        "cleared": 3,
+        "damName": "普",
+        "damType": 2,
+        "slotId": 1000
+      }
+    ],
+    "topPets": [
+      {
+        "count": 56,
+        "img": "HeadIcon/3141.webp",
+        "name": "花衣蝶",
+        "petBaseId": 3141
+      }
+    ],
+    "total": 251,
+    "wins": 23
+  },
+  "run": {
+    "chapterId": 3001,
+    "chapterIdx": 2,
+    "chapters": [
+      3000,
+      3001,
+      3002
+    ],
+    "coin": 12,
+    "effects": [
+      1001,
+      1008
+    ],
+    "log": [
+      {
+        "ids": [
+          3001,
+          3
+        ],
+        "kind": "node",
+        "label": "推进节点",
+        "ts": 1700000000
+      },
+      {
+        "action": 2,
+        "ids": [
+          288001
+        ],
+        "kind": "reward",
+        "label": "直接收下",
+        "ts": 1700000001
+      }
+    ],
+    "nodeIndex": 3,
+    "options": [
+      {
+        "event": 110061,
+        "eventCost": 1,
+        "extra": [
+          2016
+        ],
+        "level": 40,
+        "reward": 7110340,
+        "rewardCost": 4,
+        "slot": 1
+      },
+      {
+        "event": 100017,
+        "level": 40,
+        "reward": 7040220,
+        "slot": 2
+      }
+    ],
+    "pet": {
+      "energy": 10,
+      "equipped": [
+        1,
+        2
+      ],
+      "features": [
+        288135,
+        288001
+      ],
+      "gid": 133,
+      "growth": 2,
+      "hp": 264,
+      "img": "HeadIcon/3569.webp",
+      "level": 60,
+      "maxHp": 389,
+      "name": "黑猫巫师",
+      "shards": [
+        2016,
+        3005
+      ],
+      "skills": [
+        {
+          "cost": 4,
+          "fusion": 1,
+          "id": 7020500,
+          "merged": [
+            7090100
+          ],
+          "power": 25,
+          "slot": 2
+        },
+        {
+          "cost": 0,
+          "id": 7880058,
+          "power": 20,
+          "slot": 2
+        }
+      ],
+      "species": "黑猫巫师"
+    },
+    "refreshCost": 2,
+    "reward": {
+      "coin": 10,
+      "event": 110005,
+      "extra": [
+        2016
+      ],
+      "id": 288001
+    },
+    "shop": [
+      {
+        "bought": false,
+        "id": 288154,
+        "index": 4,
+        "price": 6,
+        "type": 2
+      },
+      {
+        "bought": true,
+        "id": 2016,
+        "index": 5,
+        "price": 4,
+        "type": 3
+      }
+    ],
+    "slotId": 1000,
+    "slotName": "普系",
+    "trialId": 10002
+  },
+  "ts": 1700000000
+}

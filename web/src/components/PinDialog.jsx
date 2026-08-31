@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { verifyAccountPin, setAccountPin, deleteAccount } from '../api'
+import { useDialog } from '../hooks/useDialog'
 
 // PinDialog: 账号 PIN 保护弹窗,三种模式:
 //   mode='verify'  — 切账号时校验 PIN,输入正确后调 onVerified()
@@ -16,14 +17,17 @@ export function PinDialog({ account, name, hasPin, mode, onClose, onVerified, on
   const [pin, setPin] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const inputRef = useRef(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
 
   const title = mode === 'verify' ? '输入 PIN'
     : mode === 'manage' ? (hasPin ? '修改 PIN' : '设置 PIN')
     : mode === 'delete' ? '删除账号'
     : ''
+
+  // 焦点管理(P5.4.3):useDialog 会聚焦弹窗内第一个可聚焦元素 —— 三种模式下
+  // DOM 顺序里第一个都是「该填的那个 PIN 输入框」(verify:pin;manage 有旧 PIN
+  // 时:旧 PIN;manage 无旧 PIN:新 PIN;delete:确认删除的输入框),
+  // 与原先手动 ref 聚焦的效果一致,故不再各模式单独绑 inputRef。
+  const { ref, dialogProps } = useDialog(title)
 
   const submit = async () => {
     setErr('')
@@ -83,14 +87,15 @@ export function PinDialog({ account, name, hasPin, mode, onClose, onVerified, on
   }
 
   return (
-    <div className="pin-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
+    <div className="pin-backdrop" ref={ref} {...dialogProps}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
       <div className="pin-dialog">
         <div className="pin-title">{title}</div>
         {name && <div className="pin-acct">{name}</div>}
         {err && <div className="pin-err">{err}</div>}
         {mode === 'verify' && (
           <>
-            <input ref={inputRef} className="input pin-input" type="password" inputMode="numeric"
+            <input className="input pin-input" type="password" inputMode="numeric"
               placeholder="4-6 位数字" value={pin} maxLength={6}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
@@ -100,12 +105,11 @@ export function PinDialog({ account, name, hasPin, mode, onClose, onVerified, on
         {mode === 'manage' && (
           <>
             {hasPin && (
-              <input ref={inputRef} className="input pin-input" type="password" inputMode="numeric"
+              <input className="input pin-input" type="password" inputMode="numeric"
                 placeholder="旧 PIN" value={oldPin} maxLength={6}
                 onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))} />
             )}
             <input className="input pin-input" type="password" inputMode="numeric"
-              ref={!hasPin ? inputRef : undefined}
               placeholder="新 PIN(4-6 位数字)" value={newPin} maxLength={6}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))} />
             <input className="input pin-input" type="password" inputMode="numeric"
@@ -114,7 +118,7 @@ export function PinDialog({ account, name, hasPin, mode, onClose, onVerified, on
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
             <div className="pin-actions">
               {hasPin && (
-                <button className="btn pin-clear-btn" onClick={clearPin} disabled={busy || oldPin.length < 4}
+                <button className="btn ghost" onClick={clearPin} disabled={busy || oldPin.length < 4}
                   title={oldPin.length < 4 ? '需先输入旧 PIN 才能清除' : '清除后切到该账号不再需要 PIN'}>清除 PIN</button>
               )}
               <button className="btn primary pin-submit" onClick={submit} disabled={busy || newPin.length < 4 || newPin !== confirmPin}>保存</button>
@@ -124,13 +128,13 @@ export function PinDialog({ account, name, hasPin, mode, onClose, onVerified, on
         {mode === 'delete' && (
           <>
             <div className="pin-warn">将永久删除该账号的全部宠物、事件、精灵蛋等数据,不可恢复。</div>
-            <input ref={inputRef} className="input pin-input" type="password" inputMode="numeric"
+            <input className="input pin-input" type="password" inputMode="numeric"
               placeholder="输入 PIN 确认删除" value={pin} maxLength={6}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
             <div className="pin-actions">
               <button className="btn" onClick={onClose} disabled={busy}>取消</button>
-              <button className="btn pin-danger-btn" onClick={submit} disabled={busy || pin.length < 4}>确认删除</button>
+              <button className="btn danger pin-danger-btn" onClick={submit} disabled={busy || pin.length < 4}>确认删除</button>
             </div>
           </>
         )}

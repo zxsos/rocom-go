@@ -90,15 +90,15 @@ export default function MerchantSubsCard({ onUnauthed }) {
           className="input" rows={3} placeholder="邮件内容(留空用默认)" value={testBody}
           onChange={(e) => setTestBody(e.target.value)}
         />
-        <button className="btn primary" type="submit" disabled={!testEmail.trim() || testBusy}>
-          {testBusy ? '发送中…' : '发送测试邮件'}
+        <button className={'btn primary' + (testBusy ? ' is-loading' : '')} type="submit" disabled={!testEmail.trim() || testBusy}>
+          发送测试邮件
         </button>
       </form>
       {/* 强制刷新:回源第三方重抓商人数据(烧对方额度,仅维护用) */}
       <div className="admin-play-toolbar">
-        <button className="btn" type="button" onClick={forceMerchant} disabled={forceBusy}
+        <button className={'btn' + (forceBusy ? ' is-loading' : '')} type="button" onClick={forceMerchant} disabled={forceBusy}
           title="绕过后端缓存,强制后端重新向第三方抓取当前轮商人数据(烧对方额度,非必要别点)">
-          {forceBusy ? '强制刷新中…' : '强制刷新商人数据'}
+          强制刷新商人数据
         </button>
         <span className="admin-hint">绕过后端缓存,强制后端重新向第三方抓取当前轮商人数据(烧对方额度,非必要别点)。</span>
       </div>
@@ -128,7 +128,7 @@ export default function MerchantSubsCard({ onUnauthed }) {
                     <td>{s.keywords || <span className="muted">全部</span>}</td>
                     <td>{fmtShortTime(s.created_at)}</td>
                     <td>
-                      <button className="btn ghost" onClick={() => removeSub(s.email)}>删除</button>
+                      <button className="btn ghost danger" onClick={() => removeSub(s.email)}>删除</button>
                     </td>
                   </tr>
                 ))}

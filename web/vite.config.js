@@ -7,6 +7,16 @@ export default defineConfig({
   build: {
     outDir: '../internal/server/web',
     emptyOutDir: true,
+    // 路由级分包(main.jsx 的 React.lazy)之外的补充:把 React 全家桶单独拆 chunk,
+    // 让浏览器长缓存复用(配合 handleStatic 对 hash 产物返回 immutable),
+    // 页面 chunk 相互独立,新增页面不使旧缓存失效。
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
   },
   server: {
     proxy: {

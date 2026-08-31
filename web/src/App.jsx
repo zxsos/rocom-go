@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { getIcons } from './api'
 import { AccountContext, AccountNameContext, IconsContext } from './context'
 import { useFullscreen } from './hooks/useFullscreen'
@@ -105,7 +105,7 @@ export default function App() {
               {/* 不用 key={account} 强制重挂:各页按 account 依赖重取(见 hooks/useAsyncData 的
                   reloadKey),切账号只刷新数据、不动组件树,故筛选/页码/详情弹窗等 UI 态得以保留。 */}
               <main className="content">
-                <Outlet />
+                <RouteEnter><Outlet /></RouteEnter>
               </main>
             </MapEngineProvider>
 
@@ -145,4 +145,22 @@ export default function App() {
       </AccountNameContext.Provider>
     </AccountContext.Provider>
   )
+}
+
+// RouteEnter 页面切换过渡(P5.4.1):路由出口包一层,pathname 变化时换 key 触发
+// CSS animation —— 内容淡入 + 8px 上移(--dur-base / --ease-out,见 base.css 注释)。
+//
+// 两个刻意的设计:
+//  1. **只包 Outlet,不包整页**:顶栏/底导航是固定外壳,跟着内容一起动会显得整页在晃。
+//  2. **key 用 pathname 而非 location.key**:后者每次导航(含同路径的 replace)都变,
+//     会让「点同一个菜单项」也重播动画;pathname 语义正好是「换了一屏」。
+//     路由组件本来就会随导航卸载重挂(见 useAsyncData 的 reloadKey 注释),
+//     故这里换 key 不会额外损失 UI 态。
+//
+// 地图页安全性:.map-vp 的尺寸用 clientWidth/clientHeight 测量(usePanZoom),
+// 布局尺寸不受 transform 影响,故 8px 位移不会让地图算错视口;位移也只在动画
+// 期间存在(animation 无 fill-mode,结束后回到常态 transform: none)。
+function RouteEnter({ children }) {
+  const { pathname } = useLocation()
+  return <div className="route-enter" key={pathname}>{children}</div>
 }

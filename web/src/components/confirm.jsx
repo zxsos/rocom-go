@@ -22,7 +22,7 @@ export function confirmDialog({ message = '', okText = '确定', cancelText = '�
     cancel.className = 'btn'
     cancel.textContent = cancelText
     const ok = document.createElement('button')
-    ok.className = 'btn primary' + (danger ? ' confirm-danger' : '')
+    ok.className = 'btn' + (danger ? ' danger' : ' primary')
     ok.textContent = okText
     actions.append(cancel, ok)
     dlg.append(msg, actions)

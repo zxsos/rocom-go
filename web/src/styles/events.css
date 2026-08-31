@@ -109,7 +109,6 @@
 /* 多规则联合逻辑:说明文字 + AND/OR 切换,两端对齐 */
 .rule-logic { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rule-logic-toggle { display: flex; gap: 4px; margin-left: auto; }
-.btn.small { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
 .muted.small { font-weight: 400; font-size: 13px; }
 
 @media (max-width: 760px) {

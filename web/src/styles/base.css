@@ -11,6 +11,7 @@
   --fg-dim: #9aa7b4;
   --accent: #4c8dff;
   --accent-soft: rgba(76, 141, 255, .14);
+  --accent-hi: #5c9aff; /* --accent 亮一档,primary 按钮 hover 用(原硬编码 #5c9aff) */
   --gold: #f5b942;
   --green: #3fb950;
   --red: #f85149;
@@ -89,6 +90,31 @@
      字体加载失败时只是数字字形变了,布局与可读性不受影响。 */
   --font-num: 'RocoNum', -apple-system, 'PingFang SC', system-ui, sans-serif;
 
+  /* 中文标题显示字体(自托管,思源黑体 Bold 子集,见 @font-face 处注释)。
+     只给标题(h1/h2、顶栏站名)用,正文保持系统字体栈 —— 显示字体只有 700
+     一档,字号小的 h3/小标题用它会显得过重。回退链以系统字体收尾,
+     子集外字符按字符回退,不出现豆腐块。 */
+  --font-display: 'RocoDisplay', -apple-system, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+
+  /* 标题字号标度(3.2 排版标度统一):h1/h2/h3 只经这三个令牌定字号。
+     统一前各页标题散落 17/18/20px 与浏览器默认 24px(页面级 h2 大多没设字号),
+     现在页面级标题统一 20px,卡片内小标题 15px。
+     正文 11-13px 属数据密集节奏,不纳入标度(改动无视觉收益、纯 churn)。 */
+  --text-h1: 26px; /* 预留,当前无 h1 页面 */
+  --text-h2: 20px;
+  --text-h3: 15px;
+
+  /* 动效令牌(3.4 动效体系):时长分级 + 统一缓动,新增动效一律从这里取,改一处全局生效。
+     fast=悬停/按压反馈(原 150ms 收紧到 120ms,更跟手);
+     base=浮层(提示/确认/下拉)显隐(原 160ms 统一到 200ms);
+     slow=抽屉/大元素入场(抽屉原 250ms 放宽到 320ms,滑入更顺)。
+     ease-out 用系统抽屉曲线(安卓/iOS 同款):入场快、尾段缓,不做回弹
+     (回弹只留给"庆祝类"动效,当前无此场景,不预置令牌)。 */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(.32, .72, 0, 1);
+
   /* 系别标签的深字色:浅底系别(冰/翼/草/虫…)用白字对比度不足,改用这一档。
      取值接近纯黑但留一点冷调,与 --fg 系同源。放在这里(而非系别色那段另起
      一个 :root 块)是硬要求:scripts/check-css-vars.mjs 用 `rootVars = ...`
@@ -161,6 +187,7 @@
   --fg-dim: #656d76;
   --accent: #2f6fdb;
   --accent-soft: rgba(47, 111, 219, .12);
+  --accent-hi: #2559b8; /* 亮色下 hover 用略深的一档(白底上再亮会看不清,同 --red-hi 口径) */
   --gold: #b88200;
   --green: #1a7f37;
   --red: #cf222e;
@@ -204,6 +231,43 @@
   unicode-range: U+20, U+22-23, U+25-29, U+2B-3A, U+3C-5A, U+61-7A, U+7E, U+B0, U+D7;
 }
 
+/* —— 中文标题显示字体(自托管,思源黑体 / Noto Sans CJK SC Bold 700 子集,SIL OFL 1.1)——
+
+   仓库内文件:web/public/fonts/source-han-sans-sc-700-subset.woff2(~238KB)+ OFL-NotoSansCJK.txt。
+   自托管理由同 RocoNum:局域网内可能没外网,任何 CDN 引用都会静默失效。
+
+   为什么只要 700 一个字重:这个站用显示字体的地方**全是粗体**(站名、页面标题、
+   详情弹窗的宠物名),不存在 regular 的展示场景,多下一个字重纯属浪费。
+   源字体约 17MB,子集只取标题(约 20 字)+ 宠物名(约 830 字)+ ASCII/标点,共 ~945 字。
+
+   为什么子集要含宠物名:详情弹窗 h2 显示 pet.name,是用户看得最多的大字 ——
+   子集外的宠物名会逐字回退系统字体,与其余标题混排。全量收录后任意宠物名
+   都有字形,零回退。
+
+   子集外字符(新标题、新宠物名)按 unicode-range 命中与否逐字符回退到系统字体,
+   **不会**出现豆腐块 —— 但新增标题/宠物名文字后应重跑
+   node web/scripts/subset-display-font.mjs 把新字收进子集。 */
+@font-face {
+  font-family: 'RocoDisplay';
+  src: url('/fonts/source-han-sans-sc-700-subset.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  /* 子集含:ASCII 可打印 + ° × … —— ’ “ ” 与 CJK 统一表意(U+4E00-9FFF)。
+     用到子集外的字符时按此逐字符回退到下面的系统字体,不会出现豆腐块。 */
+  unicode-range: U+20-7E, U+B0, U+D7, U+2014, U+2018-2019, U+201C-201D, U+2026, U+4E00-9FFF;
+}
+
+/* 标题用显示字体:页面 h1/h2 与顶栏站名切到 --font-display(见 :root 处注释)。
+   正文与 h3 等小标题保持系统字体 —— 显示字体只有 700 一档,字号小时会过重。
+   详情弹窗 h2 是宠物名(子集已含全部宠物名),同样受益。
+   字号统一走 --text-* 标度(见 :root 处注释):页面级标题 20px、卡片小标题 15px。
+   例外(刻意保留):admin-card h2 18px(管理卡片密集,20px 会撑高)、
+   移动端 admin-head h2 18px(触屏密度)。 */
+h1 { font-family: var(--font-display); font-size: var(--text-h1); }
+h2 { font-family: var(--font-display); font-size: var(--text-h2); }
+h3 { font-size: var(--text-h3); }
+
 * { box-sizing: border-box; }
 /* 禁用移动端点按高亮:默认的 -webkit-tap-highlight-color 会在触摸按钮时闪一个
    灰色半透明方形框(点击一次闪一下,和 :active 反馈叠加很难看)。
@@ -233,28 +297,55 @@ button, input, select { font: inherit; color: inherit; }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 7px 12px; cursor: pointer; white-space: nowrap; user-select: none;
-  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
+  position: relative; /* is-loading 的 spinner 定位锚点 */
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform .08s ease;
 }
 .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
 .btn:active { transform: scale(.97); }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* —— 按钮变体矩阵(全部走语义色,深浅主题自动适配)——
+   语义分级:primary=主操作(每屏 ≤1 个);danger=危险操作(删数据/放生);
+   ghost=次要操作(紧凑,悬停给主色反馈);ghost+danger=弱化危险(列表里的"删除"
+   ——红字不铺红底,降低误触压迫感)。默认 .btn=常规次级。 */
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { background: #5c9aff; border-color: #5c9aff; }
+.btn.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+.btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.danger:hover { background: var(--red-hi); border-color: var(--red-hi); }
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--fg-dim); padding: 4px 10px; font-size: 12px; }
+.btn.ghost:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.btn.ghost.danger:hover { color: var(--red); border-color: var(--red); background: rgba(248, 81, 73, .1); }
+.btn.small { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+
+/* —— 按钮 loading 态:.btn.is-loading 内置 spinner(复用 @keyframes spin),
+   隐藏文字/图标、禁止点击。颜色取 currentColor,任意变体上自动适配
+   (danger 红底白字→白 spinner,ghost 灰字→灰 spinner)。 */
+.btn.is-loading { pointer-events: none; }
+.btn.is-loading:disabled { opacity: .7; } /* 保住 spinner 可辨度,不叠 .4 的禁用淡出 */
+.btn.is-loading::before {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px;
+  border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent;
+  animation: spin .7s linear infinite;
+}
+.btn.is-loading > * { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-loading::before { animation-duration: 1.6s; }
+}
 /* 单图标按钮:固定正方形,与 .icon-btn 视觉统一 */
 .btn-icon { width: 30px; height: 30px; padding: 0; font-size: 15px; line-height: 1; }
 /* 通用方形图标按钮(抽屉关闭/侧栏收起等):全局可用,桌面移动同尺寸 */
 .icon-btn {
   width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--bg-3); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; color: var(--fg);
-  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform .08s ease;
 }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(76, 141, 255, .12); }
 .icon-btn:active { transform: scale(.94); }
 .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .input, .select {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 10px; width: 100%;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
 /* 屏蔽 number 输入的原生上下箭头 */
@@ -264,13 +355,13 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
   background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; font-size: 12px; color: var(--fg-dim); white-space: nowrap; user-select: none;
-  transition: border-color .15s ease, background .15s ease, color .15s ease, transform .08s ease;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform .08s ease;
 }
 .chip:hover { border-color: var(--accent); color: var(--fg); }
 .chip:active { transform: scale(.97); }
 .chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.chip.on:hover { background: #5c9aff; border-color: #5c9aff; }
+.chip.on:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 .pill {
   display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; line-height: 1.5;
   background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-dim);
@@ -297,7 +388,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   box-shadow: var(--shadow);
   color: var(--fg); padding: 10px 16px; font-size: 13px; line-height: 1.5; text-align: center;
   opacity: 0; transform: translateY(8px);
-  transition: opacity .2s ease, transform .2s ease;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
@@ -306,21 +397,19 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   position: fixed; inset: 0; z-index: var(--z-confirm);
   background: rgba(0, 0, 0, .55); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; padding: 16px;
-  opacity: 0; transition: opacity .16s ease;
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-out);
 }
 .confirm-backdrop.show { opacity: 1; }
 .confirm-dialog {
   width: 100%; max-width: 340px; padding: 20px;
   background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px;
-  transform: scale(.96); transition: transform .16s ease;
+  transform: scale(.96); transition: transform var(--dur-base) var(--ease-out);
 }
 .confirm-backdrop.show .confirm-dialog { transform: scale(1); }
 .confirm-message { font-size: 13px; color: var(--fg-dim); line-height: 1.6; }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .confirm-actions .btn { min-width: 76px; }
-.confirm-danger { background: var(--red); border-color: var(--red); color: #fff; }
-.confirm-danger:hover { filter: brightness(1.1); }
 
 /* ---- 炫彩色卡放大预览(GlassZoom,见 components/badges.jsx) ---- */
 /* 各场景色卡(列表/详情/地图悬浮/花种)都可点击放大;图标退化态不可点。 */
@@ -330,7 +419,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   background: rgba(0, 0, 0, .55);
   display: flex; align-items: center; justify-content: center;
   cursor: zoom-out;
-  animation: glass-zoom-in .15s ease;
+  animation: glass-zoom-in var(--dur-fast) var(--ease-out);
   touch-action: manipulation; /* 移动端点按立即派发 click,不等双击缩放判定 */
 }
 @keyframes glass-zoom-in { from { opacity: 0; } to { opacity: 1; } }
@@ -407,4 +496,71 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   .icon-btn { width: 36px; height: 36px; min-height: 36px; }
   .chip { padding: 5px 11px; }
   .boxmap-btn { width: 32px; height: 32px; }
+}
+
+/* ---- 骨架屏(P5.4.2,配合 components/Skeleton.jsx)----
+   底色与高光都取自主题令牌(--bg-3 底 + --line 高光):深色下 --line 更亮、
+   浅色下更暗,两主题都是「微妙提亮」而**不会闪白** —— 闪白的根源是写死
+   rgba(255,255,255,.x),浅色主题下等于把白底高光叠在白底上。
+   只用 background-position 做扫光(不动画几何属性),合成器友好。 */
+.skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--bg-3) 25%, var(--line) 37%, var(--bg-3) 63%);
+  background-size: 400% 100%;
+  border-radius: var(--radius);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
+}
+.skeleton-rows { display: flex; flex-direction: column; }
+
+/* ---- 图片加载占位(P5.4.2)----
+   直接给 <img> 自己铺底色,不额外插占位元素:图片元素本身已由各自的类
+   (.inline-ic / .pet-avatar)定好尺寸,铺上背景就是一个尺寸正确的灰块,
+   加载完成后摘掉类即可 —— 没有多余 DOM,也不会出现占位与图片并存导致的跳位。 */
+.img-ph { background: var(--bg-3); border-radius: 4px; }
+
+/* ---- 路由切换过渡(P5.4.1,配合 App.jsx 的 RouteEnter)----
+   内容区淡入 + 8px 上移,只用 transform/opacity(合成器属性),时长走 --dur-base。
+   keyframes 不写 to、animation 也不设 fill-mode:动画结束即回到元素常态
+   (transform: none),不会留下一个持久的 containing block ——
+   地图页的 .map-vp 定位与尺寸测量都建立在「祖先无 transform」的假设上。 */
+.route-enter { animation: route-enter var(--dur-base) var(--ease-out); }
+@keyframes route-enter { from { opacity: 0; transform: translateY(8px); } }
+
+/* 地图页的高度链必须在这里接住:map.css 里是 .content:has(.map-page) 变 flex 列、
+   .map-page 用 flex:1 1 auto 撑满 —— 多插一层 .route-enter 后,若它是个普通块级
+   flex 项,map-page 的 flex 就落在一个非 flex 容器里失效,地图视口撑不满高度。
+   故只在地图页让包装层「接住并传递」这条链(他页保持普通块级,布局行为不变)。 */
+.content:has(.map-page) > .route-enter {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+}
+
+/* ---- 路由懒加载的页面级占位(main.jsx 的 PageLoading)----
+   只在懒加载 chunk 未就绪的瞬间出现(局域网内通常一闪而过),
+   先给纯 spinner,P5 会升级成与页面布局同构的骨架屏。 */
+.page-loading {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 40vh; color: var(--fg-dim); font-size: 13px;
+}
+.spinner {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  /* 降速不停止:用户仍需知道「正在加载」,只是不要晃眼 */
+  .spinner { animation-duration: 1.6s; }
+  /* 页面切换是纯装饰动效(内容本来就在导航瞬间到位),直接关掉不打折 */
+  .route-enter { animation: none; }
+  /* 骨架屏扫光同样只是「示意在加载」,静态底色已足够表达,去掉循环动画 */
+  .skeleton { animation: none; }
+  /* 浮层/抽屉的位移动画属非必要动效,直接关闭(过渡声明保留,只把时长压到不可感);
+     .filters 是移动端侧滑抽屉(panel.css)。保留不透明度过渡,避免瞬间闪变。 */
+  .toast, .confirm-backdrop, .confirm-dialog, .glass-zoom-backdrop, .filters {
+    transition-duration: 0.01ms !important;
+  }
 }

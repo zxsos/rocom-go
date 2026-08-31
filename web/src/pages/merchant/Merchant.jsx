@@ -3,6 +3,7 @@ import { getMerchant, getAccounts, setAccountRank } from '../../api'
 import { AccountContext } from '../../context'
 import RankTitle from '../../components/RankTitle'
 import { confirmDialog } from '../../components/confirm'
+import { Skeleton, SkeletonRows } from '../../components/Skeleton'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { STATUS, count, unwrap } from './format'
 import { RoundSteps, MerchantTurn } from './components'
@@ -66,7 +67,20 @@ export default function Merchant() {
     return <div className="merchant-page"><div className="merchant-err">{error.message}</div></div>
   }
   if (!d) {
-    return <div className="merchant-page"><div className="empty">{loading ? '加载中…' : ''}</div></div>
+    // 骨架屏(P5.4.2):照 merchant-hero(横幅)+ 轮次卡片(纵向堆叠)的形状铺一遍,
+    // 数据到位时是「就地填色」而不是整屏从中间撑开。
+    return (
+      <div className="merchant-page" role="status" aria-label={loading ? '加载中' : ''}>
+        {loading
+          ? (
+            <>
+              <Skeleton h={104} />
+              <SkeletonRows rows={3} h={120} gap={12} />
+            </>
+          )
+          : <div className="empty" />}
+      </div>
+    )
   }
 
   const open = d.status === 'open'

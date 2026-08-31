@@ -152,6 +152,13 @@ export async function resetPaint(res, layer) {
 // 之后由 SSE home 覆盖;从未进过家园时返回 null。
 export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
 
+// getTrial 返回当前账号最近一次草系徽章试炼状态(试炼页加载即时回显):
+//   {ts, active, run:{trialId,slotId,slotName,chapterId,chapterIdx,nodeIndex,coin,chapters,
+//    effects,boss,pet:{gid,name,species,img,level,hp,maxHp,energy,growth,skills,features,shards,
+//    equipped},options[],refreshCost,bless,reward,shop[],result,log[]}, history:{…}}
+// 之后由 SSE trial 覆盖;从未见过试炼报文时返回 null。
+export const getTrial = () => getJSON('/api/trial?' + buildQuery(), null)
+
 // getFlowers 返回当前账号最近一次花种(花灵)BOSS 分组(花种页加载即时回显):
 //   {flowers:[{id,name,img,star,blood,endTs,specSeedId,activityId,ownerUserId}]}
 // 之后由 SSE flowers 覆盖;从未收到过 0x0375(游戏内未打开过花种面板)时返回 null。
