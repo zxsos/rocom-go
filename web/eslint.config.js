@@ -57,8 +57,11 @@ export default [
     //   - motion-report.mjs             偏差可视化报告
     //   - verify-admin-browser.mjs      管理面板失效令牌不黑屏
     //   - verify-admin-paging.mjs       游玩记录分页
-    //   - verify-account-width.mjs      顶栏账号下拉宽度(5 字基准 + 自适应)
+    //   - verify-account-width.mjs      顶栏账号切换器(徽章顺序 + 5 字基准 + 截断)
+    //   - verify-account-mobile.mjs     手机端账号 sheet(portal / 三种退出 / 键盘)
     // 判定方法:顶层 import 'playwright' 的脚本就是双环境的,加进来即可。
+    // 忘登记的代价:脚本里的 page.evaluate 回调全是浏览器全局,no-undef 会报几十条,
+    // npm run lint 直接红 —— 新加验收脚本时务必同步这里。
     files: [
       'scripts/verify-map-vp-browser.mjs',
       'scripts/verify-map-browser.mjs',
@@ -68,6 +71,7 @@ export default [
       'scripts/verify-admin-browser.mjs',
       'scripts/verify-admin-paging.mjs',
       'scripts/verify-account-width.mjs',
+      'scripts/verify-account-mobile.mjs',
     ],
     languageOptions: {
       ecmaVersion: 'latest',

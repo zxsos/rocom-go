@@ -30,7 +30,7 @@ export default function App() {
   const { accounts, account, current, accountName, requestAccount, selectAccount, refreshAccounts } =
     useAccounts(onPinRequired)
   const { theme, cycle: cycleTheme } = useTheme()
-  const { on: privacyOn, toggle: togglePrivacy } = usePrivacy()
+  const { on: privacyOn, toggle: togglePrivacy, setOff: setPrivacyOff, setOn: setPrivacyOn } = usePrivacy()
   const fullscreen = useFullscreen() // 网页全屏:全局入口,各页面都能用(原先只在宠物列表)
   const [icons, setIcons] = useState({ stat: {} })
 
@@ -43,6 +43,14 @@ export default function App() {
     if (needPin) onPinRequired(needPin)
   }
   const closePin = () => { setPinDialog(null); setPendingAccount(null) }
+
+  // 账号切换器展开期间临时解除遮罩,收起即恢复 —— 无论是切成功还是取消。
+  // 详见 hooks/usePrivacy 的注释。用 useCallback 包住:它作为 prop 传给 AccountSelect
+  // 并进了那里的 useEffect 依赖,引用不稳会导致每次渲染都重跑。
+  const onDropdownOpenChange = useCallback((open) => {
+    if (open) setPrivacyOff()
+    else setPrivacyOn()
+  }, [setPrivacyOff, setPrivacyOn])
 
   const themeLabel = theme === 'auto' ? '跟随系统' : theme === 'light' ? '白天' : '夜间'
   const themeIcon = theme === 'auto' ? <IconMonitor size={17} />
@@ -78,6 +86,7 @@ export default function App() {
                   accounts={accounts}
                   current={current}
                   onChange={switchAccount}
+                  onDropdownOpenChange={onDropdownOpenChange}
                   onManagePin={(acc) => setPinDialog({ mode: 'manage', account: acc.account, name: acc.name, hasPin: acc.hasPin })}
                   onDeleteAccount={(acc) => setPinDialog({ mode: 'delete', account: acc.account, name: acc.name, hasPin: acc.hasPin })}
                 />

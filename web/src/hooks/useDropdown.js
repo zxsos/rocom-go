@@ -2,13 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 // useOutsideClick 浮层「点外部即收起」:ref 指向根容器,按下落在它之外时调用 onClose。
 // 通用 Dropdown、账号下拉、移动端 tab 分组三处都要这个行为,故抽出来;onClose 需引用稳定。
-export function useOutsideClick(ref, onClose, active = true) {
+//
+// extraRef 是**可选的第二根容器**:账号的手机端 sheet 用 createPortal 挂到了
+// document.body(见 AccountSheet.jsx),它不是 rootRef 的 DOM 后代 —— 若不把它一并纳入
+// 包含性判断,点 sheet 里任何地方都会被判成「点外部」而立刻收起。
+// 两个 ref 都允许为 null(未挂载时 .current 是 null),按下时现读即可。
+export function useOutsideClick(ref, onClose, active = true, extraRef = null) {
   useEffect(() => {
     if (!active) return
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    const inside = (node) =>
+      (ref.current && ref.current.contains(node)) ||
+      (extraRef?.current && extraRef.current.contains(node))
+    const onDoc = (e) => { if (!inside(e.target)) onClose() }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
-  }, [ref, onClose, active])
+  }, [ref, extraRef, onClose, active])
 }
 
 // useDropdown 自绘下拉的公共行为:开合、键鼠/触屏导航、点外部收起、高亮项滚动到可见。
@@ -22,14 +30,17 @@ export function useOutsideClick(ref, onClose, active = true) {
 //   rootRef/ulRef       挂到根容器与 <ul> 上(前者判「点外部」,后者按索引取子元素滚动)
 //   onKeyDown           挂到根容器的 onKeyDown
 //   pickAt(i)           选中第 i 项并收起
-export function useDropdown({ count, selectedIndex = -1, disabled = false, onPick }) {
+//
+// extraRef 可选:透传给 useOutsideClick,供 portal 到别处的浮层(账号的手机端 sheet)
+// 一并纳入「点内部」判断。Dropdown / NavBar 不传,行为不变。
+export function useDropdown({ count, selectedIndex = -1, disabled = false, onPick, extraRef = null }) {
   const [open, setOpen] = useState(false)
   const [hi, setHi] = useState(0)
   const rootRef = useRef(null)
   const ulRef = useRef(null)
 
   const close = useCallback(() => setOpen(false), [])
-  useOutsideClick(rootRef, close, open)
+  useOutsideClick(rootRef, close, open, extraRef)
 
   // 打开时把高亮重置为当前选中项,方便直接 ↑↓ 移动。
   // selectedIndex 走 ref:只作为「打开那一刻」的初值,不该让它在变化时重置用户的高亮。

@@ -161,3 +161,10 @@ export const IconClose = (p) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </S>
 )
+
+// 对勾(账号下拉的选中标记)
+export const IconCheck = (p) => (
+  <S {...p}>
+    <path d="M20 6L9 17l-5-5" />
+  </S>
+)
