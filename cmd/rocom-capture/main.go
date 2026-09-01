@@ -38,6 +38,7 @@ func main() {
 	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
 	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
 	probe := flag.String("merchant-probe", "", "远行商人整点抢单(临时测试模式):auto=对准下一个 8/12/16/20 整点每 10s 回源直到拿到本轮货单,now=立即开始;空=不启用")
+	slots := flag.Bool("slots-capture", true, "远行商人档期观察(临时验证模式):对准下一个 8/12/16/20 整点,前 2 分钟起每 30s 抓一次 onebiji 页面到整点后 7 分钟,只打日志不改业务;false=不启用")
 	flag.Parse()
 
 	db, err := gamedata.Load()
@@ -51,6 +52,9 @@ func main() {
 	srv := server.New(st, server.NewHub(), db, *eggAPIKey, *smtpUser, *smtpPass)
 	if *probe != "" {
 		srv.StartMerchantProbe(*probe) // 临时测试模式,见 AI_merchant_probe.md
+	}
+	if *slots {
+		srv.StartSlotsCapture() // 临时验证模式,见 docs/merchant-onebiji-probe.md
 	}
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
