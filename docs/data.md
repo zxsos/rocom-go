@@ -1602,6 +1602,36 @@ blood:  {形态: [技能下标, ...]}
 183 KB;若每条都重复存定义则要 ~480 KB(且原来 263 KB 还只有天生一类)。
 后来加第四类技能(如活动技能)只需再加一张索引表。
 
+### 特性名(`scripts/fetch_features.py` + `scripts/gen_features.py`)
+
+特性是协议里的**全局编号**(试炼等只下发 `288xxx` 的 id),此前项目没有任何特性
+名表 —— 试炼页只能按 id 展示。特性数据由 `internal/gamedata/features.go` 提供,
+`data/features.json` 由 `gen_features.py` 生成。
+
+**wiki 没有集中的特性图鉴页**:特性名+描述是**逐只精灵**写在图鉴页 wikitext 里的
+(`{{精灵信息/兼容|特性=助燃|特性描述=...}}`)。因此 `fetch_features.py` 分两步:
+先搜 `insource:"精灵信息/兼容"` 拿全部精灵图鉴页名单(走 searchwiki 子域搜索页
+HTML,**不走 api.php** —— api.php 的 GET 连续调用会被 CDN 限流返回 567),再对
+`action=query&prop=revisions` 按 50 页一批 **POST** 取 wikitext(测试确认 POST 不受
+GET 限流影响),正则提取 `|特性=` 与 `|特性描述=`。输出 `~/Downloads/rocom/
+features_raw.jsonl`(增量续传)。
+
+`data/features.json` 两块:
+```
+features:    [[特性名, 描述, [出现该特性的精灵...]], ...]   词典(190 个,均带描述)
+pet_feature: {精灵页名: 特性名}                               用于 id 桥接
+```
+
+**关键限制:wiki 只给名字,不给 id。** 190 个名字里没有一个是 `288xxx` 段 ——
+`id → 名` 的正向映射只能靠两条路补(均不做进 features.json):
+- **标注模式**:玩家在 web 端对未知特性 id 搜索选取名字提交,管理员审核后全服共享
+  (即本仓库「标注模式」功能,表结构见 docs/architecture.md);
+- **试炼抓包桥接**:试炼数据里「宠物与其天生特性 id 同时出现」,用
+  `pet_feature` 查出该宠物特性名 → 得出该 id 的名字(脚本化待做,需要真实抓包样本)。
+
+站点改版后 `fetch_features.py` 会抓不到(正则依赖精灵图鉴模板字段),列表为 0 或
+特性为 0 时报错退出而非静默产出错数据(与 `fetch_skill_ids.py` 同款策略)。
+
 ---
 
 待校准(多数需含相应事件/宠物的新样本)：

@@ -11,6 +11,7 @@ import AccountSelect from './components/AccountSelect'
 import { PinDialog } from './components/PinDialog'
 import { IconSun, IconMoon, IconMonitor, IconExpand, IconCompress } from './components/svg'
 import MapEngineProvider from './pages/map/MapEngineProvider'
+import AnnotationsProvider from './components/annotations'
 
 // App 全局壳:顶栏导航 + 账号切换 + 底部 tab(移动),并分发账号/图标两个全局 Context。
 // 各块细节分别见 hooks/useTheme、hooks/usePrivacy、hooks/useAccounts、components/NavBar、
@@ -59,6 +60,7 @@ export default function App() {
   return (
     <AccountContext.Provider value={account}>
       <AccountNameContext.Provider value={accountName}>
+        <AnnotationsProvider>
         <IconsContext.Provider value={icons}>
           <div className="app">
             <header className="topbar">
@@ -142,6 +144,7 @@ export default function App() {
             />
           )}
         </IconsContext.Provider>
+        </AnnotationsProvider>
       </AccountNameContext.Provider>
     </AccountContext.Provider>
   )

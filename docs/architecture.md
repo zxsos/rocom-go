@@ -40,7 +40,7 @@
 | `pet` | `ParsePetListRsp` 解析宠物列表；`ToPet` 转中文化业务模型；`ParseLoginAccount` 取登录 user_id/昵称 |
 | `scene` | 场景移动/切换/区域/星星实体消息解析(实时地图页) |
 | `gamedata` | embed 的 id→中文名 查找库 |
-| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3);后台 `checkpointLoop` 错峰做 WAL checkpoint(见 §6) |
+| `store` | SQLite 持久化,按 `account` 分区(宠物/盒队/奖牌/事件/**精灵蛋** + `accounts` 表)与多维筛选查询;`For(account)` 返回绑定账号的 `*Scoped` 视图;另存 `sessions` 表(连接会话密钥+账号归属,供重启续解,见 §3);后台 `checkpointLoop` 错峰做 WAL checkpoint(见 §6)。**例外**:`annotations`(标注模式)不按账号分区,是全服共享表(见 §5「例外:全服共享的标注表」) |
 | `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/data.md 3.8) |
 
@@ -97,6 +97,12 @@
   配合缓存的会话密钥即可对仍存活的连接续解并正确归属,无需再等下次登录。
 - **已知限制**:首次仍必须抓到某连接的 `LOGIN_RSP` 才能建立归属(从未见过登录、且无缓存的
   连接,其消息直接丢弃,不回退 IP)。
+- **例外:全服共享的标注表(`annotations`)**:标注模式(众包图鉴)存的是「协议 id → 名字」
+  的公共映射 —— 玩家提交、管理员审核后**所有人可见**,故它**不加 `account` 列、不走
+  `Scoped`**(见 `internal/store/annotations.go`)。写入时仍记 `submitter`(谁提的),但
+  下发侧(API 响应)只给管理员看,不给全服玩家 —— 避免共享图鉴带上个人信息。
+  同一 `(kind,code)` 可有多条待审(不同玩家各有猜测),审核通过某条时其余自动转 rejected:
+  一个 id 只能有一个被认可的答案。数据背景见 docs/data.md「特性名」。
 
 ## 6. HTTP 接口
 

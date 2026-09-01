@@ -5,6 +5,7 @@ import { useAsyncData } from '../../hooks/useAsyncData'
 import { ImgAvatar } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
 import { fmtTime } from '../../utils/format'
+import { UnknownChip, useAnnotations } from '../../components/annotations'
 
 // 草系徽章试炼页:实时同步游戏内的一局。
 //
@@ -477,6 +478,25 @@ function OpponentCard({ o }) {
 
 function PetCard({ pet }) {
   const pct = pet.maxHp > 0 ? Math.round((pet.hp / pet.maxHp) * 100) : 0
+  const { lookup } = useAnnotations() || {}
+  // 特性只有 id —— 内置名表接不进来(不像技能有 skills.json),先查全服已审核标注:
+  // 命中就显示名字(带「玩家标注」提示),没命中交给 UnknownChip 让玩家标注。
+  // 这是「标注模式」在展示侧的落点,提交/审核见 components/annotations.jsx。
+  const featureChip = (f) => {
+    const a = lookup && lookup('feature', f)
+    if (!a) return <UnknownChip key={f} kind="feature" code={f} />
+    // a.pending:自己刚提交、管理员还没审 —— 只在本会话可见,故加待审标记,
+    // 免得把自己还没核实的猜测当成权威数据显示出去。
+    return (
+      <span
+        key={f}
+        className={'trial-chip anno-hit' + (a.pending ? ' anno-pending' : '')}
+        title={`${a.desc || a.name}${a.pending ? '(你提交的,待管理员审核)' : '(玩家标注)'}`}
+      >
+        {a.name}{a.pending ? ' ·待审' : ''}
+      </span>
+    )
+  }
   return (
     <section className="trial-group">
       <h4 className="trial-group-t">试炼宠物</h4>
@@ -506,9 +526,9 @@ function PetCard({ pet }) {
               <div className="trial-skill-head">
                 <span className="trial-skill-slot">槽 {s.slot}</span>
                 {/* 技能名按 id 查(融合不改 id,故融合态也有名);
-                    资料站未收录的新技能查不到,回退显示 id */}
+                    资料站未收录的新技能查不到,回退成可标注的 id(玩家可提交名字) */}
                 <span className="trial-skill-id" title={`技能 id ${s.id}`}>
-                  {s.name || s.id}
+                  {s.name || <UnknownChip kind="skill" code={s.id} />}
                 </span>
               </div>
               <div className="trial-skill-meta">
@@ -529,8 +549,8 @@ function PetCard({ pet }) {
       {(pet.features && pet.features.length > 0) || (pet.shards && pet.shards.length > 0)
         ? (
           <div className="trial-meta">
-            {/* 特性只有 id:游戏特性名表未接入(不像技能那样有 skills.json),
-                故一律按 id 展示 —— 编一个名字比留 id 更糟。
+            {/* 特性只有 id:游戏特性名表未接入(不像技能那样有 skills.json)。
+                展示优先级:全服已审核标注(查不到时)→ UnknownChip(让玩家标注)。
                 能拿到天生/获得的拆分时分开显示(局级 initial_feature_ids,
                 整局不变;与已获特性之差就是试炼中拿到的,见 trial.InitialFeatures);
                 拿不到就退回不区分的展示。 */}
@@ -540,17 +560,13 @@ function PetCard({ pet }) {
                   {pet.innateFeatures && pet.innateFeatures.length > 0 && (
                     <>
                       <span className="muted" title="宠物自带的特性">特性·天生</span>
-                      {pet.innateFeatures.map((f) => (
-                        <span key={f} className="trial-chip trial-feat-innate">{f}</span>
-                      ))}
+                      {pet.innateFeatures.map(featureChip)}
                     </>
                   )}
                   {pet.gainedFeatures && pet.gainedFeatures.length > 0 && (
                     <>
                       <span className="muted" title="本局试炼中获得的特性">特性·获得</span>
-                      {pet.gainedFeatures.map((f) => (
-                        <span key={f} className="trial-chip trial-feat-gained">{f}</span>
-                      ))}
+                      {pet.gainedFeatures.map(featureChip)}
                     </>
                   )}
                 </>
@@ -558,7 +574,7 @@ function PetCard({ pet }) {
               : (
                 <>
                   <span className="muted">特性</span>
-                  {[...new Set(pet.features)].map((f) => <span key={f} className="trial-chip">{f}</span>)}
+                  {[...new Set(pet.features)].map(featureChip)}
                 </>
               )}
             {pet.shards && pet.shards.length > 0 && (

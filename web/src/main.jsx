@@ -35,6 +35,7 @@ import './styles/handbook.css'
 import './styles/leaderboard.css'
 import './styles/admin.css'
 import './styles/pin.css'
+import './styles/annotations.css'
 
 // 路由懒加载的兜底占位(P5 将升级为与页面布局同构的骨架屏)。
 function PageLoading() {

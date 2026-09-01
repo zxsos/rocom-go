@@ -165,6 +165,14 @@ func (p *Pipeline) handleTrial(m capture.Message, acc string) {
 		if prog != nil {
 			st.history = &trialHist{progress: prog, updatedAt: now}
 			st.finishFromReview(prog)
+			// 与 0x1975 同源,同样要补录见闻录 —— 少了这行,「登录进去」图鉴不会刷新。
+			//
+			// 0x1959 是**打开试炼面板**的响应(0x1958 触发),而 0x1975 要等真打一场
+			// 试炼战斗才下发。实测本 pcap:登录 14:55:06 → 0x1959 在 14:55:10(4 秒后,
+			// 带 167/127/98 只)→ 首条 0x1975 在 15:04:45(10 分钟后)。
+			// 只挂 0x1975 的话,用户打开面板看到的是空白三张图,得打完一场才补上 ——
+			// 而档案其实在登录几秒内就已经送到门口了。
+			p.syncTrialEncounters(prog, acc, m.Time.Unix())
 			changed = true
 		}
 

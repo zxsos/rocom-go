@@ -76,6 +76,8 @@ type DB struct {
 	skills *skillsDB
 	// 草系徽章试炼的静态配置(独立于 names.json,数据源是玩家维护的 wiki,见 trial.go)。
 	trial *trialDB
+	// 特性词典(独立于 names.json,数据源是 wiki 精灵图鉴页,只有名字没有 id,见 features.go)。
+	features *featuresDB
 }
 
 // Load 加载 embed 的名称表。
@@ -299,6 +301,7 @@ func Load() (*DB, error) {
 		nestFurn:       nestFurn,
 		skills:         loadSkills(),
 		trial:          loadTrial(),
+		features:       loadFeatures(),
 	}, nil
 }
 

@@ -246,3 +246,25 @@ func (db *DB) expandIdxList(petbaseID uint32, idxOf map[uint32][]uint32, cache *
 func (db *DB) HasInnateSkills(petbaseID uint32) bool {
 	return db.skills != nil && len(db.skills.innate[petbaseID]) > 0
 }
+
+// SkillCatalogEntry 是技能候选目录里的一条(标注模式搜索候选用)。
+type SkillCatalogEntry struct {
+	ID   uint32 `json:"id"`
+	Name string `json:"name"`
+}
+
+// SkillCatalog 返回全部技能(含重名技能)的 id -> 名目录,按 id 升序。
+// 标注模式里玩家对未知技能 id 从这份目录搜索选取名字;也供宠物详情等场景
+// 做「全量技能名表」展示。
+func (db *DB) SkillCatalog() []SkillCatalogEntry {
+	sdb := db.skills
+	if sdb == nil {
+		return nil
+	}
+	out := make([]SkillCatalogEntry, 0, len(sdb.names))
+	for id, name := range sdb.names {
+		out = append(out, SkillCatalogEntry{ID: id, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
