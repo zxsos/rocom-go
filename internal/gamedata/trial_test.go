@@ -1,6 +1,9 @@
 package gamedata
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // 本文件验证草系徽章试炼的静态配置(scripts/gen_trial.py 产出)。
 // 数据源是玩家维护的 wiki,内容会随版本变,故只断言**结构**与已实测的事实,
@@ -215,6 +218,36 @@ func TestTrialBossesNotInPools(t *testing.T) {
 		for _, p := range pool {
 			if boss[p] {
 				t.Errorf("第 %d 章普通池里混进了首领 %d", ch, p)
+			}
+		}
+	}
+}
+
+// TestTrialPoolsHaveNoLeaderForms 断言普通池里没有「xxx_首领形态」。
+//
+// 与上面的 TestTrialBossesNotInPools **不重复**:那个按 id 比对 bosses 列表,
+// 而这里按**形态名**判定 —— 4005~4090 这 20 只「圣水守护_首领形态」之类根本
+// 不在 bosses 列表里(bosses 是 8101~8122 的「xxx_草系徽章-首领形态」),
+// 按 id 比对完全漏得掉,而它们混在普通池里虚增了进度分母。
+//
+// ⚠️ 判形态要看 PetBaseInfo.Form(形态后缀),**不是 Name** —— Name 只是形态名
+// (「圣水守护」),不含「首领形态」后缀,拿它判会永远匹配不到(踩过一次,
+// 变异测试才暴露出来)。
+// 另须排除含「草系徽章」的:那是第 4 层的真首领,要保留。
+func TestTrialPoolsHaveNoLeaderForms(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for ch, pool := range db.trial.pools {
+		for _, base := range pool {
+			info, ok := db.PetBase(base)
+			if !ok {
+				continue
+			}
+			if strings.Contains(info.Form, "首领形态") && !strings.Contains(info.Form, "草系徽章") {
+				t.Errorf("第 %d 章普通池里有首领形态 %d(%s_%s) —— 普通层遇不到,应由 gen_trial.py 剔除",
+					ch, base, info.Name, info.Form)
 			}
 		}
 	}

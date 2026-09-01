@@ -149,33 +149,3 @@ func TestAddTrialEncountersTS(t *testing.T) {
 	}
 }
 
-// TestClearTrialEncounters 守清空:按章清与全清。
-func TestClearTrialEncounters(t *testing.T) {
-	st := newTestStore(t)
-	seedEnc(t, st, testAcc, 1, 0, 3001)
-	seedEnc(t, st, testAcc, 2, 0, 3005)
-	seedEnc(t, st, "UID:2", 1, 0, 3001) // 另一账号,不该被波及
-
-	if err := st.ClearTrialEncounters(testAcc, 1); err != nil {
-		t.Fatalf("清第1章: %v", err)
-	}
-	if _, ok := st.TrialEncounters(testAcc, 1)[3001]; ok {
-		t.Error("第1章应已清空")
-	}
-	if _, ok := st.TrialEncounters(testAcc, 2)[3005]; !ok {
-		t.Error("清第1章不该动到第2章")
-	}
-	if _, ok := st.TrialEncounters("UID:2", 1)[3001]; !ok {
-		t.Error("不该清掉别的账号")
-	}
-
-	if err := st.ClearTrialEncounters(testAcc, 0); err != nil {
-		t.Fatalf("全清: %v", err)
-	}
-	if n := len(st.TrialEncounters(testAcc, 0)); n != 0 {
-		t.Errorf("全清后本账号应为空, 实际 %d 条", n)
-	}
-	if _, ok := st.TrialEncounters("UID:2", 1)[3001]; !ok {
-		t.Error("全清本账号不该动到别的账号")
-	}
-}

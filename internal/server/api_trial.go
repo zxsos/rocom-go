@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
@@ -143,27 +142,16 @@ func trialDataUpdated() string {
 	return raw.Updated
 }
 
-// handleDeleteTrialEncounters 清空遇见记录。?chapter=1|2|3 只清某一章,不给则全清。
+// 「清空遇见记录」的接口**已删除**(2026-09-01)。
 //
-// 存在的理由:精灵池是**第三方 wiki 的静态配置**,游戏换版本换池子后旧记录就对不上了
-// —— 里头会有当前版本根本遇不到的 petbase,进度永远停在某个不满的数。此时需要手动清。
-// 见 store.ClearTrialEncounters 的注释。
+// 它从设计上就不可能生效:遇见记录的权威来源是服务器下发的见闻录(0x1975 档案,
+// 见 pipeline.syncTrialEncounters),它按「只补缺的」补录。手动清空后,库里
+// 那一章变成空的,下一次收到档案时清单里的 id 全被判成「缺的」而重新补回 ——
+// 而 0x1975 有两处触发(打开试炼面板 0x1959、打完一场),清空的结果往往活不过
+// 玩家下一次打开试炼页的几秒钟。
 //
-// 注意这不是「重置本局」:本局状态走 SSE,与此无关。清的是**累积的历史**,不可恢复。
-func (s *Server) handleDeleteTrialEncounters(w http.ResponseWriter, r *http.Request) {
-	acc := s.acct(r)
-	var ch uint32
-	if v := r.URL.Query().Get("chapter"); v != "" {
-		n, err := strconv.ParseUint(v, 10, 32)
-		if err != nil || n < 1 || n > 3 {
-			http.Error(w, "chapter 须为 1/2/3", http.StatusBadRequest)
-			return
-		}
-		ch = uint32(n)
-	}
-	if err := s.store.ClearTrialEncounters(acc, ch); err != nil {
-		http.Error(w, "清空失败: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, map[string]any{"ok": true, "chapter": ch})
-}
+// 当初加它的理由是「wiki 换版本换池子后旧记录对不上」,但真遇到换池子,正确做法
+// 是让新池子的记录自然累积,而不是清掉历史(清了也会立刻补回)。留着它只会让
+// 用户以为清空有效、反复点、然后困惑于数据没变。
+//
+// 需要清数据时用 store 层或 sqlite 直接操作,不再提供 HTTP 入口。
