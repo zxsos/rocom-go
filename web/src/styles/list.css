@@ -1,7 +1,19 @@
 /* 宠物列表页:盒子示意图、桌面表格、移动卡片、分页、右键菜单。 */
 
-/* 盒子位置示意图 */
-.boxmap { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+/* 盒子位置示意图。
+   格子边长 --boxmap-cell 自适应(见 .boxmap-grid),故两处尺寸都从它推导:
+   列宽直接取它,预留高度按「最大行数 × 它」算,切换容器时两处同步缩放。 */
+.boxmap {
+  --boxmap-cols: 6;    /* 列数,由 BoxMap 按容器类型覆盖(盒子 6、队伍 3) */
+  --boxmap-gap: 4px;
+  /* 格子边长 = 期望 40px,但**不超过**容器能给的:盒子 6 列在 1024~1300 视口下
+     需要 6×40+5×4=260px,而侧栏此时只给得起 ~212px(clamp(260px,20vw,312px)
+     减两级内边距)。不设上限就会撑破侧栏 —— 侧栏变宽连带 .list-layout 超出视口,
+     顶栏被挤出屏幕。故用 min() 让格子在空间不足时缩小,而不是溢出。
+     100% 取 .boxmap-grid 的宽度(即 .boxmap 内容宽),无循环依赖。 */
+  --boxmap-cell: min(40px, calc((100% - var(--boxmap-gap) * (var(--boxmap-cols) - 1)) / var(--boxmap-cols)));
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px;
+}
 .boxmap-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .boxmap-name { font-size: 13px; font-weight: 600; }
 .boxmap-nav { display: flex; gap: 4px; }
@@ -15,9 +27,19 @@
 .boxmap-btn:active:not(:disabled) { transform: scale(.94); }
 .boxmap-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
 .boxmap-btn:disabled { opacity: 0.35; cursor: default; }
-/* 预留 6 排高度(队伍 6×3 最高),切换容器时下方筛选条件不上下抖动 */
-.boxmap-grid { display: grid; gap: 4px; justify-content: center; align-content: start; min-height: 260px; }
-.boxmap-cell { width: 40px; height: 40px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
+/* 预留 6 排高度 —— **队伍 3 列 × 6 行是所有容器里最高的**(盒子 6 列 × 5 行),
+   取它做下限,切换容器时下方筛选条件才不会上下抖动。
+   用 calc 而非钉死 260px:格子边长会随侧栏宽度缩小,预留高度必须跟着缩,
+   否则窄屏下会白留一大截(原先 260px 是按 40px 格子算死的)。 */
+.boxmap-grid {
+  display: grid; gap: var(--boxmap-gap); justify-content: center; align-content: start;
+  grid-template-columns: repeat(var(--boxmap-cols), var(--boxmap-cell));
+  max-width: 100%; min-width: 0;
+  min-height: calc(var(--boxmap-cell) * 6 + var(--boxmap-gap) * 5);
+}
+/* 格子是正方形:宽度由列宽定(空间不足时已收缩),高度用 aspect-ratio 跟随,
+   故头像不会被压扁。原先 width/height 都钉死 40px,窄侧栏下就撑破了。 */
+.boxmap-cell { width: 100%; min-width: 0; aspect-ratio: 1; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
 .boxmap-cell.filled { background: var(--bg-3); border-color: var(--accent); cursor: pointer; }
 .boxmap-cell.filled:hover { box-shadow: 0 0 0 2px var(--accent); }
 .boxmap-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
