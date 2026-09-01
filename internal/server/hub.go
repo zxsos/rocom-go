@@ -136,6 +136,22 @@ func (h *Hub) unsubscribe(s *sub) {
 	h.mu.Unlock()
 }
 
+// SubscribeForTest 是**仅供测试**的订阅入口:让其它包(如 pipeline)能数「某类消息
+// 广播了几次」。生产路径是 SSE(见 handleStream),用不到它。
+//
+// 存在的理由:广播**次数**是一类只能测不能看的行为 —— 数据始终是对的,只有把整份
+// 列表重发几十遍才会让前端卡住,而接口响应、golden 快照全都看不出差别。要锁住这类
+// 退化就得数次数,故开放这个口子(返回取一条的函数与取消函数)。
+func (h *Hub) SubscribeForTest() (pop func(ctx context.Context) (string, bool), cancel func()) {
+	s := h.subscribe()
+	return func(ctx context.Context) (string, bool) {
+			m, ok := s.pop(ctx)
+			return m.typ, ok
+		}, func() {
+			h.unsubscribe(s)
+		}
+}
+
 // Broadcast 把一条消息广播给所有订阅者(满则丢旧保新,见 sub.push)。account 为消息所属账号,
 // 传 "" 表示全局消息(所有连接都收);订阅端按 account/type 决定是否转发(见 handleStream)。
 // 无订阅者(没有页面连着)时直接返回,省去 json.Marshal——实时抓包对每条消息都发 debug 广播、

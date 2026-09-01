@@ -1,8 +1,12 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 
-// BoxMap 位置示意图(每行 6 格;盒子 5 排、队伍 3 队;有宠物格显示头像,灰=空,选中高亮)。
+// BoxMap 位置示意图:盒子 6 列 × 5 排(30 格)、队伍 3 列 × 6 行(18 格);
+// 有宠物格显示头像,灰=空,选中高亮。
 // 标题右侧上一个/下一个按钮在容器间切换(大世界队伍排在所有盒子最前)。
+//
+// 格子边长由 CSS 变量 --boxmap-cell 自适应(见 list.css),这里只按容器类型给列数:
+// 盒子 6 列是**最宽**的形态,窄侧栏下必须让格子缩小才不撑破侧栏。
 export default function BoxMap({ container, selected, onCell, onPrev, onNext }) {
   const slots = (container && container.slots) || []
   const heads = (container && container.heads) || {}
@@ -22,7 +26,9 @@ export default function BoxMap({ container, selected, onCell, onPrev, onNext }) 
           <button className="boxmap-btn" title="下一个" onClick={onNext}>›</button>
         </span>
       </div>
-      <div className="boxmap-grid" style={{ gridTemplateColumns: `repeat(${cols}, 40px)` }}>
+      {/* 只给列数,格子边长交给 CSS 自适应(见 list.css 的 --boxmap-cell):
+          盒子 6 列在窄侧栏下要把格子缩小才不撑破侧栏,写死 40px 就会溢出。 */}
+      <div className="boxmap-grid" style={{ '--boxmap-cols': cols }}>
         {slots.map((gid, i) => (
           <div
             key={i}

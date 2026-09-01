@@ -118,7 +118,11 @@ func (p *Pipeline) wildKinds(a scene.NpcActor) []string {
 
 // resetWilds 换场景/传送时重置野生宠物观测态并推空列表(前端随即清掉上个场景的标记)。
 func (p *Pipeline) resetWilds(conn, acc string, res int32, now time.Time) {
-	p.conn(conn).wilds = newWildTracker(res)
+	cs := p.conn(conn)
+	cs.wilds = newWildTracker(res)
+	// 换场景/传送必须**立即**广播(旧标记要当场清掉,不能等合并窗口),
+	// 顺带把待发的变更一并消费掉 —— 否则紧接着还会再补发一次,白多一份全量。
+	cs.wildsDirtyAt = time.Time{}
 	p.pushWilds(conn, acc, now)
 }
 
@@ -216,7 +220,7 @@ func (p *Pipeline) observeWilds(conn, acc string, body []byte, now time.Time, sn
 	p.paintSeen(conn, acc, cs.res, nil)
 
 	if changed {
-		p.pushWilds(conn, acc, now)
+		p.markWildsDirty(conn, now)
 	}
 }
 
@@ -243,12 +247,88 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 	p.paintSeen(conn, acc, cs.res, nil)
 
 	if changed {
+		p.markWildsDirty(conn, now)
+	}
+}
+
+// wildsDebounce 是野生宠物图层广播的合并窗口。
+//
+// 取值依据(实测一份 604 秒 pcap,0x0414 共 11282 条、其中 2878 条带实体进出):
+//     50ms → 407 次(14.1%)   200ms → 260 次(9.0%)
+//    100ms → 356 次(12.4%)   500ms → 199 次(6.9%)
+//    150ms ≈ 300 次          1s    → 146 次(5.1%)
+// 边际收益递减明显,50ms 就已经吃掉大部分抖动。取 150ms 是**兼顾提醒及时性**:
+// 稀有宠出现提醒(见 web/src/pages/map/wildNotify.js)走的就是这条推送,窗口开太大
+// 会「玩家都跑过去了才响」。150ms 人眼无感,却已合并掉约九成突发。
+const wildsDebounce = 150 * time.Millisecond
+
+// markWildsDirty 记下「该连接的野生宠有变更,待广播」。真正的广播由 flushDirtyWilds
+// 在窗口到点后补发 —— 突发时一连几十条实体进出只发一次。
+// now 是消息时刻(非墙钟),离线回放才不会把窗口判成早已超时。
+func (p *Pipeline) markWildsDirty(conn string, now time.Time) {
+	cs := p.conn(conn)
+	if cs == nil {
+		return
+	}
+	// 已有待广播的,保留**最早**那个时刻:窗口从第一次变更起算,
+	// 否则持续突发会不断把时刻推后,永远发不出去(饿死)。
+	if cs.wildsDirtyAt.IsZero() {
+		cs.wildsDirtyAt = now
+	}
+}
+
+// flushDirtyWilds 广播所有「窗口已到」的待发变更。由 handle 在每条消息后调用:
+// 没有独立的定时器,故完全跟着消息走 —— 离线回放几秒跑完一份 pcap 时,窗口按包内
+// 时间戳判定,行为与实时抓包一致(不会因为墙钟只过了几秒就一次都不发)。
+func (p *Pipeline) flushDirtyWilds(now time.Time) {
+	for conn, cs := range p.conns {
+		if cs.wildsDirtyAt.IsZero() || now.Sub(cs.wildsDirtyAt) < wildsDebounce {
+			continue
+		}
+		cs.wildsDirtyAt = time.Time{}
+		acc := p.connAccount[conn]
+		if acc == "" {
+			continue
+		}
+		p.pushWilds(conn, acc, now)
+	}
+}
+
+// flushAllDirtyWilds 无条件补发所有待发的野生宠变更(不看窗口)。
+// 只在离线回放结束时用一次:此后不会再有消息推进窗口,不补发就永远丢了。
+func (p *Pipeline) flushAllDirtyWilds() {
+	// now 必须取**消息时间轴**上的时刻(最后一条消息),不能用 time.Now():
+	// 离线回放的包时间是几小时前,用墙钟会让 pushWilds 的 TTL 判定(now - seenAt)
+	// 算出几小时,把整份列表当成过期灰点全删掉 —— 补发反而清空了地图。
+	now := p.lastMsgAt
+	if now.IsZero() {
+		now = time.Now()
+	}
+	for conn, cs := range p.conns {
+		if cs.wildsDirtyAt.IsZero() {
+			continue
+		}
+		cs.wildsDirtyAt = time.Time{}
+		acc := p.connAccount[conn]
+		if acc == "" {
+			continue
+		}
 		p.pushWilds(conn, acc, now)
 	}
 }
 
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
-// 只在成员/状态真的变了时调用:实体进出 AOI 是低频事件,不必节流。
+//
+// 调用方只有两处:markWildsDirty 攒够窗口后的补发(常规路径),以及换场景/传送时的
+// resetWilds —— 后者必须**立即**广播(玩家已经到了新场景,旧标记要当场清掉,不能
+// 等窗口)。延迟一律走 markWildsDirty,别在这里节流。
+//
+// 为什么不逐条广播:实体进出 AOI 在跑动时是**突发**而非低频 —— 实测一份 604 秒的
+// pcap 里 0x0414 有 11282 条,其中 2878 条带实体进出(约 4.8 次/秒);而同一只宠
+// 反复进出占 53.6%(1441 次进入只涉及 669 个实体)。每次都把整份视野列表(平均 73
+// 只宠、约 8.7KB)重发一遍,就是 41.5 KB/s 的下行与每秒数百个标记的重建 —— 前端
+// 地图卡顿的根因。攒 150ms 再发可降到约 10%(见 wildsDebounce 的实测数据)。
+//
 // now 取**消息时刻**而非 time.Now():离线回放的包时间是几小时前的,用挂钟一比就全过期了。
 func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 	cs := p.conns[conn]

@@ -39,6 +39,11 @@ type Pipeline struct {
 	connAccount map[string]string
 	conns       map[string]*connState
 	accts       map[string]*acctState
+
+	// lastMsgAt 是最近一条消息的**包内时刻**(非墙钟)。离线回放时包时间是几小时前,
+	// 需要「当前时刻」的地方(如回放结束时补发野生宠)必须用它而不是 time.Now():
+	// 否则野生宠的 TTL 判定(now - seenAt)会算出几小时,把整份列表全当过期删掉。
+	lastMsgAt time.Time
 }
 
 // connState 是单条 GCP 连接的实时地图状态。场景 res 与区域只在切场景/跨触发体时下发、
@@ -69,6 +74,10 @@ type connState struct {
 	// handle 里用它避免每条消息都查库(状态翻转才读写 store)。
 	last        time.Time
 	sessionOpen bool
+	// wildsDirtyAt:野生宠物图层有变更、但还没广播的时刻(零值=无待广播)。
+	// 实体进出 AOI 会突发(实测同一只宠反复进出占 53.6%),逐条广播等于把整份视野
+	// 列表重发几十遍,故攒一攒再发(见 wildsDebounce 与 flushDirtyWilds)。
+	wildsDirtyAt time.Time
 }
 
 // acctState 是单个账号的消费状态。
@@ -170,7 +179,11 @@ func (p *Pipeline) Run(eng *capture.Engine) {
 		select {
 		case m, ok := <-eng.Out:
 			if !ok {
-				// 离线回放结束:把剩余连接断开通知处理完(正常退出,不留悬挂会话)。
+				// 离线回放结束:野生宠的合并窗口由消息推进(无独立定时器),最后一批变更
+				// 若还在窗口里就再也不会有下一条消息来触发它了 —— 这里无条件补发一次,
+				// 否则回放结束时地图会停在最后一次广播的状态(少几只宠)。
+				p.flushAllDirtyWilds()
+				// 把剩余连接断开通知处理完(正常退出,不留悬挂会话)。
 				for cid := range eng.CloseCh {
 					p.onConnClose(cid)
 				}
@@ -238,6 +251,12 @@ func (p *Pipeline) sweepOnce(now time.Time) {
 }
 
 func (p *Pipeline) handle(m capture.Message) {
+	// 记下消息时间轴的当前时刻(非墙钟):离线回放时包时间是过去的,回放结束补发
+	// 野生宠要用它算 TTL,否则会把整份列表当过期删掉(见 flushAllDirtyWilds)。
+	if m.Time.After(p.lastMsgAt) {
+		p.lastMsgAt = m.Time
+	}
+
 	// 登录回包:解析 user_id → 账号并登记 connID 映射(必须在下面归属 acc 之前)。
 	if m.Direction == gcp.S2C && m.Opcode == pet.OpLoginRsp {
 		p.registerLogin(m)
@@ -301,9 +320,14 @@ func (p *Pipeline) handle(m capture.Message) {
 		if m.Direction == gcp.S2C && m.Opcode == pet.OpBattleFinishNotify {
 			p.handlePet(m, acc)
 		}
+		p.flushDirtyWilds(m.Time)
 		return
 	}
 	p.handlePet(m, acc)
+
+	// 野生宠物图层的合并窗口由消息推进(无独立定时器):实体进出 AOI 是突发,
+	// 逐条广播会把整份视野列表重发几十遍(详见 wildsDebounce 的实测数据)。
+	p.flushDirtyWilds(m.Time)
 }
 
 // allowed 判断账号是否允许处理:黑名单优先拒绝;白名单非空时仅白名单内账号放行;无规则时
