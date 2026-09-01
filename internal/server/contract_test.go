@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -846,3 +847,94 @@ func testAdminToken(t *testing.T, s *Server) string {
 }
 
 const testAdminPw = "contract-test-pw"
+
+// TestAnnotationNameCleaned 提交的名字必须**去掉所有空白** —— 这是中文游戏,
+// 技能/特性名里没有合法空格(现有 807 个名字含空格的为 0)。
+//
+// 起因:wiki 图鉴页为排版在字间插空格,玩家照抄后提交成「魔 法 增 效 」,
+// 末尾还常带一个空格。标注是给全服看名字的,名字脏了等于白标。
+//
+// 每个用例用**不同的 code**:清洗会把这些变体都归一成「魔法增效」,同一个 code
+// 下第二次提交会被 UNIQUE 约束判为重复(409)—— 那其实反过来证明清洗生效了,
+// 但会淹没「存成了什么」这个断言,故错开 code 让每例独立。
+func TestAnnotationNameCleaned(t *testing.T) {
+	s := newTestServer(t)
+	post := func(code int64, name string) (status int, stored string) {
+		body, _ := json.Marshal(map[string]any{
+			"kind": "skill", "code": code, "name": name,
+		})
+		rr := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST",
+			"/api/annotations?account="+contractAcc, bytes.NewReader(body)))
+		var out struct {
+			Item struct{ Name string `json:"name"` } `json:"item"`
+		}
+		_ = json.Unmarshal(rr.Body.Bytes(), &out)
+		return rr.Code, out.Item.Name
+	}
+
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"魔 法 增 效", "魔法增效"},    // 字间空格(wiki 排版)
+		{"魔 法 增 效 ", "魔法增效"},   // 末尾还有空格
+		{"  魔法增效  ", "魔法增效"},   // 首尾空格
+		{"魔法增效", "魔法增效"},        // 干净的输入不受影响
+		{"魔\u3000法增效", "魔法增效"},  // 全角空格 U+3000
+		{"魔法\t增效", "魔法增效"},     // 制表符
+		{"魔 法  增   效", "魔法增效"}, // 多个连续空白
+	}
+	for i, c := range cases {
+		// 7880001 起顺延,避开别处占用的 code
+		status, got := post(int64(7880010+i), c.in)
+		if status != 200 {
+			t.Errorf("第 %d 例 %q 提交失败: %d", i+1, c.in, status)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("第 %d 例: 提交 %q 存成 %q, 期望 %q", i+1, c.in, got, c.want)
+		}
+	}
+}
+
+// TestAnnotationNameCleanedDeduplicates 同一个 id 下,「魔 法 增 效」与「魔法增效」
+// 清洗后相同 → 第二次提交应判重复(409),而不是存成两条。
+// 这条守住 UNIQUE 约束与清洗的配合:若清洗只去首尾,两条会并存,页面上同一个
+// 技能会显示两个写法不同的名字。
+func TestAnnotationNameCleanedDeduplicates(t *testing.T) {
+	s := newTestServer(t)
+	post := func(name string) int {
+		body, _ := json.Marshal(map[string]any{
+			"kind": "skill", "code": 7880050, "name": name,
+		})
+		rr := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST",
+			"/api/annotations?account="+contractAcc, bytes.NewReader(body)))
+		return rr.Code
+	}
+	if got := post("魔 法 增 效"); got != 200 {
+		t.Fatalf("首次提交: %d, 期望 200", got)
+	}
+	if got := post("魔法增效"); got != 409 {
+		t.Errorf("清洗后重复的提交 = %d, 期望 409(清洗应让两者归一)", got)
+	}
+}
+
+// TestCleanAnnotationName 直接测清洗函数(上面的用例走 HTTP,失败时看不出
+// 是清洗的问题还是提交路径的问题)。
+func TestCleanAnnotationName(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"   ", ""},          // 全是空白 → 空(会被「名字不能为空」拦下)
+		{"魔法增效", "魔法增效"}, // 无空白原样返回
+		{"魔 法 增 效", "魔法增效"},
+		{"魔　法增效", "魔法增效"},
+		{"a b", "ab"}, // 英文间的空格也一并去掉(现有名字无此情形,见函数注释)
+	}
+	for _, c := range cases {
+		if got := cleanAnnotationName(c.in); got != c.want {
+			t.Errorf("cleanAnnotationName(%q) = %q, 期望 %q", c.in, got, c.want)
+		}
+	}
+}

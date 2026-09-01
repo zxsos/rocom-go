@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"sort"
 	"time"
 )
@@ -79,7 +80,8 @@ func (s *Store) SetAccountAvatar(account, url string) error {
 
 // SetAccountCoins 写入账号的洛克贝数(登录回包解析成功后调用;coins 为 0 也是真实值,
 // 一并置 has_coins=1 与「从未解析」区分,前端可显示「待同步」)。
-// 同时记一条洛克贝快照(coin_snapshots),排行榜盈亏以首条快照为基线,单事务保证一致。
+// 同时记一条洛克贝快照(coin_snapshots):排行榜按日切盈亏,取当日首条快照为起点
+// (无则带昨夜最后一条,见 dayStartBaselineSQL),单事务保证一致。
 func (s *Store) SetAccountCoins(account string, coins int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -103,7 +105,7 @@ func (s *Store) SetAccountRankJoin(account string, join bool) error {
 }
 
 // RankEntry 是排行榜上单个账号的数据。
-// Baseline 为首次洛克贝快照(起始资金);无快照时退回当前 coins,盈亏为 0。
+// Baseline 是**今日起点**洛克贝(见 dayStartBaseline);Profit 为当日盈亏。
 // Title 由 server 层按当日称号合并填充。
 type RankEntry struct {
 	Account  string `json:"account"`
@@ -116,13 +118,47 @@ type RankEntry struct {
 	Title    string `json:"title"`
 }
 
-// Leaderboard 返回全部参加排行(rank_join=1)的账号,含当前洛克贝、首次快照基线
-// 与盈亏(当前-基线)。调用方自行按福布斯/盈亏排序。
+// rankLoc 排行榜用的时区:固定北京时间(UTC+8,无夏令时)。
+//
+// 与 SettleRankTitles 一致 —— 营业日/自然日都按北京时间切分,服务器本地时区
+// 常是 UTC,直接用 time.Now() 的日期会把 0~8 点算成前一天。
+var rankLoc = time.FixedZone("CST", 8*3600)
+
+// rankDayStart 返回 now 所在自然日(北京时间)的 00:00 时间戳。
+func rankDayStart(now time.Time) int64 {
+	t := now.In(rankLoc)
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, rankLoc).Unix()
+}
+
+// dayStartBaselineSQL 是「今日起点洛克贝」的子查询,供 Leaderboard/AccountRank 共用:
+//
+//  1. 今日 00:00(含)之后的第一条快照 —— 今天登录过,它就是今天起点;
+//  2. 否则退回今日 00:00 之前的最后一条 —— 昨天玩到半夜、今天还没登录,
+//     带昨夜余额进今天,盈亏口径连续(与 SettleRankTitles 的 preDay 带入同思路);
+//  3. 都没有(从未记录过) → NULL,由 COALESCE 兜成当前 coins,盈亏为 0。
+//
+// **为什么不用「首次快照」**:那是累计盈亏,而快照只在登录时写入 ——
+// 不登录的人余额与基线一起冻结在历史峰值,于是「曾经赚过」的人永远排在盈亏榜首,
+// 哪怕他一整天没上线。排行榜要看的是「谁**今天**在赚钱」,故改按日切。
+// 这也与称号评选(赚钱王按前一日净变化,见 SettleRankTitles)口径一致。
+func dayStartBaselineSQL(dayStart int64) string {
+	return fmt.Sprintf(`
+  COALESCE(
+    (SELECT cs.coins FROM coin_snapshots cs
+      WHERE cs.account = a.account AND cs.ts >= %[1]d
+      ORDER BY cs.ts ASC, cs.id ASC LIMIT 1),
+    (SELECT cs.coins FROM coin_snapshots cs
+      WHERE cs.account = a.account AND cs.ts < %[1]d
+      ORDER BY cs.ts DESC, cs.id DESC LIMIT 1),
+    a.coins)`, dayStart)
+}
+
+// Leaderboard 返回全部参加排行(rank_join=1)的账号,含当前洛克贝、今日起点基线
+// 与当日盈亏(当前-今日起点)。调用方自行按福布斯/盈亏排序。
 func (s *Store) Leaderboard() ([]RankEntry, error) {
 	rows, err := s.rdb.Query(`
-SELECT a.account, a.name, a.coins, a.has_coins, 1,
-  COALESCE((SELECT cs.coins FROM coin_snapshots cs
-            WHERE cs.account = a.account ORDER BY cs.ts ASC, cs.id ASC LIMIT 1), a.coins)
+SELECT a.account, a.name, a.coins, a.has_coins, 1, ` +
+		dayStartBaselineSQL(rankDayStart(time.Now())) + `
 FROM accounts a
 WHERE a.rank_join = 1`)
 	if err != nil {
@@ -142,12 +178,12 @@ WHERE a.rank_join = 1`)
 }
 
 // AccountRank 返回单个账号的排行参与信息(含 join 开关)。账号不存在时返回零值。
+// 盈亏口径同 Leaderboard(当日盈亏,见 dayStartBaselineSQL)。
 func (s *Store) AccountRank(account string) RankEntry {
 	var e RankEntry
 	_ = s.rdb.QueryRow(`
-SELECT a.account, a.name, a.coins, a.has_coins, a.rank_join,
-  COALESCE((SELECT cs.coins FROM coin_snapshots cs
-            WHERE cs.account = a.account ORDER BY cs.ts ASC, cs.id ASC LIMIT 1), a.coins)
+SELECT a.account, a.name, a.coins, a.has_coins, a.rank_join, `+
+		dayStartBaselineSQL(rankDayStart(time.Now()))+`
 FROM accounts a WHERE a.account = ?`, account).
 		Scan(&e.Account, &e.Name, &e.Coins, &e.HasCoins, &e.Join, &e.Baseline)
 	e.Profit = e.Coins - e.Baseline

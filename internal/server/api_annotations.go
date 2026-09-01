@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -84,7 +85,7 @@ func (s *Server) handleSubmitAnnotation(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "kind 须为 skill 或 feature", http.StatusBadRequest)
 		return
 	}
-	req.Name = strings.TrimSpace(req.Name)
+	req.Name = cleanAnnotationName(req.Name)
 	req.Desc = strings.TrimSpace(req.Desc)
 	if req.Code <= 0 {
 		http.Error(w, "code 须为正整数", http.StatusBadRequest)
@@ -186,6 +187,30 @@ func (s *Server) handleReviewAnnotation(w http.ResponseWriter, r *http.Request) 
 	// 前端只当信号用,重拉 GET /api/annotations 拿全量(量小,没必要做增量)。
 	s.hub.Broadcast("annotations", "", map[string]any{"id": id, "approve": req.Approve})
 	writeJSON(w, map[string]any{"ok": true})
+}
+
+// cleanAnnotationName 规范化标注名字:**移除所有空白字符**。
+//
+// 起因:wiki 图鉴页为排版在文字间插了空格,玩家照着抄(或手输时带空格)就把
+// 「魔法增效」提交成了「魔 法 增 效」,末尾还常带一个空格。这类脏名字进库后
+// 全服可见 —— 标注本来就是为了给别人看名字,名字错了等于白标。
+//
+// 为什么敢直接移除**所有**空白而不只是压缩+去首尾:
+// 现有技能名(617)与特性名(190)共 807 个,含空格的为 **0** —— 这是中文游戏,
+// 技能/特性名里没有合法的空格。压缩成单空格只能把「魔 法 增 效」变成
+// 「魔 法 增 效」(仍是脏的),必须整个去掉才是「魔法增效」。
+//
+// 用 unicode.IsSpace 而非只看 ' ':能一并处理全角空格(U+3000)与制表符 ——
+// 从网页复制文本时全角空格很常见。
+// 若将来真出现带空格的合法名字(如英文名),这里要改成「压缩为单空格」,
+// 并另行提供去字间空格的入口。
+func cleanAnnotationName(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1 // 丢弃
+		}
+		return r
+	}, s)
 }
 
 // annotationKind 校验 kind 参数取值(skill / feature),返回规范化后的值。

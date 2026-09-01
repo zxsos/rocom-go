@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -21,6 +22,8 @@ import (
 //       * **已结束的槽永不回源** —— 回源拿到的是「现在」的货单,写进历史槽就是伪造数据;
 //       * **进行中的槽按 merchantRefetch 冷却重查、限 merchantRefetchWin 窗口** ——
 //         第三方自己有缓存,轮次开始后新上的商品滞后才出现,只查一次会永久错过;
+//         重查统一带 refresh=true 让它真正回源(见 merchantForceRefresh),否则
+//         拿回的始终是它那份旧快照,重查等同空转;
 //   - 触发回源两条路径:merchantLoop 每 15 分钟检查当前槽(覆盖「早上 8 点自动查第一次」),
 //     以及玩家打开页面时 handleMerchant 按当前时间补查/重查当前轮;
 //   - 订阅提醒:有货槽写入后对比本营业日更早轮与**本槽已通知过的商品**找出「新增商品」,
@@ -39,6 +42,10 @@ const (
 	// (魔力果/火系粉尘/萌系粉尘)。只在槽开始时查一次的话,这部分商品永久错过,
 	// 页面只有「强制刷新」才补得回来。
 	//
+	// 注:该实测发生在 refresh=false(拿第三方缓存快照)时;现已统一带 refresh=true
+	// 回源(见 merchantForceRefresh),滞后时间应大幅缩短甚至消失。本冷却与
+	// merchantRefetchWin 仍保留作为兜底 —— 第三方是否真会即时更新没有保证。
+	//
 	// 取值 10 分钟:一轮 4h 但只在前 90 分钟重查(merchantRefetchWin),故单轮至多 9 次,
 	// 一天 4 轮 + 补查 ≈ 40 次/天,token 可控。注意它必须 ≥ merchantClaimCooldown
 	// (merchant_notify.go),否则订阅提醒的正常补发会被认领机制误挡。
@@ -49,7 +56,29 @@ const (
 	// 兜底用:第三方滞后多久没有保证,不能让一个槽无限期地每 10 分钟烧一次 token。
 	// 取 90 分钟 = 实测滞后 56 分钟 + 余量,且远小于槽长 4h,轮次后半段不再打扰第三方。
 	merchantRefetchWin = 90 * time.Minute
+
+	// merchantForceRefresh 回源时是否带 refresh=true(让第三方绕过自己的缓存)。
+	//
+	// **开启原因**:第三方自己有缓存,轮次整点开始后新上架的商品要滞后才出现在它
+	// 的响应里 —— 2026-08-30 实测 20:00 开轮,那份快照到 20:56 才补全 3 件轮次专属货。
+	// 更关键的是:**带 refresh=false 时,重查拿到的仍是它缓存的旧快照** —— 于是在
+	// 补全之前,无论重查多少次都是同一份不完整数据,「滞后 56 分钟」不是靠等就能熬
+	// 过去的。带 refresh=true 才会真正回源,准点后很快就能拿到新货单(用户实测整点
+	// 后约 1 分钟即可拿到)。
+	//
+	// 代价是每次回源都真正打到上游(烧 token),故仍需 merchantShouldFetch 控制次数
+	// (一轮至多 9 次、一天 ≈40 次),不能因为开了它就放开重查。
+	merchantForceRefresh = true
 )
+
+// merchantShouldForceRefresh 决定本次回源是否强制第三方刷新缓存。
+//
+// 抽成函数是为了让策略可调:目前一律 true(首查要真实数据、重查就是为了追滞后,
+// 两者都必须强制;拿陈旧快照的重查没有意义)。若将来第三方对 refresh 单独限流,
+// 可在此按「首查/重查」或时间窗口细分,而不必改调用点。
+func merchantShouldForceRefresh() bool {
+	return merchantForceRefresh
+}
 
 // merchantFetchURL 第三方接口地址。
 //
@@ -176,11 +205,11 @@ func (s *Server) merchantEnsure(now time.Time, force ...bool) {
 	// 有货的新回源槽收集起来,锁外再补发订阅邮件(发信慢,别占锁)。
 	var notify []time.Time
 	if len(force) > 0 && force[0] {
-		if ok, empty := s.merchantFetch(slots[cur]); ok && !empty {
+		if ok, empty := s.merchantFetch(slots[cur], merchantShouldForceRefresh()); ok && !empty {
 			notify = append(notify, slots[cur])
 		}
 	} else if s.merchantShouldFetch(slots[cur], now) {
-		if ok, empty := s.merchantFetch(slots[cur]); ok && !empty {
+		if ok, empty := s.merchantFetch(slots[cur], merchantShouldForceRefresh()); ok && !empty {
 			notify = append(notify, slots[cur])
 		}
 	}
@@ -243,11 +272,15 @@ func (s *Server) merchantShouldFetch(slotStart, now time.Time) bool {
 // merchantFetch 回源第三方并写入槽缓存,顺带清理 2 天前的过期记录。
 // 返回 (ok, empty):ok=拿到「第三方正常响应」(有货无货都算,仅网络/HTTP 层失败返回 false,
 // 不写库);empty=该槽查过但无货。ok && !empty 时调用方应在锁外触发 merchantNotify。
-func (s *Server) merchantFetch(slotStart time.Time) (bool, bool) {
+//
+// refresh 对应第三方的 refresh 参数:
+// true = 让它绕过自己的缓存直接回源(拿到的是此刻真实货单),false = 拿它可能陈旧的快照。
+// 取值策略见 merchantShouldForceRefresh。
+func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 	params := url.Values{}
 	params.Add("key", s.eggAPIKey)
 	params.Add("format", "json")
-	params.Add("refresh", "false")
+	params.Add("refresh", strconv.FormatBool(refresh))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

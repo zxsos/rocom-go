@@ -134,7 +134,23 @@ func New(st *store.Store, db *gamedata.DB, srv *server.Server) *Pipeline {
 			}
 		}
 	}
+	// 把「用户点清空」这条反向调用注入 server:野生宠观测态在管线侧(见 Server.SetWildsClearer)。
+	srv.SetWildsClearer(p.clearWildsForAccount)
 	return p
+}
+
+// clearWildsForAccount 清空某账号的野生宠标记(server 的 DELETE /api/wildpets 走这里)。
+//
+// 账号可能同时有多条连接(多设备/多游戏服),故逐条清;连接状态各自持有观测态,
+// 清空后等下一个 actor_enter 自然重建 —— 不会像见闻录那样被服务器补回。
+func (p *Pipeline) clearWildsForAccount(acc string) {
+	now := time.Now()
+	for conn, a := range p.connAccount {
+		if a != acc {
+			continue
+		}
+		p.clearWilds(conn, acc, p.conn(conn).res, now)
+	}
 }
 
 // conn 返回(必要时创建)某连接的状态。

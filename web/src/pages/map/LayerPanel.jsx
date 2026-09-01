@@ -51,7 +51,19 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             放在图标图层下面,同属大地图静态收集物一类。 */}
         <ZonePanel stats={zoneStats} onFocus={onFocusZone} disabled={!onFocusZone} />
         <div className="filter-group">
-          <label>野生宠物</label>
+          {/* 清空按钮放进 label 内:复用 .filter-group > label 的既有 flex 布局
+              (左侧装饰竖条靠 ::before),不必另加包裹层与配套样式。
+              这是唯一会真正删除野生宠标记的入口 —— 换场景/传送都只置灰
+              (见 pipeline.resetWilds),系统不自动抹掉,清不清由用户决定。 */}
+          <label>
+            野生宠物
+            <button className="map-collect-btn map-wild-clear" onClick={() => {
+              confirmDialog({
+                message: '清空全部野生宠物标记?(含已置灰的「最后所见」)',
+                okText: '清空', danger: true,
+              }).then((ok) => ok && wilds.clear())
+            }} title="清空地图上的野生宠物标记(含灰点)" aria-label="清空野生宠标记">🗑</button>
+          </label>
           <div className="map-layer-row">
             <button className={'map-layer-btn map-notify-btn' + (wilds.notify ? ' on' : '')}
               onClick={wilds.toggleNotify}

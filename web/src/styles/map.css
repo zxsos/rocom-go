@@ -385,6 +385,11 @@
 .map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
 /* 稀有宠提醒按钮的铃铛:与图层色点同一行高对齐;关闭态随按钮灰掉。 */
 .map-notify-ic { font-size: 15px; line-height: 1; flex: none; }
+
+/* 「清空野生宠标记」按钮:塞在分组标题(label)里,靠 margin-left:auto 推到行右端。
+   .map-collect-btn 默认 width:32px,在标题行里偏大,收紧到 24px 与下方图层行对齐。
+   它是唯一会真正删除标记的入口(换场景/传送只置灰),故用 🗑 而非 ↺ 以示区别。 */
+.map-wild-clear { width: 24px; height: 24px; font-size: 12px; margin-left: auto; }
 .map-notify-btn:not(.on) .map-notify-ic { opacity: .45; }
 /* 「仅双牌时提醒」子开关:缩进表示从属提醒开关;禁用(提醒关时)变灰不可点。 */
 .map-notify-dual-row { padding-left: 20px; }
