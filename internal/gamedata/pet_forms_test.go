@@ -86,6 +86,67 @@ func TestPetByName(t *testing.T) {
 	}
 }
 
+// TestPetFormsMatchPetByName 锁住「候选名单」与「标注回填」必须同口径。
+//
+// 玩家在候选里选「圣光迪莫」提交,后端拿这个名字经 PetByName 反查成形态 id
+// 再取头像。两条路若取到不同的形态,结果就是**玩家标了 A、页面显示 B** ——
+// 不报错、两者各自都"对",只有把两边放在一起比才看得出来。
+//
+// 这条不一致真实发生过两次,两次都是口径差一点点:
+//
+//  1. PetForms 只收有图鉴号的形态,而 petNames 收全部 ——
+//     于是「圣光迪莫」候选挂 5025(有图鉴号),回填却取到 3048(无图鉴号的
+//     占位形态,压根不在候选里)。头像对得上才怪。
+//  2. PetForms 按 (Book, Base) 排序后去重、PetByName 按全局最小 id 取 ——
+//     同名但分属不同图鉴号时,两者会挑中不同的记录。
+//
+// 故这里**逐个候选**比对,而不是抽查:不一致只在个别名字上出现,抽样会漏。
+func TestPetFormsMatchPetByName(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	forms := db.PetForms()
+	if len(forms) == 0 {
+		t.Fatal("PetForms 为空")
+	}
+	// 1. 候选按名字唯一:同名同图的多条记录(棋契陛下 8 条、鸭吉吉国王 6 条)
+	//    在玩家眼里完全一样,列 8 遍只会让人瞎选。
+	seen := map[string]bool{}
+	for _, f := range forms {
+		if seen[f.Name] {
+			t.Errorf("候选里 %q 重复出现 —— 玩家无从分辨,去重失效了", f.Name)
+		}
+		seen[f.Name] = true
+	}
+	// 2. 每个候选的 Base 必须就是 PetByName 反查的结果
+	for _, f := range forms {
+		id, _, ok := db.PetByName(f.Name)
+		if !ok {
+			t.Fatalf("%q 在候选里但反查不到 —— 两表口径不一致", f.Name)
+		}
+		if id != f.Base {
+			t.Errorf("%q: 候选 base=%d 但 PetByName=%d —— 玩家标了 A 会显示 B",
+				f.Name, f.Base, id)
+		}
+	}
+	// 3. 稳定性:map 迭代顺序随机,若去重前没排序,每次启动挂的 id 都可能不同。
+	//    跑多次比对,单次运行过不代表部署后还过。
+	want := forms
+	for i := 0; i < 3; i++ {
+		got := db.PetForms()
+		if len(got) != len(want) {
+			t.Fatalf("第 %d 次调用长度不同: %d vs %d —— 去重前没排序", i, len(got), len(want))
+		}
+		for j := range got {
+			if got[j] != want[j] {
+				t.Fatalf("第 %d 次第 %d 项不同: %+v vs %+v", i, j, got[j], want[j])
+			}
+		}
+	}
+	t.Logf("候选 %d 个,均与 PetByName 一致", len(forms))
+}
+
 func TestPetForms(t *testing.T) {
 	db, err := Load()
 	if err != nil {

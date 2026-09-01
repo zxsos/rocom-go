@@ -170,6 +170,15 @@ func Load() (*DB, error) {
 	}
 	petbase := make(map[uint32]PetBaseInfo, len(raw.Petbase))
 	// 形态全名 -> id 的反查表(标注里的精灵名要换回形态 id 才能取头像,见 PetByName)。
+	//
+	// ⚠️ **必须与 PetForms 同口径:只收录有图鉴号(Book≠0)的形态。**
+	// 无图鉴号的是内部占位形态(圣光迪莫的 3048/103005、迪莫的 8007/103004),
+	// 玩家在游戏里见不到,PetForms 也据此过滤掉了它们。
+	//
+	// 两处口径不一致的后果是**玩家标了 A、页面显示 B**:PetForms 只在有图鉴号的
+	// 里取最小(圣光迪莫 → 5025),而 petNames 若无过滤会取到全局最小的 3048 ——
+	// 那是个不在候选列表里的占位形态,头像可能都对不上。
+	//
 	// 同名形态取最小 id:基础形态的头像最"正",变体(103004 这类)是次要记录。
 	petNames := make(map[string]uint32, len(raw.Petbase))
 	evoIndex := map[uint32][]uint32{}
@@ -182,9 +191,12 @@ func Load() (*DB, error) {
 			Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E, EggGroups: v.Eg,
 			HeightLow: v.HL, HeightHigh: v.HH, WeightLow: v.WL, WeightHigh: v.WH,
 		}
-		full := petFullName(v.N, v.F) // 全角括号:与 wiki 精灵页名同口径,见 petFullName
-		if prev, ok := petNames[full]; !ok || uint32(id) < prev {
-			petNames[full] = uint32(id)
+		// 只收录有图鉴号的形态 —— 与 PetForms 同口径,见上方 petNames 的说明。
+		if v.B != 0 {
+			full := petFullName(v.N, v.F) // 全角括号:与 wiki 精灵页名同口径,见 petFullName
+			if prev, ok := petNames[full]; !ok || uint32(id) < prev {
+				petNames[full] = uint32(id)
+			}
 		}
 		if v.E != 0 {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
