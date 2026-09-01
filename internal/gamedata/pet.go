@@ -332,17 +332,27 @@ type PetFormOption struct {
 // 形态没图时前端自己占位,标了却搜不到才是更糟的体验。
 func (db *DB) PetForms() []PetFormOption {
 	out := make([]PetFormOption, 0, len(db.petbase))
+	// 按**形态全名去重**:同一只精灵在配置里可能有若干条形态记录 ——
+	// 「棋契陛下」有 8 条(四条进化来源各一条)、「鸭吉吉国王」6 条、「钻石蜗」6 条,
+	// 共 16 组、52 个形态。它们的名字与头像**完全一样**,玩家搜「棋契陛下」会看到
+	// 8 个一模一样的选项,无从分辨、只能瞎选 —— 加头像也救不了(图也一样)。
+	//
+	// 保留最小 id,与 PetByName(同名取最小)保持同一口径:候选里选到的那个,
+	// 就是标注回填时反查到的那个。两者若不一致,玩家标了 A、页面显示 B。
+	//
+	// 去重会丢掉一部分 petbase id,代价是那些 id 无法被直接标注 —— 可以接受:
+	// 同名同图的两条记录,玩家(和我们)都无从区分,标哪个都是同一个结果。
+	//
+	// 去重前**必须先排序**:map 的迭代顺序是随机的,若边遍历边去重,
+	// 保留下来的是「碰巧先被遍历到的那个」而非最小的 —— 于是每次启动
+	// 候选里挂的 petbase id 都可能不同,而 PetByName 总是取最小的,
+	// 结果就是玩家标了 A、页面显示 B,且这种不一致挑不出规律。
+	//
+	// 是的,排序后先遇到的一定是最小 id(排序键第二位是 Base)。
 	for id, info := range db.petbase {
-		if info.Book == 0 {
-			continue
+		if info.Book != 0 {
+			out = append(out, PetFormOption{Base: id, Name: db.PetFullName(id), Book: info.Book})
 		}
-		// 只取头像(不取全身图):候选列表里要的是「一眼认出是哪只」,
-		// 全身图尺寸大、占比高,会挤掉本就紧张的列表空间。
-		o := PetFormOption{Base: id, Name: db.PetFullName(id), Book: info.Book}
-		if im := db.PetImageByBase(id, false); im.Head != "" {
-			o.Img = im.Head
-		}
-		out = append(out, o)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Book != out[j].Book {
@@ -350,7 +360,23 @@ func (db *DB) PetForms() []PetFormOption {
 		}
 		return out[i].Base < out[j].Base
 	})
-	return out
+
+	// 就地去重(去掉重复名字时保留排在最前 = id 最小的那条)
+	uniq := out[:0]
+	seen := map[string]bool{}
+	for _, o := range out {
+		if seen[o.Name] {
+			continue
+		}
+		seen[o.Name] = true
+		// 只取头像(不取全身图):候选列表里要的是「一眼认出是哪只」,
+		// 全身图尺寸大、占比高,会挤掉本就紧张的列表空间。
+		if im := db.PetImageByBase(o.Base, false); im.Head != "" {
+			o.Img = im.Head
+		}
+		uniq = append(uniq, o)
+	}
+	return uniq
 }
 
 // PetEggGroups 返回某 petbase 形态的蛋组列表(社区名+描述,按配置顺序);无则返回 nil。
