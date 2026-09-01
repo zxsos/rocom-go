@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { getWildPets, subscribe } from '../../api'
+import { getWildPets, clearWildPets, subscribe } from '../../api'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { WILD_LAYERS, MEDAL_FILTERS, SWITCH_KEYS, MEDAL_KEYS,
   DEFAULT_SWITCHES, DEFAULT_MEDALS, DEFAULT_MEDAL_ON,
@@ -263,5 +263,17 @@ export function useWildPets(account) {
     return [num, numStale]
   }, [pets, allPets, medals, medalOn, dual])
 
-  return { marks, num, numStale, on, toggle, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, setDualThreshold, notify, toggleNotify, notifyDualOnly, toggleNotifyDualOnly }
+  // clear 主动清空野生宠标记(侧栏「清空」按钮),灰点也一并清掉。
+  //
+  // 与换场景/传送不同:那两者只把标记置灰(见 pipeline.resetWilds),标记会一直
+  // 留在图上、久了可能攒一堆灰点,是否抹平由用户决定 —— 这里就是那个决定。
+  // 清空后不会被服务器补回(标记只随 AOI 实体下发重建),等走近了才重新出现。
+  //
+  // 本地先清(响应快),后端随后广播一条空列表兜住同账号的其它页面。
+  const clear = useCallback(() => {
+    setData({ pets: [], allPets: [] })
+    return clearWildPets().catch(() => {}) // 失败无所谓:下次实体下发会重建
+  }, [setData])
+
+  return { marks, num, numStale, on, toggle, clear, medals, setThreshold, open, toggleOpen, medalOn, toggleMedal, dual, toggleDual, setDualThreshold, notify, toggleNotify, notifyDualOnly, toggleNotifyDualOnly }
 }

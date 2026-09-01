@@ -84,7 +84,9 @@ func (s *Server) runMerchantProbe(slot time.Time) {
 		n++
 
 		s.merchantMu.Lock()
-		ok, empty := s.merchantFetch(slot)
+		// 探测的目的就是「盯准点那一刻第三方什么时候给出本轮货单」,必须强制回源
+		// (refresh=true):拿缓存快照的话看到的永远是旧数据,探不出真实更新时间。
+		ok, empty := s.merchantFetch(slot, true)
 		s.merchantMu.Unlock()
 
 		// 拿到非空的本轮货单才算「响应」:读回刚写的槽体,看商品 time_label 是否以

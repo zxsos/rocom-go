@@ -60,6 +60,33 @@ func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, v)
 }
 
+// SetWildsClearer 由消费管线注册「清空野生宠标记」的回调。
+//
+// 为什么要绕这一层:野生宠的观测态(connState.wilds)归 **pipeline** 持有,server 够不着;
+// 而 pipeline 已经依赖 server(pipeline.New 收 *Server),若 server 再 import pipeline 就是
+// 循环引用。故用函数回调把反向调用注入进来 —— 与涂地不同,涂地状态在 server 里
+// (s.paint),可以直接清(见 handlePaintReset)。
+func (s *Server) SetWildsClearer(fn func(account string)) {
+	s.wildsMu.Lock()
+	s.wildsClearer = fn
+	s.wildsMu.Unlock()
+}
+
+// handleWildPetsClear 主动清空当前账号的野生宠标记(用户点「清空」时用)。
+//
+// 与「换场景/传送」是两回事:那是管线自动做的、且**只置灰不删**(见 pipeline.resetWilds),
+// 这是用户**明确要求**抹掉 —— 灰点也一并清掉。这是唯一会真正删除标记的入口。
+func (s *Server) handleWildPetsClear(w http.ResponseWriter, r *http.Request) {
+	acc := s.acct(r)
+	s.wildsMu.Lock()
+	fn := s.wildsClearer
+	s.wildsMu.Unlock()
+	if fn != nil {
+		fn(acc)
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
 // SetLastHome 缓存某账号最近一次家园小窝图层(由消费管线在广播 home 时调用),
 // 供实时地图页加载时经 GET /api/home 即时回显。玩家不在家园时缓存的是空列表。
 func (s *Server) SetLastHome(account string, payload *HomePayload) {

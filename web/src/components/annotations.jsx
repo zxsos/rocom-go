@@ -114,12 +114,18 @@ export function AnnotationModal({ kind, code, onClose }) {
   useEffect(() => { if (inputRef.current) inputRef.current.focus() }, [])
 
   // 过滤候选:名字/描述含搜索词(忽略大小写);特性候选还按描述搜。
+  //
+  // **比较时忽略空格**:wiki 为排版在字间插了空格,玩家照着搜「魔 法 增 效」或反过来
+  // 搜「魔法增效」,都该命中同一条候选。两边都去掉空白再比,就不必要求玩家猜中
+  // 数据里到底有没有空格(后端提交时也会清洗,见 cleanAnnotationName)。
   const filtered = useMemo(() => {
-    const kw = q.trim().toLowerCase()
+    const strip = (s) => (s || '').replace(/\s+/g, '')
+    const kw = strip(q).toLowerCase()
     if (!candidates) return []
     if (!kw) return candidates.slice(0, 50)
     return candidates.filter((c) =>
-      c.name.toLowerCase().includes(kw) || (c.desc || '').toLowerCase().includes(kw),
+      strip(c.name).toLowerCase().includes(kw) ||
+      strip(c.desc).toLowerCase().includes(kw),
     ).slice(0, 50)
   }, [candidates, q])
 

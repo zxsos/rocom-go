@@ -44,7 +44,7 @@ function RankRow({ entry, rank, account, mode }) {
               <span className={`rank-profit ${entry.profit >= 0 ? 'pos' : 'neg'}`}>
                 <TweenNumber value={entry.profit} format={profitFmt} />
               </span>
-              <span className="rank-sub">{fmt(entry.coins)} / 基线 {fmt(entry.baseline)}</span>
+              <span className="rank-sub">{fmt(entry.coins)} / 今日起点 {fmt(entry.baseline)}</span>
             </>
           ) : (
             <span className="rank-unknown">待同步</span>
@@ -140,7 +140,7 @@ export default function Leaderboard() {
         {list.map((e, i) => <RankRow key={e.account} entry={e} rank={i + 1} account={account} mode={tab} />)}
       </div>
       <div className="rank-foot">
-        盈亏 = 当前洛克贝 − 首次记录洛克贝(每次登录自动记录)· 仅统计「已参加」账号 · 未同步洛克贝的账号显示「待同步」
+        盈亏 = 当前洛克贝 − 今日起点(每天 0 点归零;未登录则带昨夜余额)· 仅统计「已参加」账号 · 未同步洛克贝的账号显示「待同步」
       </div>
     </div>
   )

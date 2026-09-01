@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sync"
 	"testing"
 	"time"
 )
@@ -111,7 +113,7 @@ func TestMerchantFetchKeepsGoodsOnEmptyResponse(t *testing.T) {
 	}
 	fakeMerchantAPI(t, `{"code":200,"data":{"item_count":0,"items":[]}}`, http.StatusOK)
 
-	ok, empty := s.merchantFetch(slot)
+	ok, empty := s.merchantFetch(slot, true)
 
 	if !ok || !empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, true)", ok, empty)
@@ -139,7 +141,7 @@ func TestMerchantFetchStillWritesEmptyWhenNoGoods(t *testing.T) {
 	const none = `{"code":200,"data":{"item_count":0,"items":[]}}`
 	fakeMerchantAPI(t, none, http.StatusOK)
 
-	ok, empty := s.merchantFetch(slot)
+	ok, empty := s.merchantFetch(slot, true)
 
 	if !ok || !empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, true)", ok, empty)
@@ -165,7 +167,7 @@ func TestMerchantFetchRefetchUpdatesGoods(t *testing.T) {
 	}
 	hits := fakeMerchantAPI(t, later, http.StatusOK)
 
-	ok, empty := s.merchantFetch(slot)
+	ok, empty := s.merchantFetch(slot, true)
 
 	if !ok || empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, false)", ok, empty)
@@ -216,6 +218,110 @@ func TestMerchantCurrentSlot(t *testing.T) {
 		}
 		if !merchantSlotLive(slots[c.want], day.Add(c.elapsed)) {
 			t.Errorf("当前轮 %s 在进行中判定上不成立(now = 0 点 + %v)", slots[c.want].Format("15:04"), c.elapsed)
+		}
+	}
+}
+
+// TestMerchantFetchSendsRefresh 回源必须带 refresh=true —— 这条光读代码看不出来
+// (参数拼在 URL 查询串里),但它是「准点拿到新货单」的关键。
+//
+// 为什么必须强制第三方回源:它自己有缓存,带 refresh=false 时返回的可能是上一轮
+// 甚至更早的**旧快照** —— 那时无论我们重查多少次,拿回的始终是同一份陈旧数据,
+// 「轮次开始后滞后补全」这件事永远追不上(2026-08-30 实测滞后 56 分钟)。
+// 带 refresh=true 才会真正回源,准点后约 1 分钟即可拿到新货单。
+//
+// 同时也钉住其余必填参数:key 与 format=json 缺一不可。
+func TestMerchantFetchSendsRefresh(t *testing.T) {
+	s := newTestServer(t)
+	s.eggAPIKey = "test-key" // merchantFetch 的必填查询参数;真 token 不在测试里出现
+	slot := merchantDaySlots(testDay(0))[5] // 避开别处占用的槽
+	const goods = `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`
+
+	// 收集**所有**请求而非只记最后一次:New() 起的 merchantLoop 后台 goroutine 也会
+	// 回源打到这个假服务(见 server.go),只记最后一次的话可能读到后台的请求 ——
+	// 那会让断言「碰巧正确」(假绿灯)。改成收集全部并断言全部,后台请求反而
+	// 变成额外的验证样本。
+	var mu sync.Mutex
+	var queries []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.Query())
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, goods)
+	}))
+	t.Cleanup(srv.Close)
+	old := merchantFetchURL
+	merchantFetchURL = srv.URL
+	t.Cleanup(func() { merchantFetchURL = old })
+
+	if ok, _ := s.merchantFetch(slot, true); !ok {
+		t.Fatal("merchantFetch 失败(应拿到正常响应)")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(queries) == 0 {
+		t.Fatal("没有捕到任何回源请求")
+	}
+	for i, q := range queries {
+		if got := q.Get("refresh"); got != "true" {
+			t.Errorf("第 %d 次请求 refresh = %q, 期望 \"true\"(不强制回源会拿到第三方陈旧快照,重查等同空转)", i+1, got)
+		}
+		if got := q.Get("format"); got != "json" {
+			t.Errorf("第 %d 次请求 format = %q, 期望 \"json\"", i+1, got)
+		}
+		if got := q.Get("key"); got == "" {
+			t.Errorf("第 %d 次请求 key 缺失(第三方必填)", i+1)
+		}
+	}
+}
+
+// TestMerchantEnsureForcesRefresh 走**真实调用链**验证强制刷新生效:
+// merchantEnsure → merchantShouldForceRefresh → merchantFetch。
+//
+// 为什么要有它:TestMerchantFetchSendsRefresh 直接调 merchantFetch(slot, true),
+// 绕过了策略函数 —— 变异测试证明,把 merchantShouldForceRefresh 改成恒返回 false
+// 时那条用例**照样通过**(假绿灯)。真正决定线上行为的是 merchantEnsure 里的调用,
+// 故必须在这里钉死。
+func TestMerchantEnsureForcesRefresh(t *testing.T) {
+	s := newTestServer(t)
+	s.eggAPIKey = "test-key"
+	// 用昨天的一个进行中槽(避开别处占用的):把 now 设在槽开始后 30 分钟
+	slot := merchantDaySlots(testDay(-1))[1]
+	now := slot.Add(30 * time.Minute)
+
+	var mu sync.Mutex
+	var queries []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.Query())
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`)
+	}))
+	t.Cleanup(srv.Close)
+	old := merchantFetchURL
+	merchantFetchURL = srv.URL
+	t.Cleanup(func() { merchantFetchURL = old })
+
+	// force=true:前端「强制刷新」路径
+	s.merchantEnsure(now, true)
+
+	// 常规路径(shouldFetch 判定要回源):同样必须带 refresh=true —— 重查的目的
+	// 就是追第三方滞后,拿它的缓存快照等于空转。
+	s.merchantEnsure(now) // 此时该槽刚回源过(冷却内),换个槽触发常规首查
+	slot2 := merchantDaySlots(testDay(-1))[2]
+	s.merchantEnsure(slot2.Add(30 * time.Minute))
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(queries) == 0 {
+		t.Fatal("merchantEnsure 没有发起回源")
+	}
+	for i, q := range queries {
+		if got := q.Get("refresh"); got != "true" {
+			t.Errorf("第 %d 次回源 refresh = %q, 期望 \"true\"(拿缓存快照的重查等同空转)", i+1, got)
 		}
 	}
 }
