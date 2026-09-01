@@ -213,7 +213,8 @@
   flex-wrap: wrap;
 }
 
-/* 类别徽标:看「全部」时用来区分技能/特性 */
+/* 类别徽标:看「全部」时用来区分技能/特性/精灵 —— 三类混在一个列表里,
+   同一个数字(如 288022 与 7020550)光看 code 分不清是哪一类。 */
 .anno-review-kind {
   flex: none;
   font-size: 11px;
@@ -225,6 +226,7 @@
 }
 .anno-review-kind.kind-feature { color: var(--accent); border-color: var(--accent); }
 .anno-review-kind.kind-skill { color: var(--green, var(--accent)); border-color: currentColor; }
+.anno-review-kind.kind-event { color: var(--gold); border-color: var(--gold); }
 
 .anno-review-code {
   font-size: 11px;

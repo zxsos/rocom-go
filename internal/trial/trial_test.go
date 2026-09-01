@@ -53,6 +53,27 @@ func TestParseChallengeDataInitialFeatures(t *testing.T) {
 	}
 }
 
+// TestIsFeatureID 锁住三类 id 的区间判据。
+//
+// 协议不下发类型字段,类别全靠区间分(逐条对照 updated_pet 的落点得出,
+// 见 docs/pcap-20260831-grass-trial.md 2.1)。判据写宽一点点,技能就会被当成
+// 特性、拿精灵的特性名去绑 —— 名字绑在错误的 id 上,比不绑糟糕得多。
+// 前端 web/src/pages/trial/Trial.jsx 的 isFeatureID 是同一套判据,改一处要改两处。
+func TestIsFeatureID(t *testing.T) {
+	yes := []uint32{288000, 288001, 288135, 288999}
+	no := []uint32{0, 1999, 2016, 3005, 7020500, 7880058, 289000, 4000000}
+	for _, id := range yes {
+		if !IsFeatureID(id) {
+			t.Errorf("IsFeatureID(%d) 应为 true", id)
+		}
+	}
+	for _, id := range no {
+		if IsFeatureID(id) {
+			t.Errorf("IsFeatureID(%d) 应为 false", id)
+		}
+	}
+}
+
 func TestParseChallengeData(t *testing.T) {
 	var body []byte
 	body = protowire.AppendTag(body, 1, protowire.VarintType) // state

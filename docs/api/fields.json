@@ -1,4 +1,21 @@
 {
+  "annotations-event": {
+    "desc": "全服已审核的试炼事件标注(事件 → 精灵)",
+    "endpoint": "GET /api/annotations?kind=event",
+    "sample": "internal/server/testdata/contract/annotations-event.json",
+    "shape": {
+      "items": [
+        {
+          "code": "int",
+          "createdAt": "int",
+          "id": "int",
+          "kind": "str",
+          "name": "str"
+        }
+      ],
+      "ts": "int"
+    }
+  },
   "annotations-feature": {
     "desc": "全服已审核的特性标注(众包图鉴)",
     "endpoint": "GET /api/annotations?kind=feature",
@@ -827,9 +844,26 @@
               {}
             ],
             "level": "int",
+            "names": {
+              "7020430": "str",
+              "7020440": "str",
+              "7110340": "str",
+              "7160140": "str"
+            },
+            "pet": {
+              "base": "int",
+              "img": "str",
+              "name": "str"
+            },
+            "pool": [
+              {}
+            ],
             "reward": "int",
             "rewardCost": "int",
-            "slot": "int"
+            "slot": "int",
+            "used": [
+              {}
+            ]
           }
         ],
         "pet": {
@@ -837,13 +871,22 @@
           "equipped": [
             {}
           ],
+          "featureNames": {
+            "288135": "str"
+          },
           "features": [
+            {}
+          ],
+          "gainedFeatures": [
             {}
           ],
           "gid": "int",
           "growth": "int",
           "hp": "int",
           "img": "str",
+          "innateFeatures": [
+            {}
+          ],
           "level": "int",
           "maxHp": "int",
           "name": "str",

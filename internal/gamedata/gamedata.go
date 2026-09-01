@@ -41,6 +41,7 @@ type DB struct {
 	images       map[string]imageEntry  // petbase_id -> 文件名
 	imageBase    map[string]string      // conf_id -> petbase_id(base==自身者不入表)
 	petbase      map[uint32]PetBaseInfo // petbase_id -> 形态元数据
+	petNames     map[string]uint32      // 形态全名 -> petbase_id(同名取最小,见 PetByName)
 	eggGroup     map[uint32]EggGroup    // 蛋组id(1-15) -> 社区名/描述
 	npcPets      map[uint32]uint32      // 野生宠 NPC_CONF id -> petbase_id(取名称/头像,见 3.5)
 	npcBosses    map[uint32]bool        // 野外首领的 NPC_CONF id(throwing_interact_type=4,见 3.8)
@@ -168,6 +169,9 @@ func Load() (*DB, error) {
 		imageBase[k] = key(v)
 	}
 	petbase := make(map[uint32]PetBaseInfo, len(raw.Petbase))
+	// 形态全名 -> id 的反查表(标注里的精灵名要换回形态 id 才能取头像,见 PetByName)。
+	// 同名形态取最小 id:基础形态的头像最"正",变体(103004 这类)是次要记录。
+	petNames := make(map[string]uint32, len(raw.Petbase))
 	evoIndex := map[uint32][]uint32{}
 	for k, v := range raw.Petbase {
 		id, err := strconv.ParseUint(k, 10, 32)
@@ -177,6 +181,10 @@ func Load() (*DB, error) {
 		petbase[uint32(id)] = PetBaseInfo{
 			Name: v.N, Book: v.B, Form: v.F, Stage: v.S, Evo: v.E, EggGroups: v.Eg,
 			HeightLow: v.HL, HeightHigh: v.HH, WeightLow: v.WL, WeightHigh: v.WH,
+		}
+		full := petFullName(v.N, v.F) // 全角括号:与 wiki 精灵页名同口径,见 petFullName
+		if prev, ok := petNames[full]; !ok || uint32(id) < prev {
+			petNames[full] = uint32(id)
 		}
 		if v.E != 0 {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
@@ -285,6 +293,7 @@ func Load() (*DB, error) {
 		images:         raw.Images,
 		imageBase:      imageBase,
 		petbase:        petbase,
+		petNames:       petNames,
 		eggGroup:       eggGroup,
 		npcPets:        npcPets,
 		npcBosses:      npcBosses,

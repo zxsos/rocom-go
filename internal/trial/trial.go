@@ -123,6 +123,18 @@ func (f InitialFeatures) Has(id uint32) bool {
 	return false
 }
 
+// IsFeatureID 报告一个试炼 id 是不是特性(288xxx)。
+//
+// 判据是**数值区间**:协议不下发类型字段,只能按区间分 ——
+// 实测(逐条对照 0x1968 的 updated_pet 落点,见 docs/pcap-20260831-grass-trial.md 2.1):
+//
+//	7xxxxxx    技能(进 skills[])
+//	288xxx     特性(进 acquired_feature_ids[])
+//	20xx/30xx  碎片(进 acquired_shard_effect_ids[])
+//
+// 区间外一律答 false:认错会把名字绑到错误的 id 上,不认只是少一个名字。
+func IsFeatureID(id uint32) bool { return id >= 288000 && id < 289000 }
+
 // InitialFeatures 是宠物**天生的**特性(局级 initial_feature_ids,#33)。
 //
 // 与 Pet.Features(宠物级 acquired_feature_ids,#11)的关系:

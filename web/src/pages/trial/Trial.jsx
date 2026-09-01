@@ -293,7 +293,7 @@ function RunView({ run, active }) {
       {run.options && run.options.length > 0 && (
         <section className="trial-group">
           <h4 className="trial-group-t">当前节点({run.options.length} 个事件)</h4>
-          <div className="trial-grid">
+          <div className="trial-opts">
             {run.options.map((o) => <OptionCard key={o.slot} o={o} />)}
           </div>
           {run.refreshCost > 0 && (
@@ -355,7 +355,7 @@ function RunView({ run, active }) {
       {run.shop && run.shop.length > 0 && (
         <section className="trial-group">
           <h4 className="trial-group-t">商店</h4>
-          <div className="trial-grid">
+          <div className="trial-shop">
             {run.shop.map((s) => (
               <div key={s.index} className={'trial-card' + (s.bought ? ' trial-card-bought' : '')}>
                 <div className="trial-card-t">{shopKind(s.type)}</div>
@@ -448,23 +448,46 @@ function OpponentCard({ o }) {
 function PetCard({ pet }) {
   const pct = pet.maxHp > 0 ? Math.round((pet.hp / pet.maxHp) * 100) : 0
   const { lookup } = useAnnotations() || {}
-  // 特性只有 id —— 内置名表接不进来(不像技能有 skills.json),先查全服已审核标注:
-  // 命中就显示名字(带「玩家标注」提示),没命中交给 UnknownChip 让玩家标注。
+  // 特性在协议里只有 id —— 内置名表接不进来(不像技能有 skills.json)。
   // 这是「标注模式」在展示侧的落点,提交/审核见 components/annotations.jsx。
+  // 三条取名路径,优先级从高到低:
+  //   1. 全服已审核标注(管理员核实过);
+  //   2. wiki「精灵 → 特性」表桥接(pet.featureNames,这只精灵天生的那条)——
+  //      开局就能带上,玩家不必再标一次;
+  //   3. 自己刚提交、待审的(只在本会话可见)。
   const featureChip = (f) => {
     const a = lookup && lookup('feature', f)
-    if (!a) return <UnknownChip key={f} kind="feature" code={f} />
-    // a.pending:自己刚提交、管理员还没审 —— 只在本会话可见,故加待审标记,
-    // 免得把自己还没核实的猜测当成权威数据显示出去。
-    return (
-      <span
-        key={f}
-        className={'trial-chip anno-hit' + (a.pending ? ' anno-pending' : '')}
-        title={`${a.desc || a.name}${a.pending ? '(你提交的,待管理员审核)' : '(玩家标注)'}`}
-      >
-        {a.name}{a.pending ? ' ·待审' : ''}
-      </span>
-    )
+    if (a && !a.pending) {
+      return (
+        <span key={f} className="trial-chip anno-hit" title={`${a.desc || a.name}(玩家标注,已审核)`}>
+          {a.name}
+        </span>
+      )
+    }
+    const wiki = (pet.featureNames || {})[String(f)]
+    if (wiki) {
+      return (
+        <span
+          key={f}
+          className="trial-chip trial-feat-wiki"
+          title={`${wiki}(wiki 精灵→特性表:按「${pet.name || pet.species}」反查,未经 id 校验)`}
+        >
+          {wiki} ⁓
+        </span>
+      )
+    }
+    if (a) { // 待审:只在本会话可见,故加待审标记
+      return (
+        <span
+          key={f}
+          className="trial-chip anno-hit anno-pending"
+          title={`${a.desc || a.name}(你提交的,待管理员审核)`}
+        >
+          {a.name} ·待审
+        </span>
+      )
+    }
+    return <UnknownChip key={f} kind="feature" code={f} />
   }
   return (
     <section className="trial-group">
@@ -559,22 +582,126 @@ function PetCard({ pet }) {
   )
 }
 
-// OptionCard 是当前节点的一个候选事件。
-function OptionCard({ o }) {
+// IdChip 渲染一个协议 id:查得到名字就显示名字,查不到给标注入口。
+//
+// 三类 id 的"名字"来源不同,故走三条路:
+//   技能(7xxxxx)—— 后端 names 兜了绝大部分(覆盖率 98.7%),没有的是资料站未收录;
+//   特性(288xxx)—— 没有内置名表,先查全服标注,查不到才是未知;
+//   碎片(20xx/30xx)—— 本就无名可查,直接显示 id(玩家也不靠名字认碎片)。
+//
+// used 标出**本节点已经抽过**的:重掷时服务器排除它们,压暗显示能让人一眼看出
+// 「换奖励还剩下哪些可能」。
+function IdChip({ id, name, used, current }) {
+  const { lookup } = useAnnotations() || {}
+  const isFeat = isFeatureID(id)
+  const anno = isFeat && lookup ? lookup('feature', id) : null
+  const text = name || (anno && anno.name)
+  // 名字来自 wiki 桥接(标注精灵后自动带出的)时提示来源:它是按精灵反查出来的,
+  // 与玩家提交、管理员核实的标注不是一回事,不该看着一样。
+  const from = name ? 'wiki 精灵→特性表' : anno ? '玩家标注' : ''
   return (
-    <div className="trial-card">
-      <div className="trial-card-t">槽 {o.slot} · 事件 {o.event}</div>
-      <div className="trial-card-id">{rewardKind(o.reward)} {o.reward}</div>
-      <div className="trial-card-meta">
-        {o.level > 0 && <span>Lv {o.level}</span>}
-        {o.eventCost > 0 && <span className="muted">换事件 {o.eventCost}</span>}
-        {o.rewardCost > 0 && <span className="muted">换奖励 {o.rewardCost}</span>}
-      </div>
-      {o.extra && o.extra.length > 0 && (
-        <div className="trial-card-meta">
-          <span className="muted">额外 {o.extra.map((x) => rewardKind(x)).join(' / ')}</span>
+    <span
+      className={'trial-chip trial-id' + (used ? ' trial-id-used' : '') +
+        (isFeat ? ' trial-id-feat' : '') + (current ? ' trial-id-cur' : '') +
+        (anno && anno.pending ? ' anno-pending' : '')}
+      title={[
+        text ? `${text}${from ? `(${from})` : ''}` : `未知${isFeat ? '特性' : '技能'} id ${id}`,
+        current ? '当前抽到的(与上方「技能」一致)' : '',
+        used ? '本节点已抽过,重掷不会再出' : '',
+      ].filter(Boolean).join(' · ')}
+    >
+      {text || (isFeat || isSkillID(id)
+        ? <UnknownChip kind={isFeat ? 'feature' : 'skill'} code={id} />
+        : id)}
+    </span>
+  )
+}
+
+// OptionCard 是当前节点的一个候选事件。
+//
+// 版面照游戏内的样子排:
+//
+//	┌────────────────────────────────┐
+//	│ ┌────────────────────────────┐ │
+//	│ │          (头像)        🧩  │ │  整体方框:头像居中,右上角挂额外碎片
+//	│ │          奇丽花            │ │
+//	│ │     技能 触底强击           │ │
+//	│ │        Lv 40               │ │
+//	│ │  抽取池 5 个 id             │ │
+//	│ │        换奖励 🪙 2          │ │
+//	│ └────────────────────────────┘ │
+//	│          换事件 🪙 1            │  最下方:换的是整只精灵
+//	└────────────────────────────────┘
+//
+// 两种重掷都花金币但换的东西不同,故分开摆:换奖励只在这只精灵的 5 选 1 里重抽,
+// 换事件连精灵一起换掉(抽取池随之变成新精灵的那一套)—— 它不属于"这只精灵"
+// 的内容,放在方框外,免得被读成"这只精灵的一项"。
+function OptionCard({ o }) {
+  const { lookup } = useAnnotations() || {}
+  // 精灵:后端按**已审核**标注回填(带头像);没回填时退回本会话提交的(待审)。
+  // 后者不是多余 —— 管理员审核前后端不会带 pet,但提交的人应当立刻看到自己标的
+  // 名字,否则标注看着像没生效。
+  const anno = lookup && lookup('event', o.event)
+  const petName = (o.pet && o.pet.name) || (anno && anno.name) || ''
+  const pool = o.pool || []
+  const used = new Set(o.used || [])
+  const name = (id) => (o.names || {})[String(id)]
+  return (
+    <div className="trial-opt">
+      <div className="trial-opt-box">
+        <div className="trial-opt-pet">
+          {/* 头像右上角挂额外奖励(多是碎片):它是挂在**这个事件**上的,
+              与抽取池里的奖励不是一回事,故单独成角标而非混进池子。 */}
+          <div className="trial-opt-avatar">
+            <ImgAvatar src={o.pet && o.pet.img} alt={petName} className="trial-opt-img" />
+            {o.extra && o.extra.length > 0 && (
+              <span
+                className="trial-opt-extra"
+                title={`额外奖励:${o.extra.map((x) => rewardKind(x) + ' ' + x).join('、')}`}
+              >
+                +{o.extra.length}
+              </span>
+            )}
+          </div>
+          <div className="trial-opt-petname">
+            {petName || <UnknownChip kind="event" code={o.event} />}
+          </div>
         </div>
-      )}
+
+        <div className="trial-opt-reward">
+          <span className="muted trial-opt-kind">{rewardKind(o.reward)}</span>
+          {name(o.reward)
+            ? <b className="trial-opt-name">{name(o.reward)}</b>
+            : <IdChip id={o.reward} />}
+        </div>
+
+        <div className="trial-opt-meta">
+          {o.level > 0 && <span>Lv {o.level}</span>}
+          <span className="trial-opt-cost" title="在这只精灵的抽取池里重抽一个">
+            换奖励 🪙 {o.rewardCost || 0}
+          </span>
+        </div>
+
+        {pool.length > 0
+          ? (
+            <div className="trial-opt-pool">
+              <span className="muted trial-opt-kind">抽取池 {pool.length}</span>
+              <div className="trial-opt-ids">
+                {pool.map((id) => (
+                  // current:池里这一条就是当前抽到的(与上方「技能」是同一个 id),
+                  // 圈出来免得看着像「两个不同的奖励」。
+                  <IdChip key={id} id={id} name={name(id)} used={used.has(id)} current={id === o.reward} />
+                ))}
+              </div>
+            </div>
+          )
+          : <div className="muted trial-note">协议未下发抽取池(random_skills 为空)</div>}
+      </div>
+
+      <div className="trial-opt-swap" title="换掉整只精灵,抽取池随之换成新精灵的一套">
+        换事件 🪙 {o.eventCost || 0}
+        <span className="muted trial-opt-slot">槽 {o.slot} · 事件 {o.event}</span>
+      </div>
     </div>
   )
 }
@@ -660,12 +787,17 @@ function HistoryView({ history }) {
   )
 }
 
-// rewardKind 按 id 区间判断奖励类别:技能 7xxxxx / 特性 288xxx / 碎片 20xx-30xx。
-// 判据来自 docs/pcap-20260831-grass-trial.md 2.1(逐条对照 updated_pet 的落点)。
+// 三类 id 的**区间判据**:技能 7xxxxx / 特性 288xxx / 碎片 20xx-30xx。
+// 协议不带类型字段,只能按区间分,判据来自 docs/pcap-20260831-grass-trial.md 2.1
+// (逐条对照 updated_pet 的落点),与后端 trial.IsFeatureID 是同一套 —— 改一处要改两处。
+const isSkillID = (id) => id >= 7000000
+const isFeatureID = (id) => id >= 288000 && id < 289000
+
+// rewardKind 按 id 区间判断奖励类别。
 function rewardKind(id) {
   if (!id) return ''
-  if (id >= 7000000) return '技能'
-  if (id >= 288000 && id < 289000) return '特性'
+  if (isSkillID(id)) return '技能'
+  if (isFeatureID(id)) return '特性'
   if (id >= 2000 && id <= 3999) return '碎片'
   return '奖励'
 }

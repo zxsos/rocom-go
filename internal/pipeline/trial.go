@@ -683,11 +683,15 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 	}
 	if r.selection != nil {
 		for _, e := range r.selection.Events {
-			out.Options = append(out.Options, server.TrialOption{
+			o := server.TrialOption{
 				Slot: e.SlotIndex, Event: e.EventConfID, Reward: e.RewardID,
 				Level: e.Level, EventCost: e.EventCost, RewardCost: e.RewardCost,
-				Extra: e.ExtraRewards,
-			})
+				Extra: e.ExtraRewards, Pool: e.RandomSkills, Used: e.UsedRewards,
+			}
+			// 事件对应哪只精灵协议不说,靠标注补(见 trialEventPet)。
+			o.Pet = p.trialEventPet(e.EventConfID)
+			p.trialOptionNames(&o)
+			out.Options = append(out.Options, o)
 		}
 		out.RefreshCost = r.selection.TotalRefreshCost
 	}
@@ -731,6 +735,73 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 	return out
 }
 
+// trialEventPet 查某事件对应哪只精灵;查不到返回 nil(前端显示占位)。
+//
+// 协议只给 event_conf_id,到精灵的那张映射表在游戏配置里(未解包),故只能靠
+// **标注**补:标注类型 event,code 是 event_conf_id,名字是精灵形态全名。
+// 名字再经 gamedata.PetByName 反查成形态 id,才拿得到头像。
+//
+// 每次组载荷都查一次库(一个节点 3 条而已),不做缓存:标注是众包的,管理员审
+// 核通过后下一次推送就该生效;缓存住就得等人想起来重启。
+func (p *Pipeline) trialEventPet(eventConfID uint32) *server.TrialOppPet {
+	a, ok := p.st.ApprovedAnnotation("event", int64(eventConfID))
+	if !ok {
+		return nil
+	}
+	base, info, ok := p.db.PetByName(a.Name)
+	if !ok {
+		return nil // 标注的名字对不上任何形态(多半是 wiki 别名),宁缺勿错
+	}
+	pet := &server.TrialOppPet{Base: base, Name: info.Name}
+	if info.Form != "" {
+		pet.Name += "_" + info.Form
+	}
+	if im := p.db.PetImageByBase(base, false); im.Head != "" {
+		pet.Img = im.Head
+	}
+	return pet
+}
+
+// trialOptionNames 给一个事件卡片里出现的 id 补中文名(技能 + 能确定的那条特性)。
+//
+// 技能:按 id 查 skills.json,融合不改 base_skill_id 故融合态同样查得到。
+//
+// 特性:没有内置名表,但**标出精灵之后就有了** —— 池里那条 288xxx 就是这只精灵
+// 自身的特性,拿形态去查「精灵 → 特性」表即得(见 gamedata.FeatureNameOfBase)。
+// 只在池里**恰好一个**特性 id 时才绑:一只精灵只有一个自身特性,出现多条说明
+// 我们对池的理解是错的,这时宁可都不给名字。
+func (p *Pipeline) trialOptionNames(o *server.TrialOption) {
+	ids := make([]uint32, 0, len(o.Pool)+len(o.Extra)+1)
+	ids = append(ids, o.Reward)
+	ids = append(ids, o.Pool...)
+	ids = append(ids, o.Extra...)
+	var feats []uint32
+	for _, id := range ids {
+		if id == 0 {
+			continue
+		}
+		if trial.IsFeatureID(id) {
+			feats = append(feats, id)
+			continue
+		}
+		if n := p.db.SkillName(id); n != "" {
+			if o.Names == nil {
+				o.Names = map[uint32]string{}
+			}
+			o.Names[id] = n
+		}
+	}
+	if len(feats) != 1 || o.Pet == nil {
+		return
+	}
+	if n := p.db.FeatureNameOfBase(o.Pet.Base); n != "" {
+		if o.Names == nil {
+			o.Names = map[uint32]string{}
+		}
+		o.Names[feats[0]] = n
+	}
+}
+
 // trialPetPayload 把试炼宠物副本转成对外载荷:名称/头像走 gamedata 按 base_conf_id 查。
 // initial 是局级的天生特性(#33),用来把 Features 拆成「天生」与「试炼获得」两组。
 func (p *Pipeline) trialPetPayload(tp *trial.Pet, initial trial.InitialFeatures) *server.TrialPet {
@@ -755,6 +826,14 @@ func (p *Pipeline) trialPetPayload(tp *trial.Pet, initial trial.InitialFeatures)
 				out.InnateFeatures = append(out.InnateFeatures, f)
 			} else {
 				out.GainedFeatures = append(out.GainedFeatures, f)
+			}
+		}
+		// 天生特性的名字:用 wiki 的「精灵 → 特性」表桥接(见 gamedata.FeatureNameOfBase)。
+		// **只有恰好一条天生特性时才绑** —— 表是「一只精灵 → 一个特性名」的口径,
+		// 出现多条天生时无从判断该把名字给谁,猜一个不如都不给。
+		if len(out.InnateFeatures) == 1 {
+			if n := p.db.FeatureNameOfBase(tp.BaseConfID); n != "" {
+				out.FeatureNames = map[uint32]string{out.InnateFeatures[0]: n}
 			}
 		}
 	}

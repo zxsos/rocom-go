@@ -88,12 +88,38 @@
 
 | 方法 路径 | 鉴权 | 账号 | 说明 |
 | --- | --- | --- | --- |
-| `GET /api/annotations` | — | — | 全服**已审核**标注（`?kind=skill\|feature`）；全局共享不按账号分 |
+| `GET /api/annotations` | — | — | 全服**已审核**标注（`?kind=skill\|feature\|event`）；全局共享不按账号分 |
 | `POST /api/annotations` | — | ✓ | 提交标注（body: `kind`,`code`,`name`,`desc`）→ 进待审；同一人对同一 `(kind,code,name)` 重复提交返回 **409** |
-| `GET /api/annotation-candidates` | — | — | 标注候选词典（`?kind=`）：`skill`=全量技能目录（带 id），`feature`=wiki 特性词典（**只有名字，无 id**） |
+| `GET /api/annotation-candidates` | — | — | 标注候选词典（`?kind=`）：`skill`=全量技能目录（带 id），`feature`=wiki 特性词典（**只有名字，无 id**），`event`=全部精灵形态（带 petbase id） |
 
 审核语义：`approve` 一条时，同一 `(kind,code)` 的其余待审**自动转拒绝** —— 一个 id 只
 能有一个被认可的答案。待审标注只有管理员可见，审核通过后才出现在 `GET /api/annotations`。
+
+三类标注对象：
+
+- `skill`／`feature`：**协议给了 id、缺名字**（技能 `7xxxxx`、特性 `288xxx`）；
+- `event`：草系试炼的 `event_conf_id` → 对应**哪只精灵**。协议连对象都不给
+  （事件到精灵的映射表在游戏配置里，未解包），只能照游戏画面标。
+  标完之后试炼页显示头像与名字，并且池里那条 `288xxx` 会顺着
+  「精灵 → 特性」表自动带上名字（`docs/data.md`「特性名」）。
+  `event` 标注的 `name` 必须**逐字**取自候选名单（形态全名，形态后缀用全角括号），
+  否则后端反查不到形态、带不出头像。
+
+> **新增一个 kind 要同步改 6 处，漏掉任何一处的症状都是静默的。**
+> 加 `event` 时漏了前端审核面板那一处，结果是：玩家提交成功、数据进了库，
+> 管理员面板却永远显示「暂无待审核标注」——没有报错，也没有任何线索指向真正的原因。
+>
+> | # | 位置 | 漏了的症状 |
+> | --- | --- | --- |
+> | 1 | `internal/server/api_annotations.go` 的 `annotationKind` 白名单 | 接口 400 |
+> | 2 | 同上 `handleListCandidates` 的 switch | 标注弹窗候选为空 |
+> | 3 | `web/src/components/annotations.jsx` 的 `ANNOTATION_KINDS` | 前端根本不认这一类 |
+> | 4 | `web/src/pages/admin/AnnotationsCard.jsx` 的类别按钮 | **面板永远看不到待审**（本次踩的） |
+> | 5 | `internal/server/contract_test.go` 的 `seedAnnotations` + `checkGolden` | 端点失去契约守护 |
+> | 6 | `scripts/gen_apifields.py` 的 golden 元信息表 | `fields.json` 里 desc/endpoint 为空 |
+>
+> 第 3、4 项现已从同一份 `ANNOTATION_KINDS` 派生（它是前端的唯一登记处），
+> 但仍需人工记得第 1、2、5、6 项 —— 它们是 Go 与 Python 侧的，跨语言收敛不了。
 
 ## 远行商人
 
@@ -140,7 +166,7 @@
 | `GET /api/admin/merchant-subs` | admin | 商人邮件推送名单 |
 | `DELETE /api/admin/merchant-subs` | admin | 删除某邮箱订阅（`?email=`） |
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
-| `GET /api/admin/annotations/pending` | admin | 待审标注列表（`?kind=skill\|feature`） |
+| `GET /api/admin/annotations/pending` | admin | 待审标注列表（`?kind=skill\|feature\|event`） |
 | `POST /api/admin/annotations/{id}/review` | admin | 审核标注（body: `approve`） |
 
 > `GET /api/admin/placeholder` 曾为占位接口，前端已删除唯一调用者，
