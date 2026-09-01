@@ -50,6 +50,7 @@
   "run": {
     "chapterId": 3001,
     "chapterIdx": 2,
+    "chapterName": "记忆中的巨石阵",
     "chapters": [
       3000,
       3001,
@@ -60,6 +61,8 @@
       1001,
       1008
     ],
+    "floor": "npc",
+    "floorLabel": "NPC",
     "log": [
       {
         "ids": [
@@ -80,7 +83,29 @@
         "ts": 1700000001
       }
     ],
-    "nodeIndex": 3,
+    "nodeIndex": 7,
+    "opponents": [
+      {
+        "id": 310005,
+        "name": "易西",
+        "pets": [
+          {
+            "base": 3031,
+            "img": "HeadIcon/3031.webp",
+            "name": "奇丽花"
+          },
+          {
+            "base": 3067,
+            "img": "HeadIcon/3067.webp",
+            "name": "卷毛鸭"
+          },
+          {
+            "base": 3027,
+            "name": "蒲公英娃娃"
+          }
+        ]
+      }
+    ],
     "options": [
       {
         "event": 110061,

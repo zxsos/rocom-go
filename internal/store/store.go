@@ -246,6 +246,23 @@ CREATE TABLE IF NOT EXISTS star_zone (
   PRIMARY KEY(account, camp, npc_id)
 );
 
+-- 草系徽章试炼的遇见记录(试炼页「遇见记录」用,见 docs/data.md 与 trial/battle.go)。
+-- chapter 是第几章(1/2/3),**每章独立计算** —— 与 wiki 的口径一致:页面注明
+-- 「3 章首领按章节独立计算」,即同一只精灵在第 1 章遇到过、第 2 章的图里仍算未遇见。
+-- kind 是战斗类型(0 普通 / 1 首领 / 2 NPC / 3 最终 BOSS,见 trial.BattleType)。
+-- 只记试炼战斗:解析时以「带 grass_trial_battle_info」为准,试炼外的战斗不会进来。
+CREATE TABLE IF NOT EXISTS trial_encounter (
+  account TEXT NOT NULL,
+  petbase INTEGER NOT NULL,
+  chapter INTEGER NOT NULL,
+  kind INTEGER NOT NULL,
+  first_seen INTEGER NOT NULL,
+  last_seen INTEGER NOT NULL,
+  times INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY(account, petbase, chapter)
+);
+CREATE INDEX IF NOT EXISTS idx_trial_encounter_account ON trial_encounter(account, chapter);
+
 -- 涂地(实时地图页的覆盖图层,见 docs/data.md 3.8):「玩家 ↔ 已下发的野生宠」之间那条走廊
 -- 扫过的格子各记一位,cells 是 w*h 的位图(每字节 8 格,低位在前),按账号 + 场景 + 分层各存一张。
 CREATE TABLE IF NOT EXISTS paint (

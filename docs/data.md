@@ -1478,6 +1478,39 @@ s2c 0x1346 DATA 明文 body
   (乱序/单独翻某页不触发,避免误删),且只删对账开始前就存在(`updated_at` 早于本轮起始)的宠物,
   放过对账期间刚捕获入库的新宠。
 
+### 草系试炼的静态配置(`scripts/fetch_trial_data.py` + `scripts/gen_trial.py`)
+
+草系徽章试炼的层结构、各章精灵池、22 名首领、第 7 层 NPC 阵容,由
+`internal/gamedata/trial.go` 提供,`data/trial.json` 由 `gen_trial.py` 生成。
+
+**数据源连第三方资料站都不是,而是玩家维护的 wiki**
+(`wiki.biligame.com/rocom/草系徽章试炼`,CC BY-NC-SA 4.0)。协议里不下发这些内容 ——
+服务器只给 `chapter_id` / `node_index` 这类编号。
+
+**关键:数据不在页面正文,而在 Lua 模块里。** 页面由 `{{#invoke:GrassTrial|render}}`
+渲染,真正的结构化数据在 `Module:GrassTrialData`(130 KB,带 `base_id`)。用 MediaWiki
+的 `action=parse&prop=wikitext` 可直接取到模块源码,比解析 HTML 稳得多。
+
+三条实测结论(详见 `gen_trial.py` 文件头):
+
+1. **层结构与 `node_index` 的对应是实测的,不是照抄 wiki**。wiki 说每章 7 层,
+   协议每章是 8 个节点(0~7)。`node_index 0` 是章节起点(无战斗),1~7 依次对应
+   wiki 的 1~7 层。两条证据:`node_index 6` 之后有 18 秒无战斗(对上「6 层无精灵」);
+   `node_index 7` 的对手是 NPC「草系研究员」,且其阵容成员与 wiki 候选一致。
+2. **`base_id` 与我方 petbase 100% 一致**(390/390),故精灵池可直接显示头像与名字。
+3. **NPC 阵容按难度累积**:基础 2/2/1 → 进阶1 4/4/1 → 进阶2 6/6/1 套候选。
+
+两条限制:
+
+- **wiki 的 opponent id(300xxx)与协议 `npc_id`(实测 86023)不是同一套编号**,
+  无从绑定,故只能给候选池、不能断言当前遭遇的是哪一个。
+- **键用章节序号(1/2/3),不用 wiki 的 chapter id**。三套编号互不通用:
+  协议恒为 3000/3001/3002;wiki 池是 1000/1001/1002;wiki 各难度下又按难度分段
+  (mode 10001 下是 2000/2001/2002,10002 下是 3000/3001/3002)。拿 id 当键必错。
+
+22 名首领中有 2 名(霜翼领主、深渊罗隐)**不在 wiki 的 pets 表里** —— 我方解包数据
+里反而有(带「草系徽章-首领形态」后缀),故生成时用我方名称库兜底。
+
 ### 技能名(`scripts/fetch_skill_ids.py` + `scripts/gen_skills.py`)
 
 技能数据由 `internal/gamedata/skills.go` 提供,`data/skills.json` 由 `gen_skills.py`

@@ -175,6 +175,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/paint", s.handlePaintReset)
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
 	s.mux.HandleFunc("GET /api/trial", s.handleTrial)
+	s.mux.HandleFunc("GET /api/trial/encounters", s.handleTrialEncounters)
+	s.mux.HandleFunc("DELETE /api/trial/encounters", s.handleDeleteTrialEncounters)
 	s.mux.HandleFunc("GET /api/flowers", s.handleFlowers)
 	s.mux.HandleFunc("GET /api/flowers/slots", s.handleFlowerSlots)
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)

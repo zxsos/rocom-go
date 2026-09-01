@@ -354,6 +354,7 @@ func (s *Store) DeleteAccount(account string) error {
 		"pets", "events", "pet_box", "pet_boxes", "pet_team", "pet_medal",
 		"eggs", "star_state", "star_zone", "paint", "sessions",
 		"account_rule", "coin_snapshots", "rank_titles", "accounts",
+		"trial_encounter",
 	}
 	for _, t := range tables {
 		if _, err := tx.Exec("DELETE FROM "+t+" WHERE account=?", account); err != nil {

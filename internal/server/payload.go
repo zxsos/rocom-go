@@ -250,6 +250,38 @@ type TrialRun struct {
 	Shop        []TrialShopItem `json:"shop,omitempty"`
 	Result      *TrialResult    `json:"result,omitempty"` // 上一局结算(Active=false 时)
 	Log         []TrialLogEntry `json:"log,omitempty"`    // 操作流水(最新在前)
+
+	// 以下三项来自**静态配置**(wiki,见 gamedata/trial.go),协议不发这些:
+	//   Floor      当前节点是什么(普通/首领/商人/NPC…)
+	//   ChapterName 章节名(如「记忆中的索米亚草原」)
+	//   Opponents  第 7 层的候选 NPC 阵容;其余层为 nil
+	// 静态配置缺失时(如数据没生成)两项为空、Opponents 为 nil,不是错误。
+	Floor       string          `json:"floor,omitempty"`       // start/normal/boss/merchant/npc
+	FloorLabel  string          `json:"floorLabel,omitempty"`  // 中文名(普通/首领/商人/NPC)
+	ChapterName string          `json:"chapterName,omitempty"` // 章节名
+	Opponents   []TrialOpponent `json:"opponents,omitempty"`   // 第 7 层候选阵容
+}
+
+// TrialOpponent 是第 7 层的一个候选 NPC 阵容。
+//
+// ⚠️ **这是候选池,不是「当前遭遇的对手」**:wiki 的 opponent id 与协议里的
+// npc_id 不是同一套编号(实测协议 npc_id=86023),无从绑定。前端应照此表述,
+// 不要写成「对面就是这几只」。
+type TrialOpponent struct {
+	ID   uint32        `json:"id"`   // wiki 的 opponent 编号(300xxx 等),仅作标识
+	Name string        `json:"name"` // NPC 名(研究员/易西/罗兰)
+	Pets []TrialOppPet `json:"pets"` // 阵容:每只带名字与头像
+}
+
+// TrialOppPet 是候选阵容里的一只精灵。
+//
+// 带名字与头像而不只给 petbase id:这两样都要查 gamedata(且**并非每个形态都有
+// 头像** —— 缺图时 Img 为空,由前端决定占位),后端查比前端再查一遍省事,
+// 也避免前端硬编码「HeadIcon/<id>.webp」这种路径约定。
+type TrialOppPet struct {
+	Base uint32 `json:"base"`          // petbase id
+	Name string `json:"name"`          // 形态全名(未知时为空)
+	Img  string `json:"img,omitempty"` // HeadIcon/<n>.webp;无图时缺失
 }
 
 // TrialPet 是试炼里的宠物副本。
@@ -268,8 +300,15 @@ type TrialPet struct {
 	Growth   uint32       `json:"growth"`
 	Skills   []TrialSkill `json:"skills,omitempty"`
 	Features []uint32     `json:"features,omitempty"` // 已获特性(288xxx)
-	Shards   []uint32     `json:"shards,omitempty"`   // 已获碎片(20xx/30xx)
-	Equipped []uint32     `json:"equipped,omitempty"` // 出战技能槽位
+	// 下面两组是 Features 的拆分,**只有能拿到天生特性时才给**:
+	//   InnateFeatures = 宠物天生的(局级 initial_feature_ids)
+	//   GainedFeatures = 试炼中获得的(已获 - 天生)
+	// 拿不到时两者都缺席、Features 仍在 —— 前端据此回退到「不区分」的展示。
+	// 刻意不猜:标错比不标更糟,用户会把「天生」当成确定的事实。
+	InnateFeatures []uint32 `json:"innateFeatures,omitempty"`
+	GainedFeatures []uint32 `json:"gainedFeatures,omitempty"`
+	Shards         []uint32 `json:"shards,omitempty"`   // 已获碎片(20xx/30xx)
+	Equipped       []uint32 `json:"equipped,omitempty"` // 出战技能槽位
 }
 
 // TrialSkill 是试炼宠物的一个技能槽(融合体)。
@@ -381,6 +420,54 @@ type TrialSlot struct {
 	DamType uint32 `json:"damType"`
 	DamName string `json:"damName,omitempty"`
 	Cleared uint32 `json:"cleared"`
+}
+
+// TrialEncountersPayload 是草系试炼的「遇见记录」:三章各一张图,列出本章可能
+// 遇到的精灵,遇到过(该章打过照面)的置灰。
+//
+// 每张图分两组:普通池(第 1/2/3/5 层)与首领(第 4 层的 22 人名单,三章共用)。
+// 二者是**独立来源**,故分开列出而非合并成一个大网格。
+//
+// 关键口径:**每章独立计算** —— 与 wiki 一致(页面注明「3 章首领按章节独立计算」)。
+// 同一只精灵在第 1 章遇到过,第 2 章的图里仍算未遇见。这样三张图的进度各自真实。
+type TrialEncountersPayload struct {
+	Account  string               `json:"account"`
+	Ts       int64                `json:"ts"`
+	Chapters []TrialEncounterBook `json:"chapters,omitempty"`
+	Updated  string               `json:"updated,omitempty"` // 静态配置的更新时间(数据可能已过期)
+}
+
+// TrialEncounterBook 是某一章的一张图。
+type TrialEncounterBook struct {
+	Chapter uint32              `json:"chapter"`        // 1 起
+	Name    string              `json:"name,omitempty"` // 章节名(如「记忆中的索米亚草原」)
+	Total   uint32              `json:"total"`          // 本章精灵总数(普通池 + 首领)
+	Seen    uint32              `json:"seen"`           // 已遇见数
+	Normal  []TrialEncounterPet `json:"normal"`         // 普通池
+	Boss    []TrialEncounterPet `json:"boss,omitempty"` // 22 名首领
+	// Extra 是**见过但不在上面两组里**的精灵(NPC 战 / 最终 BOSS 等)。
+	//
+	// 静态配置没有第 7 层 NPC 与最终 BOSS 的精灵池(只有普通池与 22 名首领),
+	// 这些遭遇无处安放。宁可单列也不丢弃 —— 用户明明打过照面,图上却显示
+	// 未遇见,比少一个分组糟糕得多。
+	//
+	// **不计入 Total/Seen**:那两个字段的口径是「池子里还剩多少」,把来源
+	// 不明的条目塞进分母会让进度百分比失去意义。故单独展示。
+	Extra []TrialEncounterPet `json:"extra,omitempty"`
+}
+
+// TrialEncounterPet 是图里的一只精灵。
+//
+// Kind/Time 用**指针**而非 omitempty 值类型:普通战的 Kind 就是 0,用值类型加
+// omitempty 会被 JSON 抹掉,前端便分不清「普通战遇到的」与「没遇到」——
+// 与 AGENTS.md 里 u/v 指针那条约定是同一个坑。未遇见时二者为 nil(键不出现)。
+type TrialEncounterPet struct {
+	Base uint32  `json:"base"`
+	Name string  `json:"name"`          // 形态全名(查不到时为空)
+	Img  string  `json:"img,omitempty"` // 头像;并非每个形态都有图
+	Seen bool    `json:"seen"`          // 本章是否已遇见
+	Kind *uint32 `json:"kind,omitempty"`
+	Time *int64  `json:"time,omitempty"`
 }
 
 // TrialLogBook 是见闻录的一册。

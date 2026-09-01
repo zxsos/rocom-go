@@ -313,6 +313,186 @@ func TestContractTrial(t *testing.T) {
 	checkGolden(t, "trial", get(t, s, "/api/trial?account="+contractAcc), nil)
 }
 
+// scrubEncTime 抹掉遇见记录里的时间取值。
+//
+// 顶层 ts 与每只精灵的 time 都取自「入库时刻」,每次跑测试都不同。契约锁的是
+// **键在不在**(kind/time 是可选指针,键出现与否本身就是契约的一部分),
+// 不是几点几分,故抹成 0 —— 与 scrubTS 同理,替换值须保持 JSON 合法。
+var encTimeRe = regexp.MustCompile(`"time": \d+`)
+
+func scrubEncTime(s string) string {
+	return encTimeRe.ReplaceAllString(scrubTS(s), `"time": 0`)
+}
+
+// TestContractTrialEncounters 锁定「遇见记录」的响应结构。
+//
+// 三条种子各守一条契约,改之前先想清楚守的是什么:
+//  1. 3001 记为**普通战**(kind=0):守 kind/time 用**指针**而非 omitempty 值类型 ——
+//     取值 0 时键必须仍在,否则前端分不清「普通战遇到过」与「压根没遇到」。
+//     这是全接口最易改坏的一处,Go 编译发现不了,肉眼看 JSON 也容易漏。
+//  2. 8101 记为首领:22 名首领三章共用,故三张图里都会出现同一批。
+//  3. 3005 只记在第 2 章:它在第 3 章池里也有,用来守「每章独立计算」——
+//     第 3 章那张图里 3005 必须仍显示未遇见。
+//  4. 3027 / 5061 是**池外**遭遇:守 extra 组。这俩是回放实测撞上的真实例子 ——
+//     3027 是 NPC 战、5061 是最终 BOSS(敌方式斗酷猫),静态配置没有第 7 层的
+//     精灵池,按旧逻辑会静默丢失:用户明明遇到过,图上却永远显示未遇见。
+func TestContractTrialEncounters(t *testing.T) {
+	s := newTestServer(t)
+	for _, w := range []struct {
+		ch    uint32
+		kind  uint32
+		bases []uint32
+	}{
+		{1, 0, []uint32{3001}},
+		{1, 1, []uint32{8101}},
+		{2, 0, []uint32{3005}},
+		{1, 2, []uint32{3027}}, // NPC 战 —— 不在普通池也不在首领池
+		{3, 3, []uint32{5061}}, // 最终 BOSS —— 同上
+	} {
+		// ts 固定:这是「战斗发生的时刻」(见 AddTrialEncounters),
+		// golden 里由 scrubEncTime 抹成 0,故取值本身不进契约。
+		if err := s.store.AddTrialEncounters(contractAcc, w.ch, w.kind, w.bases, 1700000000); err != nil {
+			t.Fatalf("写遇见记录(第%d章 %v): %v", w.ch, w.bases, err)
+		}
+	}
+	checkGolden(t, "trial-encounters",
+		get(t, s, "/api/trial/encounters?account="+contractAcc), scrubEncTime)
+}
+
+// TestContractTrialEncountersExtra 单独锁 extra 组的**语义**:不计入 total/seen。
+//
+// golden 只能看出「extra 里有 3027」,看不出「它没有把 seen 加一」—— 而这个区别
+// 正是设计意图:total/seen 的口径是「池子里还剩多少」,把来源不明的条目塞进分母,
+// 进度百分比就会失去意义(golden 不会报警,因为它只比对结构)。
+// 故这里直接断言计数,把这条口径钉死。
+func TestContractTrialEncountersExtra(t *testing.T) {
+	s := newTestServer(t)
+	// 先量一份基线:没有任何记录时三章的 total
+	var base [4]uint32
+	var got struct {
+		Chapters []struct {
+			Chapter uint32 `json:"chapter"`
+			Total   uint32 `json:"total"`
+			Seen    uint32 `json:"seen"`
+			Extra   []struct {
+				Base uint32 `json:"base"`
+				Seen bool   `json:"seen"`
+				Kind *uint32
+			} `json:"extra"`
+		} `json:"chapters"`
+	}
+	if err := json.Unmarshal(get(t, s,
+		"/api/trial/encounters?account="+contractAcc), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+	for _, c := range got.Chapters {
+		if c.Chapter >= 1 && c.Chapter <= 3 {
+			base[c.Chapter] = c.Total
+		}
+	}
+
+	// 记一条池外遭遇(NPC 战 3027,第 1 章)
+	if err := s.store.AddTrialEncounters(contractAcc, 1, 2, []uint32{3027}, 1700000000); err != nil {
+		t.Fatalf("写遇见记录: %v", err)
+	}
+	got.Chapters = nil
+	if err := json.Unmarshal(get(t, s,
+		"/api/trial/encounters?account="+contractAcc), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+
+	var ch1 *struct {
+		Chapter uint32 `json:"chapter"`
+		Total   uint32 `json:"total"`
+		Seen    uint32 `json:"seen"`
+		Extra   []struct {
+			Base uint32 `json:"base"`
+			Seen bool   `json:"seen"`
+			Kind *uint32
+		} `json:"extra"`
+	}
+	for i := range got.Chapters {
+		if got.Chapters[i].Chapter == 1 {
+			ch1 = &got.Chapters[i]
+		}
+	}
+	if ch1 == nil {
+		t.Fatal("第1章缺失")
+	}
+	// 池外遭遇进了 extra
+	if len(ch1.Extra) != 1 || ch1.Extra[0].Base != 3027 {
+		t.Fatalf("extra 应为 [3027], 实际 %+v", ch1.Extra)
+	}
+	if ch1.Extra[0].Kind == nil || *ch1.Extra[0].Kind != 2 {
+		t.Errorf("extra 的 kind 应为 2(NPC 战), 实际 %v", ch1.Extra[0].Kind)
+	}
+	// 但**不该**改变 total/seen —— 这是本测试存在的全部理由
+	if ch1.Total != base[1] {
+		t.Errorf("extra 不该计入 total: 基线 %d, 现在 %d", base[1], ch1.Total)
+	}
+	if ch1.Seen != 0 {
+		t.Errorf("extra 不该计入 seen: 实际 %d, 期望 0", ch1.Seen)
+	}
+}
+
+// TestContractTrialEncountersEmpty 锁定「一条遇见记录都没有」时的响应。
+//
+// 结论先行:**空账号下 chapters 照样存在**。精灵池来自静态配置(gamedata.TrialPool),
+// 与数据库无关 —— 只要 trial.json 在,三章的池就是满的,Total 恒 > 0。
+// 「还没有任何遇见记录」表现为每只 seen=false 且不带 kind/time,而非 chapters 缺席。
+//
+// 这条容易被想当然:Chapters 上挂着 `omitempty`,会让人以为无数据时键会消失。
+// 写本测试时正是这么假设的,跑出来才发现是错的 —— 那个 omitempty 因此是个**死标签**。
+// 留着不删是为了不无谓改动对外契约,但别指望它,真要判空请看 books.length。
+// 前端 EncountersView 的「没有试炼精灵池数据」分支,触发条件是静态配置缺失
+// (chapters 为空),不是「没打过试炼」。
+func TestContractTrialEncountersEmpty(t *testing.T) {
+	s := newTestServer(t)
+	var got map[string]any
+	if err := json.Unmarshal(get(t, s,
+		"/api/trial/encounters?account="+contractAcc), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+	want := map[string]bool{"account": true, "ts": true, "updated": true, "chapters": true}
+	for k := range got {
+		if !want[k] {
+			t.Errorf("/api/trial/encounters(无记录) 多了字段 %q", k)
+		}
+	}
+	for k := range want {
+		if _, ok := got[k]; !ok {
+			t.Errorf("/api/trial/encounters(无记录) 少了字段 %q", k)
+		}
+	}
+	books, _ := got["chapters"].([]any)
+	if len(books) != 3 {
+		t.Fatalf("无记录时仍应有 3 章(池来自静态配置), 实际 %d", len(books))
+	}
+	// 三章都必须是「整章未遇见」,且不带 kind/time。
+	for _, b := range books {
+		book, _ := b.(map[string]any)
+		if seen, _ := book["seen"].(float64); seen != 0 {
+			t.Errorf("第%v章 无记录时 seen 应为 0, 实际 %v", book["chapter"], seen)
+		}
+		if total, _ := book["total"].(float64); total == 0 {
+			t.Errorf("第%v章 无记录时 total 不该为 0(池来自静态配置)", book["chapter"])
+		}
+		for _, p := range append(
+			book["normal"].([]any), book["boss"].([]any)...) {
+			pet, _ := p.(map[string]any)
+			if s, _ := pet["seen"].(bool); s {
+				t.Errorf("无记录时 base=%v 不该是 seen", pet["base"])
+			}
+			if _, ok := pet["kind"]; ok {
+				t.Errorf("无记录时 base=%v 不该带 kind 键", pet["base"])
+			}
+			if _, ok := pet["time"]; ok {
+				t.Errorf("无记录时 base=%v 不该带 time 键", pet["base"])
+			}
+		}
+	}
+}
+
 // contractTrial 造一份试炼快照:进行中的一局 + 账号档案。
 func contractTrial() *TrialPayload {
 	return &TrialPayload{
@@ -321,10 +501,21 @@ func contractTrial() *TrialPayload {
 		Active:  true,
 		Run: &TrialRun{
 			TrialID: 10002, SlotID: 1000, SlotName: "普系",
-			ChapterID: 3001, ChapterIdx: 2, NodeIndex: 3, Coin: 12,
+			ChapterID: 3001, ChapterIdx: 2, NodeIndex: 7, Coin: 12,
 			Chapters: []uint32{3000, 3001, 3002},
 			Effects:  []uint32{1001, 1008},
 			Boss:     false,
+			// node_index 7 = NPC 层(层类型的映射见 gamedata/trial.go),
+			// 故下面带上第 7 层的候选阵容;其余层不会带 opponents。
+			Floor: "npc", FloorLabel: "NPC",
+			ChapterName: "记忆中的巨石阵",
+			Opponents: []TrialOpponent{
+				{ID: 310005, Name: "易西", Pets: []TrialOppPet{
+					{Base: 3031, Name: "奇丽花", Img: "HeadIcon/3031.webp"},
+					{Base: 3067, Name: "卷毛鸭", Img: "HeadIcon/3067.webp"},
+					{Base: 3027, Name: "蒲公英娃娃"}, // 无头像:形态没图时 img 缺失
+				}},
+			},
 			Pet: &TrialPet{
 				Gid: 133, Name: "黑猫巫师", Species: "黑猫巫师", Img: "HeadIcon/3569.webp",
 				Level: 60, HP: 264, MaxHP: 389, Energy: 10, Growth: 2,

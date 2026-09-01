@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"log"
 	"sort"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/gcp"
 	"github.com/whoisnian/rocom-capture/internal/server"
 	"github.com/whoisnian/rocom-capture/internal/trial"
@@ -83,16 +85,19 @@ type trialRun struct {
 	chapters    []uint32
 	effects     []uint32
 	pet         *trial.Pet
-	selection   *trial.Selection
-	bless       *trial.BlessSelection
-	pending     *trial.PendingStep // 祝福的下一步(候选技能等)
-	reward      *trial.Reward      // 待处理的节点奖励
-	shop        []trial.ShopItem
-	boss        bool          // 已进 BOSS 战
-	active      bool          // 一局进行中
-	result      *trial.Settle // 上一局结算(active=false 时才有)
-	log         []trialLogEntry
-	startedAt   time.Time
+	// initialFeatures 是局级的天生特性(#33),用于把宠物的特性拆成
+	// 「天生」与「试炼获得」两组(见 trial.InitialFeatures)。
+	initialFeatures trial.InitialFeatures
+	selection       *trial.Selection
+	bless           *trial.BlessSelection
+	pending         *trial.PendingStep // 祝福的下一步(候选技能等)
+	reward          *trial.Reward      // 待处理的节点奖励
+	shop            []trial.ShopItem
+	boss            bool          // 已进 BOSS 战
+	active          bool          // 一局进行中
+	result          *trial.Settle // 上一局结算(active=false 时才有)
+	log             []trialLogEntry
+	startedAt       time.Time
 }
 
 // trialLogEntry 是操作流水里的一条。
@@ -119,6 +124,13 @@ func (p *Pipeline) handleTrial(m capture.Message, acc string) {
 	now := time.Now()
 	s2c := m.Direction == gcp.S2C
 	changed := false
+
+	// 战斗进入通知(0x1316)**不属于试炼专属 opcode**,试炼外的战斗(野外/PVP)也走它。
+	// 是否属于试炼由消息内的 grass_trial_battle_info 判定,故在这里先看一眼再放行:
+	// 命中试炼就记下「遇到谁」,不命中则完全不动(让宠物路等其它消费者照常处理)。
+	if m.Opcode == trial.OpBattleEnterNotify {
+		p.recordTrialEncounter(m, acc, st)
+	}
 
 	switch {
 	// —— 一局的全量快照 ——
@@ -321,6 +333,7 @@ func (p *Pipeline) handleTrial(m capture.Message, acc string) {
 		if prog := trial.ParseProgressSync(m.AppBody); prog != nil {
 			st.history = &trialHist{progress: prog, updatedAt: now}
 			st.finishFromReview(prog)
+			p.syncTrialEncounters(prog, acc, m.Time.Unix())
 			changed = true
 		}
 
@@ -373,6 +386,11 @@ func (r *trialRun) merge(c *trial.Challenge) {
 	}
 	if c.Pet != nil {
 		r.pet = c.Pet
+	}
+	// 天生特性整局不变,只在建局/恢复时取一次(#33 是局级字段,
+	// apply 类的增量回包里没有它,故不在这里更新,免得被空值覆盖)。
+	if len(c.InitialFeatures) > 0 {
+		r.initialFeatures = c.InitialFeatures
 	}
 	if c.Selection != nil {
 		r.selection = c.Selection
@@ -472,6 +490,94 @@ func (p *Pipeline) sweepTrial(now time.Time) {
 	}
 }
 
+// ---- 遇见记录 ----
+
+// recordTrialEncounter 把一场试炼战斗里遇到的精灵记进数据库。
+//
+// 三道判据,缺一不记(宁可少记也别记错 —— 记错的进度比没有进度更误导):
+//  1. 必须是试炼战斗(消息带 grass_trial_battle_info);
+//  2. 必须有正在进行的试炼局(否则拿不到章节);
+//  3. 必须推得出第几章 —— 归不到某张图上的记录毫无用处。
+//
+// 章节取自**当前局**而非战斗消息:后者不带章节信息。这也意味着若是战斗拖到
+// 退出试炼之后才结束,可能因 active=false 而漏记 —— 可接受,遇到概率极低,
+// 且漏记只是少一格,记错章节才会污染整张图的进度。
+func (p *Pipeline) recordTrialEncounter(m capture.Message, acc string, st *trialState) {
+	e := trial.ParseBattleEnter(m.AppBody)
+	if e == nil || !e.Type.IsTrial() || len(e.PetBases) == 0 {
+		return
+	}
+	if st.run == nil || !st.run.active {
+		return
+	}
+	ch := chapterIdxOf(st.run)
+	if ch == 0 {
+		return
+	}
+	// 时间戳用**报文自带的时间**而非当前时刻:离线回放历史 pcap 补录时,
+	// 写成入库时刻会让补出来的记录全挤在回放那一下(见 AddTrialEncounters)。
+	if err := p.st.AddTrialEncounters(acc, ch, uint32(e.Type), e.PetBases, m.Time.Unix()); err != nil {
+		log.Printf("记录试炼遇见失败(第%d章 %v): %v", ch, e.PetBases, err)
+		return
+	}
+	for _, b := range e.PetBases {
+		log.Printf("试炼遇见: 第%d章 %s战 petbase=%d", ch, e.Type.Label(), b)
+	}
+	// 通知前端重拉「遇见记录」。
+	//
+	// 只发信号、不带数据:一张图 786 只精灵,整份塞进 SSE 太重,而前端那头本来
+	// 就有完整拉取逻辑(GET /api/trial/encounters),让它自己去取即可。
+	// 与 eggs 频道同一路数(见 eggs.go:69)。
+	//
+	// 这条不加的话:遇见记录是读库的累积历史、不走 trial 快照,打完一局页面
+	// 不会有任何变化,只有重进页面才看得到 —— 用过的人只会以为没记录上。
+	p.srv.Hub().Broadcast("trial_enc", acc, map[string]any{"account": acc})
+}
+
+// syncTrialEncounters 用账号档案(0x1975)里的见闻录补录「已经遇见过」的精灵。
+//
+// 为什么需要它:0x1316 战斗通知只能记到**抓包期间发生的那几场**,而见闻录是
+// 服务器保存的账号完整历史 —— 实测同一账号:抓包 17 场 vs 见闻录 292 只。
+// 没有这条,用户装好之后看到的是近乎空白的三张图,得重新打一遍才填得满,
+// 而实际上游戏里早就遇见过了。登录后档案一同步就能补齐(故不必回放历史 pcap)。
+//
+// 只补**缺的**:0x1975 是账号档案的全量推送,每次登录/同步都会重发一遍,
+// 若逐条 AddTrialEncounters 会把 times 反复累加、last_seen 一直被推到当下,
+// 「首次遇到」这个时间语义就废了。故先查已有记录,只写没见过的那些。
+func (p *Pipeline) syncTrialEncounters(prog *trial.Progress, acc string, ts int64) {
+	var added int
+	for i := range prog.Logs {
+		rec := &prog.Logs[i]
+		ch := rec.ChapterOf()
+		if ch == 0 || len(rec.DiscoveredIDs) == 0 {
+			continue
+		}
+		have := p.st.TrialEncounters(acc, ch)
+		var fresh []uint32
+		for _, id := range rec.DiscoveredIDs {
+			if _, ok := have[id]; !ok {
+				fresh = append(fresh, id)
+			}
+		}
+		if len(fresh) == 0 {
+			continue
+		}
+		// 见闻录不带战斗类型,这里记 BattleNormal(0):
+		// 它只保证「遇到过」,无法区分普通/首领/NPC。若之后再从战斗通知拿到
+		// 更具体的类型,AddTrialEncounters 的 kind 取最大规则会把它升上去,
+		// 不会被这里的 0 覆盖(见该函数的 SQL)。
+		if err := p.st.AddTrialEncounters(acc, ch, uint32(trial.BattleNormal), fresh, ts); err != nil {
+			log.Printf("补录试炼遇见失败(第%d章 %d 只): %v", ch, len(fresh), err)
+			continue
+		}
+		added += len(fresh)
+	}
+	if added > 0 {
+		log.Printf("见闻录补录: 新增 %d 只已遇见的精灵", added)
+		p.srv.Hub().Broadcast("trial_enc", acc, map[string]any{"account": acc})
+	}
+}
+
 // ---- 推送 ----
 
 // pushTrial 组一份试炼快照,缓存并广播。
@@ -498,6 +604,25 @@ func (p *Pipeline) pushTrial(acc string, st *trialState) {
 	p.srv.Hub().Broadcast("trial", acc, payload)
 }
 
+// chapterIdxOf 推出「当前是第几章」(1 起)。
+//
+// 按服务器给的可选章节次序定位;列表为空时退回 chapter_id 末三位
+// (协议恒为 3000/3001/3002,故 3000→第1章)。返回 0 表示推不出来。
+//
+// 单独抽成函数是因为两处要用:载荷的 chapterIdx,以及遇见记录要按章归档 ——
+// 两处口径必须一致,否则记录会记到别的章上去。
+func chapterIdxOf(r *trialRun) uint32 {
+	for i, c := range r.chapters {
+		if c == r.chapterID {
+			return uint32(i) + 1
+		}
+	}
+	if r.chapterID >= 3000 {
+		return r.chapterID - 3000 + 1
+	}
+	return 0
+}
+
 // trialRunPayload 把一局镜像转成对外载荷。damOf 是 slot_id → 属性系的查表(见 pushTrial)。
 func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.TrialRun {
 	out := &server.TrialRun{
@@ -515,19 +640,38 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 			out.SlotName = n + "系"
 		}
 	}
-	// 第几章:按服务器给的可选章节次序;列表为空时退回 chapter_id 末三位(3000→第1章)
-	for i, c := range r.chapters {
-		if c == r.chapterID {
-			out.ChapterIdx = uint32(i) + 1
+	out.ChapterIdx = chapterIdxOf(r)
+	// 静态配置(wiki):层类型 / 章节名 / 第 7 层候选阵容。
+	// 协议只给编号,这些「这一层是什么、对面可能是谁」得查静态表才知道。
+	// 缺数据时留空 —— 静态配置是可选的,不该因为它缺失就让整个接口失败。
+	if f := p.db.TrialFloor(r.nodeIndex); f != gamedata.FloorUnknown {
+		out.Floor, out.FloorLabel = string(f), f.Label()
+		if f == gamedata.FloorNPC {
+			for _, o := range p.db.TrialNPCOpponents(r.trialConfID, out.ChapterIdx) {
+				op := server.TrialOpponent{ID: o.ID, Name: o.Name}
+				for _, base := range o.Pets {
+					pet := server.TrialOppPet{Base: base}
+					if info, ok := p.db.PetBase(base); ok {
+						pet.Name = info.Name
+						if form := info.Form; form != "" {
+							pet.Name += "_" + form
+						}
+					}
+					// 头像按 petbase 查;不是每个形态都有图,缺图时留空由前端占位
+					if im := p.db.PetImageByBase(base, false); im.Head != "" {
+						pet.Img = im.Head
+					}
+					op.Pets = append(op.Pets, pet)
+				}
+				out.Opponents = append(out.Opponents, op)
+			}
 		}
 	}
-	if out.ChapterIdx == 0 && r.chapterID >= 3000 {
-		out.ChapterIdx = r.chapterID - 3000 + 1
-	}
+	out.ChapterName = p.db.TrialChapterName(out.ChapterIdx)
 	out.Chapters = r.chapters
 	out.Effects = r.effects
 	if r.pet != nil {
-		out.Pet = p.trialPetPayload(r.pet)
+		out.Pet = p.trialPetPayload(r.pet, r.initialFeatures)
 	}
 	if r.selection != nil {
 		for _, e := range r.selection.Events {
@@ -580,11 +724,31 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 }
 
 // trialPetPayload 把试炼宠物副本转成对外载荷:名称/头像走 gamedata 按 base_conf_id 查。
-func (p *Pipeline) trialPetPayload(tp *trial.Pet) *server.TrialPet {
+// initial 是局级的天生特性(#33),用来把 Features 拆成「天生」与「试炼获得」两组。
+func (p *Pipeline) trialPetPayload(tp *trial.Pet, initial trial.InitialFeatures) *server.TrialPet {
 	out := &server.TrialPet{
 		Gid: tp.Gid, Name: tp.Name, Level: tp.Level,
 		HP: tp.HP, MaxHP: tp.MaxHP, Energy: tp.EnergyCeil, Growth: tp.Growth,
 		Features: tp.Features, Shards: tp.Shards, Equipped: tp.Equipped,
+	}
+	// 天生 vs 试炼获得:两边都判,不按下标切片(见 InitialFeatures 的说明)。
+	// initial 缺失时(老快照/字段不存在)两组都留空 —— **不猜**,
+	// 标错比不标更糟,用户会把「天生」当成确定的事实。
+	if len(initial) > 0 {
+		// 去重保序:acquired 是累积追加的,同一个 id 可能出现多次
+		// (实测 features 里 288001 就有两个 —— 它是「已获得」的流水而非集合)。
+		seen := map[uint32]bool{}
+		for _, f := range tp.Features {
+			if f == 0 || seen[f] {
+				continue
+			}
+			seen[f] = true
+			if initial.Has(f) {
+				out.InnateFeatures = append(out.InnateFeatures, f)
+			} else {
+				out.GainedFeatures = append(out.GainedFeatures, f)
+			}
+		}
 	}
 	if info, ok := p.db.PetBase(tp.BaseConfID); ok {
 		out.Species = info.Name

@@ -748,6 +748,7 @@
       "run": {
         "chapterId": "int",
         "chapterIdx": "int",
+        "chapterName": "str",
         "chapters": [
           {}
         ],
@@ -755,6 +756,8 @@
         "effects": [
           {}
         ],
+        "floor": "str",
+        "floorLabel": "str",
         "log": [
           {
             "action": "int",
@@ -767,6 +770,19 @@
           }
         ],
         "nodeIndex": "int",
+        "opponents": [
+          {
+            "id": "int",
+            "name": "str",
+            "pets": [
+              {
+                "base": "int",
+                "img": "str",
+                "name": "str"
+              }
+            ]
+          }
+        ],
         "options": [
           {
             "event": "int",
@@ -836,6 +852,54 @@
         "trialId": "int"
       },
       "ts": "int"
+    }
+  },
+  "trial-encounters": {
+    "desc": "草系试炼遇见记录(三章精灵图,读库累积)",
+    "endpoint": "GET /api/trial/encounters",
+    "sample": "internal/server/testdata/contract/trial-encounters.json",
+    "shape": {
+      "account": "str",
+      "chapters": [
+        {
+          "boss": [
+            {
+              "base": "int",
+              "img": "str",
+              "kind": "int",
+              "name": "str",
+              "seen": "bool",
+              "time": "int"
+            }
+          ],
+          "chapter": "int",
+          "extra": [
+            {
+              "base": "int",
+              "img": "str",
+              "kind": "int",
+              "name": "str",
+              "seen": "bool",
+              "time": "int"
+            }
+          ],
+          "name": "str",
+          "normal": [
+            {
+              "base": "int",
+              "img": "str",
+              "kind": "int",
+              "name": "str",
+              "seen": "bool",
+              "time": "int"
+            }
+          ],
+          "seen": "int",
+          "total": "int"
+        }
+      ],
+      "ts": "int",
+      "updated": "str"
     }
   },
   "wildpets": {
