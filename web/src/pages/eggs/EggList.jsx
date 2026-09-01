@@ -15,9 +15,13 @@ import { toast } from '../../components/toast'
 // 此前还有第三段「已孵化蛋」(标记在孵但进度满),那是给历史 bug 打的补丁:服务器取出孵蛋器
 // 不清 start_hatch_time,背包全量/登录(0x1344)会把已取出的蛋重新标成在孵,而进度字段被清零
 // 后前端外推瞬间顶满,于是按「在孵且进度满」把它们圈出来隔离。15648bf 改用登录/开孵蛋器时
-// 的权威 egg_gid 判定在孵后,残留标记不再产生,该栏随之作废,进度满的蛋也一并不再显示
-// (孵化倍率是本地估的,见 hatch.js,拿它当「可破壳」的依据并不可靠;且孵蛋器上限 3 格,
-// 孵满了玩家会立刻点掉,不会在页面上看它挂着)。
+// 的权威 egg_gid 判定在孵后,残留标记不再产生,该栏作废。
+//
+// 但「进度满就不显示」这个过滤**回收得不干净**:真孵好的蛋(等玩家点破壳)也会被它
+// 一并滤掉,两栏都看不到 —— 玩家等着蛋孵好,蛋却不见了。故现在两栏都只按 hatching
+// 标记分(与上游一致):进度只影响进度条怎么画,不决定蛋出不出现 —— 进度是本地估算
+// 的(倍率靠两次采样反推,见 hatch.js),拿它当「该不该出现」的依据会把估算误差放大成
+// 数据丢失。孵好的蛋照常留在孵蛋器,进度条显示「可破壳」。
 // 排序复刻游戏内背包的两种(见 docs/data.md 3.6 与 internal/pet.SortEggs)。
 const SORTS = [
   { k: 'quality', label: '品质' },
@@ -112,15 +116,25 @@ export default function EggList() {
 
   useEffect(() => { load() }, [load])
   // 后端在蛋有变动(收蛋/入孵/进度/破壳)时推 eggs,收到就重拉。
-  useEffect(() => subscribe('eggs', load), [load])
+  // onOpen 断线重连时也要补拉:SSE 断开期间的推送全丢了,不补就一直显示旧数据
+  // (登录那次广播尤其可能正好落在断线窗口里 —— 见 pipeline/eggs.go 登录分支)。
+  useEffect(() => subscribe('eggs', load, { onOpen: load }), [load])
   // 孵化进度随时间涨:秒级刷新即可。
   useInterval(() => setNow(Date.now()), 1000)
 
-  // 两段分类:孵蛋器=标记在孵且进度未满的蛋(保持后端槽位序);仓库=其余(后端已排好序,原样保留)。
-  // 进度满的蛋两处都不显示(见文件头说明)。
-  const withP = data.eggs.map((e) => ({ e, p: hatchProgress(e, now) }))
-  const incubating = withP.filter((x) => x.e.hatching && (x.p == null || x.p.pct < 100)).map((x) => x.e)
-  const bag = withP.filter((x) => !x.e.hatching).map((x) => x.e)
+  // 两段分类:**只看 hatching 标记**,不看进度。
+  //
+  // 这个过滤条件曾经是 `hatching && pct < 100`,那是给一个**已修复的**历史 bug 打的
+  // 补丁:服务器取出孵蛋器不清 start_hatch_time,背包全量会把已取出的蛋重新标成在孵,
+  // 而进度被清零后前端外推瞬间顶满,于是把「在孵且进度满」的圈出来隔离。
+  // 15648bf 改用登录/开孵蛋器时的权威 egg_gid 判定在孵后,残留标记不再产生,补丁该
+  // 回收了 —— 留着它,**真孵好的蛋(进度确实满了、等玩家点破壳)会两栏都不显示**,
+  // 玩家眼看着蛋不见了。上游(wiki 同源项目)也是只按 hatching 分栏。
+  //
+  // 更根本的:进度是**本地估算**的(倍率靠两次采样反推,见 hatch.js),拿它决定
+  // 「这颗蛋该不该出现」就是把估算误差放大成数据丢失。它只该影响进度条怎么画。
+  const incubating = data.eggs.filter((e) => e.hatching)
+  const bag = data.eggs.filter((e) => !e.hatching)
   const slots = HATCH_SLOTS
 
   return (
@@ -133,6 +147,17 @@ export default function EggList() {
             e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
               : <div key={'s' + i} className="egg-slot-empty">空格子</div>
           ))}
+          {/* 全空时给一句解释:光秃秃 3 个空格子,用户分不清是「真没在孵」还是
+              「数据还没到」。蛋的完整数据只随背包全量(0x1344)下发 —— 那是玩家
+              在游戏内**打开一次背包**才发的,登录包只带「哪几颗在孵」的 id 清单
+              (见 internal/pipeline/eggs.go),光有 id 画不出卡片。
+              故首次使用(库里还没有蛋)时,提示去游戏内开一次背包。 */}
+          {incubating.length === 0 && bag.length === 0 && (
+            <div className="empty eggs-incu-hint">
+              孵蛋器是空的。若游戏里正在孵蛋,需在游戏内打开一次背包 ——
+              蛋的数据只随背包下发给服务端。
+            </div>
+          )}
         </aside>
 
         <div className="eggs-bar">
