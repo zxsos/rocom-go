@@ -237,3 +237,69 @@ func TestFeatureNameOfBase(t *testing.T) {
 	}
 	t.Logf("桥接出特性名的形态 %d 个", hits)
 }
+
+// TestFeatureNameOfBasePrefersIdIndex 锁住「先按 petbase_id 查,查不到才回退名字」。
+//
+// 这个顺序**不能反**。两份资料的可靠性差一个量级:
+//
+//	roco.world 按 petbase_id 索引 —— 它的页面数据里有 petbase_id,
+//	与我方解包出的 id 完全一致(实测 594/594),覆盖率 89%,不会抄串;
+//	wiki 只能按精灵页名反查 —— 要靠「名 + 全角括号的形态后缀」拼对才查得到,
+//	覆盖率 74%,且有 8 处**抄串**。
+//
+// 抄串最典型的是女王蜂(5015)与花魁蜂后(3157):wiki 把两只的特性对调了。
+// 若优先用名字匹配,这两只会一直显示对方的特性名 —— 名字匹配"成功"了,
+// 只是配错了,没有任何报错。
+//
+// 故这里拿这两只做**反向验证**:id 索引给的答案必须与 wiki 那份不同
+// (说明没走回退),且各自正确。样本写死 id 是安全的 —— 形态 id 是游戏配置
+// 的主键,跨版本稳定(不像图鉴号那种业务编号)。
+func TestFeatureNameOfBasePrefersIdIndex(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// 硬失败而非 Skip:索引缺失意味着 generate 脚本没跑或数据丢了,
+	// 此时 FeatureNameOfBase 会静默退化到名字匹配(覆盖率 89%→74%,且抄串),
+	// 而**没有任何报错**。跳过的话 CI 一片绿,线上却一直在用较差的那条路。
+	const missingMsg = "petbase_feature 未加载 —— 先跑 scripts/fetch_rocoworld.py 再 " +
+		"scripts/gen_features.py;缺了它特性桥接会静默退化到名字匹配(覆盖率降且会抄串)"
+	if db.features == nil || len(db.features.baseToName) == 0 {
+		t.Fatal(missingMsg)
+	}
+	// 女王蜂(图鉴84 阶段4)与花魁蜂后(阶段3):wiki 把两者特性对调了
+	queen, queenWiki := uint32(5015), "虫群鼓舞"
+	bee, beeWiki := uint32(3157), "虫群突袭"
+	if got := db.FeatureNameOfBase(queen); got != "虫群突袭" {
+		t.Errorf("女王蜂(5015) = %q, 期望 %q —— 走了名字回退就会拿到 %q(wiki 抄串的那个)",
+			got, "虫群突袭", queenWiki)
+	}
+	if got := db.FeatureNameOfBase(bee); got != "虫群鼓舞" {
+		t.Errorf("花魁蜂后(3157) = %q, 期望 %q —— 走了名字回退就会拿到 %q",
+			got, "虫群鼓舞", beeWiki)
+	}
+	// 确认这份数据里 wiki 那份确实是反的 —— 否则上面的断言就失去意义了
+	if w, _ := db.PetFeatureName(db.PetFullName(queen)); w != queenWiki {
+		t.Logf("注意:wiki 那份已修正为 %q,本用例的「反向验证」前提不再成立", w)
+	}
+	// 学院呱呱:wiki 压根没收录,只能靠 id 索引查到
+	if got := db.FeatureNameOfBase(3620); got != "留学生" {
+		t.Errorf("学院呱呱(3620) = %q, 期望 %q —— wiki 未收录它,查不到说明 id 索引没生效",
+			got, "留学生")
+	}
+	// 覆盖率:id 索引应显著优于纯名字匹配(实测 89% vs 74%)
+	var byID, byName int
+	for _, f := range db.PetForms() {
+		if _, ok := db.features.baseToName[f.Base]; ok {
+			byID++
+		}
+		if _, ok := db.PetFeatureName(f.Name); ok {
+			byName++
+		}
+	}
+	if byID <= byName {
+		t.Errorf("id 索引覆盖 %d 个形态, 未超过名字匹配的 %d 个 —— 数据源没生效或退化了",
+			byID, byName)
+	}
+	t.Logf("id 索引覆盖 %d 个形态, 名字匹配 %d 个", byID, byName)
+}

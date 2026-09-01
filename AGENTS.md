@@ -73,6 +73,14 @@
   靠 HTML class 正则提取,改版后抓不到会报错退出)、`uv run python scripts/gen_skills.py`
   (skillIds.json + arkmeng.cn 的 skillGuideData.json → internal/gamedata/data/skills.json:
   技能 id→名 供试炼页、形态→天生技能 供宠物详情;**两份互补缺一不可,见 docs/data.md「技能名」**);
+  `uv run python scripts/fetch_rocoworld.py`(刮 roco.world 图鉴 594 页 →
+  `~/Downloads/rocom/rocoworld_raw.jsonl`:**petbase_id → 特性名+描述**,附带种族值/
+  身高体重/蛋组/技能表;页面内嵌 SSR 的 `<script type="application/json">`,
+  其 `page.data.petbase_id` **与我方 id 完全一致**,故可绕开名字匹配 ——
+  覆盖率 89%,远优于 wiki 那份的 74%(且后者有 8 处抄串);
+  URL 从 `sitemap-zh-hans-jini.xml` 取,不硬编码数量;4 并发约 6 分钟,增量续传。
+  `gen_features.py` 会把它并进 features.json 的 `petbase_feature`,**新代码一律用
+  按 id 建键的那份**,`pet_feature`(按名字)仅为兼容保留)。
   `uv run python scripts/fetch_trial_data.py`(草系试炼静态配置:wiki 的
   Module:GrassTrialData → ~/Downloads/rocom/grassTrialData.lua;页面由 Lua 渲染,
   数据在模块里不在正文)、`uv run python scripts/gen_trial.py`(→ data/trial.json:
