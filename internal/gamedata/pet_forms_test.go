@@ -112,7 +112,33 @@ func TestPetForms(t *testing.T) {
 			t.Fatalf("未按序: %d/%d 在 %d/%d 之后", a.Book, a.Base, b.Book, b.Base)
 		}
 	}
-	t.Logf("候选形态 %d 个", len(forms))
+	// 头像:同名形态极多(「棋契陛下」有 10 个形态),搜出来 10 条一模一样的
+	// 文字,玩家无从分辨该选哪只,只能瞎选 —— 标注数据因此不可信。
+	// 故候选**必须**带图。这里不断言「每只都要有图」(素材不全,强求会变红),
+	// 断言的是「有图的那部分占绝大多数」:整体掉到 0 说明图索引坏了。
+	withImg := 0
+	for _, f := range forms {
+		if f.Img != "" {
+			withImg++
+		}
+	}
+	if withImg == 0 {
+		t.Fatal("候选一个头像都没有 —— 标注时无从分辨同名形态")
+	}
+	if want := len(forms) * 9 / 10; withImg < want {
+		t.Errorf("只有 %d/%d 个候选带头像, 期望至少 %d —— 图索引出问题了",
+			withImg, len(forms), want)
+	}
+	// 抽验头像路径能对应到该形态(取图路径写错同样会让「有图」变成假的)
+	for _, f := range forms {
+		if f.Img == "" {
+			continue
+		}
+		if got := db.PetImageByBase(f.Base, false).Head; got != f.Img {
+			t.Fatalf("base=%d 的候选 img=%q 与实际取图 %q 不一致", f.Base, f.Img, got)
+		}
+	}
+	t.Logf("候选形态 %d 个, 其中 %d 个带头像", len(forms), withImg)
 }
 
 // TestFeatureNameOfBase 端到端验证特性桥接:形态 id → 特性名。

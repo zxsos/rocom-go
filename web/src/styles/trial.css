@@ -258,17 +258,9 @@
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.trial-slots {
-  display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-}
-.trial-slot {
-  display: flex; align-items: center; justify-content: space-between; gap: 4px;
-  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
-  background: var(--bg-1); padding: 5px 8px; font-size: 12px;
-}
-.trial-slot.full { border-color: var(--green, var(--accent)); }
-.trial-slot.full .trial-slot-c { color: var(--green, var(--accent)); font-weight: 600; }
-.trial-slot-c { font-variant-numeric: tabular-nums; color: var(--fg-dim); }
+/* 各系通关原先是 18 个格子的 grid,已换成徽章星盘(见 .sigil-* 与
+   ElementWheel.jsx)—— 圆形比格子更能看出「还差哪一片」,且全通时能闭合
+   成一整个环。旧格子样式一并删除,不留死代码。 */
 
 @media (max-width: 640px) {
   .trial-pet-img { width: 52px; height: 52px; }
@@ -334,3 +326,221 @@
    避免彩色头像在半透明下与深色背景糊成一片。 */
 .trial-grid-item.is-seen { opacity: .38; filter: grayscale(1); }
 .trial-grid-item.is-seen:hover { opacity: .7; filter: grayscale(.5); }
+
+/* —— 徽章星盘:18 系通关进度(ElementWheel.jsx)——
+   一块暗底的黄铜仪器:金色刻线作盘缘,18 盏元素灯环列其上,每通关系点亮一盏;
+   全通时相邻灯之间的「封印链」闭合成环、中央印记燃起金光。
+
+   盘面**始终是深色**,在亮色主题下也不翻白 —— 它是「一块仪表」而非「一块卡片」,
+   深色盘面才能让元素色的光晕显出来(浅底上发光等于没有发光)。
+   故刻线统一用金色/白色的低透明度固定值,不引用 --line(那个变量在亮色下
+   会变浅,在深色盘面上直接消失)。 */
+
+.sigil-wrap { max-width: 460px; margin: 0 auto; }
+
+.sigil { display: block; width: 100%; height: auto; }
+
+/* 盘缘:两道同心细线,像刻度盘的边 */
+.sigil-rim { fill: none; stroke: rgba(245, 185, 66, .20); stroke-width: 1; }
+.sigil-rim-soft { stroke: rgba(245, 185, 66, .09); }
+
+/* 18 边形底链:暗到几乎看不见,只作结构骨架 —— 亮段才是主角 */
+.sigil-poly { fill: none; stroke: rgba(255, 255, 255, .055); stroke-width: 1; }
+
+/* 封印链亮段:相邻两系都满才亮。用 dash 从零画出,载入时逐段点亮 ——
+   这是整块盘最"贵"的一笔,18 段依次描出比一次性显示有仪式感得多。
+   段长约 51px(2·148·sin10°),dasharray 取 60 略长以确保完全覆盖。 */
+.sigil-link {
+  fill: none; stroke: var(--gold); stroke-width: 2.2; stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(245, 185, 66, .5));
+  stroke-dasharray: 60; stroke-dashoffset: 60;
+  animation: sigil-draw .5s cubic-bezier(.4, 0, .2, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes sigil-draw { to { stroke-dashoffset: 0; } }
+
+/* 进度弧带:内圈那一环。已通的段用该系颜色,未通的只留暗槽 */
+.sigil-arc-slot { fill: none; stroke: rgba(255, 255, 255, .045); }
+.sigil-arc {
+  fill: none; stroke-linecap: butt;
+  transition: filter .18s ease;
+  animation: sigil-fade .5s ease backwards;
+  animation-delay: var(--d, 0ms);
+}
+/* hot:悬停时该系的弧发光。与节点、刻度、系名联动 ——
+   同一个系的四样东西(弧/刻度/节点/名字)一起响应,视线才连得起来;
+   只放大节点的话,得来回找哪段弧是它的。 */
+.sigil-arc.hot { filter: drop-shadow(0 0 7px var(--c)); }
+
+/* 难度刻度:每系 3 枚菱形,由内到外。未通的只留空框,通了填元素色 */
+.sigil-tick {
+  stroke: rgba(255, 255, 255, .16); stroke-width: 1;
+  animation: sigil-fade .4s ease backwards;
+  animation-delay: var(--d, 0ms);
+}
+.sigil-tick.on { stroke: none; }
+.sigil-tick.hot { filter: drop-shadow(0 0 5px var(--c)); }
+
+/* 系名:未通是暗的,全通后转成该系颜色并加粗 —— 与节点的光呼应 */
+.sigil-label {
+  fill: var(--fg-dim); font-size: 13px; font-weight: 400;
+  text-anchor: middle; dominant-baseline: middle;
+  transition: fill .18s ease;
+  animation: sigil-fade .45s ease backwards;
+  animation-delay: var(--d, 0ms);
+}
+.sigil-label.full { fill: var(--c); font-weight: 700; }
+.sigil-label.hot { fill: var(--c); font-weight: 700; }
+/* 主题系(本页徽章所属的系):常驻金色描边。
+   用 paint-order 把描边画在填充之下 —— 否则描边会吃掉字的笔画,小字号下糊成一团。 */
+.sigil-label.theme {
+  fill: var(--gold); font-weight: 700;
+  stroke: rgb(10 13 18 / .85); stroke-width: 2.6px; paint-order: stroke fill;
+}
+
+/* 加冕金环:主题系专属,**与通关状态无关** ——
+   「这是当前徽章」是页面主题,不是进度,不该跟着进度亮灭。
+   虚线缓慢旋转,像表盘上的指针基准位,静态时也在暗示"这一格是基准"。 */
+.sigil-crown {
+  fill: none; stroke: var(--gold); stroke-width: 1.6;
+  stroke-dasharray: 5 4; opacity: .75;
+  transform-box: fill-box; transform-origin: center;
+  animation: sigil-spin 60s linear infinite reverse;
+}
+.sigil-node.theme .sigil-crown { opacity: .95; stroke-width: 1.9; }
+
+/* 中心印记的系图标 */
+.sigil-core-ic { pointer-events: none; }
+
+/* 节点 */
+.sigil-node { cursor: pointer; outline: none; }
+/* 内层承载缩放与入场:外层 g 的 SVG transform 属性负责定位,
+   CSS transform 若加在外层会整个覆盖它(节点会全飞到左上角),故必须分层。 */
+.sigil-node-in {
+  transform-box: fill-box; transform-origin: center;
+  transition: transform .18s cubic-bezier(.34, 1.4, .64, 1);
+  animation: sigil-pop .55s cubic-bezier(.2, .9, .3, 1.25) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes sigil-pop {
+  from { opacity: 0; transform: scale(.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+.sigil-node.on .sigil-node-in,
+.sigil-node:focus-visible .sigil-node-in { transform: scale(1.18); }
+
+.sigil-node-bg { fill: #1a2029; }
+.sigil-node-ring {
+  fill: none; stroke: rgba(255, 255, 255, .13); stroke-width: 1.4;
+  transition: stroke-width .18s ease;
+}
+/* 全通的环加粗并换成元素色 —— 环是"灯罩",亮起来才有灯的质感 */
+.sigil-node.full .sigil-node-ring { stroke-width: 2; }
+.sigil-node.on .sigil-node-ring { stroke-width: 2.6; }
+
+/* 未通关的暗纱:图标仍可见(认得出是哪个系),但明显没点着 */
+.sigil-node-dim { fill: rgba(10, 13, 18, .62); }
+.sigil-node.on .sigil-node-dim { fill: rgba(10, 13, 18, .3); }
+
+/* 光晕两层:外层大而淡、内层小而浓,叠出真实的发散感。
+   呼吸幅度刻意很小(.10→.16)—— 18 个点一起大幅闪动会晃眼,
+   这里要的是"还活着"的暗示,不是霓虹灯。 */
+.sigil-halo { opacity: .10; }
+.sigil-halo-2 { opacity: .13; }
+.sigil-node.full .sigil-halo {
+  animation: sigil-breathe 4.5s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes sigil-breathe {
+  0%, 100% { opacity: .10; }
+  50% { opacity: .17; }
+}
+.sigil-node.full.on .sigil-halo { opacity: .3; animation: none; }
+
+.sigil-node-ic { pointer-events: none; }
+/* 透明热区:比可见节点大一圈,触屏上也点得中 */
+.sigil-hit { fill: transparent; }
+.sigil-node:focus-visible .sigil-hit { stroke: var(--accent); stroke-width: 2; }
+
+/* 中心印记 */
+/* 中心三段纵向排布:系图标(-32..-6)/ 进度 / 系名(+27)。
+   字号比原先小一号 —— 上方多了 26px 的系图标,再保持 27px 会顶出 R_CORE=44 的圆。 */
+.sigil-core-num {
+  font-family: var(--font-num); font-size: 24px; font-weight: 700;
+  fill: var(--fg); text-anchor: middle; dominant-baseline: middle;
+}
+.sigil-core-den { font-size: 14px; fill: var(--fg-dim); }
+.sigil-core-sub {
+  font-size: 11.5px; fill: var(--fg-dim);
+  text-anchor: middle; dominant-baseline: middle; letter-spacing: .04em;
+}
+.sigil-core-bg { fill: #151b26; stroke: rgba(245, 185, 66, .18); stroke-width: 1; }
+.sigil-core-fill { opacity: .16; }
+.sigil-core-glow {
+  fill: none; stroke: var(--gold); stroke-width: 1.4;
+  animation: sigil-core-pulse 3.6s ease-in-out infinite;
+}
+@keyframes sigil-core-pulse {
+  0%, 100% { opacity: .3; }
+  50% { opacity: .62; }
+}
+/* 全通:中央数字转金,盘缘一并提亮 —— 18 盏灯都亮了,盛这道光的盘也该亮。
+   这是唯一的"全服公告"式表达,故除了数字还要有一处大范围的响应,
+   否则全通的成就感只挤在中间一小块里。 */
+.sigil-done .sigil-core-num { fill: var(--gold); }
+.sigil-done .sigil-core-sub { fill: #e8c477; }
+.sigil-done .sigil-rim { stroke: rgba(245, 185, 66, .42); }
+.sigil-done .sigil-rim-soft { stroke: rgba(245, 185, 66, .16); }
+
+/* 全通的旋转光芒:36 道细线,90 秒转一圈。
+   慢到几乎察觉不到 —— 它不该抢戏,只是让盘面"在转"这件事被余光捕捉到。 */
+.sigil-rays line { stroke: rgba(245, 185, 66, .13); stroke-width: 1; }
+.sigil-rays {
+  transform-box: fill-box; transform-origin: center;
+  animation: sigil-spin 90s linear infinite;
+}
+@keyframes sigil-spin { to { transform: rotate(360deg); } }
+
+@keyframes sigil-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 图例:说明 3 枚菱形与"全通"的含义。放在盘外 ——
+   盘内 18 个方位都已占满,塞说明会破坏对称。 */
+.sigil-legend {
+  display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+  margin-top: 10px; font-size: 12px; color: var(--fg-dim);
+}
+.sigil-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sigil-lg-tick {
+  width: 7px; height: 7px; transform: rotate(45deg);
+  border: 1px solid rgba(255, 255, 255, .22); border-radius: 1px;
+}
+.sigil-lg-tick.on { background: var(--gold); border-color: var(--gold); }
+.sigil-lg-node {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  box-shadow: 0 0 6px rgb(245 185 66 / .55);
+}
+/* 加冕的示例:金色虚线圆环,与盘上主题系那圈一致 */
+.sigil-lg-crown {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px dashed var(--gold); opacity: .9;
+}
+
+/* 窄屏:字号按盘面等比缩了,系名在很小的屏上会糊成一圈 ——
+   藏掉文字,靠图标和 hover 时的原生 tooltip 认系(节点上挂了 <title>)。 */
+@media (max-width: 520px) {
+  .sigil-label { display: none; }
+  .sigil-legend { gap: 12px; font-size: 11px; }
+}
+
+/* 关掉全部动效:静态盘面信息一毫不丢(颜色/填充/链段都靠 fill 与 stroke,
+   与动画无关),只是不再有入场、呼吸与旋转。 */
+@media (prefers-reduced-motion: reduce) {
+  .sigil-link, .sigil-arc, .sigil-tick, .sigil-label,
+  .sigil-node-in, .sigil-node.full .sigil-halo,
+  .sigil-rays, .sigil-core-glow {
+    animation: none !important;
+  }
+  .sigil-link { stroke-dashoffset: 0; }
+  .sigil-node-in { transform: none; transition: none; }
+}

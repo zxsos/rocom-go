@@ -110,15 +110,19 @@ export default function Flowers() {
     return [{ key: '__current__', label: currentLabel(curOwnerID), flowers }, ...real]
   }, [slots, curKey, curOwnerID, flowers, myUID])
   // 当前视图:__current__=实时当前世界;否则选中的存档槽。花种按特殊(最多 3 只)/普通(最多 20 只)分组展示。
+  //
+  // 只返回 flowers,**不返回 label**:视图名已由上面的下拉框显示(它的选项就是
+  // slotLabel 现算的),在这里再算一份是重复,且多算一份 label 会让这段 memo
+  // 依赖 myUID/curOwnerID —— 那两个一变(比如后端补到自己的 UID)整个视图就重算。
   const view = useMemo(() => {
     if (selKey !== '__current__') {
       const sel = slots && slots.find((s) => s.key === selKey)
-      if (sel) return { label: slotLabel(sel.key, myUID), flowers: sel.flowers || [] }
+      if (sel) return sel.flowers || []
     }
-    return { label: currentLabel(curOwnerID), flowers }
-  }, [selKey, slots, flowers, curOwnerID, myUID])
-  const viewSpecials = view.flowers.filter((f) => f.specSeedId > 0)
-  const viewNormals = view.flowers.filter((f) => !(f.specSeedId > 0))
+    return flowers
+  }, [selKey, slots, flowers])
+  const viewSpecials = view.filter((f) => f.specSeedId > 0)
+  const viewNormals = view.filter((f) => !(f.specSeedId > 0))
 
   return (
     <div className="flowers-page">
@@ -126,7 +130,7 @@ export default function Flowers() {
         <h3 style={{ margin: 0 }}>花种</h3>
         <span className="muted toolbar-hint">打开面板自动更新,点地图花种看详情</span>
         <div className="spacer" />
-        <span className="muted">共 {view.flowers.length} 只花灵</span>
+        <span className="muted">共 {view.length} 只花灵</span>
       </div>
       {/* 视图切换:默认当前世界(实时),可切到世界存档槽;切槽后只展示该槽,删除后回访重新建档 */}
       <div className="slot-bar">
@@ -152,9 +156,10 @@ export default function Flowers() {
         <div className="empty">尚未收到花种数据:游戏内打开一次花种面板后自动显示…</div>
       ) : (
         <>
-          <div className="flowers-group">
-            <h4 className="flowers-group-t">{view.label}({view.flowers.length})</h4>
-          </div>
+          {/* 这里**刻意没有**「视图名(总数)」的标题:
+              视图名就是上面下拉框的选中项,总数在顶栏「共 N 只花灵」,
+              且下面「特殊(N)」「普通(N)」相加也是它 ——
+              再添一行就成了插槽下方连着三行标题,首行纯属重复。别加回去。 */}
           {viewSpecials.length > 0 && (
             <section className="flowers-group">
               <h4 className="flowers-group-t">特殊花种(7 星,{viewSpecials.length})</h4>

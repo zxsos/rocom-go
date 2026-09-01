@@ -316,6 +316,17 @@ type TrialPet struct {
 	FeatureNames map[uint32]string `json:"featureNames,omitempty"`
 	Shards       []uint32          `json:"shards,omitempty"`   // 已获碎片(20xx/30xx)
 	Equipped     []uint32          `json:"equipped,omitempty"` // 出战技能槽位
+	// 下面四项是**玩家自己的精灵**带进试炼的外观:异色 / 炫彩 / 炫彩配色。
+	// 取自内嵌 PetData 的 mutation_type(bit0=异色、bit3=炫彩)与 glass_info。
+	//
+	// 三者都会影响显示:异色换头像(且 img 已按异色取过图)、炫彩加色卡。
+	// ⚠️ 异色头像**不是每只精灵都有素材** —— 没有时 gamedata 静默回退普通图,
+	// 此时 shiny 仍为 true 而 img 是普通图的路径。前端**不可**拿 img 反推 shiny:
+	// 那样没素材的异色精灵会被当成普通的。要判断异色,只看 shiny 这个字段。
+	Shiny      bool   `json:"shiny"`
+	Colorful   bool   `json:"colorful"`
+	GlassType  int32  `json:"glassType,omitempty"`
+	GlassValue uint32 `json:"glassValue,omitempty"`
 }
 
 // TrialSkill 是试炼宠物的一个技能槽(融合体)。

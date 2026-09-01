@@ -245,6 +245,12 @@ type annotationCandidate struct {
 	Desc string `json:"desc,omitempty"`
 	// Pets: wiki 上带这个特性的精灵(仅 feature 候选有),给玩家判断用的线索。
 	Pets []string `json:"pets,omitempty"`
+	// Img: 头像路径(仅 event 候选有)。
+	//
+	// event 候选是精灵形态,同名形态极多(「棋契陛下」有 10 个形态),
+	// 只有名字的话列出来一模一样、无从分辨,玩家只能瞎选 ——
+	// 标注数据因此不可信。故这里必须带图。
+	Img string `json:"img,omitempty"`
 }
 
 // handleAnnotationCandidates 返回标注模式的候选词典(skill=全量技能目录 / feature=特性词典)。
@@ -271,7 +277,7 @@ func (s *Server) handleAnnotationCandidates(w http.ResponseWriter, r *http.Reque
 		// 但标注提交只存名字,故名字必须**逐字**取自这份名单(PetFullName 口径,
 		// 形态名用全角括号),手打的同义名反查不到,头像也就出不来。
 		for _, p := range s.db.PetForms() {
-			out = append(out, annotationCandidate{ID: p.Base, Name: p.Name})
+			out = append(out, annotationCandidate{ID: p.Base, Name: p.Name, Img: p.Img})
 		}
 	}
 	writeJSON(w, map[string]any{"kind": kind, "items": out})

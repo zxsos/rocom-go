@@ -147,64 +147,22 @@
       }
     ],
     "pet": {
-      "colorful": false,
+      "colorful": true,
       "energy": 10,
-      "equipped": [
-        1,
-        2
-      ],
-      "featureNames": {
-        "288135": "预警"
-      },
       "features": [
-        288135,
-        288001
-      ],
-      "gainedFeatures": [
-        288001
-      ],
-      "gid": 133,
-      "growth": 2,
-      "hp": 264,
-      "img": "HeadIcon/3569.webp",
-      "innateFeatures": [
         288135
       ],
+      "gid": 133,
+      "glassType": 1,
+      "glassValue": 65538,
+      "growth": 2,
+      "hp": 264,
+      "img": "HeadIcon/3044_1.webp",
       "level": 60,
       "maxHp": 389,
-      "name": "黑猫巫师",
-      "shards": [
-        2016,
-        3005
-      ],
-      "shiny": false,
-      "skills": [
-        {
-          "cost": 4,
-          "fusion": 1,
-          "id": 7020500,
-          "merged": [
-            7090100
-          ],
-          "name": "乱打",
-          "power": 25,
-          "slot": 2
-        },
-        {
-          "cost": 0,
-          "id": 7880058,
-          "name": "魔能爆",
-          "power": 20,
-          "slot": 2
-        },
-        {
-          "cost": 1,
-          "id": 7999999,
-          "power": 10,
-          "slot": 3
-        }
-      ],
-      "species": "黑猫巫师"
+      "name": "异色的它",
+      "shiny": true,
+      "species": "异色的它"
     },
     "refreshCost": 2,
     "reward": {

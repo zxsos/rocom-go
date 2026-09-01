@@ -6,6 +6,8 @@ import { ImgAvatar } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
 import { fmtTime } from '../../utils/format'
 import { UnknownChip, useAnnotations } from '../../components/annotations'
+import { Marks } from '../../components/badges'
+import ElementWheel from './ElementWheel'
 
 // 草系徽章试炼页:实时同步游戏内的一局。
 //
@@ -498,6 +500,12 @@ function PetCard({ pet }) {
           <div className="trial-pet-name">
             {pet.name || pet.species || '未知'}
             {pet.species && pet.species !== pet.name && <span className="muted"> · {pet.species}</span>}
+            {/* 异色/炫彩:试炼带的是玩家**自己的**精灵,外观原样带进去。
+                标记只显示不解释来源 —— 它来自协议 mutation_type,不是猜的。
+                ⚠️ 别拿 pet.img 反推异色:异色头像不是每只精灵都有素材,
+                没素材时后端静默回退普通图(此时 shiny 仍为 true)。
+                以 img 判断会把这些精灵全当成普通的。 */}
+            <Marks p={pet} />
           </div>
           <div className="trial-meta">
             <span className="trial-chip">Lv {pet.level}</span>
@@ -643,6 +651,10 @@ function OptionCard({ o }) {
   // 名字,否则标注看着像没生效。
   const anno = lookup && lookup('event', o.event)
   const petName = (o.pet && o.pet.name) || (anno && anno.name) || ''
+  // 头像三个来源,按可靠度取:后端回填(已审核,权威)→ 本会话待审标记录的
+  // (自己刚标、还没审,后端此时**不会**回填 pet,不取这里就只剩占位)。
+  // ⚠️ 顺序别反:待审的图是本会话记的,不该盖过后端权威数据。
+  const petImg = (o.pet && o.pet.img) || (anno && anno.img) || ''
   const pool = o.pool || []
   const used = new Set(o.used || [])
   const name = (id) => (o.names || {})[String(id)]
@@ -653,7 +665,7 @@ function OptionCard({ o }) {
           {/* 头像右上角挂额外奖励(多是碎片):它是挂在**这个事件**上的,
               与抽取池里的奖励不是一回事,故单独成角标而非混进池子。 */}
           <div className="trial-opt-avatar">
-            <ImgAvatar src={o.pet && o.pet.img} alt={petName} className="trial-opt-img" />
+            <ImgAvatar src={petImg} alt={petName} className="trial-opt-img" />
             {o.extra && o.extra.length > 0 && (
               <span
                 className="trial-opt-extra"
@@ -741,14 +753,9 @@ function HistoryView({ history }) {
       {history.slots && history.slots.length > 0 && (
         <section className="trial-group">
           <h4 className="trial-group-t">各系通关(每个系 3 个难度)</h4>
-          <div className="trial-slots">
-            {history.slots.map((s) => (
-              <div key={s.slotId} className={'trial-slot' + (s.cleared >= 3 ? ' full' : '')}>
-                <span className="trial-slot-n">{s.damName || s.damType}</span>
-                <span className="trial-slot-c">{s.cleared}/3</span>
-              </div>
-            ))}
-          </div>
+          {/* theme 是本页徽章所属的属性系:星盘会把草系转到正上方并加冕,
+              中心印记也显示草系的进度。将来做火系/水系徽章页时改这一个值即可。 */}
+          <ElementWheel slots={history.slots} theme="草" />
         </section>
       )}
 

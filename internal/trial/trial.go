@@ -111,6 +111,15 @@ type Pet struct {
 	Equipped   []uint32 // 出战技能槽位(equipped_skill_slots)
 	Name       string   // 昵称,取自内嵌 PetData 的 name(玩家可能改过名)
 	ConfID     uint32   // 宠物 conf_id(取自内嵌 PetData,供查种类名)
+	// Mutation 是内嵌 PetData 的 mutation_type(字段 45),**位标志**:
+	//   bit0(1)=异色  bit3(8)=炫彩
+	// 与 internal/pet/model.go 的宠物主流程同一套判据(那里有实测样本的验证记录)。
+	//
+	// 试炼带的是**玩家自己的精灵**,异色/炫彩都会原样带进去 —— 解析时不能丢,
+	// 否则头像一律取普通图(见过:选异色精灵进试炼,头像显示成普通的)。
+	Mutation   uint32
+	GlassType  int32  // GlassInfo.glass_type(炫彩季/隐藏炫彩的类别)
+	GlassValue uint32 // GlassInfo.glass_value(配色与粒子的编码,前端按色卡还原)
 }
 
 // Has 判断某特性是否属于天生。
@@ -401,12 +410,30 @@ func ParsePet(b []byte) *Pet {
 		case num == 12:
 			p.Shards = appendU32(p.Shards, val, typ, v)
 		case num == 13 && typ == protowire.BytesType:
-			// 内嵌的真实 PetData:只要昵称与 conf_id(种类名/头像走 gamedata 按 base 查)。
+			// 内嵌的真实 PetData:昵称、conf_id,以及**外观标志**。
+			//
+			// mutation_type(45)必须取:它是试炼里唯一能知道「这只精灵是不是异色」
+			// 的地方 —— GrassTrialPetData 的外层字段里没有外观信息。丢掉它,
+			// 异色精灵在试炼页就一律显示普通头像。
 			if cid, ok := wire.Varint(val, 2); ok {
 				p.ConfID = uint32(cid)
 			}
 			if nb, ok := wire.Bytes(val, 3); ok {
 				p.Name = string(nb)
+			}
+			if mt, ok := wire.Varint(val, 45); ok {
+				p.Mutation = uint32(mt)
+			}
+			// glass_info(86):炫彩的外观类型与数值。与 mutation_type bit3 是同一
+			// 事实的两种表达,但只有这里带着具体的配色/粒子编码 —— 前端靠它
+			// 用色卡素材 CSS mask 还原炫彩外观(web/src/components/badges.jsx)。
+			if gb, ok := wire.Bytes(val, 86); ok {
+				if gt, ok := wire.Varint(gb, 17); ok {
+					p.GlassType = int32(gt)
+				}
+				if gv, ok := wire.Varint(gb, 18); ok {
+					p.GlassValue = uint32(gv)
+				}
 			}
 		case num == 14:
 			p.Equipped = appendU32(p.Equipped, val, typ, v)

@@ -219,6 +219,143 @@ func TestTrialPetFeatureNameBridged(t *testing.T) {
 	}
 }
 
+// petWithMutationBody 拼 GrassTrialPetData:field1=gid / field2=base_conf_id /
+// field13=内嵌 PetData。内嵌层里只放解析真正要用的三个字段:
+// field2=conf_id、field3=name(nickname)、field45=mutation_type。
+//
+// mutation_type 是**位标志**:bit0(1)=异色、bit3(8)=炫彩,与宠物主流程同判据
+// (internal/pet/model.go 有实测样本的验证记录)。
+func petWithMutationBody(base, mutation uint32) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 2, protowire.VarintType)
+	inner = protowire.AppendVarint(inner, uint64(base))
+	inner = protowire.AppendTag(inner, 3, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, []byte("异色的它"))
+	inner = protowire.AppendTag(inner, 45, protowire.VarintType)
+	inner = protowire.AppendVarint(inner, uint64(mutation))
+
+	var b []byte
+	b = protowire.AppendTag(b, 1, protowire.VarintType)
+	b = protowire.AppendVarint(b, 133) // gid
+	b = protowire.AppendTag(b, 2, protowire.VarintType)
+	b = protowire.AppendVarint(b, uint64(base))
+	b = protowire.AppendTag(b, 13, protowire.BytesType)
+	return protowire.AppendBytes(b, inner)
+}
+
+// findPetWithShinyImage 找一个**确有异色头像素材**的形态。
+//
+// 必须动态找:异色图不是每只精灵都有(没有时 gamedata 静默回退普通图),
+// 写死某个 id 会在数据更新后变成假阳性 —— 测试通过但什么也没守住。
+func findPetWithShinyImage(t *testing.T, db *gamedata.DB) uint32 {
+	t.Helper()
+	for _, f := range db.PetForms() {
+		if n, s := db.PetImageByBase(f.Base, false), db.PetImageByBase(f.Base, true); n.Head != "" && s.Head != "" && n.Head != s.Head {
+			return f.Base
+		}
+	}
+	t.Skip("没有带异色头像素材的形态")
+	return 0
+}
+
+// TestTrialPetMutationImage 端到端锁住「异色精灵进试炼,头像是异色的」。
+//
+// 这是真实踩过的 bug:试炼带的是玩家**自己的**精灵,异色原样带进去,
+// 而外观标志(mutation_type)只在内嵌 PetData 里。整条链路上任何一环断了 ——
+// 解析漏字段、取图传了 false —— 结果都是**异色精灵显示普通头像**,
+// 不报错、不缺字段,只是图片看着不对,谁也发现不了。
+//
+// 故这里从**原始字节**走到对外载荷,把整条链路串起来测:
+//
+//	bytes → ParsePet(mutation_type) → trialPetPayload → img / shiny / colorful
+//
+// ⚠️ 契约 golden(contract_test.go 的 trial-shiny)守不住这条链:
+// 它是手工构造的 TrialPayload,根本不经过 pipeline 的解析与取图。
+// 那份 golden 只保证「字段在不在」,这里保证「取值对不对」。
+func TestTrialPetMutationImage(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	base := findPetWithShinyImage(t, p.db)
+	normal, shinyImg := p.db.PetImageByBase(base, false), p.db.PetImageByBase(base, true)
+
+	// mutation=0:普通,取普通图
+	plain := p.trialPetPayload(trial.ParsePet(petWithMutationBody(base, 0)), nil)
+	if plain.Shiny {
+		t.Error("mutation=0 不该判为异色")
+	}
+	if plain.Img != normal.Head {
+		t.Errorf("普通宠 img = %q, 期望 %q", plain.Img, normal.Head)
+	}
+
+	// mutation=1(bit0):异色,取异色图
+	sh := p.trialPetPayload(trial.ParsePet(petWithMutationBody(base, 1)), nil)
+	if !sh.Shiny {
+		t.Error("mutation bit0 置位应判为异色 —— 解析漏了字段 45?")
+	}
+	if sh.Img != shinyImg.Head {
+		t.Errorf("异色宠 img = %q, 期望异色图 %q(取到了普通图)", sh.Img, shinyImg.Head)
+	}
+	if sh.Img == normal.Head {
+		t.Error("异色宠取到了普通图 —— 取图时传了 false?")
+	}
+	if sh.Colorful {
+		t.Error("mutation=1 不该判为炫彩(bit3 未置位)")
+	}
+
+	// mutation=9(bit0 + bit3):异色炫彩,两者都成立 —— 位标志互不排斥
+	both := p.trialPetPayload(trial.ParsePet(petWithMutationBody(base, 9)), nil)
+	if !both.Shiny || !both.Colorful {
+		t.Errorf("mutation=9 应为异色+炫彩,实际 shiny=%v colorful=%v —— 别写成互斥的三元",
+			both.Shiny, both.Colorful)
+	}
+	if both.Img != shinyImg.Head {
+		t.Errorf("异色炫彩 img = %q, 期望异色图 %q", both.Img, shinyImg.Head)
+	}
+}
+
+// TestTrialPetGlassInfo 锁住炫彩的 glass_type / glass_value 透传。
+//
+// 炫彩外观只靠这两个值还原(前端按色卡素材 CSS mask 渲染,见 badges.jsx),
+// 而它们藏在内嵌 PetData 的 glass_info(字段 86)里 —— 解析漏了,炫彩精灵
+// 在试炼页就只是个普通精灵,连色卡都出不来。
+func TestTrialPetGlassInfo(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	base := findPetWithShinyImage(t, p.db)
+
+	var gi []byte
+	gi = protowire.AppendTag(gi, 17, protowire.VarintType)
+	gi = protowire.AppendVarint(gi, 2) // glass_type
+	gi = protowire.AppendTag(gi, 18, protowire.VarintType)
+	gi = protowire.AppendVarint(gi, 0x00030004) // glass_value
+
+	var inner []byte
+	inner = protowire.AppendTag(inner, 2, protowire.VarintType)
+	inner = protowire.AppendVarint(inner, uint64(base))
+	inner = protowire.AppendTag(inner, 45, protowire.VarintType)
+	inner = protowire.AppendVarint(inner, 8) // bit3 = 炫彩(非异色)
+	inner = protowire.AppendTag(inner, 86, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, gi)
+
+	var b []byte
+	b = protowire.AppendTag(b, 2, protowire.VarintType)
+	b = protowire.AppendVarint(b, uint64(base))
+	b = protowire.AppendTag(b, 13, protowire.BytesType)
+	b = protowire.AppendBytes(b, inner)
+
+	out := p.trialPetPayload(trial.ParsePet(b), nil)
+	if !out.Colorful {
+		t.Fatal("mutation bit3 置位应判为炫彩")
+	}
+	if out.Shiny {
+		t.Error("mutation=8 不含 bit0,不该判为异色")
+	}
+	if out.GlassType != 2 {
+		t.Errorf("glassType = %d, 期望 2 —— 解析漏了 glass_info(字段 86)?", out.GlassType)
+	}
+	if out.GlassValue != 0x00030004 {
+		t.Errorf("glassValue = %#x, 期望 %#x", out.GlassValue, 0x00030004)
+	}
+}
+
 // TestTrialPetManyInnateNotNamed 锁住「天生特性有多条时都不给名」。
 //
 // 桥接表的口径是「一只精灵 → 一个特性名」,多条天生时无从判断该把名字绑给谁,

@@ -805,10 +805,17 @@ func (p *Pipeline) trialOptionNames(o *server.TrialOption) {
 // trialPetPayload 把试炼宠物副本转成对外载荷:名称/头像走 gamedata 按 base_conf_id 查。
 // initial 是局级的天生特性(#33),用来把 Features 拆成「天生」与「试炼获得」两组。
 func (p *Pipeline) trialPetPayload(tp *trial.Pet, initial trial.InitialFeatures) *server.TrialPet {
+	// 异色:试炼带的是玩家自己的精灵,异色/炫彩原样带进试炼。
+	// 判据与宠物主流程一致(bit0=异色、bit3=炫彩),见 internal/pet/model.go。
+	shiny := tp.Mutation&1 != 0
 	out := &server.TrialPet{
 		Gid: tp.Gid, Name: tp.Name, Level: tp.Level,
 		HP: tp.HP, MaxHP: tp.MaxHP, Energy: tp.EnergyCeil, Growth: tp.Growth,
 		Features: tp.Features, Shards: tp.Shards, Equipped: tp.Equipped,
+		// 外观:异色/炫彩是玩家自己精灵的属性,进试炼原样带着 ——
+		// 前端据此显示异色标记并渲染炫彩色卡(见 web/src/components/badges.jsx)。
+		Shiny: shiny, Colorful: tp.Mutation&8 != 0,
+		GlassType: tp.GlassType, GlassValue: tp.GlassValue,
 	}
 	// 天生 vs 试炼获得:两边都判,不按下标切片(见 InitialFeatures 的说明)。
 	// initial 缺失时(老快照/字段不存在)两组都留空 —— **不猜**,
@@ -837,15 +844,17 @@ func (p *Pipeline) trialPetPayload(tp *trial.Pet, initial trial.InitialFeatures)
 			}
 		}
 	}
+	// 取图时按异色取(判据见上):外观标志只存在于内嵌 PetData 里,
+	// 取图时不看,异色精灵就一律显示普通头像。
 	if info, ok := p.db.PetBase(tp.BaseConfID); ok {
 		out.Species = info.Name
-		if img := p.db.PetImageByBase(tp.BaseConfID, false); img.Head != "" {
+		if img := p.db.PetImageByBase(tp.BaseConfID, shiny); img.Head != "" {
 			out.Img = img.Head
 		}
 	}
 	if out.Species == "" && tp.ConfID != 0 {
 		out.Species = p.db.Species(tp.ConfID)
-		if img := p.db.PetImage(tp.ConfID, false); img.Head != "" {
+		if img := p.db.PetImage(tp.ConfID, shiny); img.Head != "" {
 			out.Img = img.Head
 		}
 	}
