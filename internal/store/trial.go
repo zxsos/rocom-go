@@ -74,11 +74,7 @@ func (s *Store) TrialEncounters(account string, chapter uint32) map[uint32]Trial
 	return out
 }
 
-// ClearTrialEncounters 清空某账号(或仅某一章)的遇见记录。
-// chapter 传 0 表示全清 —— 试炼模式随版本重置精灵池时,旧记录就没意义了。
-func (s *Store) ClearTrialEncounters(account string, chapter uint32) error {
-	_, err := s.db.Exec(
-		`DELETE FROM trial_encounter WHERE account=? AND (?=0 OR chapter=?)`,
-		account, chapter, chapter)
-	return err
-}
+// 曾有 ClearTrialEncounters(清空遇见记录),已删除 —— 它不可能生效:
+// 见闻录(服务器下发的账号档案)是权威来源且按「只补缺的」补录,清空后下次
+// 收到档案会被整份补回。理由见 internal/server/api_trial.go 里的说明。
+// 真要清数据直接操作 sqlite,不再提供封装。

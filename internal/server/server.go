@@ -176,7 +176,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
 	s.mux.HandleFunc("GET /api/trial", s.handleTrial)
 	s.mux.HandleFunc("GET /api/trial/encounters", s.handleTrialEncounters)
-	s.mux.HandleFunc("DELETE /api/trial/encounters", s.handleDeleteTrialEncounters)
+	// 曾有 DELETE /api/trial/encounters(清空遇见记录),已删除:见闻录是权威来源、
+	// 清空后会被立刻补回,该接口不可能生效。理由见 api_trial.go 里的说明。
 	s.mux.HandleFunc("GET /api/flowers", s.handleFlowers)
 	s.mux.HandleFunc("GET /api/flowers/slots", s.handleFlowerSlots)
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)

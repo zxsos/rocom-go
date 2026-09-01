@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react'
-import { clearTrialEncounters, getTrial, getTrialEncounters, subscribe } from '../../api'
+import { getTrial, getTrialEncounters, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { ImgAvatar } from '../../components/icons'
@@ -139,29 +139,6 @@ function EncountersView({ data, onReload }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  // 清空记录:精灵池是第三方 wiki 的静态配置,游戏换版本换池子后旧记录会对不上
-  // (里头有当前版本根本遇不到的 petbase,进度永远停在某个不满的数)。
-  // 不可恢复,故走 confirmDialog 二次确认,且**只清当前这一章** —— 全清的入口
-  // 不放到界面上,真需要时用 curl,免得误触毁掉三章的累积。
-  const clear = async () => {
-    const name = cur ? cur.name || `第${cur.chapter}章` : ''
-    if (
-      !await confirmDialog({
-        message: `确认清空${name}的遇见记录?该章已遇见的 ${cur ? cur.seen : 0} 只会全部变为未遇见,不可恢复。`,
-        okText: '清空', danger: true,
-      })
-    ) return
-    setBusy(true); setErr('')
-    try {
-      await clearTrialEncounters(cur.chapter)
-      onReload()
-    } catch (e) {
-      setErr(e.message || '清空失败')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   if (!data) return <div className="empty">加载中…</div>
   const books = data.chapters || []
   if (!books.length) {
@@ -212,14 +189,6 @@ function EncountersView({ data, onReload }) {
           <i style={{ width: pct + '%' }} />
         </div>
         <span className="muted">{pct}%</span>
-        <button
-          className="btn trial-enc-clear"
-          onClick={clear}
-          disabled={busy || cur.seen === 0}
-          title={cur.seen === 0 ? '本章还没有遇见记录,无需清空' : '清空本章遇见记录(不可恢复)'}
-        >
-          {busy ? '清空中…' : '清空本章'}
-        </button>
       </div>
       {err && <div className="trial-enc-err">{err}</div>}
       {normal.length > 0 && (

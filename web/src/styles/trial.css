@@ -229,13 +229,9 @@
   transition: width .25s ease;
 }
 
-/* 清空按钮:破坏性操作,贴右端与进度区分开;仅在本章有记录时可用 */
-.trial-enc-clear {
-  flex-shrink: 0; padding: 2px 10px; font-size: 12px;
-}
-.trial-enc-clear:disabled { opacity: .4; cursor: not-allowed; }
+/* 「清空本章」按钮的样式已随功能删除(清空不可能生效,见 api_trial.go 的说明)。 */
 
-/* 刷新按钮:放最左,与右侧的破坏性操作拉开距离,免得点错 */
+/* 刷新按钮 */
 .trial-enc-refresh {
   flex-shrink: 0; padding: 2px 10px; font-size: 12px;
 }

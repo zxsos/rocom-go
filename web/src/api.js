@@ -166,20 +166,6 @@ export const getTrial = () => getJSON('/api/trial?' + buildQuery(), null)
 //    boss:[…]}]}
 export const getTrialEncounters = () => getJSON('/api/trial/encounters?' + buildQuery(), null)
 
-// clearTrialEncounters 清空遇见记录。chapter 传 1/2/3 只清某一章,不给则全清。
-// 精灵池是第三方 wiki 的静态配置,游戏换版本换池子后旧记录会对不上(里头有当前版本
-// 根本遇不到的 petbase,进度永远停在某个不满的数),此时需要手动清。**不可恢复**。
-export async function clearTrialEncounters(chapter) {
-  const q = chapter ? buildQuery({ chapter }) : buildQuery()
-  const r = await fetch('/api/trial/encounters?' + q, { method: 'DELETE' })
-  if (!r.ok) {
-    let msg = '清空失败(' + r.status + ')'
-    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
-    throw new Error(msg)
-  }
-  return r.json()
-}
-
 // getFlowers 返回当前账号最近一次花种(花灵)BOSS 分组(花种页加载即时回显):
 //   {flowers:[{id,name,img,star,blood,endTs,specSeedId,activityId,ownerUserId}]}
 // 之后由 SSE flowers 覆盖;从未收到过 0x0375(游戏内未打开过花种面板)时返回 null。

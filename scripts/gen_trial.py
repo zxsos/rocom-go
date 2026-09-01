@@ -95,14 +95,31 @@ if unknown:
 
 
 def to_bases(gt_ids):
-    """gt_内部id 列表 -> 我方 petbase 列表(去重保序,丢掉未知的)。"""
+    """gt_内部id 列表 -> 我方 petbase 列表(去重保序,丢掉未知的与首领形态)。
+
+    **剔除「xxx_首领形态」**(如 圣水守护_首领形态,4005~4090 那 20 只):
+    它们只作为首领出现在第 4 层,普通层(第 1/2/3/5 层)遇不到,却混在各章普通池里,
+    于是「遇见记录」三张图各列出 20 个永远碰不上的形态 —— 进度分母被虚增,
+    用户看着「还有这么多没遇到」其实是假象。实测抓包里这 20 只出现 0 次。
+
+    ⚠️ 判名要**排除「xxx_草系徽章-首领形态」**(8101~8122):那是 bosses 组
+    (第 4 层的 22 名首领),是真实存在且要保留的,别误删。
+    """
     out, seen = [], set()
+    dropped = []
     for g in gt_ids:
         p = pets.get(g)
         if not p or p["base"] in seen or p["base"] not in petbase:
             continue
         seen.add(p["base"])
+        form = petbase[p["base"]]
+        full = form["n"] + ("_" + form["f"] if form.get("f") else "")
+        if "首领形态" in full and "草系徽章" not in full:
+            dropped.append(full)
+            continue
         out.append(p["base"])
+    if dropped:
+        print(f"  剔除普通池里的首领形态 {len(dropped)} 个:", "、".join(dropped))
     return out
 
 
