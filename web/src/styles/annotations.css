@@ -119,6 +119,20 @@
   background: var(--accent-soft);
 }
 
+/* 带头像的候选(event):头像在左、文字在右。
+   横向排布是因为重名形态极多(「棋契陛下」10 个形态)—— 头像紧挨名字,
+   才对得上「这张脸叫这个名」;竖排会让人把图和下一条的名字看串。
+   用显式修饰类而非 :has() —— 后者在旧浏览器上直接失效,而这里失效的
+   后果是头像与名字错位、认错精灵。 */
+.anno-item-withimg { flex-direction: row; align-items: center; gap: 8px; }
+.anno-item-img {
+  flex: none;
+  width: 34px; height: 34px; border-radius: 50%;
+  object-fit: cover; background: var(--bg-3);
+}
+/* 有头像时把文字三行收进一列,免得 id 掉到头像下面 */
+.anno-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
 .anno-item-name {
   font-size: 13px;
   color: var(--fg);

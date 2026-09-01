@@ -315,6 +315,13 @@ type PetFormOption struct {
 	Base uint32 `json:"base"` // petbase 形态 id
 	Name string `json:"name"` // 形态全名(PetFullName 口径)
 	Book uint32 `json:"book"` // 图鉴编号(排序用)
+	// Img 是头像路径(web 相对路径,前端拼 webAssetsBase);没有素材时为空串。
+	//
+	// ⚠️ 不带头像**不能选**:同名形态极多 —— 676 个有图鉴号的形态里
+	// 100 个基础名是重名的(「棋契陛下」有 10 个形态、「圣代甜甜」9 个),
+	// 搜索时列出来 10 条一模一样的文字,玩家无从分辨该选哪个,
+	// 于是只能瞎选,标注数据因此不可信。
+	Img string `json:"img,omitempty"`
 }
 
 // PetForms 返回全部精灵形态,按图鉴号、id 升序。
@@ -329,7 +336,13 @@ func (db *DB) PetForms() []PetFormOption {
 		if info.Book == 0 {
 			continue
 		}
-		out = append(out, PetFormOption{Base: id, Name: db.PetFullName(id), Book: info.Book})
+		// 只取头像(不取全身图):候选列表里要的是「一眼认出是哪只」,
+		// 全身图尺寸大、占比高,会挤掉本就紧张的列表空间。
+		o := PetFormOption{Base: id, Name: db.PetFullName(id), Book: info.Book}
+		if im := db.PetImageByBase(id, false); im.Head != "" {
+			o.Img = im.Head
+		}
+		out = append(out, o)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Book != out[j].Book {

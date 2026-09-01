@@ -309,10 +309,48 @@ func contractFlowers() *FlowerPayload {
 	}
 }
 
+// TestContractTrial 锁定试炼响应的结构(含节点事件、宠物、商店)。
+//
+// 宠物是**普通**的(shiny=false)。这条 golden 单独看有个盲点:若哪天有人把异色
+// 判断写回硬编码 false,这条仍旧通过 —— 它本来就是 false。故另有
+// TestContractTrialShiny 专门守异色那条路,**两条必须成对看**。
 func TestContractTrial(t *testing.T) {
 	s := newTestServer(t)
 	s.SetLastTrial(contractAcc, contractTrial())
 	checkGolden(t, "trial", get(t, s, "/api/trial?account="+contractAcc), nil)
+}
+
+// TestContractTrialShiny 守住「选异色精灵进试炼,头像得是异色的」。
+//
+// 这是真实踩过的坑:试炼带的是玩家**自己的**精灵,异色/炫彩原样带进去,
+// 而外观标志(mutation_type)只存在于内嵌 PetData 里 —— 解析时漏掉它,
+// 取图就一律按非异色取,异色精灵在试炼页显示成普通头像。
+//
+// 与 TestContractTrial 成对存在:那条是普通宠(shiny=false),这条是异色宠。
+// 少任何一条,「把 shiny 写死成 false」这种改动都能静默溜过去。
+func TestContractTrialShiny(t *testing.T) {
+	s := newTestServer(t)
+	// 3044 是实测**确有异色头像**的形态:普通 3044.webp / 异色 3044_1.webp。
+	// 选一只真有素材的,否则取图会静默回退普通图、golden 里的 img 与普通宠一样,
+	// 这条测试就守不住任何东西了(这正是异色头像素材不全时最容易踩的假阳性)。
+	const shinyBase = uint32(3044)
+	normal, shinyImg := s.db.PetImageByBase(shinyBase, false), s.db.PetImageByBase(shinyBase, true)
+	if normal.Head == "" || shinyImg.Head == "" || normal.Head == shinyImg.Head {
+		t.Fatalf("base %d 的异色头像素材缺失(普通=%q 异色=%q) —— 换一只有异色图的形态",
+			shinyBase, normal.Head, shinyImg.Head)
+	}
+	p := contractTrial()
+	p.Run.Pet = &TrialPet{
+		Gid: 133, Name: "异色的它", Species: "异色的它", Img: shinyImg.Head,
+		Level: 60, HP: 264, MaxHP: 389, Energy: 10, Growth: 2,
+		Features: []uint32{288135},
+		// 异色(bit0) + 炫彩(bit3)同时成立:位标志互不排斥,
+		// 异色炫彩精灵两者都为真,别写成互斥的三元。
+		Shiny: true, Colorful: true,
+		GlassType: 1, GlassValue: 0x00010002,
+	}
+	s.SetLastTrial(contractAcc, p)
+	checkGolden(t, "trial-shiny", get(t, s, "/api/trial?account="+contractAcc), nil)
 }
 
 // scrubEncTime 抹掉遇见记录里的时间取值。

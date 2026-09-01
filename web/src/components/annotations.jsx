@@ -23,6 +23,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getAnnotations, getAnnotationCandidates, submitAnnotation, subscribe } from '../api'
 import { AnnotationsContext } from '../context'
+import { ImgAvatar } from './icons'
 import { toast } from './toast'
 
 export const ANNOTATION_KINDS = [
@@ -105,8 +106,11 @@ export default function AnnotationsProvider({ children }) {
       return own ? { ...own, pending: true } : null
     },
     // addMine 记录自己刚提交的标注,让本会话立即回显(见上)。
-    addMine: (kind, code, name, desc) => {
-      setMine((prev) => ({ ...prev, [kind + ':' + code]: { name, desc } }))
+    // img 只对 event 那一类有意义(标的是精灵,有头像):待审期间后端不会回填
+    // pet(它只认已审核的),若这里不存图,提交者会看到「名字出来了、头像还是
+    // 占位」——像是标注只生效了一半。
+    addMine: (kind, code, name, desc, img) => {
+      setMine((prev) => ({ ...prev, [kind + ':' + code]: { name, desc, img } }))
     },
     refresh,
   }), [byKind, mine, refresh])
@@ -159,9 +163,15 @@ export function AnnotationModal({ kind, code, onClose }) {
     ).slice(0, 50)
   }, [candidates, q])
 
+  // pickedImg 记住选中候选的头像,提交时一并存进 mine:
+  // 名字是从候选里选的,头像自然也该用同一条 —— 否则回显时名字对、图不对。
+  const [pickedName, setPickedName] = useState('')
+  const [pickedImg, setPickedImg] = useState('')
   const pick = (c) => {
     setName(c.name)
     setDesc((c.desc || '').slice(0, 500))
+    setPickedName(c.name)
+    setPickedImg(c.img || '')
     setErr('')
   }
 
@@ -173,7 +183,9 @@ export function AnnotationModal({ kind, code, onClose }) {
       await submitAnnotation(kind, code, name.trim(), desc.trim())
       // 立刻在本会话回显(带「待审」标记):提交后页面纹丝不动会让人以为没生效,
       // 而等管理员审核可能要几小时。其他人要等审核通过才看得到。
-      addMine(kind, code, name.trim(), desc.trim())
+      // pickedImg 只在名字仍与选中候选一致时带上 —— 手动改过名字就不知道
+      // 对应哪只精灵了,宁可不显示图,也别把错误的头像配上去。
+      addMine(kind, code, name.trim(), desc.trim(), name.trim() === pickedName ? pickedImg : '')
       toast('已提交,等待管理员审核(你这边已先显示)')
       refresh()
       onClose()
@@ -217,13 +229,19 @@ export function AnnotationModal({ kind, code, onClose }) {
                 <button
                   key={c.id || c.name}
                   type="button"
-                  className="anno-item"
+                  className={'anno-item' + (c.img ? ' anno-item-withimg' : '')}
                   title={c.pets && c.pets.length > 0 ? `拥有该特性的精灵:${c.pets.join('、')}` : undefined}
                   onClick={() => pick(c)}
                 >
-                  <span className="anno-item-name">{c.name}</span>
-                  {c.desc && <span className="anno-item-desc">{c.desc}</span>}
-                  {c.id && <span className="anno-item-id">id {c.id}</span>}
+                  {/* 头像(event 候选才有):**不是装饰,是判据** ——
+                      同名形态极多(「棋契陛下」有 10 个形态),光看名字列出来
+                      一模一样,玩家无从分辨该选哪只,只能瞎选。 */}
+                  {c.img && <ImgAvatar src={c.img} alt={c.name} className="anno-item-img" />}
+                  <span className="anno-item-text">
+                    <span className="anno-item-name">{c.name}</span>
+                    {c.desc && <span className="anno-item-desc">{c.desc}</span>}
+                    {c.id && <span className="anno-item-id">id {c.id}</span>}
+                  </span>
                 </button>
               ))}
         </div>

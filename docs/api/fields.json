@@ -867,6 +867,7 @@
           }
         ],
         "pet": {
+          "colorful": "bool",
           "energy": "int",
           "equipped": [
             {}
@@ -893,6 +894,7 @@
           "shards": [
             {}
           ],
+          "shiny": "bool",
           "skills": [
             {
               "cost": "int",
@@ -979,6 +981,168 @@
       ],
       "ts": "int",
       "updated": "str"
+    }
+  },
+  "trial-shiny": {
+    "desc": "试炼状态(异色+炫彩宠物的外观字段与异色头像)",
+    "endpoint": "GET /api/trial",
+    "sample": "internal/server/testdata/contract/trial-shiny.json",
+    "shape": {
+      "account": "str",
+      "active": "bool",
+      "history": {
+        "challengeInc": "int",
+        "cleared": [
+          {}
+        ],
+        "logs": [
+          {
+            "discovered": "int",
+            "logConfId": "int",
+            "total": "int",
+            "unlocked": "bool"
+          }
+        ],
+        "recent": [
+          {
+            "duration": "int",
+            "petBaseId": "int",
+            "petLevel": "int",
+            "petName": "str",
+            "settleAt": "int",
+            "slotId": "int",
+            "trialId": "int",
+            "victory": "bool"
+          }
+        ],
+        "slots": [
+          {
+            "cleared": "int",
+            "damName": "str",
+            "damType": "int",
+            "slotId": "int"
+          }
+        ],
+        "topPets": [
+          {
+            "count": "int",
+            "img": "str",
+            "name": "str",
+            "petBaseId": "int"
+          }
+        ],
+        "total": "int",
+        "wins": "int"
+      },
+      "run": {
+        "chapterId": "int",
+        "chapterIdx": "int",
+        "chapterName": "str",
+        "chapters": [
+          {}
+        ],
+        "coin": "int",
+        "effects": [
+          {}
+        ],
+        "floor": "str",
+        "floorLabel": "str",
+        "log": [
+          {
+            "action": "int",
+            "ids": [
+              {}
+            ],
+            "kind": "str",
+            "label": "str",
+            "ts": "int"
+          }
+        ],
+        "nodeIndex": "int",
+        "opponents": [
+          {
+            "id": "int",
+            "name": "str",
+            "pets": [
+              {
+                "base": "int",
+                "img": "str",
+                "name": "str"
+              }
+            ]
+          }
+        ],
+        "options": [
+          {
+            "event": "int",
+            "eventCost": "int",
+            "extra": [
+              {}
+            ],
+            "level": "int",
+            "names": {
+              "7020430": "str",
+              "7020440": "str",
+              "7110340": "str",
+              "7160140": "str"
+            },
+            "pet": {
+              "base": "int",
+              "img": "str",
+              "name": "str"
+            },
+            "pool": [
+              {}
+            ],
+            "reward": "int",
+            "rewardCost": "int",
+            "slot": "int",
+            "used": [
+              {}
+            ]
+          }
+        ],
+        "pet": {
+          "colorful": "bool",
+          "energy": "int",
+          "features": [
+            {}
+          ],
+          "gid": "int",
+          "glassType": "int",
+          "glassValue": "int",
+          "growth": "int",
+          "hp": "int",
+          "img": "str",
+          "level": "int",
+          "maxHp": "int",
+          "name": "str",
+          "shiny": "bool",
+          "species": "str"
+        },
+        "refreshCost": "int",
+        "reward": {
+          "coin": "int",
+          "event": "int",
+          "extra": [
+            {}
+          ],
+          "id": "int"
+        },
+        "shop": [
+          {
+            "bought": "bool",
+            "id": "int",
+            "index": "int",
+            "price": "int",
+            "type": "int"
+          }
+        ],
+        "slotId": "int",
+        "slotName": "str",
+        "trialId": "int"
+      },
+      "ts": "int"
     }
   },
   "wildpets": {

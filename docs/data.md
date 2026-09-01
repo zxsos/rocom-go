@@ -690,6 +690,22 @@ type 79–84 交叉验证);`npc_base.world_nature`(15)等于 `PETBASE_CONF.world
 组装成中文描述的是 `gamedata.DB.GlassDesc(glassType, glassValue)`。宠物列表里的
 `Pet.Colorful`(`mutation_type & 8`)与这里的炫彩是同一件事,只是那边不解析具体外观。
 
+**试炼宠物同样带这一套**:草系试炼的 `trial_pet_data.pet_data`(内嵌的真实 `PetData`,
+`ParsePet` 的字段 13)里有 `mutation_type`(45)与 `glass_info`(86)。
+
+试炼带的是**玩家自己的精灵**,外观原样带进去 —— 抓包 250 条战绩里
+`mutation_type` 分布为 普通 0×66、异色 1×79、炫彩 8×85、**异色+炫彩 9×20**:
+
+- 近四成趟数带着外观,`9` 的存在直接证明**位是并存的**(别写成互斥的三元);
+- 解析时漏掉字段 45,取图就没有异色可判,异色精灵在试炼页一律显示普通头像 ——
+  不报错、不缺字段,只是图片看着不对。
+  修复与守卫见 `internal/trial/trial.go` 的 `ParsePet`、`internal/pipeline/trial.go`
+  的 `trialPetPayload`,以及 `TestTrialPetMutationImage` / `TestTrialPetGlassInfo`。
+
+⚠️ **异色头像不是每只精灵都有素材**:`gamedata.imageOf` 在缺素材时静默回退普通图,
+此时 `shiny=true` 而 `img` 是普通图路径。**判断异色只能看 `shiny` 字段**,
+拿 `img`(如看路径里有没有 `_1`)反推会把没有异色素材的精灵全误判成普通的。
+
 **炫彩色卡(玻璃色卡缩略图)不在后端预生成**,改由前端实时渲染:
 `scripts/gen_glass.py` 读仓库内 `COLOR_RANDOM_CONF.ts`/`PARTICLE_RANDOM_CONF.ts` 生成
 `web/src/data/glassConf.js`(底图 Bg / 中层 Bg2 / 粒子大图 / 配色 / 隐藏整图清单)。
