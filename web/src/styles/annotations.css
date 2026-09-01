@@ -172,23 +172,59 @@
 .anno-review {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* 审核行:原先是「窄卡片里的紧凑一行」—— 名字 13px、描述 11px 且被挤到折行,
+   按钮只有文字宽,读起来费劲。改宽版:加大内边距与行高,名字提到 15px、
+   描述 13px,按钮给固定最小宽度(不再随文字缩成一小条)。 */
 .anno-review-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm, 6px);
   background: var(--bg-2);
 }
 
+/* 按钮不随卡片拉伸(admin-card .btn 默认 width:100%),给固定宽度并让文字换行居中 */
+.anno-review-row .btn {
+  width: auto;
+  flex: none;
+  min-width: 72px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
 .anno-review-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
+
+/* 名字与 id 同一行:名字加粗放大,id 弱化作辅助信息 */
+.anno-review-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 类别徽标:看「全部」时用来区分技能/特性 */
+.anno-review-kind {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+  background: var(--bg-1);
+}
+.anno-review-kind.kind-feature { color: var(--accent); border-color: var(--accent); }
+.anno-review-kind.kind-skill { color: var(--green, var(--accent)); border-color: currentColor; }
 
 .anno-review-code {
   font-size: 11px;
@@ -196,18 +232,19 @@
 }
 
 .anno-review-name {
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--fg);
 }
 
 .anno-review-desc {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--fg-dim);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .anno-review-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-dim);
   white-space: nowrap;
 }
