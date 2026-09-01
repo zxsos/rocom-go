@@ -1,4 +1,40 @@
 {
+  "annotations-feature": {
+    "desc": "全服已审核的特性标注(众包图鉴)",
+    "endpoint": "GET /api/annotations?kind=feature",
+    "sample": "internal/server/testdata/contract/annotations-feature.json",
+    "shape": {
+      "items": [
+        {
+          "code": "int",
+          "createdAt": "int",
+          "desc": "str",
+          "id": "int",
+          "kind": "str",
+          "name": "str"
+        }
+      ],
+      "ts": "int"
+    }
+  },
+  "annotations-skill": {
+    "desc": "全服已审核的技能标注(众包图鉴)",
+    "endpoint": "GET /api/annotations?kind=skill",
+    "sample": "internal/server/testdata/contract/annotations-skill.json",
+    "shape": {
+      "items": [
+        {
+          "code": "int",
+          "createdAt": "int",
+          "desc": "str",
+          "id": "int",
+          "kind": "str",
+          "name": "str"
+        }
+      ],
+      "ts": "int"
+    }
+  },
   "boxes": {
     "desc": "盒子槽位布局",
     "endpoint": "GET /api/boxes",

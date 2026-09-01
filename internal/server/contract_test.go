@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"os"
@@ -618,3 +619,230 @@ func TestContractFlowersHiddenFields(t *testing.T) {
 		}
 	}
 }
+
+// —— 标注模式(众包图鉴)——
+//
+// 契约要点是「**只下发已审核的**」:玩家提交的标注在管理员审核前不能出现在
+// /api/annotations 里(否则玩家 A 的猜测会被全服当成事实)。这条语义光看 golden
+// 看不出来(只看到 approved 那一条),故 TestAnnotationsReviewFlow 另作行为断言。
+
+// seedAnnotations 造三条标注:特性已审核 1 条、特性待审 1 条、技能已审核 1 条。
+// 待审那条是为了证明它**不会**出现在 GET /api/annotations 的响应里。
+func seedAnnotations(t *testing.T, s *Server) {
+	t.Helper()
+	if _, err := s.store.SubmitAnnotation(store.Annotation{
+		Kind: "feature", Code: 288135, Name: "助燃", Desc: "使用火系技能后，获得双攻+20%", Submitter: "UID:1",
+	}); err != nil {
+		t.Fatalf("写已审核特性标注: %v", err)
+	}
+	if _, err := s.store.SubmitAnnotation(store.Annotation{
+		Kind: "feature", Code: 288001, Name: "待审名字", Desc: "不该出现在响应里", Submitter: "UID:2",
+	}); err != nil {
+		t.Fatalf("写待审特性标注: %v", err)
+	}
+	if _, err := s.store.SubmitAnnotation(store.Annotation{
+		Kind: "skill", Code: 7999999, Name: "新技能名", Desc: "资料站未收录", Submitter: "UID:1",
+	}); err != nil {
+		t.Fatalf("写已审核技能标注: %v", err)
+	}
+	// 前两条(按插入序 id=1/2)里只审通过 id=1,以及技能那条 id=3。
+	for _, id := range []int64{1, 3} {
+		if err := s.store.ReviewAnnotation(id, true, "admin"); err != nil {
+			t.Fatalf("审核 id=%d: %v", id, err)
+		}
+	}
+}
+
+// scrubAnnotationTime 抹掉响应里的时间取值:顶层 ts 是响应时刻,createdAt 是提交时刻,
+// 两者每次跑都不同(与 scrubTS 同理,替换值保持 JSON 合法)。
+var annotationTimeRe = regexp.MustCompile(`"(ts|createdAt)": \d+`)
+
+func scrubAnnotationTime(s string) string { return annotationTimeRe.ReplaceAllString(s, `"$1": 0`) }
+
+func TestContractAnnotations(t *testing.T) {
+	s := newTestServer(t)
+	seedAnnotations(t, s)
+	checkGolden(t, "annotations-feature",
+		get(t, s, "/api/annotations?kind=feature"), scrubAnnotationTime)
+	checkGolden(t, "annotations-skill",
+		get(t, s, "/api/annotations?kind=skill"), scrubAnnotationTime)
+}
+
+// TestAnnotationsReviewFlow 钉住审核语义:
+//   1. 未审核的标注不下发(golden 看不出「它本可以在却没在」,这里显式断言);
+//   2. 通过某条时,同一 (kind,code) 的其余待审自动转 rejected —— 一个 id 只有一个答案。
+func TestAnnotationsReviewFlow(t *testing.T) {
+	s := newTestServer(t)
+	for _, name := range []string{"甲", "乙"} {
+		if _, err := s.store.SubmitAnnotation(store.Annotation{
+			Kind: "feature", Code: 288022, Name: name, Submitter: "UID:1",
+		}); err != nil {
+			t.Fatalf("提交标注 %s: %v", name, err)
+		}
+	}
+
+	var got struct {
+		Items []struct {
+			Code int64  `json:"code"`
+			Name string `json:"name"`
+		} `json:"items"`
+	}
+	// ① 都还在待审,响应应为空
+	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+	if len(got.Items) != 0 {
+		t.Fatalf("待审标注不该下发,实际 %d 条: %+v", len(got.Items), got.Items)
+	}
+
+	// ② 审通过第一条(id=1),第二条(id=2)应自动转 rejected
+	if err := s.store.ReviewAnnotation(1, true, "admin"); err != nil {
+		t.Fatalf("审核: %v", err)
+	}
+	got.Items = nil
+	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+	if len(got.Items) != 1 || got.Items[0].Name != "甲" {
+		t.Fatalf("应只剩通过的「甲」一条,实际 %+v", got.Items)
+	}
+	// ③ 被自动拒绝的那条确实转成了 rejected(而不是仍留在 pending 里)
+	if items, err := s.store.PendingAnnotations("feature"); err != nil {
+		t.Fatalf("查待审: %v", err)
+	} else if len(items) != 0 {
+		t.Fatalf("同 code 的其余待审应被自动拒绝,仍有 %d 条 pending", len(items))
+	}
+}
+
+// TestAnnotationsFilterByKind 钉住 kind 过滤:技能标注不出现在特性列表里(反之亦然)。
+// 两者共用一张表,漏掉 WHERE kind 会互相串味 —— 而 golden 里 skill/feature 是分开的
+// 两个快照,恰好掩盖这类串味(串了也只是各自多一条,结构仍对得上)。
+func TestAnnotationsFilterByKind(t *testing.T) {
+	s := newTestServer(t)
+	seedAnnotations(t, s)
+	for _, c := range []struct {
+		kind     string
+		wantCode int64
+	}{{"feature", 288135}, {"skill", 7999999}} {
+		var got struct {
+			Items []struct {
+				Code int64 `json:"code"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(get(t, s, "/api/annotations?kind="+c.kind), &got); err != nil {
+			t.Fatalf("解析 %s: %v", c.kind, err)
+		}
+		if len(got.Items) != 1 || got.Items[0].Code != c.wantCode {
+			t.Fatalf("kind=%s 应只有 %d 一条,实际 %+v", c.kind, c.wantCode, got.Items)
+		}
+	}
+}
+
+// TestAnnotationSubmit 钉住玩家提交入口的校验与去重:
+//   1. 合法提交 → 进待审,不下发(golden 那套只覆盖 GET,提交路径是玩家唯一写入口);
+//   2. 非法 kind / code / name → 400(前端弹窗依赖这些状态码给出可读提示);
+//   3. 同一人对同一 (kind,code,name) 重复提交 → 409(防刷)。
+func TestAnnotationSubmit(t *testing.T) {
+	s := newTestServer(t)
+	postJSON := func(body string) int {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/annotations?account="+contractAcc, strings.NewReader(body))
+		s.Handler().ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	// ① 非法输入一律 400
+	for _, bad := range []string{
+		`{"kind":"xxx","code":288135,"name":"助燃"}`, // kind 不在 skill/feature
+		`{"kind":"feature","code":0,"name":"助燃"}`,   // code 非正
+		`{"kind":"feature","code":288135,"name":""}`, // 空名字
+	} {
+		if code := postJSON(bad); code != 400 {
+			t.Errorf("非法提交 %s 应 400,实际 %d", bad, code)
+		}
+	}
+
+	// ② 合法提交 → 200,且**不下发**(待审)
+	ok := `{"kind":"feature","code":288135,"name":"助燃","desc":"使用火系技能后，获得双攻+20%"}`
+	if code := postJSON(ok); code != 200 {
+		t.Fatalf("合法提交应 200,实际 %d", code)
+	}
+	var got struct {
+		Items []struct {
+			Code int64 `json:"code"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
+		t.Fatalf("解析: %v", err)
+	}
+	if len(got.Items) != 0 {
+		t.Fatalf("刚提交的标注还在待审,不该下发,实际 %+v", got.Items)
+	}
+
+	// ③ 重复提交 → 409(UNIQUE 约束)
+	if code := postJSON(ok); code != 409 {
+		t.Errorf("重复提交应 409,实际 %d", code)
+	}
+}
+
+// TestAnnotationReviewBroadcasts 钉住「审核后要广播」这条链路。
+//
+// 为什么必须广播:标注是全服共享的,而前端只在 App 挂载时拉一次。不广播的话
+// 管理员审完之后,玩家不手动刷新浏览器就看不到任何变化 —— 提交的人得不到反馈
+// (只会以为没生效),下一个遇到同一 id 的人又会再标一次,众包就空转了。
+// 这条链路坏掉时接口照样 200、数据照样入库,只有 SSE 静默不响,故必须测。
+func TestAnnotationReviewBroadcasts(t *testing.T) {
+	s := newTestServer(t)
+	sub := s.Hub().subscribe()
+	defer s.Hub().unsubscribe(sub)
+
+	if _, err := s.store.SubmitAnnotation(store.Annotation{
+		Kind: "feature", Code: 288135, Name: "助燃", Submitter: "UID:1",
+	}); err != nil {
+		t.Fatalf("提交标注: %v", err)
+	}
+
+	// 审核(通过):走 HTTP 入口,顺带确认管理员鉴权之外的整条链路
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/admin/annotations/1/review", strings.NewReader(`{"approve":true}`))
+	req.Header.Set("X-Admin-Token", testAdminToken(t, s))
+	s.Handler().ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("审核应 200,实际 %d: %s", rr.Code, rr.Body)
+	}
+
+	// 广播应当到达订阅者;account 为空(全服共享,不按账号分发)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, ok := sub.pop(ctx)
+	if !ok {
+		t.Fatal("审核后没有收到任何广播 —— 前端不会刷新,标注对玩家不可见")
+	}
+	if got.typ != "annotations" {
+		t.Errorf("广播类型应为 annotations,实际 %q", got.typ)
+	}
+	if got.account != "" {
+		t.Errorf("共享标注的广播不该带账号(会被前端按账号过滤掉),实际 %q", got.account)
+	}
+}
+
+// testAdminToken 设好管理员密码并返回令牌,供需要鉴权的测试用例使用。
+func testAdminToken(t *testing.T, s *Server) string {
+	t.Helper()
+	var res struct {
+		Token string `json:"token"`
+	}
+	rr := httptest.NewRecorder()
+	body := strings.NewReader(`{"password":"` + testAdminPw + `"}`)
+	s.Handler().ServeHTTP(rr, httptest.NewRequest("POST", "/api/admin/setup", body))
+	if rr.Code != 200 {
+		t.Fatalf("设置管理员密码: %d %s", rr.Code, rr.Body)
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &res); err != nil {
+		t.Fatalf("解析令牌: %v", err)
+	}
+	return res.Token
+}
+
+const testAdminPw = "contract-test-pw"

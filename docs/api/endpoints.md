@@ -80,6 +80,21 @@
 | `GET /api/eggs/query` | — | ✓ | 查随机蛋可能孵出的物种（代理第三方，令牌在服务端） |
 | `GET /api/handbook-glasses` | — | ✓ | 图鉴炫彩收集（按品种聚合，图鉴号升序） |
 
+## 标注模式（众包图鉴）
+
+标注对象是协议里**不带名字**的 id：技能 id 与特性 id（`288xxx`）。技能有 `skills.json`
+过渡库（仍有未收录的新技能），特性名表只有名字、没有 id（见 docs/data.md「特性名」），
+故 `id → 名字` 由玩家提交、管理员审核后建立，**全服共享**。
+
+| 方法 路径 | 鉴权 | 账号 | 说明 |
+| --- | --- | --- | --- |
+| `GET /api/annotations` | — | — | 全服**已审核**标注（`?kind=skill\|feature`）；全局共享不按账号分 |
+| `POST /api/annotations` | — | ✓ | 提交标注（body: `kind`,`code`,`name`,`desc`）→ 进待审；同一人对同一 `(kind,code,name)` 重复提交返回 **409** |
+| `GET /api/annotation-candidates` | — | — | 标注候选词典（`?kind=`）：`skill`=全量技能目录（带 id），`feature`=wiki 特性词典（**只有名字，无 id**） |
+
+审核语义：`approve` 一条时，同一 `(kind,code)` 的其余待审**自动转拒绝** —— 一个 id 只
+能有一个被认可的答案。待审标注只有管理员可见，审核通过后才出现在 `GET /api/annotations`。
+
 ## 远行商人
 
 | 方法 路径 | 鉴权 | 账号 | 说明 |
@@ -125,6 +140,8 @@
 | `GET /api/admin/merchant-subs` | admin | 商人邮件推送名单 |
 | `DELETE /api/admin/merchant-subs` | admin | 删除某邮箱订阅（`?email=`） |
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
+| `GET /api/admin/annotations/pending` | admin | 待审标注列表（`?kind=skill\|feature`） |
+| `POST /api/admin/annotations/{id}/review` | admin | 审核标注（body: `approve`） |
 
 > `GET /api/admin/placeholder` 曾为占位接口，前端已删除唯一调用者，
 > 后端连带删除（见 `docs/refactor-contract.md`）。

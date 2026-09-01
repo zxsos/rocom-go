@@ -368,6 +368,26 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
   glass_value INTEGER NOT NULL,
   PRIMARY KEY(account, pet_base_id, glass_type, glass_value)
 );
+
+-- 全服共享标注(众包 + 管理员审核,见 annotations.go):玩家对协议里查不到名字的
+-- 技能 id / 特性 id(288xxx)提交名字与描述,管理员审核通过后所有人可见。
+-- 同一 (kind, code) 允许多条待审;approve 时同 code 其余 pending 自动转 rejected
+-- (答案唯一)。status: pending / approved / rejected。
+CREATE TABLE IF NOT EXISTS annotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,          -- skill / feature
+  code INTEGER NOT NULL,       -- 协议 id:技能 base_skill_id / 特性 288xxx
+  name TEXT NOT NULL,
+  desc TEXT NOT NULL DEFAULT '',
+  submitter TEXT NOT NULL,     -- 提交的登录账号
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at INTEGER NOT NULL,
+  reviewed_by TEXT NOT NULL DEFAULT '',
+  reviewed_at INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(kind, code, name, submitter)
+);
+CREATE INDEX IF NOT EXISTS idx_annotations_lookup ON annotations(kind, status);
+CREATE INDEX IF NOT EXISTS idx_annotations_code ON annotations(kind, code);
 `)
 	if err != nil {
 		return err
