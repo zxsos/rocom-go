@@ -35,10 +35,17 @@ function hatchRate(egg) {
 }
 
 // hatchProgress 返回 {pct, secs} —— 外推到 now(毫秒)的孵化进度;不在孵蛋器里返回 null。
+//
+// **没有采样就返回 null,绝不外推**:hatchUpdate 为 0 表示这颗蛋从未有过进度采样
+// (登录包 0x0102 只给「哪些蛋在孵」、不带逐蛋进度,进度要等开孵蛋器 0x0312 或开
+// 背包 0x1344)。此时若按 elapsed = now - 0 外推,得到的是十几亿秒,进度直接顶满 ——
+// 而 EggList 把「在孵且进度满」的蛋两栏都不显示,蛋就这样凭空消失了。
+// 返回 null 时页面按「在孵、进度未知」处理(见 EggList 的分栏与 EggCard 的展示)。
 export function hatchProgress(egg, now) {
   if (!egg || !egg.hatching || !egg.maxSecs) return null
+  if (!egg.hatchUpdate) return null // 无采样:不外推,免得算成 100% 把蛋弄丢
   const rate = hatchRate(egg)
-  const elapsed = Math.max(0, Math.floor(now / 1000) - (egg.hatchUpdate || 0))
+  const elapsed = Math.max(0, Math.floor(now / 1000) - egg.hatchUpdate)
   const secs = Math.min(egg.maxSecs, (egg.hatchedSecs || 0) + elapsed * rate)
   const pct = Math.floor(Math.min(100, (secs / egg.maxSecs) * 100))
   return { pct, secs }

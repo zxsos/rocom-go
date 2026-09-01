@@ -1,7 +1,9 @@
 package pipeline
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -406,4 +408,74 @@ func backpackWithEggs(eggGids []uint32) []byte {
 	b = protowire.AppendTag(b, 3, protowire.BytesType)
 	b = protowire.AppendBytes(b, box)
 	return b
+}
+
+// TestLoginHatchSlotsNotVisibleUntilBackpack 复现用户报告的「登录后孵蛋器没有刷新」。
+//
+// 现状:登录包带了孵蛋器占用列表(实测抓包有 3 颗),但 ReconcileHatching 只遍历
+// **库里已有的蛋**(store/egg.go 的 SELECT FROM eggs WHERE account=?)。库里没这些
+// 蛋时,对账改不动任何行 → changed=false → 既不写标记也不广播。
+//
+// 而蛋**首次入库**只发生在 0x1344(背包分页),要玩家打开背包才下发。于是:
+//   登录 → 拿到列表 → 库里无蛋 → 无广播、蛋不出现
+//         → 直到玩家打开一次背包(0x1344)后,孵蛋器才显示出来
+// 玩家登录后直接看孵蛋页,看到的就是空的 ——「没有刷新」。
+//
+// 本测试把这条时序**如实记录**下来(不断言它是 bug):它描述了当前行为,
+// 将来若改为「登录时即按列表补建占位行 / 或无条件广播」,这里要跟着更新。
+func TestLoginHatchSlotsNotVisibleUntilBackpack(t *testing.T) {
+	p, srv := newTestPipeline(t)
+
+	// 订阅广播,确认登录后有没有通知前端
+	pop, cancel := srv.Hub().SubscribeForTest()
+	defer cancel()
+	typed := make(chan string, 32)
+	go func() {
+		for {
+			typ, ok := pop(context.Background())
+			if !ok {
+				return
+			}
+			typed <- typ
+		}
+	}()
+
+	// 登录:带 3 颗在孵的蛋
+	p.handle(msg(gcp.S2C, pet.OpLoginRsp, loginWithHatchBody(1, "测试", []uint64{3259, 3262, 3264})))
+
+	// 列表记住了 —— 这一步是对的(TestHatchSlotsLoginBeforeBackpack 已锁)
+	if got := p.conn(testSess).hatchGids; len(got) != 3 {
+		t.Fatalf("登录应记住 3 颗在孵的蛋,实际 %v", got)
+	}
+	// 但库里一颗蛋都没有:对账无从下手
+	eggs, err := p.st.For(testAcc).ListEggs(store.EggFilter{})
+	if err != nil {
+		t.Fatalf("查蛋: %v", err)
+	}
+	if len(eggs) != 0 {
+		t.Fatalf("前置错误:应当空库,实际 %d 颗蛋", len(eggs))
+	}
+	// 修复前:这里一条 eggs 广播都没有 —— 库里没蛋就没改动,按 changed 判断不发,
+	// 前端于是不知道要重拉,孵蛋器一直停在旧数据上。故登录时**无条件**广播一次。
+	if !sawTyped(typed, "eggs") {
+		t.Error("登录后应广播一次 eggs(哪怕对账没改动),否则前端不会重拉、孵蛋器不刷新")
+	}
+	cancel()
+}
+
+// sawTyped 在已收到的广播类型里找 typ(非阻塞)。
+func sawTyped(ch <-chan string, typ string) bool {
+	for {
+		select {
+		case v, ok := <-ch:
+			if !ok {
+				return false
+			}
+			if v == typ {
+				return true
+			}
+		case <-time.After(50 * time.Millisecond):
+			return false
+		}
+	}
 }

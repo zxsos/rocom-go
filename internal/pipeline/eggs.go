@@ -56,6 +56,11 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 			// 登录包往往先于背包分页到达,此刻库里还没有蛋,对账改不动任何行 ——
 			// 故把列表记住(applyHatchSlots 内),等蛋入库时逐颗判定(见 hatchGids)。
 			p.applyHatchSlots(m.Session, sc, acc, gids, nil, nil, m.Time)
+			// **无条件补一次广播**:登录这一刻 applyHatchSlots 多半是"什么都没改"
+			// (库里还没蛋,或标记本就一致),按 changed 判断就不发,前端便无从得知
+			// 该重拉 —— 玩家登录后孵蛋器停在旧数据上,直到打开背包(0x1344)送蛋入库
+			// 才会动。登录是玩家最常重进页面的时机,这里主动通知一次(前端据它重拉)。
+			p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 		}
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetBagItemInfoByPageRsp:
