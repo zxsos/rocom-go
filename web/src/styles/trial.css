@@ -146,8 +146,71 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* —— 节点事件 / 商店 —— */
-.trial-grid {
+/* —— 节点事件 —— */
+/* 三个事件并排。旧做法是套用 .trial-grid(最小 200px),卡片里塞了 5 个 id 后
+   挤成竖条,故单独给一套更宽的列宽:一屏三列时每张卡才有地方摊开抽取池。 */
+.trial-opts {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.trial-opt { display: flex; flex-direction: column; gap: 6px; }
+/* 整体方框:里面是「这只精灵自身的东西」(头像/奖励/抽取池/换奖励)。
+   换事件被有意留在框外 —— 它换掉的是整只精灵,不属于这只精灵的内容。 */
+.trial-opt-box {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); padding: 12px 10px; box-shadow: var(--shadow-sm);
+}
+/* 头像居中 + 右上角角标:角标用 absolute 挂在头像容器上,不占布局,
+   免得碎片数量变化时整张卡的高度跟着抖。 */
+.trial-opt-pet { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.trial-opt-avatar { position: relative; }
+.trial-opt-img {
+  width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+  background: var(--bg-3); display: block;
+}
+.trial-opt-extra {
+  position: absolute; top: -4px; right: -6px;
+  min-width: 20px; height: 20px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 1px solid var(--gold);
+  background: var(--bg-1); color: var(--gold);
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgb(0 0 0 / .25);
+}
+.trial-opt-petname { font-size: 13px; font-weight: 600; text-align: center; }
+.trial-opt-reward { display: flex; align-items: baseline; gap: 6px; justify-content: center; }
+.trial-opt-kind { font-size: 12px; }
+.trial-opt-name { font-size: 15px; font-variant-numeric: tabular-nums; }
+.trial-opt-meta {
+  display: flex; gap: 10px; font-size: 12px; color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.trial-opt-cost { color: var(--gold); }
+/* 抽取池:5 个 id(1 特性 + 4 技能)换行平铺,每个都是可标注的胶囊 */
+.trial-opt-pool {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; border-top: 1px dashed var(--line); padding-top: 6px;
+}
+.trial-opt-ids { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.trial-id { max-width: 140px; }
+.trial-id-feat { border-color: var(--accent); }
+/* 当前抽到的那条:池里其它 id 是「重掷可能出的」,它是「已经拿到的」,必须分得开 */
+.trial-id-cur { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* 已抽过的:重掷不会再出,压暗 + 删除线,和「还有可能」的区别要一眼看出 */
+.trial-id-used { opacity: .45; text-decoration: line-through; }
+/* 换事件:整只精灵一起换,放在方框外并铺满宽度,视觉上独立于卡片内容 */
+.trial-opt-swap {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-2); color: var(--gold);
+  padding: 4px 10px; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.trial-opt-slot { font-size: 11px; }
+
+/* —— 商店 —— */
+/* 单独一套类名:商店卡片原先也用 .trial-grid,但那个类在本文件末尾被精灵网格
+   覆盖成 76px 一列(同名类后者生效),商店卡被挤成竖条。故拆开,各用各的。 */
+.trial-shop {
   display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 .trial-card {
@@ -210,6 +273,8 @@
 @media (max-width: 640px) {
   .trial-pet-img { width: 52px; height: 52px; }
   .trial-skills { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  /* 窄屏放不下三列 260px,降一档让卡片仍能并排(抽取池会换行,但不会挤成竖条) */
+  .trial-opts { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
 
 /* —— 遇见记录:三章各一张精灵图,遇到过的置灰 —— */
@@ -240,6 +305,9 @@
 /* 特性只有 id(名字表未接入),用边框色区分天生/获得,免得一串数字分不清哪来的 */
 .trial-feat-innate { border-color: var(--accent); }
 .trial-feat-gained { opacity: .85; }
+/* 名字来自 wiki「精灵 → 特性」表桥接:虚线边框 + 尾标,与玩家标注过的(实线)区分 ——
+   两条路的可靠度不同,看着一样会让人把反查结果当成核实过的事实。 */
+.trial-feat-wiki { border-style: dashed; color: var(--fg-dim); }
 .trial-enc-err { color: var(--danger); font-size: 12px; margin: 2px 0 6px; }
 
 /* 精灵网格:自适应列宽,头像下挂名字 */

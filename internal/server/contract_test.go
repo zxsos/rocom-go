@@ -530,11 +530,28 @@ func contractTrial() *TrialPayload {
 					{ID: 7999999, Power: 10, Cost: 1, Slot: 3},
 				},
 				Features: []uint32{288135, 288001},
-				Shards:   []uint32{2016, 3005},
-				Equipped: []uint32{1, 2},
+				// 天生 vs 试炼中获得的拆分(局级 initial_feature_ids)
+				InnateFeatures: []uint32{288135},
+				GainedFeatures: []uint32{288001},
+				// 天生那条的名字:用「精灵 → 特性」表桥接出来的(黑猫巫师 → 预警)
+				FeatureNames: map[uint32]string{288135: "预警"},
+				Shards:       []uint32{2016, 3005},
+				Equipped:     []uint32{1, 2},
 			},
 			Options: []TrialOption{
-				{Slot: 1, Event: 110061, Reward: 7110340, Level: 40, EventCost: 1, RewardCost: 4, Extra: []uint32{2016}},
+				// 抽取池:1 个特性 + 4 个技能(「换奖励」就在这 5 个里重抽)。
+				// used 里那条是本节点已抽过的,重掷不会再出,前端据此压暗。
+				{Slot: 1, Event: 110061, Reward: 7110340, Level: 40, EventCost: 1, RewardCost: 4,
+					Extra: []uint32{2016},
+					Pool:  []uint32{288135, 7110340, 7020430, 7020440, 7160140},
+					Used:  []uint32{7040220},
+					// 技能名来自 skills.json;特性名来自「精灵 → 特性」表(要标出精灵才有)
+					Names: map[uint32]string{7110340: "超导加速", 7020430: "见招拆招",
+						7020440: "触底强击", 7160140: "超级糖果"},
+					// 事件对应哪只精灵协议不给,只能标注 —— 标了才有 pet
+					Pet: &TrialOppPet{Base: 3031, Name: "奇丽花", Img: "HeadIcon/3031.webp"},
+				},
+				// 未标注的事件:pet 缺失、names 缺失,前端显示占位与标注入口
 				{Slot: 2, Event: 100017, Reward: 7040220, Level: 40},
 			},
 			RefreshCost: 2,
@@ -646,8 +663,15 @@ func seedAnnotations(t *testing.T, s *Server) {
 	}); err != nil {
 		t.Fatalf("写已审核技能标注: %v", err)
 	}
-	// 前两条(按插入序 id=1/2)里只审通过 id=1,以及技能那条 id=3。
-	for _, id := range []int64{1, 3} {
+	// 试炼事件 → 精灵。code 是 event_conf_id 而非精灵 id(标注的对象是事件),
+	// name 是精灵形态全名 —— 后端据此反查形态取头像,故名字口径不能错。
+	if _, err := s.store.SubmitAnnotation(store.Annotation{
+		Kind: "event", Code: 130056, Name: "奇丽花", Submitter: "UID:3",
+	}); err != nil {
+		t.Fatalf("写已审核事件标注: %v", err)
+	}
+	// 前两条(按插入序 id=1/2)里只审通过 id=1,以及技能那条 id=3、事件那条 id=4。
+	for _, id := range []int64{1, 3, 4} {
 		if err := s.store.ReviewAnnotation(id, true, "admin"); err != nil {
 			t.Fatalf("审核 id=%d: %v", id, err)
 		}
@@ -667,11 +691,17 @@ func TestContractAnnotations(t *testing.T) {
 		get(t, s, "/api/annotations?kind=feature"), scrubAnnotationTime)
 	checkGolden(t, "annotations-skill",
 		get(t, s, "/api/annotations?kind=skill"), scrubAnnotationTime)
+	// event 这一类是后加的,端点没被 golden 守护过 —— 若哪天有人动 kind 的校验
+	// 白名单(annotationKind)忘了带 event,这里会红。
+	// ⚠️ golden 只管得住后端:前端审核面板的类别列表是另一套硬编码,
+	// 漏了它不报错、只是「面板永远空着」,本次就踩过(见 AnnotationsCard.jsx)。
+	checkGolden(t, "annotations-event",
+		get(t, s, "/api/annotations?kind=event"), scrubAnnotationTime)
 }
 
 // TestAnnotationsReviewFlow 钉住审核语义:
-//   1. 未审核的标注不下发(golden 看不出「它本可以在却没在」,这里显式断言);
-//   2. 通过某条时,同一 (kind,code) 的其余待审自动转 rejected —— 一个 id 只有一个答案。
+//  1. 未审核的标注不下发(golden 看不出「它本可以在却没在」,这里显式断言);
+//  2. 通过某条时,同一 (kind,code) 的其余待审自动转 rejected —— 一个 id 只有一个答案。
 func TestAnnotationsReviewFlow(t *testing.T) {
 	s := newTestServer(t)
 	for _, name := range []string{"甲", "乙"} {
@@ -740,9 +770,9 @@ func TestAnnotationsFilterByKind(t *testing.T) {
 }
 
 // TestAnnotationSubmit 钉住玩家提交入口的校验与去重:
-//   1. 合法提交 → 进待审,不下发(golden 那套只覆盖 GET,提交路径是玩家唯一写入口);
-//   2. 非法 kind / code / name → 400(前端弹窗依赖这些状态码给出可读提示);
-//   3. 同一人对同一 (kind,code,name) 重复提交 → 409(防刷)。
+//  1. 合法提交 → 进待审,不下发(golden 那套只覆盖 GET,提交路径是玩家唯一写入口);
+//  2. 非法 kind / code / name → 400(前端弹窗依赖这些状态码给出可读提示);
+//  3. 同一人对同一 (kind,code,name) 重复提交 → 409(防刷)。
 func TestAnnotationSubmit(t *testing.T) {
 	s := newTestServer(t)
 	postJSON := func(body string) int {
@@ -755,8 +785,8 @@ func TestAnnotationSubmit(t *testing.T) {
 
 	// ① 非法输入一律 400
 	for _, bad := range []string{
-		`{"kind":"xxx","code":288135,"name":"助燃"}`, // kind 不在 skill/feature
-		`{"kind":"feature","code":0,"name":"助燃"}`,   // code 非正
+		`{"kind":"xxx","code":288135,"name":"助燃"}`,   // kind 不在 skill/feature
+		`{"kind":"feature","code":0,"name":"助燃"}`,    // code 非正
 		`{"kind":"feature","code":288135,"name":""}`, // 空名字
 	} {
 		if code := postJSON(bad); code != 400 {
@@ -867,7 +897,9 @@ func TestAnnotationNameCleaned(t *testing.T) {
 		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST",
 			"/api/annotations?account="+contractAcc, bytes.NewReader(body)))
 		var out struct {
-			Item struct{ Name string `json:"name"` } `json:"item"`
+			Item struct {
+				Name string `json:"name"`
+			} `json:"item"`
 		}
 		_ = json.Unmarshal(rr.Body.Bytes(), &out)
 		return rr.Code, out.Item.Name
@@ -880,8 +912,8 @@ func TestAnnotationNameCleaned(t *testing.T) {
 		{"魔 法 增 效", "魔法增效"},    // 字间空格(wiki 排版)
 		{"魔 法 增 效 ", "魔法增效"},   // 末尾还有空格
 		{"  魔法增效  ", "魔法增效"},   // 首尾空格
-		{"魔法增效", "魔法增效"},        // 干净的输入不受影响
-		{"魔\u3000法增效", "魔法增效"},  // 全角空格 U+3000
+		{"魔法增效", "魔法增效"},       // 干净的输入不受影响
+		{"魔\u3000法增效", "魔法增效"}, // 全角空格 U+3000
 		{"魔法\t增效", "魔法增效"},     // 制表符
 		{"魔 法  增   效", "魔法增效"}, // 多个连续空白
 	}
@@ -926,7 +958,7 @@ func TestAnnotationNameCleanedDeduplicates(t *testing.T) {
 func TestCleanAnnotationName(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"", ""},
-		{"   ", ""},          // 全是空白 → 空(会被「名字不能为空」拦下)
+		{"   ", ""},      // 全是空白 → 空(会被「名字不能为空」拦下)
 		{"魔法增效", "魔法增效"}, // 无空白原样返回
 		{"魔 法 增 效", "魔法增效"},
 		{"魔　法增效", "魔法增效"},

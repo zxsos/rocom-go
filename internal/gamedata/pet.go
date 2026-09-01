@@ -268,6 +268,78 @@ func (db *DB) RandGlass() (glassType, glassValue int32) {
 	return GlassCommon, 1
 }
 
+// PetFullName 返回 petbase 形态的**全名**:「名」或「名（形态）」。
+//
+// 括号是**全角**,与 wiki 精灵图鉴页的命名一致(实测 3012 → 「鸭吉吉（蓬松的样子）」)。
+// 这不是排版偏好:wiki 的「精灵 → 特性」表(features.json 的 pet_feature)就是按这个
+// 口径建的键,故凡是要拿形态名去反查 wiki 的地方都必须走这里拼,别自造格式 ——
+// 用半角括号或下划线都会**静默查不到**(实测 494 个 wiki 键里只能对上 351 个)。
+func (db *DB) PetFullName(petbaseID uint32) string {
+	info, ok := db.petbase[petbaseID]
+	if !ok {
+		return ""
+	}
+	return petFullName(info.Name, info.Form)
+}
+
+// petFullName 是形态全名的**唯一拼装点**:名 + 全角括号的形态后缀。
+//
+// 建反查表(gamedata.go)与对外查询(PetFullName)都必须走这里 —— 两处各拼一份,
+// 迟早会有一处改了另一处没改,而这种不一致的后果是**静默查不到**而非报错。
+func petFullName(name, form string) string {
+	if form != "" {
+		return name + "（" + form + "）"
+	}
+	return name
+}
+
+// PetByName 按形态全名(PetFullName 的口径,含全角括号)反查 petbase id;查不到返回 false。
+//
+// 同名形态取**最小 id**:同一只精灵的若干变体在配置里是多条记录(「迪莫」有
+// 3004/8007/103004/16000007),取最小的是基础形态,头像与名字都最"正"。
+//
+// ⚠️ 只用于「标注里的精灵名 → 头像」这类展示场景:同名形态本就是同一只精灵,
+// 选哪个都不算错。别拿它做身份判定(比如判定"遇到的到底是哪一只")——
+// 那条信息协议里没有,反查推不出来。
+func (db *DB) PetByName(fullName string) (uint32, PetBaseInfo, bool) {
+	id, ok := db.petNames[fullName]
+	if !ok {
+		return 0, PetBaseInfo{}, false
+	}
+	info, ok := db.petbase[id]
+	return id, info, ok
+}
+
+// PetFormOption 是候选名单里的一个精灵形态(标注「试炼事件 → 精灵」时供搜索选取)。
+type PetFormOption struct {
+	Base uint32 `json:"base"` // petbase 形态 id
+	Name string `json:"name"` // 形态全名(PetFullName 口径)
+	Book uint32 `json:"book"` // 图鉴编号(排序用)
+}
+
+// PetForms 返回全部精灵形态,按图鉴号、id 升序。
+//
+// 只收**有图鉴号**的形态(b≠0):没有图鉴号的是内部占位形态(实测 9801「鸭吉吉_普通」
+// 这类属性变换用的记录),玩家在游戏里见不到,混进候选只会干扰搜索。
+// 与 WildPetOptions 不同,这里**不过滤无头像的形态** —— 标注只取名字与 id,
+// 形态没图时前端自己占位,标了却搜不到才是更糟的体验。
+func (db *DB) PetForms() []PetFormOption {
+	out := make([]PetFormOption, 0, len(db.petbase))
+	for id, info := range db.petbase {
+		if info.Book == 0 {
+			continue
+		}
+		out = append(out, PetFormOption{Base: id, Name: db.PetFullName(id), Book: info.Book})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Book != out[j].Book {
+			return out[i].Book < out[j].Book
+		}
+		return out[i].Base < out[j].Base
+	})
+	return out
+}
+
 // PetEggGroups 返回某 petbase 形态的蛋组列表(社区名+描述,按配置顺序);无则返回 nil。
 func (db *DB) PetEggGroups(petbaseID uint32) []EggGroup {
 	info, ok := db.petbase[petbaseID]

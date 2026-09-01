@@ -13,7 +13,7 @@ import (
 // 「标注模式」让玩家提交名字与描述,管理员在面板审核通过后**全服可见**。
 //
 // 表设计:
-//   - kind 区分两类对象(skill=技能 / feature=特性),共用一张表;
+//   - kind 区分三类对象(skill=技能 / feature=特性 / event=草系试炼的事件→精灵),共用一张表;
 //   - 同一 (kind, code) 允许多条待审(不同玩家各有猜测),审核通过时**同 code 的
 //     其余 pending 自动转 rejected** —— 答案只能有一个,避免前端显示歧义;
 //   - 查询侧永远只看 approved,status 的历史意义是让管理员知道审过什么;
@@ -65,6 +65,23 @@ func (s *Store) ApprovedAnnotations(kind string) ([]Annotation, error) {
 		 FROM annotations WHERE kind = ? AND status = ? ORDER BY id`,
 		kind, AnnotationApproved,
 	)
+}
+
+// ApprovedAnnotation 返回某类(kind)下某个 code 的已通过标注;没有返回 false。
+//
+// 与 ApprovedAnnotations 的区别只是「按 code 精确取一条」:试炼组载荷时要给每个
+// 事件补精灵,全量拉回来再自己遍历也行,但那张表会随众包持续增长,而一次只要
+// 一两条 —— 让数据库按索引取,别把整表搬进内存。
+func (s *Store) ApprovedAnnotation(kind string, code int64) (Annotation, bool) {
+	rows, err := s.queryAnnotations(
+		`SELECT id, kind, code, name, desc, submitter, status, created_at, reviewed_by, reviewed_at
+		 FROM annotations WHERE kind = ? AND code = ? AND status = ? ORDER BY id`,
+		kind, code, AnnotationApproved,
+	)
+	if err != nil || len(rows) == 0 {
+		return Annotation{}, false
+	}
+	return rows[0], true
 }
 
 // PendingAnnotations 返回某类(kind)待审核的标注(管理员面板用)。

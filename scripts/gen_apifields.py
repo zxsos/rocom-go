@@ -43,6 +43,8 @@ ENDPOINTS = {
     "trial-encounters": ("GET /api/trial/encounters", "草系试炼遇见记录(三章精灵图,读库累积)"),
     "annotations-feature": ("GET /api/annotations?kind=feature", "全服已审核的特性标注(众包图鉴)"),
     "annotations-skill": ("GET /api/annotations?kind=skill", "全服已审核的技能标注(众包图鉴)"),
+    # event 的 code 是 event_conf_id(事件编号)而非精灵 id,故描述里说清标的是什么。
+    "annotations-event": ("GET /api/annotations?kind=event", "全服已审核的试炼事件标注(事件 → 精灵)"),
 }
 
 

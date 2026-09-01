@@ -1,25 +1,36 @@
 import React, { useCallback, useState } from 'react'
 import { adminPendingAnnotations, adminReviewAnnotation } from '../../api'
+import { ANNOTATION_KINDS } from '../../components/annotations'
 import { useAdminFetch } from './useAdminFetch'
 
-// AnnotationsCard 标注审核:玩家对协议里查不到名字的技能/特性 id 提交名字,通过后
-// 全服共享(众包图鉴)。本卡片只处理 pending 的两类标注(技能 / 特性),可分别切换。
+// AnnotationsCard 标注审核:玩家对协议里查不到名字的 id 提交名字,通过后
+// 全服共享(众包图鉴)。本卡片处理 pending 的三类标注(技能 / 特性 / 精灵),可分别切换。
+//
+// 三类对象(kind)各有各的「缺什么」:
+//   skill / feature  协议给了 id、缺名字;
+//   event            草系试炼的事件 → 对应哪只精灵,协议连对象都没给。
+// 第三类与前两类共用同一张表、同一套审核流程 —— 故**每加一个 kind 都要改这里**,
+// 否则玩家提交成功、面板却永远显示「暂无待审核」,数据躺在库里没人看得见。
 //
 // 审核语义:通过一条时,**同一 (kind,code) 的其余待审自动被拒** —— 一个 id 只能有
 // 一个被认可的答案(见 internal/store/annotations.go 的 ReviewAnnotation)。
-// KINDS 是审核面板的类别切换项。默认「全部」(空 kind):玩家技能与特性都会提交,
-// 只盯一类会漏掉另一半 —— 表现为「明明有人提交,面板却是空的」。
-const KINDS = [
-  { key: '', label: '全部' },
-  { key: 'feature', label: '特性' },
-  { key: 'skill', label: '技能' },
-]
+// 类别列表与文案一律从 annotations.jsx 的 ANNOTATION_KINDS 派生(那是唯一登记处):
+// 新增 kind 时若在别处各写一份,漏掉的那处症状是**静默的** ——
+// 玩家提交成功、数据进了库,但面板永远显示「暂无待审核」,没有任何报错指向真正原因。
+//
+// KINDS 是切换按钮(首项是「全部」);ALL_KINDS 是「全部」时实际去拉的列表
+// (后端按 kind 过滤,没有「全部」这个取值)。二者同源于一处,不会再走散。
+const KINDS = [{ key: '', label: '全部' }, ...ANNOTATION_KINDS]
+const ALL_KINDS = ANNOTATION_KINDS.map((k) => k.key)
+// 徽标文案查表。**不能写成三元**:「不是技能就是特性」在加了 event 之后
+// 会把精灵标注显示成「特性」,审核者据此判断必错。
+const KIND_LABEL = Object.fromEntries(ANNOTATION_KINDS.map((k) => [k.key, k.label]))
+const CODE_LABEL = Object.fromEntries(ANNOTATION_KINDS.map((k) => [k.key, k.codeLabel]))
 
 export default function AnnotationsCard({ onUnauthed }) {
   const [kind, setKind] = useState('')
-  // kind 为空时两类都拉(后端按 kind 过滤,没有「全部」这个取值),合一份按时间倒序。
   const fetcher = useCallback(async () => {
-    const kinds = kind ? [kind] : ['feature', 'skill']
+    const kinds = kind ? [kind] : ALL_KINDS
     const lists = await Promise.all(kinds.map((k) => adminPendingAnnotations(k)))
     return lists.flatMap((d) => d.items || []).sort((a, b) => b.id - a.id)
   }, [kind])
@@ -46,10 +57,11 @@ export default function AnnotationsCard({ onUnauthed }) {
     <div className="admin-card admin-annotations admin-wide">
       <h3>标注审核</h3>
       <p className="admin-hint">
-        玩家提交的技能/特性标注。通过后全服可见(试炼等只给 id 的场景即显示名字);
+        玩家提交的技能/特性/精灵标注。通过后全服可见(试炼等只给 id 的场景即显示名字);
         通过某条时,同一 id 的其余待审自动拒绝。
+        精灵那类标的是「草系试炼事件 → 哪只精灵」,通过后试炼页显示头像并带出特性名。
       </p>
-      {/* 默认看「全部」而非某一类:玩家两种都会提交,只看一类会让人以为
+      {/* 默认看「全部」而非某一类:玩家三类都会提交,只看一类会让人以为
           「别人提交的没进来」—— 那是误判,数据其实在另一类里。 */}
       <div className="anno-review-kinds">
         {KINDS.map(({ key: k, label }) => (
@@ -78,13 +90,13 @@ export default function AnnotationsCard({ onUnauthed }) {
                 <div key={a.id} className="anno-review-row">
                   <div className="anno-review-main">
                     <div className="anno-review-line">
-                      {/* 类别徽标:看「全部」时必须能一眼分清是技能还是特性,
-                          否则同一个 id 数字(如 288022 与 7020550)容易看混。 */}
+                      {/* 类别徽标:看「全部」时必须能一眼分清是哪一类,
+                          否则同一个数字(如 288022 与 7020550)容易看混。 */}
                       <span className={'anno-review-kind kind-' + a.kind}>
-                        {a.kind === 'skill' ? '技能' : '特性'}
+                        {KIND_LABEL[a.kind] || a.kind}
                       </span>
                       <span className="anno-review-name">{a.name}</span>
-                      <span className="anno-review-code">id {a.code}</span>
+                      <span className="anno-review-code">{CODE_LABEL[a.kind] || 'id'} {a.code}</span>
                     </div>
                     {a.desc && <div className="anno-review-desc">{a.desc}</div>}
                     <div className="anno-review-sub">由 {a.submitter} 提交</div>

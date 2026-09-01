@@ -375,9 +375,15 @@
     "pet": { "gid": 133, "name": "黑猫巫师", "species": "黑猫巫师", "img": "HeadIcon/3569.webp",
              "level": 60, "hp": 264, "maxHp": 389, "energy": 10, "growth": 2,
              "skills": [{ "id": 7020500, "power": 25, "cost": 4, "fusion": 1, "slot": 2, "merged": [7090100] }],
-             "features": [288135], "shards": [2016], "equipped": [1, 2] },
+             "features": [288135, 288001], "innateFeatures": [288135], "gainedFeatures": [288001],
+             "featureNames": { "288135": "预警" },
+             "shards": [2016], "equipped": [1, 2] },
     "options": [{ "slot": 1, "event": 110061, "reward": 7110340, "level": 40,
-                  "eventCost": 1, "rewardCost": 4, "extra": [2016] }],
+                  "eventCost": 1, "rewardCost": 4, "extra": [2016],
+                  "pool": [288135, 7110340, 7020430, 7020440, 7160140], "used": [7040220],
+                  "names": { "7110340": "超导加速", "7020430": "见招拆招",
+                             "7020440": "触底强击", "7160140": "超级糖果" },
+                  "pet": { "base": 3031, "name": "奇丽花", "img": "HeadIcon/3031.webp" } }],
     "refreshCost": 2,
     "bless": { "event": 500001, "options": [100], "effect": 0, "candidates": [7120100] },
     "reward": { "event": 110005, "id": 288001, "extra": [2016], "coin": 10 },
@@ -404,10 +410,42 @@
   见 `docs/data.md`「技能名」）。**融合不改变 `base_skill_id`**（只改威力与融合次数），
   故融合态技能同样有 `name`。仅当资料站未收录该 id 时 `name` 缺失，前端回退显示 `id`。
   试炼给少数技能换了 id（如魔能爆 `7020550` → 试炼态 `7880058`），这些已单独登记。
-- 其余（特性 `288xxx`、碎片 `20xx-30xx`、事件、奖励）**只有 id，无名称表**，一律原样展示。
-  奖励 id 的类别按区间可判（7xxxxx=技能、288xxx=特性、20xx-30xx=碎片），前端已内置该映射。
+- 其余（特性 `288xxx`、碎片 `20xx-30xx`、事件、奖励）协议里**只有 id**，类别按区间可判
+  （7xxxxx=技能、288xxx=特性、20xx-30xx=碎片），前端已内置该映射。名字看类型：
+  技能查第三方资料（`skills.json`）；特性本身没有表，但见下面 `featureNames` 的桥接。
+
+#### `run.options[]` 一个节点事件 = 一只精灵 + 从它身上抽的一个奖励
+
+```json
+{ "slot": 1, "event": 110061, "reward": 7110340, "level": 40,
+  "eventCost": 1, "rewardCost": 4, "extra": [2016],
+  "pool": [288135, 7110340, 7020430, 7020440, 7160140], "used": [7040220],
+  "names": { "7110340": "超导加速", "7020430": "见招拆招" },
+  "pet": { "base": 3031, "name": "奇丽花", "img": "HeadIcon/3031.webp" } }
+```
+
+- `pool`（协议 `random_skills[]`）是本事件的抽取池：**该精灵 1 个自身特性 + 4 个技能**。
+  两种重掷都花金币，换的东西不同 ——
+  `rewardCost`=**换奖励**，只在这 5 个里重抽一个；`eventCost`=**换事件**，整只精灵换掉，
+  `pool` 随之变成新精灵的那一套。只看 `reward` 无法预判重掷会出什么，故整池下发。
+- `used`（协议 `used_reward_ids[]`）是本节点该槽位**已抽过**的，重掷时服务器排除它们 ——
+  `pool` 减去 `used` 才是下一次重掷的真实候选。
+- `names` 是本卡片里查得到中文名的 id → 名字，覆盖 `reward` / `pool` / `extra`。
+  **查不到的 id 不出现在这里**，前端显示裸 id 并给标注入口。
+- ⚠️ `pet` **协议不下发**：事件到精灵的映射表在游戏配置里（未解包），只能靠
+  **标注**（`kind=event`）补，标注后经形态名反查才带得出 `base` / `img`。
+  没标注时该项缺失，前端显示占位 —— 别把它当成「服务器说是这只」。
+- `pool` 里那条 `288xxx` 就是这只精灵自身的特性。**标出精灵之后它会自动带上名字**
+  （走「精灵 → 特性」表，见 `docs/data.md`「特性名」），玩家不必再标一次特性。
+  仅在池里**恰好一个**特性 id 时才绑，多条说明理解有误，宁可都不给。
 - `log` 是操作流水（最新在前，最多 40 条），`kind` 取值 `start/node/refresh/bless/reward/
   shop/boss/settle`；`ids` 随 kind 而异（如 `node` 是 [章节号, 节点号]）。
+- `run.pet.innateFeatures` / `gainedFeatures` 是 `features` 的**天生 vs 试炼中获得的**拆分
+  （局级 `initial_feature_ids` 减出来）；拿不到局级字段时两者都缺席、`features` 仍在 ——
+  刻意不猜，标错比不标更糟。
+- `run.pet.featureNames` 是天生特性的名字（id → 名）。**只在恰好一条天生特性时给**，
+  名字由 wiki「精灵 → 特性」表按形态反查而来（见 `docs/data.md`「特性名」），
+  可靠性低于人工标注，前端用虚线边框区分。
 - 一局结束有两条路径收敛：0x196a 结算通知，或档案 0x1975 里最新战绩的补判
   （服务器未必发结算通知，见 `docs/pcap-20260831-grass-trial.md` 第 5 节）。
 

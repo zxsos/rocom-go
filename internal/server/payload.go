@@ -307,8 +307,15 @@ type TrialPet struct {
 	// 刻意不猜:标错比不标更糟,用户会把「天生」当成确定的事实。
 	InnateFeatures []uint32 `json:"innateFeatures,omitempty"`
 	GainedFeatures []uint32 `json:"gainedFeatures,omitempty"`
-	Shards         []uint32 `json:"shards,omitempty"`   // 已获碎片(20xx/30xx)
-	Equipped       []uint32 `json:"equipped,omitempty"` // 出战技能槽位
+	// FeatureNames 是查到名字的特性:id -> 名字。
+	//
+	// 名字**不是**游戏配置给的,而是用 wiki 的「精灵 → 特性」表桥接出来的:
+	// 按形态全名查到特性名,再绑到该精灵天生的那条 id 上(原理与覆盖率见
+	// gamedata.FeatureNameOfBase)。只对天生特性成立 —— 试炼中获得的特性
+	// 是节点随机给的,拿精灵的特性名去绑必然是错的,故那些 id 不进这张表。
+	FeatureNames map[uint32]string `json:"featureNames,omitempty"`
+	Shards       []uint32          `json:"shards,omitempty"`   // 已获碎片(20xx/30xx)
+	Equipped     []uint32          `json:"equipped,omitempty"` // 出战技能槽位
 }
 
 // TrialSkill 是试炼宠物的一个技能槽(融合体)。
@@ -326,14 +333,43 @@ type TrialSkill struct {
 // 故只在能查到时才带 name —— 前端回退显示 id。
 
 // TrialOption 是当前节点的一个候选事件。
+//
+// 一个事件 = 一只精灵 + 从它身上抽的一个奖励。两种重掷都花金币,含义不同:
+//
+//	换奖励(rewardCost):在这只精灵的抽取池(Pool)里重抽一个;
+//	换事件(eventCost) :整只精灵换掉,抽取池随之变成新精灵的那一套。
 type TrialOption struct {
-	Slot       uint32   `json:"slot"`
-	Event      uint32   `json:"event"`  // event_conf_id
-	Reward     uint32   `json:"reward"` // reward_id(技能 7xxxxx / 特性 288xxx / 碎片 20xx-30xx)
-	Level      uint32   `json:"level,omitempty"`
-	EventCost  uint32   `json:"eventCost,omitempty"`  // 重掷该事件的报价
-	RewardCost uint32   `json:"rewardCost,omitempty"` // 重掷奖励的报价
-	Extra      []uint32 `json:"extra,omitempty"`      // 额外奖励(多是碎片)
+	Slot   uint32 `json:"slot"`
+	Event  uint32 `json:"event"`  // event_conf_id
+	Reward uint32 `json:"reward"` // reward_id(技能 7xxxxx / 特性 288xxx / 碎片 20xx-30xx)
+	// Names 是本卡片里查得到中文名的 id -> 名字,覆盖 Reward / Pool / Extra。
+	//
+	// 技能名来自 skills.json(覆盖率 98.7%);特性名则要**先标出精灵**才能查 ——
+	// 走「精灵 → 特性」表(见 gamedata.FeatureNameOfBase),这正是标注精灵省下的
+	// 那一步:池里那条 288xxx 不用玩家再标一次。查不到的 id 不进这张表,
+	// 前端显示裸 id 并给标注入口。
+	Names      map[uint32]string `json:"names,omitempty"`
+	Level      uint32            `json:"level,omitempty"`
+	EventCost  uint32            `json:"eventCost,omitempty"`  // 重掷该事件的报价
+	RewardCost uint32            `json:"rewardCost,omitempty"` // 重掷奖励的报价
+	Extra      []uint32          `json:"extra,omitempty"`      // 额外奖励(多是碎片)
+	// Pool 是本事件的抽取池:该精灵「1 个自身特性 + 4 个技能」(协议 random_skills[])。
+	//
+	// 换奖励就是从这 5 个里重抽一个 —— 只看当前那条 Reward 无法预判重掷会出什么,
+	// 故整池下发:玩家能提前把 5 个 id 都标注好,也能看出重掷还可能出什么。
+	// 字段名沿用协议的 random_skills,它是 repeated,长度待更多样本确认(预期 5)。
+	Pool []uint32 `json:"pool,omitempty"`
+	// Used 是本节点该槽位**已经抽过**的奖励(协议 used_reward_ids[]):重掷时服务器
+	// 会排除它们,故 Pool 减去 Used 才是下一次重掷的真实候选。
+	Used []uint32 `json:"used,omitempty"`
+	// Pet 是本事件对应的精灵(头像+名字)。
+	//
+	// ⚠️ 协议**不下发**它:GrassTrialNodeEvent 只有 event_conf_id,到精灵的映射
+	// 表在游戏配置里(未解包)。故这一项只能靠**标注**补(标注类型 event,
+	// 玩法见 internal/server/api_annotations.go)—— 标注里填的精灵名经
+	// gamedata.PetByName 反查成形态 id,取到头像才带;没标注就缺失,
+	// 前端显示占位并给标注入口。别把它当成"服务器说是这只"。
+	Pet *TrialOppPet `json:"pet,omitempty"`
 }
 
 // TrialBless 是祝福节点(先选选项,再在候选技能里挑一个)。

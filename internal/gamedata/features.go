@@ -93,3 +93,28 @@ func (db *DB) PetFeatureName(pet string) (string, bool) {
 	n, ok := fdb.petToName[strings.TrimSpace(pet)]
 	return n, ok
 }
+
+// FeatureNameOfBase 按 petbase 形态查该精灵的特性名(wiki 精灵图鉴页口径)。
+//
+// 这是特性 id 桥接的落点。两头都不完整,拼起来才有用:
+//
+//	协议侧:只给特性 id(288xxx),名字一个都没有;
+//	wiki 侧:只有「精灵 → 特性名」,一个 id 都没有。
+//
+// 桥是「宠物与它的天生特性 id **总是同时出现**」(试炼的 initial_feature_ids 与
+// 宠物的 base_conf_id 同包下发):拿形态全名去 wiki 查到特性名,再把这个名字
+// 绑到那条 id 上,于是 288135 就有了名字。
+//
+// 覆盖率:wiki 收录 494 只精灵,其中 481 只能与形态全名对上(97%)。查不到返回
+// 空串 —— 形态名口径不一致就查不到,宁可不显示也不猜(标错比不标更糟)。
+//
+// ⚠️ 只对**天生**特性成立:试炼中获得的特性是节点随机给的,与精灵本身无关,
+// 拿精灵的特性名去绑它们必然是错的。
+func (db *DB) FeatureNameOfBase(petbaseID uint32) string {
+	name := db.PetFullName(petbaseID)
+	if name == "" {
+		return ""
+	}
+	n, _ := db.PetFeatureName(name)
+	return n
+}

@@ -16,7 +16,8 @@ import (
 //
 // 交互流程(试炼页/宠物详情页):
 //  1. 前端对未知 id 展示为「未知,点击标注」;
-//  2. 点击后搜索候选(技能查 skills.json、特性查 features.json 词典),选中并提交;
+//  2. 点击后搜索候选(技能查 skills.json、特性查 features.json 词典、试炼事件查
+//     精灵形态名单),选中并提交;
 //  3. 管理员在 #/admin 面板审核,通过后 GET /api/annotations 全服下发。
 //
 // 数据结构与表设计见 internal/store/annotations.go。
@@ -47,7 +48,7 @@ type annotationAdminItem struct {
 func (s *Server) handleGetAnnotations(w http.ResponseWriter, r *http.Request) {
 	kind, ok := annotationKind(r.URL.Query().Get("kind"))
 	if !ok {
-		http.Error(w, "kind 须为 skill 或 feature", http.StatusBadRequest)
+		http.Error(w, "kind 须为 skill / feature / event", http.StatusBadRequest)
 		return
 	}
 	items, err := s.store.ApprovedAnnotations(kind)
@@ -82,7 +83,7 @@ func (s *Server) handleSubmitAnnotation(w http.ResponseWriter, r *http.Request) 
 	}
 	kind, ok := annotationKind(req.Kind)
 	if !ok {
-		http.Error(w, "kind 须为 skill 或 feature", http.StatusBadRequest)
+		http.Error(w, "kind 须为 skill / feature / event", http.StatusBadRequest)
 		return
 	}
 	req.Name = cleanAnnotationName(req.Name)
@@ -132,7 +133,7 @@ func (s *Server) handleListPendingAnnotations(w http.ResponseWriter, r *http.Req
 	}
 	kind, ok := annotationKind(r.URL.Query().Get("kind"))
 	if !ok {
-		http.Error(w, "kind 须为 skill 或 feature", http.StatusBadRequest)
+		http.Error(w, "kind 须为 skill / feature / event", http.StatusBadRequest)
 		return
 	}
 	items, err := s.store.PendingAnnotations(kind)
@@ -213,13 +214,20 @@ func cleanAnnotationName(s string) string {
 	}, s)
 }
 
-// annotationKind 校验 kind 参数取值(skill / feature),返回规范化后的值。
+// annotationKind 校验 kind 参数取值(skill / feature / event),返回规范化后的值。
+//
+// event 是草系试炼特有的第三类:对象是**事件**而非协议里的某个 id ——
+// GrassTrialNodeEvent 只给 event_conf_id,对应哪只精灵协议不下发(映射表在游戏
+// 配置里,未解包),只能由玩家照着游戏画面标。标完试炼页就能显示头像与名字,
+// 还能顺着「精灵 → 特性」表把该精灵的特性 id 一起认出来(见 gamedata.FeatureNameOfBase)。
 func annotationKind(v string) (string, bool) {
 	switch strings.TrimSpace(v) {
 	case "skill":
 		return "skill", true
 	case "feature":
 		return "feature", true
+	case "event":
+		return "event", true
 	}
 	return "", false
 }
@@ -244,7 +252,7 @@ type annotationCandidate struct {
 func (s *Server) handleAnnotationCandidates(w http.ResponseWriter, r *http.Request) {
 	kind, ok := annotationKind(r.URL.Query().Get("kind"))
 	if !ok {
-		http.Error(w, "kind 须为 skill 或 feature", http.StatusBadRequest)
+		http.Error(w, "kind 须为 skill / feature / event", http.StatusBadRequest)
 		return
 	}
 	var out []annotationCandidate
@@ -256,6 +264,14 @@ func (s *Server) handleAnnotationCandidates(w http.ResponseWriter, r *http.Reque
 	case "feature":
 		for _, f := range s.db.Features() {
 			out = append(out, annotationCandidate{Name: f.Name, Desc: f.Desc, Pets: f.Pets})
+		}
+	case "event":
+		// 精灵形态名单,按图鉴号排序(与游戏内图鉴同序,玩家好找)。
+		// 带 base id 是为了让后端能把标注的名字换回形态、取到头像 ——
+		// 但标注提交只存名字,故名字必须**逐字**取自这份名单(PetFullName 口径,
+		// 形态名用全角括号),手打的同义名反查不到,头像也就出不来。
+		for _, p := range s.db.PetForms() {
+			out = append(out, annotationCandidate{ID: p.Base, Name: p.Name})
 		}
 	}
 	writeJSON(w, map[string]any{"kind": kind, "items": out})
