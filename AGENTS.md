@@ -73,6 +73,11 @@
   靠 HTML class 正则提取,改版后抓不到会报错退出)、`uv run python scripts/gen_skills.py`
   (skillIds.json + arkmeng.cn 的 skillGuideData.json → internal/gamedata/data/skills.json:
   技能 id→名 供试炼页、形态→天生技能 供宠物详情;**两份互补缺一不可,见 docs/data.md「技能名」**);
+  `uv run python scripts/fetch_trial_data.py`(草系试炼静态配置:wiki 的
+  Module:GrassTrialData → ~/Downloads/rocom/grassTrialData.lua;页面由 Lua 渲染,
+  数据在模块里不在正文)、`uv run python scripts/gen_trial.py`(→ data/trial.json:
+  层结构/各章精灵池/22 名首领/NPC 阵容;**层与 node_index 的对应是抓包实测的,
+  别照抄 wiki 的 7 层**,详见 docs/data.md)、
   抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
   (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq
   查数据、也是 gen_gamedata/gen_icons 的输入(它们直接读这些 JSON,不再自行解 .bytes)。

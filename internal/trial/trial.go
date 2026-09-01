@@ -106,12 +106,46 @@ type Pet struct {
 	EnergyCeil uint32
 	Growth     uint32
 	Skills     []Skill
-	Features   []uint32 // 已获得的特性 id(288xxx)
+	Features   []uint32 // 已获得的特性 id(288xxx):天生 + 试炼中获得,见 InitialFeatures
 	Shards     []uint32 // 已获得的碎片 id(20xx/30xx)
 	Equipped   []uint32 // 出战技能槽位(equipped_skill_slots)
 	Name       string   // 昵称,取自内嵌 PetData 的 name(玩家可能改过名)
 	ConfID     uint32   // 宠物 conf_id(取自内嵌 PetData,供查种类名)
 }
+
+// Has 判断某特性是否属于天生。
+func (f InitialFeatures) Has(id uint32) bool {
+	for _, x := range f {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+// InitialFeatures 是宠物**天生的**特性(局级 initial_feature_ids,#33)。
+//
+// 与 Pet.Features(宠物级 acquired_feature_ids,#11)的关系:
+//
+//	Features        = 天生 + 试炼中获得的(会随推进增长)
+//	InitialFeatures = 只有天生的(整局不变)
+//	差集            = 试炼中获得的
+//
+// 为什么值得区分 —— 实测一份完整试炼(17 场战斗)的特性序列:
+//
+//	第 1场 [288135]
+//	第 2场 [288135, 288001]
+//	第 6场 [288135, 288001, 288022]
+//	第17场 [288135, 288001, 288022, 288025, 288154, 288043]
+//
+// 288135 从头到尾都在、且始终是第一个,它就是宠物自带的特性;后面逐个累积的
+// 是打节点拿到的。玩家的这条经验(「第一个一定是自己本身的特性」)与数据完全吻合
+// —— 因为 initial_feature_ids 恒定,而 acquired 逐个追加。
+//
+// ⚠️ 别假设 InitialFeatures 是 Features 的前缀子集: acquired 是**累积追加**的,
+// 实测看确实是前缀,但那是观察到的行为而非协议保证。取差集时两边都查,
+// 不要只按下标切片。
+type InitialFeatures []uint32
 
 // NodeEvent 是当前节点里的一个候选事件(通常三个槽位,各带一个奖励)。
 type NodeEvent struct {
@@ -182,6 +216,9 @@ type Challenge struct {
 	Selection      *Selection
 	Effects        []uint32 // 本局生效的试炼词条(trial_effect_ids)
 	Chapters       []uint32 // 可选章节(3000/3001/3002)
+	// InitialFeatures 是宠物**天生的**特性(局级 #33,整局不变)。
+	// 与 Pet.Features 之差即「试炼中获得的」,详见 InitialFeatures 的说明。
+	InitialFeatures InitialFeatures
 }
 
 // Reward 是刚到账、等待玩家处理的节点奖励。
@@ -220,13 +257,42 @@ type SlotProgress struct {
 	ClearedIDs []uint32 // 已通关的 trial_conf_id
 }
 
-// LogRecord 是见闻录的一册(按章节记录见过的宠物数)。
+// LogRecord 是见闻录的一册(账号档案 0x1975 里下发,**服务器保存的完整历史**)。
+//
+// 这是「已经遇见过哪些精灵」的**权威来源**,比抓 0x1316 战斗通知全得多:
+// 战斗通知只能记到抓包期间发生的那几场,而见闻录是账号自始至终的累积
+// (实测同一账号:抓包 17 场 → 见闻录 292 只)。
+//
+// ⚠️ DiscoveredIDs 曾一度只被数成 Discovered 数量、把 id 全丢了 —— 那样
+// 登录后无法补录历史,已遇见的精灵得重新打一遍才会显示。别改回只计数。
 type LogRecord struct {
-	LogConfID  uint32
-	Chapters   []uint32
-	Discovered uint32 // 已发现的形态数
-	Total      uint32 // 该册总数
-	Unlocked   bool
+	LogConfID     uint32
+	Chapters      []uint32
+	DiscoveredIDs []uint32 // discovered_petbase_ids:已发现的 petbase id
+	Discovered    uint32   // 已发现的形态数(= len(DiscoveredIDs))
+	Total         uint32   // 该册总数
+	Unlocked      bool
+}
+
+// ChapterOf 返回本册对应第几章(1 起),认不出来返回 0。
+//
+// 映射 log_conf_id 100/101/102 → 第 1/2/3 章是**用实测数据验证过的**,
+// 不是照名字猜:三册各自减去「对应章的池 ∪ 22 名首领」后差集全为 0
+// (100: 148+19=167、101: 111+17=128、102: 87+14=101),吻合到个位。
+// 协议里的 chapters 字段实测为空,推不出章节,只能靠这个映射。
+//
+// 记错章的后果比不记更糟:会把一章的进度污染到另一章上,而用户很难察觉。
+// 故认不出来时返回 0,让调用方丢弃,而不是硬套一个默认值。
+func (l *LogRecord) ChapterOf() uint32 {
+	switch l.LogConfID {
+	case 100:
+		return 1
+	case 101:
+		return 2
+	case 102:
+		return 3
+	}
+	return 0
 }
 
 // Progress 是账号级的试炼档案(0x1975,约 55KB)。
@@ -285,6 +351,10 @@ func ParseChallengeData(b []byte) *Challenge {
 			c.ChallengeID = v
 		case num == 31:
 			c.Chapters = appendU32(c.Chapters, val, typ, v)
+		case num == 33:
+			// initial_feature_ids(#33,局级):宠物天生的特性。
+			// 与宠物级 #11(acquired)之差即试炼中获得的 —— 见 InitialFeatures。
+			c.InitialFeatures = appendU32(c.InitialFeatures, val, typ, v)
 		}
 	})
 	return c
@@ -563,11 +633,18 @@ func ParseLogRecord(b []byte) LogRecord {
 		case num == 3:
 			// discovered_petbase_ids 实测是**非 packed**(每个 id 一个独立 tag,392 个),
 			// 但协议允许 packed,故两种都认:packed 时一次到位,非 packed 时逐个累加。
+			// 这里要的是**具体 id** 而非数量(见 LogRecord 的说明)——
+			// 它们是补录「已经遇见过哪些精灵」的唯一来源。
 			if typ == protowire.BytesType {
-				l.Discovered += uint32(len(wire.PackedVarints(val)))
-			} else if typ == protowire.VarintType {
-				l.Discovered++
+				for _, id := range wire.PackedVarints(val) {
+					if id != 0 {
+						l.DiscoveredIDs = append(l.DiscoveredIDs, uint32(id))
+					}
+				}
+			} else if typ == protowire.VarintType && v != 0 {
+				l.DiscoveredIDs = append(l.DiscoveredIDs, uint32(v))
 			}
+			l.Discovered = uint32(len(l.DiscoveredIDs))
 		case num == 5 && typ == protowire.VarintType:
 			l.Unlocked = v != 0
 		case num == 6 && typ == protowire.VarintType:

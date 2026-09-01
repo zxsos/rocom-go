@@ -11,6 +11,48 @@ import (
 
 // 用 protowire 手工拼一份 GrassTrialChallengeData,喂给 ParseChallengeData 断言字段号。
 // 不依赖任何真实抓包,故测试可离线、可复现;字段号错了测试会红,即变异守卫。
+// TestParseChallengeDataInitialFeatures 守局级 #33(initial_feature_ids)。
+//
+// 它存在的意义是**区分宠物的天生特性与试炼中获得的特性**:
+// acquired(#11,宠物级)是累积追加的流水,initial(#33,局级)整局不变,
+// 两者之差就是本局拿到的。实测 17 场战斗的特性序列印证了这点 ——
+// 288135 从头到尾都在(天生),其余逐个累积(获得)。
+// 抓错字段号会解成空,两组拆分随之失效(且**不报错**,只是静默变成「不区分」)。
+func TestParseChallengeDataInitialFeatures(t *testing.T) {
+	var body []byte
+	body = protowire.AppendTag(body, 1, protowire.VarintType) // state
+	body = protowire.AppendVarint(body, 2)
+	for _, id := range []uint64{288135} { // initial_feature_ids(非 packed)
+		body = protowire.AppendTag(body, 33, protowire.VarintType)
+		body = protowire.AppendVarint(body, id)
+	}
+	c := ParseChallengeData(body)
+	if c == nil {
+		t.Fatal("ParseChallengeData 返回 nil")
+	}
+	if len(c.InitialFeatures) != 1 || c.InitialFeatures[0] != 288135 {
+		t.Fatalf("InitialFeatures = %v, 期望 [288135](字段号是 33 吗?)", c.InitialFeatures)
+	}
+	if !c.InitialFeatures.Has(288135) {
+		t.Error("Has(288135) 应为 true")
+	}
+	if c.InitialFeatures.Has(288001) {
+		t.Error("Has(288001) 应为 false —— 它不在天生列表里")
+	}
+
+	// packed 编码也要认(协议允许两种,repeated uint32 很常见)
+	var pk []byte
+	var packed []byte
+	packed = protowire.AppendVarint(packed, 288135)
+	packed = protowire.AppendVarint(packed, 288001)
+	pk = protowire.AppendTag(pk, 33, protowire.BytesType)
+	pk = protowire.AppendBytes(pk, packed)
+	c2 := ParseChallengeData(pk)
+	if len(c2.InitialFeatures) != 2 {
+		t.Errorf("packed 解出 %d 个, 期望 2: %v", len(c2.InitialFeatures), c2.InitialFeatures)
+	}
+}
+
 func TestParseChallengeData(t *testing.T) {
 	var body []byte
 	body = protowire.AppendTag(body, 1, protowire.VarintType) // state
@@ -218,6 +260,64 @@ func TestParseLogRecord(t *testing.T) {
 	l2 := ParseLogRecord(pk)
 	if l2.Discovered != 3 {
 		t.Errorf("packed 见闻录 discovered = %d, 期望 3", l2.Discovered)
+	}
+	if len(l2.DiscoveredIDs) != 3 || l2.DiscoveredIDs[0] != 1 ||
+		l2.DiscoveredIDs[1] != 2 || l2.DiscoveredIDs[2] != 3 {
+		t.Errorf("packed 的 id 列表 = %v, 期望 [1 2 3]", l2.DiscoveredIDs)
+	}
+}
+
+// TestParseLogRecordIDs 守「见闻录必须吐出**具体 id** 而非只有数量」。
+//
+// 这条曾真的坏过:原实现只 `Discovered++` 计数、把 id 全丢了。后果是登录后
+// 无法补录历史 —— 已遇见的几百只精灵全靠重新打一遍才会显示,而服务器明明
+// 在 0x1975 里下发了完整清单(实测 292 只 vs 抓包 17 场)。
+// 计数对、列表空,这种情况光看 Discovered 字段发现不了,故单独断言。
+func TestParseLogRecordIDs(t *testing.T) {
+	var b []byte
+	b = protowire.AppendTag(b, 1, protowire.VarintType) // log_conf_id = 101
+	b = protowire.AppendVarint(b, 101)
+	for _, id := range []uint64{3001, 3005, 8101, 3001} { // 故意重复一只,测不去重
+		b = protowire.AppendTag(b, 3, protowire.VarintType)
+		b = protowire.AppendVarint(b, id)
+	}
+	b = protowire.AppendTag(b, 6, protowire.VarintType) // total
+	b = protowire.AppendVarint(b, 337)
+
+	l := ParseLogRecord(b)
+	if l.LogConfID != 101 {
+		t.Fatalf("LogConfID = %d, 期望 101", l.LogConfID)
+	}
+	// 关键:具体 id 必须保留(顺序与重复都保留,去重交给 store 层)
+	want := []uint32{3001, 3005, 8101, 3001}
+	if len(l.DiscoveredIDs) != len(want) {
+		t.Fatalf("DiscoveredIDs = %v, 期望 %v(只拿到 %d 个,是否又退化成只计数了?)",
+			l.DiscoveredIDs, want, len(l.DiscoveredIDs))
+	}
+	for i := range want {
+		if l.DiscoveredIDs[i] != want[i] {
+			t.Errorf("DiscoveredIDs[%d] = %d, 期望 %d", i, l.DiscoveredIDs[i], want[i])
+		}
+	}
+	if l.Discovered != uint32(len(l.DiscoveredIDs)) {
+		t.Errorf("Discovered = %d, 应等于 len(DiscoveredIDs) = %d",
+			l.Discovered, len(l.DiscoveredIDs))
+	}
+	// 章节映射:认不出来的册号必须返回 0,让调用方丢弃而非硬套
+	if got := l.ChapterOf(); got != 2 {
+		t.Errorf("log_conf_id=101 应映射到第 2 章, 实际 %d", got)
+	}
+	for cid, want := range map[uint32]uint32{100: 1, 101: 2, 102: 3} {
+		r := &LogRecord{LogConfID: cid}
+		if got := r.ChapterOf(); got != want {
+			t.Errorf("log_conf_id=%d 应映射到第 %d 章, 实际 %d", cid, want, got)
+		}
+	}
+	for _, cid := range []uint32{0, 99, 103, 200, 999} {
+		r := &LogRecord{LogConfID: cid}
+		if got := r.ChapterOf(); got != 0 {
+			t.Errorf("log_conf_id=%d 认不出来应返回 0, 实际 %d(会污染别的章)", cid, got)
+		}
 	}
 }
 

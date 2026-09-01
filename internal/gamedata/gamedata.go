@@ -74,6 +74,8 @@ type DB struct {
 	nestFurn   map[uint32]string  // 小窝家具 config_id -> 家具名(实测仅 1001071 精灵小窝)
 	// 天生技能表(独立于 names.json,数据源是第三方资料站的过渡方案,见 skills.go)。
 	skills *skillsDB
+	// 草系徽章试炼的静态配置(独立于 names.json,数据源是玩家维护的 wiki,见 trial.go)。
+	trial *trialDB
 }
 
 // Load 加载 embed 的名称表。
@@ -296,6 +298,7 @@ func Load() (*DB, error) {
 		sizeMedals:     raw.SizeMedals,
 		nestFurn:       nestFurn,
 		skills:         loadSkills(),
+		trial:          loadTrial(),
 	}, nil
 }
 

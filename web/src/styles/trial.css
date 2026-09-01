@@ -60,6 +60,32 @@
 .trial-reward { color: var(--green, var(--accent)); border-color: var(--green, var(--accent)); }
 .trial-note { font-size: 12px; }
 
+/* —— 层类型标签 —— */
+/* 首领层用与 BOSS 一致的红,强调这一层是硬仗;商人层(无战斗)用最暗的灰色,
+   与「要打架」的层拉开区分;NPC 层用强调色,因为它下面才会展开候选阵容。 */
+.trial-floor-boss {
+  color: var(--red); border-color: var(--red); font-weight: 600;
+  background: color-mix(in srgb, var(--red) 12%, var(--bg-3));
+}
+.trial-floor-merchant { color: var(--fg-dim); opacity: .8; }
+.trial-floor-npc { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* —— 第 7 层 NPC 候选阵容 —— */
+.trial-opps { display: flex; flex-direction: column; gap: 8px; }
+.trial-opp {
+  border: 1px solid var(--line); border-radius: var(--radius, 8px);
+  padding: 8px 10px; background: var(--bg-2);
+}
+.trial-opp-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+/* NPC 编号是 wiki 那边的 id,与游戏内 npc_id 无关 —— 弱化显示,免得被当成官方编号 */
+.trial-opp-id { font-weight: 400; font-size: 11px; }
+.trial-opp-pets { display: flex; flex-wrap: wrap; gap: 10px; }
+.trial-opp-pet {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; cursor: help;
+}
+.trial-opp-img { width: 30px; height: 30px; flex: none; }
+
 /* —— 结算 —— */
 .trial-result {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -185,3 +211,62 @@
   .trial-pet-img { width: 52px; height: 52px; }
   .trial-skills { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+
+/* —— 遇见记录:三章各一张精灵图,遇到过的置灰 —— */
+
+/* 章头:名字 + 进度条 + 百分比 */
+.trial-enc-head {
+  display: flex; align-items: center; gap: 10px;
+  margin: 10px 0 4px; font-size: 13px;
+}
+.trial-enc-bar {
+  flex: 1; height: 6px; border-radius: 3px;
+  background: var(--bg-3); overflow: hidden; min-width: 80px;
+}
+.trial-enc-bar > i {
+  display: block; height: 100%;
+  background: var(--accent); border-radius: 3px;
+  transition: width .25s ease;
+}
+
+/* 清空按钮:破坏性操作,贴右端与进度区分开;仅在本章有记录时可用 */
+.trial-enc-clear {
+  flex-shrink: 0; padding: 2px 10px; font-size: 12px;
+}
+.trial-enc-clear:disabled { opacity: .4; cursor: not-allowed; }
+
+/* 刷新按钮:放最左,与右侧的破坏性操作拉开距离,免得点错 */
+.trial-enc-refresh {
+  flex-shrink: 0; padding: 2px 10px; font-size: 12px;
+}
+.trial-enc-refresh:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 特性只有 id(名字表未接入),用边框色区分天生/获得,免得一串数字分不清哪来的 */
+.trial-feat-innate { border-color: var(--accent); }
+.trial-feat-gained { opacity: .85; }
+.trial-enc-err { color: var(--danger); font-size: 12px; margin: 2px 0 6px; }
+
+/* 精灵网格:自适应列宽,头像下挂名字 */
+.trial-grid {
+  display: grid; gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+.trial-grid-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 4px; border-radius: var(--radius);
+  border: 1px solid transparent; cursor: help;
+  transition: opacity .15s ease, filter .15s ease;
+}
+.trial-grid-item:hover { background: var(--bg-2); border-color: var(--line); }
+.trial-grid-img { width: 44px; height: 44px; }
+.trial-grid-name {
+  font-size: 11px; line-height: 1.3; text-align: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 已遇见 → 置灰压暗。
+   与 wiki 的高亮相反:这里是「待办清单」语义,还差哪些没刷到要一眼看见,
+   故未遇见的保持原色、已遇见的压暗。用 filter 而非只降 opacity,
+   避免彩色头像在半透明下与深色背景糊成一片。 */
+.trial-grid-item.is-seen { opacity: .38; filter: grayscale(1); }
+.trial-grid-item.is-seen:hover { opacity: .7; filter: grayscale(.5); }

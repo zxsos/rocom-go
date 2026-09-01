@@ -40,6 +40,7 @@ ENDPOINTS = {
     "flowers": ("GET /api/flowers", "最近一次花种分组(已剥 cur/worlds)"),
     "flowers-slots": ("GET /api/flowers/slots", "花种世界存档槽位列表"),
     "trial": ("GET /api/trial", "最近一次草系徽章试炼状态"),
+    "trial-encounters": ("GET /api/trial/encounters", "草系试炼遇见记录(三章精灵图,读库累积)"),
 }
 
 
