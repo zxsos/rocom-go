@@ -50,6 +50,11 @@ type Server struct {
 
 	merchantMu sync.Mutex // 远行商人回源互斥:并发请求/定时任务同时缺缓存时,只放行一次回源(见 merchant.go)
 
+	// 当前生效的远行商人数据源(见 merchant.go 的源常量):启动时从库载入,
+	// 切源时更新。它几乎不变而被频繁读取(每次请求与每个 tick),故存内存镜像。
+	merchantSrc   string
+	merchantSrcMu sync.Mutex
+
 	// 「清空野生宠标记」的回调,由消费管线注册(见 SetWildsClearer)。
 	// 野生宠观测态在 pipeline 侧,server 靠这个钩子反向调用它。
 	wildsMu      sync.Mutex
@@ -93,6 +98,12 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 	s.online = newOnlineTracker()
 	s.accounts = newAcctResolver(s.online, st)
 	s.smtp = newSMTPSender(smtpUser, smtpPass)
+	// 远行商人数据源:库里没配置(老库/首次)或值非法时回退默认源。
+	// 读取失败按「未配置」处理(表是后加的,老库没有这一行属正常),同样回退。
+	s.merchantSrc = merchantSrcDefault
+	if v := st.MerchantSource(); merchantSourceValid(v) {
+		s.merchantSrc = v
+	}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
 	}
@@ -197,6 +208,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("DELETE /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("POST /api/admin/merchant-test-mail", s.handleAdminMerchantTestMail)
+	s.mux.HandleFunc("GET /api/admin/merchant-source", s.handleAdminMerchantSource)
+	s.mux.HandleFunc("POST /api/admin/merchant-source", s.handleAdminMerchantSource)
 	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
 	// 标注模式(众包图鉴):玩家对未知技能/特性 id 提交名字,管理员审核后全服可见。
 	s.mux.HandleFunc("GET /api/annotations", s.handleGetAnnotations)

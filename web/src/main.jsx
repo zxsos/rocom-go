@@ -29,6 +29,9 @@ import './styles/merchant.css'
 import './styles/detail.css'
 import './styles/map.css'
 import './styles/debug.css'
+// 各页面的入场过渡编排,集中一处 —— 见文件头的说明:
+// 节奏差异要对着看才调得出来,分开写会各自发明一套缓动。
+import './styles/motion.css'
 import './styles/flowers.css'
 import './styles/trial.css'
 import './styles/handbook.css'

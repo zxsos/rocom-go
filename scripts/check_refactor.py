@@ -83,6 +83,20 @@ ALLOWED_NEW_FUNCS = {
     "merchantSlotLive": "fix:槽是否仍在进行中(已结束的槽拿回来的是当前货单,不能回源)",
     "merchantShouldFetch": "fix:回源判定(未查过→补查;进行中且过冷却→重查;已结束/过窗口→不查)",
     "merchantCurrentSlot": "fix:从 merchantEnsure 抽出「当前轮」下标,便于无竞争地单测",
+    # fix:第三方滞后补货(与上面同批改动,当时漏登记,2026-09-02 按代码补登)
+    "merchantShouldForceRefresh": "fix:第三方滞后,开市后 10 分钟内强制回源(refresh=true)以尽快拿到本轮货单",
+    "fmtDuration": "fix:第三方滞后(同上),邮件「整点后 X」需要把 Duration 写成「3 分 20 秒」",
+    # feat:远行商人双数据源(咸鱼源 / 好游快爆源,可切换)。见 docs/data.md 第 6 节。
+    # 两源只有「怎么取」不同,故只抽出两个同签名方法,取到之后完全共用 —— 刻意不做接口化。
+    "fetchXianyu": "feat:双数据源,咸鱼源回源从 merchantFetch 抽出,与 fetchHaoyou 同签名供按源分派",
+    "merchantSource": "feat:双数据源,当前生效源(内存镜像;回源路径与 HTTP 处理器每次都读)",
+    "merchantSourceValid": "feat:双数据源,源标识合法性校验(管理端点写入与启动时载入共用)",
+    "merchantNeedKey": "feat:双数据源,该源是否必须配令牌(只有咸鱼源需要,好游快爆抓公开页面)",
+    "merchantSourceName": "feat:双数据源,源标识→中文名(映射留后端,免得与前端漂移)",
+    "merchantSetSource": "feat:双数据源,切换(落库+清空槽缓存+按新源重抓当前轮)",
+    # 同上(feat:远行商人双数据源),管理面板的读写端点:GET 读当前源与源清单,
+    # POST 切换。源清单一并下发而非法前端硬编码 —— 合法标识只有后端能校验。
+    "handleAdminMerchantSource": "feat:双数据源,管理端点的读写(GET 当前源+源清单 / POST 切换)",
 }
 
 # 有意删除的零散代码行(正则,匹配归一化后的行)。两侧都剔除后再比对。
@@ -143,7 +157,10 @@ INTENTIONALLY_CHANGED = {
     "handleMerchantSub": "阶段2:发信调用点改为 s.smtp.send*,配置判定改为 s.smtp.configured()",
     "handleAdminMerchantSubs": "阶段2:配置判定改为 s.smtp.configured()",
     "handleAdminMerchantTestMail": "阶段2:发信调用点改为 s.smtp.send*",
-    "handleMerchant": "阶段2:配置判定改为 s.smtp.configured()",
+    "handleMerchant": "阶段2:配置判定改为 s.smtp.configured();feat:双数据源,无令牌短路改为仅咸鱼源生效,响应加 source 字段",
+    # fix:第三方滞后补货(与 ALLOWED_NEW_FUNCS 里那批同批改动,当时漏登记,2026-09-02 补登):
+    # 邮件正文加「数据获取于 …(整点后 X)」一行,让读者自己判断这份货单有多旧。
+    "merchantMailContent": "fix:第三方滞后,邮件正文加「数据获取于 …(整点后 X)」一行",
     "from": "阶段2:由 merchantMailFrom 改名并入 smtpSender,凭据改读 m.user",
     # 阶段 2:位置/野生宠/花种快照收进 snapshotStore,读-改-写收敛为原子方法
     "handlePosition": "阶段2:改读 s.snap.getPos()",
@@ -167,6 +184,9 @@ INTENTIONALLY_CHANGED = {
     "handleAdminListInjects": "阶段3:mark 类型改为 *WildMark,改读 e.mark.Name/Kinds",
     "handleAdminInjectFlower": "阶段3:mark 类型改为 *WildMark,改用字段赋值",
     "handleAdminInjectWild": "阶段2+3:mark 改为 *WildMark 且合并标记改调 s.snap.mergeWild()",
+    # feat:游玩记录明细加分页(limit/offset/total),默认值随之改为 50、上限 200;
+    # 汇总仍按全量算、不随分页变化。合入时漏登记,2026-09-02 按 diff 补登。
+    "handleAdminPlaySessions": "feat:游玩记录明细加分页(limit/offset/total),默认 50、上限 200",
 }
 
 # 阶段 2 的重命名:旧名 -> 新名。改名后按新名比对内容。

@@ -83,6 +83,10 @@ export default function App() {
                   <span className="topbar-fs-text">{fullscreen.isFull ? '退出全屏' : '全屏'}</span>
                 </button>
               )}
+              {/* onClick 直接接 cycleTheme:**事件对象本身就是扩散的圆心来源** ——
+                  它读 e.currentTarget.getBoundingClientRect() 拿按钮位置,
+                  故别改成 `() => cycleTheme()`(那会丢掉事件,退化成瞬时切换)。
+                  详见 hooks/useTheme。 */}
               <button type="button" className="topbar-fs"
                 onClick={cycleTheme}
                 title={'主题:' + themeLabel + '(点击切换)'}>

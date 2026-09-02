@@ -45,6 +45,21 @@
 .admin-test-form textarea { grid-column: 1 / -1; resize: vertical; font-family: inherit; line-height: 1.5; }
 .admin-test-form .btn { white-space: nowrap; }
 
+/* —— 远行商人数据源 —— */
+.admin-source-row {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.admin-source-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* 卡片内的按钮默认撑满(见 .admin-card .btn),这里它在标题行内,只需按内容宽 */
+.admin-source-head .btn { width: auto; margin-left: auto; padding: 6px 14px; }
+.admin-source-tag {
+  padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  color: var(--accent); border: 1px solid var(--accent);
+}
+.admin-error-inline { color: var(--danger); }
+
 /* —— 查蛋 API 统计 —— */
 .egg-fail { color: var(--danger); font-size: 13px; }
 .egg-daily { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 8px; }
