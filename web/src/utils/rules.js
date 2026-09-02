@@ -53,6 +53,55 @@ export const RULE_PALETTE = [
   '#40c4ff', '#4c8dff', '#c792ea', '#f5b942',
 ]
 
+// RULE_PRESETS 常用区间模板,「添加」时直接点选,不必从零拖滑块。
+//
+// 存在理由:完全自由的区间在**第一次**配的时候最累 —— 想加个「中等体型」,
+// 得先想清楚该是多少到多少,再分别调两个端点。给一组现成的档位,一点即用,
+// 之后要微调再拖,比凭空填数字省事得多。
+//
+// 每档的区间不重叠且覆盖整个取值域:体重按「小不点 < 偏轻 < 中等 < 偏重 < 大块头」
+// 从低到高排,声音按「粗嗓门 < 偏低 < 中性 < 偏高 < 婉转声」从低到高排,
+// 视觉上对称,也避免用户不小心选出两个含义打架的区间。
+// 中间那几档(偏轻/中等/偏重、偏低/中性/偏高)是**旧版完全给不出**的:旧模型
+// 只有两极(极值边界),没有「中等」这种说法。
+export const RULE_PRESETS = [
+  // 体重百分位由低到高
+  { g: '体重', label: '小不点', dim: 'weightPct', min: 0, max: 2, color: '#ff9100' },
+  { g: '体重', label: '偏轻', dim: 'weightPct', min: 0, max: 30, color: '#ffab00' },
+  { g: '体重', label: '中等', dim: 'weightPct', min: 40, max: 60, color: '#ffc107' },
+  { g: '体重', label: '偏重', dim: 'weightPct', min: 70, max: 100, color: '#ff7043' },
+  { g: '体重', label: '大块头', dim: 'weightPct', min: 98, max: 100, color: '#ff5252' },
+  // 嗓音原值由低到高
+  { g: '声音', label: '粗嗓门', dim: 'voice', min: -100, max: -96, color: '#40c4ff' },
+  { g: '声音', label: '偏低', dim: 'voice', min: -100, max: -30, color: '#29b6f6' },
+  { g: '声音', label: '中性', dim: 'voice', min: -30, max: 30, color: '#4dd0e1' },
+  { g: '声音', label: '偏高', dim: 'voice', min: 30, max: 100, color: '#66bb6a' },
+  { g: '声音', label: '婉转声', dim: 'voice', min: 96, max: 100, color: '#3fb950' },
+]
+
+// RULE_SCHEMES 整套规则的快捷方案,点一下替换当前全部规则。
+//
+// 面向「不想逐条配」的场景:多数人只关心某几类,直接选一个现成的组合。
+// ids 引用 RULE_PRESETS 的 label(同名),故方案里的规则带预设的区间与配色,
+// 与手动添加的结果完全一致 —— 不存在「方案配的」和「自己配的」两套东西。
+export const RULE_SCHEMES = [
+  { k: 'medal', n: '奖牌四件套', ids: ['大块头', '小不点', '婉转声', '粗嗓门'] },
+  { k: 'extreme', n: '只看极值', ids: ['大块头', '婉转声'] },
+  { k: 'weight', n: '只看体型', ids: ['大块头', '小不点'] },
+  { k: 'voice', n: '只看声音', ids: ['婉转声', '粗嗓门'] },
+  { k: 'none', n: '清空', ids: [] },
+]
+
+// schemeRules 把方案展开成规则数组(带新 id,避免与既有规则撞 id)。
+export function schemeRules(scheme) {
+  const presets = RULE_PRESETS.filter((p) => scheme.ids.includes(p.label))
+  return presets.map((p, i) => ({
+    id: `s${i}_${p.label}`,
+    dim: p.dim, min: p.min, max: p.max,
+    label: p.label, color: p.color, on: true,
+  }))
+}
+
 // round1 取整到十分位。与地图显示(MapPage 的 wildTitle/资料卡)、滑块值同口径 ——
 // 否则 99.6 显示成「100%」的满格个体,阈值 100 时却因 99.6>=100 为假被误筛掉。
 const round1 = (v) => Math.round(v * 10) / 10
@@ -118,3 +167,30 @@ export function sanitizeRangeRules(v) {
 // sanitizeRangeRules 改名,React key 也不会因此重复)。
 export const newRuleId = () =>
   'r' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3)
+
+// clampRange 把区间的一端拖动后钳成合法区间,返回 [min, max]。
+//
+// 双滑块是两个独立的 range input,各自的原生行为不受另一端约束 —— 不钳的话
+// 下限能被拖到上限右边,区间就「翻」了(界面上高亮段消失,数值也看着不对)。
+//
+// 抽成纯函数而非写在组件里:这段是最容易写错的(方向、边界),而组件里的逻辑
+// verify-rules.mjs 够不着。
+export function clampRange(edge, value, other, dim) {
+  const v = Math.min(Math.max(Number(value), dim.min), dim.max)
+  const o = Math.min(Math.max(Number(other), dim.min), dim.max)
+  return edge === 'min' ? [Math.min(v, o), o] : [o, Math.max(v, o)]
+}
+
+// sliderTop 决定两个端点重合时哪个滑块在上层(接收指针事件)。
+//
+// 重合时上面的 input 会盖住下面的,总有一个端点拖不动。判据取「区间落在取值域的
+// 哪一半」:不偏右时让**上限**在上(用户多半想往右扩),偏右时让**下限**在上
+// (想往左缩)。这样两个方向都够得着,不必先拆开再调。
+//
+// 用 <= 而非 <:正好居中时(如嗓音 [-10,10],中心恰为取值域中点)归到「不偏右」,
+// 与偏左同侧处理。此时两个端点本就分开、谁在上都无所谓,但判据要有确定的归属,
+// 免得同一个值落进两个分支、行为随浮点误差漂移。
+export function sliderTop(min, max, dim) {
+  const mid = (dim.min + dim.max) / 2
+  return (min + max) / 2 <= mid ? 'max' : 'min'
+}

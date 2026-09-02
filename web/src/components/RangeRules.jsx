@@ -1,70 +1,68 @@
 import React, { useState } from 'react'
 import {
-  RANGE_DIMS, DIM_BY_K, RULE_PALETTE, DEFAULT_RANGE_RULES,
-  newRuleId, rangeRuleLabel,
+  RANGE_DIMS, DIM_BY_K, RULE_PALETTE, RULE_PRESETS, RULE_SCHEMES,
+  DEFAULT_RANGE_RULES, newRuleId, rangeRuleLabel, clampRange, sliderTop,
 } from '../utils/rules'
 
 // RangeRules 体重/声音区间规则的编辑器(事件页与大地图共用同一份规则,见 hooks/useRangeRules)。
 //
-// 每条规则一张小卡,三段:
-//   1. 头部:色点(点击换色)+ 名称(可直接改)+ 启停 + 删除
-//   2. 区间条:整条是该维度的取值域,高亮段即当前区间 —— 这是这个编辑器里最值得留的
-//      一笔:数字要读一遍再心算,色条扫一眼就知道「卡在尾巴上还是占了一大半」。
-//   3. 底部:维度 + 下限/上限输入 + 命中数
+// 每条规则两行:
+//   1. 色点(换色)+ 名称(可直接改)+ 区间值 + 命中数 + 启停 + 删除
+//   2. 维度(点切)+ **可拖的双滑块**
 //
-// 删除**不做二次确认**:规则是用户自己配的一条区间,重建只要两秒;而确认弹窗会打断
-// 「连着调几条」的手感。真正删不起的是数据(事件历史/涂地/路线进度),那些才确认。
-
-// NumInput 数字输入:输入期间保留原始文本(draft),失焦后才回到规范化值。
+// 滑块是这一版的关键:上一版区间条只能看不能拖,改区间得去数字框里填 —— 有可视化
+// 却不让人操作,是最别扭的一处。现在直接拖两端即可,数字只作为读数。
 //
-// 为什么要 draft:直接在 onChange 里钳值的话,想输「-96」时先敲的「-」是 NaN,
-// 会被立刻改写成边界值,光标和已输入内容一起乱掉 —— 负数区间根本没法输。
-// 故输入时不钳(只把有限数提交上去),失焦丢弃草稿,显示真正生效的值。
-function NumInput({ value, min, max, step, onChange, aria }) {
-  const [draft, setDraft] = useState(null)
-  const clamp = (n) => Math.min(Math.max(n, min), max)
-  return (
-    <input
-      className="input rrule-num" type="number"
-      min={min} max={max} step={step} value={draft ?? value} aria-label={aria}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        const n = Number(e.target.value)
-        if (e.target.value !== '' && Number.isFinite(n)) onChange(clamp(n))
-      }}
-      onBlur={() => setDraft(null)}
-    />
-  )
-}
+// 「+ 添加」改成从常用档位里点选(见 RULE_PRESETS),配上顶部整套方案(RULE_SCHEMES):
+// 自由度高不等于每次都从零配,多数时候选一个现成的再微调就够了。
 
-// RangeBar 区间可视化:整条是维度取值域,高亮段是 [min,max]。
-export function RangeBar({ rule, dim }) {
+// RangeSlider 双滑块:两个原生 range 叠在一起,只用它们的 thumb 接收指针事件。
+//
+// 原生 range 只能给单值,故叠两个(下限/上限),容器设 pointer-events:none、
+// 只给 thumb 设 auto —— 不这么处理的话上层 input 的轨道会整片盖住下层,
+// 另一个端点就永远拖不动了。
+function RangeSlider({ dim, min, max, color, onChange, label }) {
   const span = dim.max - dim.min
-  const left = ((Math.min(rule.min, rule.max) - dim.min) / span) * 100
-  const width = ((Math.abs(rule.max - rule.min)) / span) * 100
+  const pct = (v) => ((v - dim.min) / span) * 100
+  const top = sliderTop(min, max, dim)
   return (
-    <div className="rrule-bar" title={dim.hint}>
-      <span
-        className="rrule-bar-fill"
-        style={{ left: `${left}%`, width: `${width}%`, background: rule.color }}
+    <div className="rslider">
+      <div className="rslider-track" />
+      <div
+        className="rslider-fill"
+        style={{ left: `${pct(min)}%`, width: `${pct(max) - pct(min)}%`, background: color }}
       />
+      {(['min', 'max']).map((edge) => (
+        <input
+          key={edge}
+          type="range"
+          className={'rslider-input' + (top === edge ? ' top' : '')}
+          min={dim.min} max={dim.max} step={dim.step}
+          value={edge === 'min' ? min : max}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            const [lo, hi] = clampRange(edge, v, edge === 'min' ? max : min, dim)
+            onChange(lo, hi)
+          }}
+          aria-label={`${label}${edge === 'min' ? '下限' : '上限'}`}
+        />
+      ))}
     </div>
   )
 }
 
 export default function RangeRules({ rules = [], setRules, counts }) {
+  const [picking, setPicking] = useState(false) // 预设选择区是否展开
   const patch = (id, next) => setRules((rs) => rs.map((r) => (r.id === id ? { ...r, ...next } : r)))
   const remove = (id) => setRules((rs) => rs.filter((r) => r.id !== id))
 
-  const add = () => setRules((rs) => {
-    // 新规则默认铺满整个维度(全命中)而不是缩在边界上:用户接着就是收窄两端,
-    // 从一个「太宽」的起点往里收,比从一个「太窄」的起点往外扩更符合直觉。
-    const dim = RANGE_DIMS[0]
-    return [...rs, {
-      id: newRuleId(), dim: dim.k, min: dim.min, max: dim.max,
-      label: '', color: RULE_PALETTE[rs.length % RULE_PALETTE.length], on: true,
-    }]
-  })
+  const addPreset = (p) => {
+    setRules((rs) => [...rs, {
+      id: newRuleId(), dim: p.dim, min: p.min, max: p.max,
+      label: p.label, color: p.color, on: true,
+    }])
+    setPicking(false)
+  }
 
   // 维度切换:旧维度的区间按比例映射到新维度。直接保留数值会让体重 [98,100]
   // 切到声音后变成 [98,100](仍在声音域内,但语义完全变了);按比例映射则
@@ -87,6 +85,17 @@ export default function RangeRules({ rules = [], setRules, counts }) {
 
   return (
     <div className="rrule-list">
+      {/* 整套方案:点一下替换全部规则。面向「不想逐条配」的场景。 */}
+      <div className="rrule-schemes">
+        {RULE_SCHEMES.map((s) => (
+          <button
+            key={s.k} className="chip"
+            onClick={() => setRules(s.k === 'none' ? [] : schemeOf(s))}
+            title={s.ids.length ? `只留:${s.ids.join('、')}` : '清空全部规则'}
+          >{s.n}</button>
+        ))}
+      </div>
+
       {rules.map((rule) => {
         const dim = DIM_BY_K[rule.dim]
         const n = counts && counts[rule.id]
@@ -105,6 +114,12 @@ export default function RangeRules({ rules = [], setRules, counts }) {
                 onChange={(e) => patch(rule.id, { label: e.target.value })}
                 aria-label="规则名称"
               />
+              {/* 区间读数:拖动时跟着变。有自定义名时名称框已占用,这里补上数值,
+                  免得改了名就看不见区间了。 */}
+              <span className="rrule-val muted">
+                {rule.min}~{rule.max}{dim.unit}
+              </span>
+              {n != null && <span className="rrule-n muted" title="当前命中数">{n}</span>}
               <button
                 className={'rrule-mini' + (rule.on ? ' on' : '')}
                 onClick={() => patch(rule.id, { on: !rule.on })}
@@ -117,43 +132,65 @@ export default function RangeRules({ rules = [], setRules, counts }) {
               >×</button>
             </div>
 
-            <RangeBar rule={rule} dim={dim} />
-
-            <div className="rrule-foot">
-              <select
-                className="select rrule-dim" value={rule.dim}
-                onChange={(e) => switchDim(rule, e.target.value)}
-                aria-label="判定维度"
-              >
-                {RANGE_DIMS.map((d) => <option key={d.k} value={d.k}>{d.n}</option>)}
-              </select>
-              <NumInput
-                value={rule.min} min={dim.min} max={dim.max} step={dim.step}
-                onChange={(v) => patch(rule.id, { min: v })} aria="下限"
+            <div className="rrule-slide">
+              <button
+                className="rrule-dim" onClick={() => switchDim(rule, rule.dim === 'voice' ? 'weightPct' : 'voice')}
+                title="切换维度(体重百分位 / 嗓音原值),区间按比例映射过去"
+              >{dim.n}</button>
+              <RangeSlider
+                dim={dim} min={rule.min} max={rule.max} color={rule.color}
+                label={rule.label || dim.n}
+                onChange={(lo, hi) => patch(rule.id, { min: lo, max: hi })}
               />
-              <span className="rrule-tilde muted">~</span>
-              <NumInput
-                value={rule.max} min={dim.min} max={dim.max} step={dim.step}
-                onChange={(v) => patch(rule.id, { max: v })} aria="上限"
-              />
-              {n != null && <span className="rrule-n muted" title="当前命中数">{n}</span>}
             </div>
           </div>
         )
       })}
 
+      {/* 「+ 添加」展开常用档位:从零拖滑块太慢,点一个现成的再微调更省事。 */}
       <div className="rrule-actions">
-        <button className="btn ghost small" onClick={add}>+ 添加规则</button>
+        <button className="btn ghost small" onClick={() => setPicking((v) => !v)}
+          aria-expanded={picking}>+ 添加规则</button>
         <button
           className="btn ghost small"
           onClick={() => setRules(DEFAULT_RANGE_RULES.map((r) => ({ ...r })))}
           title="恢复成游戏奖牌四件套的边界(大块头/小不点/婉转声/粗嗓门)"
         >恢复默认</button>
       </div>
+      {picking && (
+        <div className="rrule-presets">
+          {RANGE_DIMS.map((d) => (
+            <div className="rrule-preset-group" key={d.k}>
+              <span className="muted">{d.n}</span>
+              <div className="chips">
+                {RULE_PRESETS.filter((p) => p.dim === d.k).map((p) => (
+                  <span key={p.label} className="chip" onClick={() => addPreset(p)}
+                    title={`${p.label}:${p.min}~${p.max}${d.unit}`}>
+                    <i className="rrule-preset-dot" style={{ background: p.color }} />
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {rules.length === 0 && (
-        <div className="rrule-empty muted">还没有规则。命中区间由你定 —— 想只看「体重 40%~60% 的中等体型」也可以。</div>
+        <div className="rrule-empty muted">
+          还没有规则。点上面「+ 添加规则」选个常用档位,或直接选一套方案。
+        </div>
       )}
     </div>
   )
+}
+
+// schemeOf 取方案的规则数组。抽出来是为了让上面的 JSX 短一点;
+// ids 为空时(清空)返回空数组,由调用方保证不传 none 进来。
+function schemeOf(s) {
+  const presets = RULE_PRESETS.filter((p) => s.ids.includes(p.label))
+  return presets.map((p) => ({
+    id: newRuleId(), dim: p.dim, min: p.min, max: p.max,
+    label: p.label, color: p.color, on: true,
+  }))
 }
