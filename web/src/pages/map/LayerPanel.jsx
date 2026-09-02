@@ -1,7 +1,8 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
-import { WILD_LAYERS, MEDAL_FILTERS } from './wildConfig'
+import { WILD_LAYERS } from './wildConfig'
+import RangeRules from '../../components/RangeRules'
 import ZonePanel from './ZonePanel'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
@@ -99,74 +100,35 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
               </div>
             )
           })}
-          {/* 奖牌四件套:整体收在「奖牌筛选」按钮下,点开才见 4 条。滑块是单值阈值,
-              默认=奖牌边界,只能往更极端拖(范围见 MEDAL_FILTERS),计数随阈值实时变化。 */}
+          {/* 体重/声音:区间规则,**与事件页共用同一套**(见 utils/rules.js)。
+              规则编辑器就是 RangeRules 组件,两个页面长得一样、改哪边都一样。
+              整体收在折叠按钮下:侧栏地方有限,而这几条多数时候配好就不动了。 */}
           <button className="map-medal-toggle" onClick={wilds.toggleOpen} aria-expanded={wilds.open}
-            title="大块头/小不点/婉转声/粗嗓门的判定阈值,默认即奖牌边界,可调更严">
-            <span>奖牌筛选</span>
+            title="体重百分位 / 嗓音原值的命中区间,自己定范围;与事件页共用同一套规则">
+            <span>体重 / 声音</span>
             <span className="muted">▾</span>
           </button>
-          {wilds.open && !wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dir, lo, hi, step }) => {
-            const num = wilds.num[k] || 0
-            const gone = wilds.numStale[k] || 0
-            const th = wilds.medals[k]
-            const on = wilds.medalOn.has(k)
-            return (
-              <div className="map-medal-row" key={k}
-                title={gone ? `视野内 ${num - gone} · 已离开视野 ${gone}` : undefined}>
-                {/* 行首开关:关掉该项后图上不再标这类奖牌,阈值保留但滑块置灰 */}
-                <button className={'map-collect-btn map-medal-switch' + (on ? ' on' : '')}
-                  onClick={() => wilds.toggleMedal(k)}
-                  title={on ? `关闭${n}筛选` : `开启${n}筛选`} aria-label={`${n}筛选开关`}
-                  aria-pressed={on}>✓</button>
-                <span className="map-wild-swatch" style={{ borderColor: color }} />
-                <span className="map-layer-name">{n}</span>
-                <span className="map-medal-val">{dir}{th}</span>
-                <input type="range" className="map-medal-range" min={lo} max={hi} step={step ?? 0.5}
-                  value={th} onChange={(e) => wilds.setThreshold(k, Number(e.target.value))}
-                  disabled={!on} aria-label={`${n}判定阈值`} />
-                <span className="muted">{num}</span>
-              </div>
-            )
-          })}
-          {/* 双牌:奖牌组的「元筛选」。同一只宠同时命中 ≥2 张奖牌判定(体重族+嗓音族各一,
-              命中数上限就是 2,见 useWildPets 的 wildShown)才显示;开关图层(异色/炫彩、污染)
-              不受影响。双牌开后奖牌段改用双牌阈值判 ≥2 张,单牌阈值不再参与该段。
-              双牌有独立的 4 条阈值(默认=单牌当前值=擦边双牌),拖严后双牌比单牌更严但两者
-              解耦——子滑块范围 [单牌当前值, 极端值],只严不宽,由 clampDual 保证不比单牌宽。
-              开关关时子滑块折叠,计数仍显示(用单牌阈值判 ≥2 张,供参考)。 */}
+          {wilds.open && (
+            <RangeRules
+              rules={wilds.rangeRules}
+              setRules={wilds.setRangeRules}
+              counts={wilds.ruleNum}
+            />
+          )}
+          {/* 双牌:规则组的「元筛选」—— 命中 ≥2 条规则才显示。
+              规则是用户自己配的,故「双牌」即命中其中任意两条,不再限定体重族+嗓音族各一
+              (那正是旧版表达不了的:现在可以配 5 条体重区间,任意两条组合都算双牌)。
+              开关图层(异色/炫彩、污染)不受影响。 */}
           <div className="map-medal-row map-medal-dual"
             title={dualGone ? `视野内 ${dualNum - dualGone} · 已离开视野 ${dualGone}` : undefined}>
-            <button className={'map-collect-btn map-medal-switch' + (wilds.dual.on ? ' on' : '')}
+            <button className={'map-collect-btn map-medal-switch' + (wilds.dual ? ' on' : '')}
               onClick={wilds.toggleDual}
-              title="只显示同时命中 2 张奖牌判定的宠(如 大块头+婉转声);需至少开启 2 条奖牌筛选"
-              aria-label="双牌筛选开关" aria-pressed={wilds.dual.on}>✓</button>
+              title="只显示同时命中 2 条规则的宠(如 大块头+婉转声);需至少启用 2 条规则"
+              aria-label="双牌筛选开关" aria-pressed={wilds.dual}>✓</button>
             <span className="map-medal-dual-ic">✧</span>
             <span className="map-layer-name">双牌</span>
             <span className="muted">{dualNum}</span>
           </div>
-          {wilds.dual.on && MEDAL_FILTERS.map(({ k, n, color, dir, lo, hi, step }) => {
-            // 双牌子滑块:范围 [单牌当前值, 极端值],只严不宽。dir>=': min=单牌值,max=hi;
-            // dir<=': min=lo,max=单牌值。单牌值变化时 useWildPets 的 setThreshold 会联动
-            // clampDual 把双牌阈值钳到合法范围,这里取 wilds.dual.medals[k] 即可。
-            const single = wilds.medals[k]
-            const dTh = wilds.dual.medals[k]
-            const dMin = dir === '>=' ? single : lo
-            const dMax = dir === '>=' ? hi : single
-            const on = wilds.medalOn.has(k)
-            return (
-              <div className="map-medal-row map-medal-dual-sub" key={k}
-                title={on ? undefined : `${n}奖牌筛选已关闭,双牌不含此项`}>
-                <span className="map-wild-swatch" style={{ borderColor: color }} />
-                <span className="map-layer-name">{n}</span>
-                <span className="map-medal-val">{dir}{dTh}</span>
-                <input type="range" className="map-medal-range map-medal-dual-range" min={dMin} max={dMax}
-                  step={step ?? 0.5} value={dTh}
-                  onChange={(e) => wilds.setDualThreshold(k, Number(e.target.value))}
-                  disabled={!on} aria-label={`双牌${n}判定阈值`} />
-              </div>
-            )
-          })}
         </div>
         {routes.kinds.length > 0 && (
           <div className="filter-group">

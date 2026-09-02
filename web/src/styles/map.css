@@ -372,15 +372,27 @@
   position: relative; display: block; overflow: hidden;
   width: 140px; height: 77px;
   margin-top: 3px;
-  /* 资料卡整体是 pointer-events:none(免得挡住下面标记的点击),色卡是卡内**唯一**
-     需要点起来的东西 —— 点它弹出放大预览,里面有「在 rkpet 看 3D 效果」外链。
-     故只给色卡放开点击,卡片其余部分仍可穿透,原意不变。 */
+  /* 资料卡整体是 pointer-events:none(免得挡住下面标记的点击),卡内要点的东西
+     (色卡与下面的 3D 外链)各自显式放开,卡片其余部分仍可穿透,原意不变。 */
   pointer-events: auto; cursor: zoom-in;
 }
 .map-wild-tip .map-wild-tip-chip > i, .map-wild-tip .map-wild-tip-chip > img {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%;
 }
 .map-wild-tip .map-wild-tip-chip > img { object-fit: cover; }
+
+/* 资料卡里的 3D 外链。
+   色卡那一下点击是**本地放大**,「看 3D」是**跳出去** —— 两者不是一回事,故外链不只
+   藏在色卡的放大预览里(那样要连点两次才找得到,实测多数人不知道色卡还能点)。
+   摆在面板上直接可见。
+   面板整体是 pointer-events:none,这里必须显式放开 —— 否则按钮看着在却点不动,
+   与上面色卡同一个坑。 */
+.map-wild-rkpet {
+  pointer-events: auto;
+  display: flex; width: fit-content; margin: 6px auto 0;
+  font-size: 12px; color: var(--fg-dim); text-decoration: none;
+}
+.map-wild-rkpet:hover { color: var(--accent); background: var(--accent-soft); }
 
 /* 图层侧栏里野生宠物那几行:没有图标,用一个同色小圆点代表标记描边色(色值同样来自 JS)。 */
 .map-wild-swatch {

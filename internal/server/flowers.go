@@ -5,14 +5,25 @@ package server
 // 定义在 server 包(而非 pipeline):pipeline 通过类型别名引用(见 pipeline/boss.go),
 // 使管理员面板(server 包)能在不引入 pipeline 的前提下构造/读取花种数据。
 type FlowerItem struct {
-	ID             uint32 `json:"id"`             // 花种 NPC 配置 id
-	Name           string `json:"name"`           // 守护宠物名(petbase,未知时为空)
-	Img            string `json:"img"`            // 守护宠物头像 /img/<此路径>(未知时为空,前端回退)
-	Star           uint32 `json:"star"`           // 星级(普通花灵 5,特殊花灵 7)
-	Blood          uint32 `json:"blood"`          // 血脉 id(PET_BLOOD_CONF.blood,1-24)
-	BloodName      string `json:"bloodName"`      // 血脉中文短名(普通/草/火…;未知时为空)
-	BloodIcon      string `json:"bloodIcon"`      // 血脉主图标 /img/<此路径>(未知时为空)
-	NpcLogicID     uint64 `json:"npcLogicId"`     // NPC 逻辑 id(每只花种唯一;详情合并按此匹配)
+	ID         uint32 `json:"id"`         // 花种 NPC 配置 id
+	Name       string `json:"name"`       // 守护宠物名(petbase,未知时为空)
+	Img        string `json:"img"`        // 守护宠物头像 /img/<此路径>(未知时为空,前端回退)
+	Star       uint32 `json:"star"`       // 星级(普通花灵 5,特殊花灵 7)
+	Blood      uint32 `json:"blood"`      // 血脉 id(PET_BLOOD_CONF.blood,1-24)
+	BloodName  string `json:"bloodName"`  // 血脉中文短名(普通/草/火…;未知时为空)
+	BloodIcon  string `json:"bloodIcon"`  // 血脉主图标 /img/<此路径>(未知时为空)
+	NpcLogicID uint64 `json:"npcLogicId"` // NPC 逻辑 id(每只花种唯一;详情合并按此匹配)
+	// 守护宠物的形态编号(petbase id),用于「在 rkpet 看 3D 效果」的外链 ——
+	// 花种卡片的色卡点开后那条按钮靠它拼 URL,没有它按钮就不显示。
+	//
+	// 与 WildMark.BaseConfID 同源同义,⚠️ 同样**不可**从 Img 反推(见 payload.go
+	// 里 WildMark.BaseConfID 的注释:多个形态共用素材,1112 个形态里 461 个的头像
+	// 文件名与形态编号不同)。
+	//
+	// 注意:花种**没有异色标记**(0x0375 / 0x0338 两个面板都不带 mutation 字段),
+	// 故这里只给编号、不给 shiny —— rkpet 那边按普通配色渲 3D。这是数据源所限,
+	// 不是遗漏:猜一个 shiny 值上去反而会把对的渲染成错的。
+	BaseConfID     uint32 `json:"baseConfId,omitempty"`
 	ChallengeCount uint32 `json:"challengeCount"` // 本账号累计挑战次数(按品种持久化,花种消失仍保留;0=未挑战过)
 	EndTs          uint64 `json:"endTs"`          // 活动结束 Unix 秒(0=未设置)
 	SpecSeedID     uint32 `json:"specSeedId"`     // 特殊花种种子 id(0=普通花种)

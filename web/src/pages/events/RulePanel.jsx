@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react'
 import { getNameOptions } from '../../api'
 import { HOT_NATURE_NAMES } from '../../constants'
-import { FIELDS, WEIGHT_OPTS, VOICE_OPTS, GENDER_OPTS } from './highlight'
+import { FIELDS, GENDER_OPTS } from './highlight'
+import RangeRules from '../../components/RangeRules'
 
 // RulePanel 高亮规则侧栏:桌面常驻左栏,移动端为抽屉(collapsed 控制开合)。
 // 规则与 AND/OR 模式由父级持有;「种类」的自由输入草稿是面板内部状态。
-export default function RulePanel({ rules, mode, setMode, addRule, toggleRule, collapsed, onClose }) {
+//
+// 两组规则并存,各有其编辑方式:
+//   - 点选类(种类/性别/性格/特长):维度下点条目即可,见下;
+//   - 区间类(体重/声音):交给 RangeRules —— 它同时被大地图复用,改一处两边生效
+//     (见 utils/rules.js)。故这里不做任何区间相关的特判,只透传。
+export default function RulePanel({
+  rules, mode, setMode, addRule, toggleRule,
+  rangeRules, setRangeRules, rangeCounts,
+  collapsed, onClose,
+}) {
   const [nameOpts, setNameOpts] = useState({ speciality: [] }) // 全量特长点选条目
   const [speciesDraft, setSpeciesDraft] = useState('') // 「种类」自由输入框内容
   useEffect(() => { getNameOptions().then((o) => setNameOpts(o || { speciality: [] })).catch(() => {}) }, [])
 
-  // 某维度下可点选的条目:性格取宠物列表常用项、特长取全表、性别取雄/雌、体重/声音取两极标签。
+  // 某维度下可点选的条目:性格取宠物列表常用项、特长取全表、性别取雄/雌。
+  // 体重/声音不在此列 —— 它们是区间规则,由下面的 RangeRules 编辑。
   const paletteFor = (field) => {
     if (field === 'nature') return HOT_NATURE_NAMES
     if (field === 'speciality') return (nameOpts.speciality || []).filter((v) => v !== '无') // 「无特长」不作高亮项
     if (field === 'gender') return GENDER_OPTS
-    if (field === 'weight') return WEIGHT_OPTS
-    if (field === 'voice') return VOICE_OPTS
     return []
   }
   const hasRule = (field, value) => rules.some((r) => r.field === field && r.value === value)
@@ -44,10 +53,18 @@ export default function RulePanel({ rules, mode, setMode, addRule, toggleRule, c
           <button className="icon-btn rules-close" onClick={onClose} aria-label="关闭规则">✕</button>
         </div>
         <div className="rule-logic">
-          <span className="muted small" title="AND:各维度都要命中(同维度内任一条目即可)。OR:任一条目命中即可。体重/声音按百分位判定。异色/炫彩始终高亮。">
+          <span className="muted small" title="AND:各维度都要命中(同维度内任一条目即可)。OR:任一条目命中即可。体重/声音按区间判定,与大地图共用同一套规则。异色/炫彩始终高亮。">
             {mode === 'and' ? '同时满足所选条件' : '任一条件命中'}即高亮，异色/炫彩始终高亮
           </span>
         </div>
+
+        {/* 体重/声音:区间规则,放最上面 —— 它们是这次的主要配置对象,且两边共用 */}
+        <div className="filter-group">
+          <label>体重 / 声音</label>
+          <RangeRules rules={rangeRules} setRules={setRangeRules} counts={rangeCounts} />
+        </div>
+
+        {/* 点选类维度 */}
         <div className="rule-groups">
           {FIELDS.map((f) => (
             <div className="filter-group" key={f.k}>
