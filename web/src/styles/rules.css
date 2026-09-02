@@ -1,0 +1,121 @@
+/* —— 体重/声音区间规则编辑器(事件页与大地图共用)——
+   全部走既有设计令牌(--bg-2/--bg-3/--line/--radius 等),不引入新色板,
+   让它在两个侧栏里都像是本来就在那儿的东西。 */
+
+.rrule-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* 单条规则卡:三段(头部 / 区间条 / 底部)。
+   .off 只降饱和与透明度,**不隐藏** —— 停用的规则还得看得见才谈得上「再打开」。 */
+.rrule {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 9px 9px;
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  transition: border-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.rrule:hover { border-color: var(--line); }
+.rrule.off { opacity: .48; }
+.rrule.off:hover { opacity: .7; }
+
+/* —— 头部:色点 + 名称 + 启停 + 删除 —— */
+.rrule-head { display: flex; align-items: center; gap: 6px; }
+.rrule-swatch {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .22); cursor: pointer; padding: 0;
+  transition: transform .12s var(--ease-out), box-shadow .12s var(--ease-out);
+}
+.rrule-swatch:hover { transform: scale(1.18); box-shadow: 0 0 0 3px rgba(255, 255, 255, .08); }
+.rrule-swatch:active { transform: scale(.96); }
+
+/* 名称输入:撑满剩余宽度,去掉 .input 的全宽内边距让卡片更紧凑。
+   placeholder 显示区间本身 —— 没起名的规则也有个说得清的名字。 */
+.rrule-label {
+  flex: 1; min-width: 0; width: auto;
+  padding: 3px 7px; font-size: 12px; background: transparent; border-color: transparent;
+}
+.rrule-label:hover { border-color: var(--line); }
+.rrule-label:focus { background: var(--bg-2); }
+
+/* 迷你按钮:启停(✓)与删除(×)同款 20px 方格,与侧栏其它小开关(.map-collect-btn)对齐。
+   删除默认低对比,hover 才转红 —— 避免一屏好几个红叉的压迫感。 */
+.rrule-mini {
+  flex: none; width: 20px; height: 20px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1; color: var(--fg-dim);
+  background: transparent; border: 1px solid var(--line); border-radius: 6px;
+  cursor: pointer; transition: all .12s var(--ease-out);
+}
+.rrule-mini:hover { border-color: var(--accent); color: var(--accent); }
+.rrule-mini.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.rrule-mini.danger:hover { border-color: var(--red); color: var(--red); background: rgba(248, 81, 73, .1); }
+
+/* —— 区间条:整条是维度取值域,高亮段是当前区间 ——
+   4px 细条 + 端点微光,不抢文字的注意力,但扫一眼就能看出区间落在哪、有多宽。 */
+.rrule-bar {
+  position: relative; height: 4px; border-radius: 2px;
+  background: var(--bg-3); overflow: hidden;
+}
+.rrule-bar-fill {
+  position: absolute; top: 0; bottom: 0; border-radius: 2px;
+  /* 一点内发光:深色底图上的纯色细条容易显得干瘪 */
+  box-shadow: 0 0 6px -1px currentColor;
+  transition: left .12s var(--ease-out), width .12s var(--ease-out);
+}
+
+/* —— 底部:维度 + 下限 ~ 上限 + 命中数 —— */
+.rrule-foot { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.rrule-dim {
+  flex: none; width: auto; padding: 3px 5px; font-size: 12px;
+  background: var(--bg-3); cursor: pointer;
+}
+.rrule-num {
+  flex: 1; min-width: 0; width: auto;
+  padding: 3px 5px; font-size: 12px; text-align: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.rrule-tilde { flex: none; font-size: 11px; }
+/* 命中数靠右,等宽数字 —— 实时变化时不会因字宽跳动 */
+.rrule-n {
+  flex: none; min-width: 20px; text-align: right;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* 底部操作:添加 / 恢复默认 */
+.rrule-actions { display: flex; gap: 6px; }
+.rrule-actions .btn { flex: 1; }
+
+.rrule-empty { font-size: 12px; line-height: 1.5; }
+
+/* —— 事件页:命中规则的彩色标签 ——
+   贴在事件行的数值旁,说明「这条是因为命中了哪条规则才亮的」。
+   色条取规则色,与地图描边同色 —— 同一条规则在两个页面长得一样,才认得出是同一条。 */
+.rule-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+.rule-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0 6px; border-radius: 999px; font-size: 11px; line-height: 16px;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg);
+  white-space: nowrap;
+}
+.rule-tag-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  /* 颜色由行内 style 给(取自规则本身),这里只定形状 */
+  background: var(--accent);
+}
+
+/* 来源筛选行:工具条下一行,与事件列表之间。
+   用 button 而非 span(可键盘聚焦、有 pressed 态),故补一条字体继承 ——
+   button 默认不继承 font-family,不补的话这行的字会和别处不一样。 */
+.event-srcs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.event-srcs .small { font-size: 12px; }
+button.chip { font-family: inherit; }
+
+/* —— 事件页:来源标签(捕捉/孵蛋/赠送获得/获得)——
+   比普通文字稍暗一档,不与「命中规则」的彩色标签抢注意力:
+   来源只是背景信息,高亮才是要点。 */
+.event-src {
+  flex: none; padding: 0 6px; border-radius: 999px;
+  font-size: 11px; line-height: 16px;
+  background: var(--bg-3); border: 1px solid var(--line-soft); color: var(--fg-dim);
+  white-space: nowrap;
+}

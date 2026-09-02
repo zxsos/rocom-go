@@ -16,8 +16,11 @@ export const NOTIFY_DUAL_ONLY_KEY = 'map.wildNotifyDualOnly.v1'
 
 // fireWildNotify 弹一条系统通知:标题 = 名字 + 类别标签(与资料卡同口径,见 wildTags),
 // 正文 = 等级 / 体重百分位 / 坐标;tag 用实体 id,浏览器同 id 自动去重。点击通知聚焦页面。
-export function fireWildNotify(p) {
-  const tags = wildTags(p.kinds)
+//
+// rangeRules 传进来是为了让标签里带上区间规则的名字:一只宠可能是因为「体重 40~60」
+// 这种自定义区间被圈出来的,光看 kinds 标签(后端只有固定四种)说不清它为什么稀有。
+export function fireWildNotify(p, rangeRules = []) {
+  const tags = wildTags(p, rangeRules)
   const title = `${p.n || '野生宠物'}${tags.length ? ' · ' + tags.join(' ') : ''}`
   const parts = []
   if (p.lv) parts.push('Lv.' + p.lv)

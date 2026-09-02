@@ -328,6 +328,7 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 		ID:         req.Base,
 		Name:       info.Name,
 		Img:        head,
+		BaseConfID: req.Base, // 花种卡片色卡的「在 rkpet 看 3D 效果」外链要用
 		Star:       star,
 		Blood:      blood,
 		BloodName:  s.db.BloodName(blood),
@@ -351,7 +352,11 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 	s.injects[req.Account] = append(s.injects[req.Account], &injectEntry{
 		id: id, account: req.Account, mark: &WildMark{
 			ID: id, Name: info.Name + "(花种)", Kinds: []string{"colorful"},
-			Glass: glassDesc, GlassType: glassType, GlassValue: glassValue,
+			// 编号给外链用。这里**不给 shiny**:花种没有异色(0x0375/0x0338 都不带
+			// mutation,注入接口也没有 kind 字段,头像同样按非异色取),与真实花种
+			// 保持一致 —— 不要因为它是「假精灵」就比真的多给一个字段。
+			BaseConfID: req.Base,
+			Glass:      glassDesc, GlassType: glassType, GlassValue: glassValue,
 		},
 		created: now, kind: "flower", flowerLogicID: f.NpcLogicID,
 	})

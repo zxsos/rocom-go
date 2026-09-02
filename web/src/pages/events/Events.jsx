@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } from 'react'
 import { getEvents, getEventCount, getEventStats, clearEvents, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredState, useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
@@ -11,9 +11,11 @@ import { PetDetailModal } from '../../components/PetDetailModal'
 import { TweenNumber } from '../../components/TweenNumber'
 import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
 import { chime, rareChime } from '../../utils/audio'
-import { sanitizeRules, isHighlight, NOTABLE_BLOODS } from './highlight'
+import { sanitizeRules, isHighlight, matchedRules, NOTABLE_BLOODS, SUB_KINDS } from './highlight'
 import RulePanel from './RulePanel'
 import Dropdown from '../../components/Dropdown'
+import { useRangeRules } from '../../hooks/useRangeRules'
+import { matchRangeRule } from '../../utils/rules'
 
 // 空列表的兜底常量:引用稳定,免得每次渲染造新数组打穿下游 memo。
 const NO_EVENTS = []
@@ -21,6 +23,13 @@ const NO_EVENTS = []
 export default function Events() {
   const account = useContext(AccountContext)
   const [rules, setRules] = useStoredJSON(localStorage, 'hlRules', [], sanitizeRules)
+  // 体重/声音的区间规则:**与大地图共用同一份**(见 hooks/useRangeRules)。
+  // 这里只消费、不自带副本 —— 在两个页面各配一遍既麻烦,也会让两边判定口径漂移。
+  const [rangeRules, setRangeRules] = useRangeRules()
+  // 只看指定来源(捕捉/孵蛋/赠送获得/获得);空=不筛选。
+  const [srcs, setSrcs] = useStoredState(localStorage, 'ev.srcs',
+    (s) => (s ? s.split(',').filter((k) => SUB_KINDS.includes(k)) : []),
+    (v) => (v || []).join(','))
   // 多规则联合逻辑:'and'=需全部命中(默认)、'or'=任一命中
   const [mode, setMode] = useStoredState(localStorage, 'hlMode', (s) => (s === 'or' ? 'or' : 'and'), (v) => v)
   // 规则抽屉开合(仅移动端生效,桌面侧栏常驻)
@@ -67,19 +76,20 @@ export default function Events() {
   )
 
   // subscribe 的 effect 只依赖 account,回调里读 rules/mode/soundOn/page/pageSize 需走 ref 拿最新值
-  const soundRef = useRef({ rules, mode, soundOn })
+  // 区间规则也要进 ref:提示音按最新规则判,否则改完规则后旧事件仍按旧口径响铃。
+  const soundRef = useRef({ rules, rangeRules, mode, soundOn })
   const pageRef = useRef({ page, pageSize })
   useEffect(() => {
-    soundRef.current = { rules, mode, soundOn }
+    soundRef.current = { rules, rangeRules, mode, soundOn }
     pageRef.current = { page, pageSize }
   })
 
   // 后端只记录获得宠物事件(放生/赠送出等减少事件不入库),故无需再按类型过滤。
   useEffect(() => subscribe('event', (ev) => {
       // 规则命中提示音:命中高亮规则的新捕获响铃,异色/炫彩(最高优先级)响升级音
-      const { rules: rs, mode: md, soundOn: so } = soundRef.current
+      const { rules: rs, rangeRules: rr, mode: md, soundOn: so } = soundRef.current
       const pet = ev && ev.pet
-      if (so && isHighlight(pet, rs, md)) {
+      if (so && isHighlight(pet, rs, rr, md)) {
         pet.shiny || pet.colorful ? rareChime() : chime()
       }
       // 仅第 1 页实时推进(头部插入并裁掉超出本页的旧条);其他页保持不动,翻回第 1 页时重拉可见
@@ -95,6 +105,36 @@ export default function Events() {
   const toggleRule = (field, value) => setRules((r) => hasRule(field, value)
     ? r.filter((x) => !(x.field === field && x.value === value))
     : [...r, { field, value }])
+  // 来源筛选:点已选中的取消、未选中的加入;空数组=不筛选(看全部)。
+  const toggleSrc = (k) => setSrcs((prev) =>
+    prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k])
+
+  // 各区间规则在当前页的命中数,供规则编辑器逐条显示。
+  // 只统计**已加载的这一页**:总数要遍历全部事件才准,而这里只是给用户调区间时
+  // 一个即时反馈(拖宽区间数字就涨),不必为它再拉一次全量。
+  const rangeCounts = useMemo(() => {
+    const c = {}
+    for (const r of rangeRules) {
+      if (!r.on) continue
+      c[r.id] = events.filter((ev) => ev.pet && matchRangeRule(ev.pet, r)).length
+    }
+    return c
+  }, [events, rangeRules])
+
+  // 先算高亮与命中规则,再依次过「仅看命中」「来源」两道筛选,最后统一渲染。
+  //
+  // 顺序有讲究:序号 # 取自**未过滤**的原始下标 i,若先 filter 再 map,被筛掉的行
+  // 会让后面所有行的序号错位(列表里 # 是「第几只」,必须稳定)。
+  // 命中规则(hits)也在这里一次算好,避免渲染时每行再算一遍。
+  const filtered = useMemo(() => events
+    .map((ev, i) => ({
+      ev, i,
+      hl: isHighlight(ev.pet, rules, rangeRules, mode),
+      hits: matchedRules(ev.pet, rules, rangeRules),
+    }))
+    .filter(({ hl }) => !onlyHl || hl)
+    .filter(({ ev }) => srcs.length === 0 || srcs.includes(ev.subKind)),
+  [events, rules, rangeRules, mode, onlyHl, srcs])
 
   // 清空事件历史(后端删除 + 前端清列表并将计数归零,下次获得从 1 重新计)
   const clearAll = async () => {
@@ -113,6 +153,7 @@ export default function Events() {
       <RulePanel
         rules={rules} mode={mode} setMode={setMode}
         addRule={addRule} toggleRule={toggleRule}
+        rangeRules={rangeRules} setRangeRules={setRangeRules} rangeCounts={rangeCounts}
         collapsed={collapsed} onClose={() => setCollapsed(true)}
       />
 
@@ -134,6 +175,19 @@ export default function Events() {
           <button className={'btn btn-icon' + (soundOn ? ' primary' : '')} onClick={() => setSoundOn((v) => !v)}
             title="规则命中提示音,新捕获命中高亮规则时响铃(异色/炫彩响升级音)">{soundOn ? '🔊' : '🔈'}</button>
           <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
+        </div>
+        {/* 来源筛选:获得方式由 catch_way 推断(捕捉/孵蛋/赠送获得/获得)。
+            此前列表里完全看不出来源,只能点开详情 —— 混在一起时想单看「这波孵了几只」
+            做不到。空选=看全部,故「全部」只在已筛选时出现。 */}
+        <div className="event-srcs">
+          <span className="muted small">来源</span>
+          {SUB_KINDS.map((k) => (
+            <button key={k} className={'chip' + (srcs.includes(k) ? ' on' : '')} onClick={() => toggleSrc(k)}
+              title={srcs.includes(k) ? `取消「${k}」` : `只看${k}`} aria-pressed={srcs.includes(k)}>{k}</button>
+          ))}
+          {srcs.length > 0 && (
+            <button className="chip" onClick={() => setSrcs([])} title="清除来源筛选,看全部">全部</button>
+          )}
         </div>
         {statsOpen && stats && (
           <div className="event-stats">
@@ -187,17 +241,18 @@ export default function Events() {
         )}
         <div className="event-list">
           {/* 先按原始下标算序号(#total-offset-i)与高亮,再按"仅看高亮"过滤,保证序号不因过滤错位 */}
-          {events
-            .map((ev, i) => ({ ev, i, hl: isHighlight(ev.pet, rules, mode) }))
-            .filter(({ hl }) => !onlyHl || hl)
-            .map(({ ev, i, hl }) => (
-              <EventItem key={ev.id || ev.gid + '-' + ev.time} ev={ev} seq={total - (page - 1) * pageSize - i} hl={hl}
-                onOpen={() => ev.gid && setDetailGid(ev.gid)} />
-            ))}
+          {filtered.map(({ ev, i, hl, hits }) => (
+            <EventItem key={ev.id || ev.gid + '-' + ev.time} ev={ev} seq={total - (page - 1) * pageSize - i} hl={hl}
+              hits={hits} onOpen={() => ev.gid && setDetailGid(ev.gid)} />
+          ))}
           {loading && <div className="empty muted">加载中…</div>}
           {!loading && events.length === 0 && <div className="empty">暂无事件。游戏中捕捉/孵蛋新宠物后将实时出现在这里。</div>}
-          {events.length > 0 && onlyHl && !events.some((ev) => isHighlight(ev.pet, rules, mode)) &&
-            <div className="empty">当前没有命中高亮规则的事件。{rules.length === 0 ? '请先添加高亮规则。' : ''}</div>}
+          {(onlyHl || srcs.length > 0) && events.length > 0 && filtered.length === 0 && (
+            <div className="empty">
+              当前筛选下没有事件。
+              {onlyHl && rules.length === 0 && rangeRules.every((r) => !r.on) ? '请先添加高亮规则。' : ''}
+            </div>
+          )}
           {events.length > 0 && (
             <div className="event-pager">
               <label className="muted pager-size">
@@ -224,7 +279,11 @@ export default function Events() {
 }
 
 // EventItem 单条捕获事件:头像 + 名称徽标行 + 关键数值摘要;点击打开详情弹窗。
-function EventItem({ ev, seq, hl, onOpen }) {
+//
+// hits 是该条命中了哪些规则(含区间规则自带的颜色):高亮本身只把整行染成金色,
+// 看不出是体重还是声音命中的 —— 这些小标签就是那层解释,颜色与地图描边同源,
+// 同一条规则在两个页面认得出是同一条。
+function EventItem({ ev, seq, hl, hits = [], onOpen }) {
   const p = ev.pet
   return (
     <div className={'event' + (hl ? ' hl' : '')} onClick={onOpen}>
@@ -238,6 +297,21 @@ function EventItem({ ev, seq, hl, onOpen }) {
             <Marks p={p} />
             {NOTABLE_BLOODS.includes(p?.blood) && <Blood p={p} iconOnly />}
           </span>
+          {/* 获得方式:由 catch_way 推断(见服务端 catchWayName)。放在名称后,
+              与异色/炫彩这类「本身稀有」的标记分开 —— 来源是背景信息,不是稀有度。 */}
+          {ev.subKind && <span className="event-src">{ev.subKind}</span>}
+          {hits.length > 0 && (
+            <span className="rule-tags">
+              {hits.map((h) => (
+                <span key={h.id} className="rule-tag">
+                  {/* 色点用行内 background 而非 CSS 变量:颜色取自规则本身,
+                      走变量的话 check-css-vars 认不出「它在行内定义」会报未定义。 */}
+                  <i className="rule-tag-dot" style={{ background: h.color }} />
+                  {h.label}
+                </span>
+              ))}
+            </span>
+          )}
           <span className="event-time muted">{fmtTime(ev.time)}</span>
         </div>
         <div className="pet-sub">

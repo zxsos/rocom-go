@@ -175,6 +175,10 @@ func (p *Pipeline) onBossNpcInfo(m capture.Message, acc string) {
 			SpecSeedID:  b.SpecSeedID,
 			ActivityID:  b.ActivityID,
 			OwnerUserID: b.OwnerUserID,
+			// 守护宠物的形态编号:花种卡片的色卡点开后「在 rkpet 看 3D 效果」外链要用。
+			// 这里直接就是 petbase id(无需反查),但**不能**从 Img 反推(见 FlowerItem
+			// 的注释)—— 头像文件名与形态编号之间没有换算关系。
+			BaseConfID: b.PetBaseID,
 		}
 		if base, ok := p.db.PetBase(b.PetBaseID); ok {
 			it.Name = base.Name
