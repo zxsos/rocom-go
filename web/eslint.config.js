@@ -60,6 +60,7 @@ export default [
     //   - verify-account-width.mjs      顶栏账号切换器(徽章顺序 + 5 字基准 + 截断)
     //   - verify-account-mobile.mjs     手机端账号 sheet(portal / 三种退出 / 键盘)
     //   - verify-route-enter.mjs        路由过渡层的布局链路(地图页高度链不被这层吃掉)
+    //   - verify-theme-spread-browser.mjs 主题切换的圆形扩散(伪元素动画是否真的在跑)
     // 判定方法:顶层 import 'playwright' 的脚本就是双环境的,加进来即可。
     // 忘登记的代价:脚本里的 page.evaluate 回调全是浏览器全局,no-undef 会报几十条,
     // npm run lint 直接红 —— 新加验收脚本时务必同步这里。
@@ -74,6 +75,7 @@ export default [
       'scripts/verify-admin-paging.mjs',
       'scripts/verify-account-width.mjs',
       'scripts/verify-account-mobile.mjs',
+      'scripts/verify-theme-spread-browser.mjs',
     ],
     languageOptions: {
       ecmaVersion: 'latest',

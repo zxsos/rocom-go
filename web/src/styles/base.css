@@ -113,7 +113,21 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+  /* 主题切换的整屏扩散(见文件末尾「主题切换」段):比 slow 再长一档 ——
+     它是唯一一个**全屏范围**的动效,视觉行程最长,320ms 会显得「唰」一下盖过去,
+     620ms 才有「从按钮处慢慢蔓延开」的观感。 */
+  --dur-theme: 620ms;
   --ease-out: cubic-bezier(.32, .72, 0, 1);
+
+  /* 主题扩散的**圆心与半径**:由 hooks/useTheme.js 在点击时按按钮位置**内联注入**。
+     这里的三行是「JS 没注入」时的静态兜底(顶栏右侧、半径铺满视口)。
+
+     写在 :root 里是硬要求:scripts/check-css-vars.mjs 只认 CSS 里的定义,
+     **看不出**某个变量是由 JS 注入的 —— 不写这三行,下面 @keyframes theme-spread
+     里的 var() 会被判成「未定义」并让 npm run check:css 退出码非 0。 */
+  --theme-x: 90vw;
+  --theme-y: 24px;
+  --theme-r: 150vmax;
 
   /* 系别标签的深字色:浅底系别(冰/翼/草/虫…)用白字对比度不足,改用这一档。
      取值接近纯黑但留一点冷调,与 --fg 系同源。放在这里(而非系别色那段另起
@@ -538,6 +552,38 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
 }
 
+/* ---- 主题切换:新主题从按钮处圆形扩散开(配合 hooks/useTheme.js)----
+
+   原理:View Transitions API 截下「旧主题」与「新主题」两张整页快照,
+   让**新**快照以按钮中心为圆心、clip-path: circle() 从 0 张到覆盖整屏 ——
+   看上去就是新颜色从按钮里蔓延出来,把旧颜色一圈圈推到屏幕外。
+
+   两个前提(缺一个就整段退回瞬时切换,判定在 useTheme 的 canSpread 里):
+     1. 浏览器支持 document.startViewTransition(Chrome 111+ / Safari 18+);
+     2. 用户没开「减少动态效果」。
+
+   关掉 UA 默认的交叉淡入是**必须的**:默认给 old/new 各挂一条淡入淡出,
+   与 clip-path 叠加后,圆还没张到的地方也会跟着整体变淡,
+   观感变成「先整屏闪一层灰,再扩散」而不是纯粹的蔓延。
+   mix-blend-mode: normal 同理 —— 这一对快照默认按 plus-lighter 叠加,
+   两张都不透明时只会越叠越亮(白屏)。 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+/* 裁的是 ::view-transition-**new**(root) —— 它是「新主题」那张快照,
+   按规范画在 old 之上,裁它才等价于「新色长出来」(裁 old 会变成旧色被挖掉)。
+   选择器挂 html.theme-spread:该 class 只在本次过渡期间存在(由 useTheme 加/删),
+   平时不匹配,故不影响将来可能出现的其它 view-transition。 */
+html.theme-spread::view-transition-new(root) {
+  animation: theme-spread var(--dur-theme) var(--ease-out) both;
+}
+@keyframes theme-spread {
+  from { clip-path: circle(0px at var(--theme-x) var(--theme-y)); }
+  to { clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y)); }
+}
+
 /* ---- 路由懒加载的页面级占位(main.jsx 的 PageLoading)----
    只在懒加载 chunk 未就绪的瞬间出现(局域网内通常一闪而过),
    先给纯 spinner,P5 会升级成与页面布局同构的骨架屏。 */
@@ -563,4 +609,8 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
   .toast, .confirm-backdrop, .confirm-dialog, .glass-zoom-backdrop, .filters {
     transition-duration: 0.01ms !important;
   }
+  /* 主题扩散:useTheme 的 canSpread 已整段跳过(连 startViewTransition 都不调),
+     这里再兜一层 —— 万一 theme-spread 因过渡被打断而残留,也不会留下一张
+     裁掉半屏的快照(animation: none 时新快照整张立即可见,即瞬时切换)。 */
+  html.theme-spread::view-transition-new(root) { animation: none; }
 }

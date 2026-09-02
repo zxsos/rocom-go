@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -71,6 +72,89 @@ const (
 	merchantForceRefresh = true
 )
 
+// 远行商人**数据源**:同一时刻只有一个生效,管理员可在管理面板切换(见
+// handleAdminMerchantSource)。两个源是互相独立的第三方,不是同一站的两条路:
+//
+//   - merchantSrcXianyu 咸鱼源:第三方 JSON 接口,需 -egg-api-key。字段最全
+//     (商人名/副标题/商品图/类别/本轮倒计时),默认源。
+//   - merchantSrcHaoyou 好游快爆源:抓公开页面,**无需令牌** —— 这是它相对咸鱼源
+//     的核心价值(2026-09-02 起咸鱼源实测返回 401)。商品名/价格/限购/商品图/类别
+//     都有(图是外链),少的只是商人名、副标题、本轮倒计时;整点后约 30~60 秒切档,
+//     与咸鱼源开了强制回源后的滞后同一量级(实测数据与时间线见 docs/data.md)。
+//
+// 两源形态完全不同(JSON 接口 vs HTML 页面),故在 merchantFetch 处按当前源分派到
+// fetchXianyu / fetchHaoyou,二者都返回**同形的响应体**再往下走 —— 有货判定、
+// 订阅邮件、前端渲染这四处因此不必分支。归一化层见 merchant_haoyou.go。
+const (
+	merchantSrcXianyu = "xianyu"
+	merchantSrcHaoyou = "haoyou"
+)
+
+// merchantSrcDefault 库里没配置时生效的源。
+const merchantSrcDefault = merchantSrcXianyu
+
+// merchantSourceValid 判断源标识是否合法(管理端点写入前的校验入口)。
+//
+// 单独成函数而非 map 查表:标识只有两个、且要被三处(载入/切换/校验)共用,
+// 用 map 反而多一个需要同步维护的清单。
+func merchantSourceValid(src string) bool {
+	return src == merchantSrcXianyu || src == merchantSrcHaoyou
+}
+
+// merchantNeedKey 该源是否必须配置第三方令牌。
+func merchantNeedKey(src string) bool { return src == merchantSrcXianyu }
+
+// merchantSourceName 源的中文展示名。
+//
+// 映射放在后端:前端切换时要 POST 标识,若这份映射只存在于前端,两边迟早漂移
+// (改了一处忘了另一处,表现是「面板显示未知源」这类没人能一眼看懂的错)。
+func merchantSourceName(src string) string {
+	switch src {
+	case merchantSrcXianyu:
+		return "咸鱼源"
+	case merchantSrcHaoyou:
+		return "好游快爆源"
+	}
+	return src
+}
+
+// merchantSource 返回当前生效的数据源标识。
+//
+// 内存镜像而非每次读库:回源路径与 HTTP 处理器都会频繁问它(merchantEnsure 每 tick、
+// handleMerchant 每次请求各一次),而它只在切源时才变 —— 没必要为一次几乎不变的
+// 读取给每条请求加一条 SQL。
+func (s *Server) merchantSource() string {
+	s.merchantSrcMu.Lock()
+	defer s.merchantSrcMu.Unlock()
+	return s.merchantSrc
+}
+
+// merchantSetSource 切换数据源:落库 → 更新内存镜像 → 清空槽缓存 → 按新源重抓当前轮。
+//
+// 清缓存是必须的(理由见 store.ClearMerchantSlots):不清的话另一源格式的旧货单会被
+// 当成新源的数据显示,页面顶部的来源标注也在说谎。代价是切源当天「昨日回顾」为空,
+// 直到下一个营业日的档被缓存 —— 管理面板卡片里写明了这一点。
+//
+// 重抓放在 goroutine:抓第三方是秒级(页面比 JSON 接口还慢),同步做会让管理面板的
+// 保存按钮一直转圈。切源后页面短暂为空是可接受的,下一个 15 分钟 tick 也会兜住。
+func (s *Server) merchantSetSource(src string) error {
+	if !merchantSourceValid(src) {
+		return fmt.Errorf("未知的数据源 %q", src)
+	}
+	if err := s.store.SetMerchantSource(src); err != nil {
+		return err
+	}
+	s.merchantSrcMu.Lock()
+	s.merchantSrc = src
+	s.merchantSrcMu.Unlock()
+	if err := s.store.ClearMerchantSlots(); err != nil {
+		return err
+	}
+	log.Printf("远行商人数据源已切换为 %s:已清空槽缓存,正在按新源重抓当前轮", src)
+	go s.merchantEnsure(time.Now(), true)
+	return nil
+}
+
 // merchantShouldForceRefresh 决定本次回源是否强制第三方刷新缓存。
 //
 // 抽成函数是为了让策略可调:目前一律 true(首查要真实数据、重查就是为了追滞后,
@@ -108,7 +192,8 @@ type merchantSlotJSON struct {
 // merchantRespJSON handleMerchant 的响应:status 供前端选择「营业中 / 昨日回顾」。
 type merchantRespJSON struct {
 	Now    int64              `json:"now"`
-	Day    string             `json:"day"` // 当前展示的营业日(YYYY-MM-DD;休市时指刚结束的营业日)
+	Day    string             `json:"day"`    // 当前展示的营业日(YYYY-MM-DD;休市时指刚结束的营业日)
+	Source string             `json:"source"` // 当前生效的数据源标识(xianyu/haoyou),前端据此标注来源
 	Status string             `json:"status"`
 	Today  []merchantSlotJSON `json:"today"` // 当天 6 个槽(升序,empty 标注休市;8 点前为空,看 prev)
 	Prev   []merchantSlotJSON `json:"prev"`  // 仅 status=idle 时填充:昨日的 6 个槽(回顾用)
@@ -186,7 +271,9 @@ func (s *Server) merchantResend(now time.Time) {
 // 写进 8 点槽等于伪造历史(服务 16 点才启动时尤其明显 —— 旧实现会把 16 点的货单同时填进
 // 8/12/16 三个槽)。宁可让历史轮显示「无数据」,也不能拿假数据充数。
 func (s *Server) merchantEnsure(now time.Time, force ...bool) {
-	if s.eggAPIKey == "" {
+	// 只有咸鱼源需要令牌:好游快爆源抓公开页面,未配 -egg-api-key 时仍应正常定时
+	// 补查 —— 否则「换源」就换不来任何数据,而这恰恰是换源最主要的用途。
+	if merchantNeedKey(s.merchantSource()) && s.eggAPIKey == "" {
 		return
 	}
 	if merchantDayStatus(now) == "idle" {
@@ -277,31 +364,16 @@ func (s *Server) merchantShouldFetch(slotStart, now time.Time) bool {
 // true = 让它绕过自己的缓存直接回源(拿到的是此刻真实货单),false = 拿它可能陈旧的快照。
 // 取值策略见 merchantShouldForceRefresh。
 func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
-	params := url.Values{}
-	params.Add("key", s.eggAPIKey)
-	params.Add("format", "json")
-	params.Add("refresh", strconv.FormatBool(refresh))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, merchantFetchURL+"?"+params.Encode(), nil)
-	if err != nil {
-		log.Printf("merchantFetch 构造请求失败: %v", err)
-		return false, false
+	// 两源形态不同,但都返回**同形**的响应体(好游快爆侧做了归一化,见
+	// merchant_haoyou.go),故从这里往下无需再区分是哪个源。
+	var body string
+	var ok bool
+	if s.merchantSource() == merchantSrcHaoyou {
+		body, ok = s.fetchHaoyou(slotStart, refresh)
+	} else {
+		body, ok = s.fetchXianyu(slotStart, refresh)
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("merchantFetch 请求失败: %v", err)
-		return false, false
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 上限 1MB
-	if err != nil {
-		log.Printf("merchantFetch 读响应失败: %v", err)
-		return false, false
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("merchantFetch HTTP %d, 响应前 200 字节: %q", resp.StatusCode, truncateBytes(body, 200))
+	if !ok {
 		return false, false
 	}
 	// 校验并判定有货/无货:第三方成功码不统一,实测 code=0 与 code=200 都表示成功,
@@ -312,8 +384,8 @@ func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 			Items []json.RawMessage `json:"items"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(body, &out); err != nil {
-		log.Printf("merchantFetch JSON 解析失败: %v, 响应前 200 字节: %q", err, truncateBytes(body, 200))
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		log.Printf("merchantFetch JSON 解析失败: %v, 响应前 200 字节: %q", err, truncateBytes([]byte(body), 200))
 		return false, false
 	}
 	empty := !((out.Code == 0 || out.Code == 200) && len(out.Data.Items) > 0)
@@ -334,11 +406,47 @@ func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 			return true, true
 		}
 	}
-	if err := s.store.PutMerchantSlot(slotStart.Unix(), empty, string(body)); err != nil {
+	if err := s.store.PutMerchantSlot(slotStart.Unix(), empty, body); err != nil {
 		log.Printf("merchantFetch 写槽缓存失败: %v", err)
 		return false, false
 	}
 	return true, empty
+}
+
+// fetchXianyu 回源咸鱼源(JSON 接口),返回响应原文。签名与 fetchHaoyou 一致,
+// 供 merchantFetch 按当前源分派。
+//
+// refresh 对应第三方的 refresh 参数:true = 让它绕过自己的缓存直接回源(拿到的是
+// 此刻真实货单),false = 拿它可能陈旧的快照。取值策略见 merchantShouldForceRefresh。
+func (s *Server) fetchXianyu(slotStart time.Time, refresh bool) (string, bool) {
+	params := url.Values{}
+	params.Add("key", s.eggAPIKey)
+	params.Add("format", "json")
+	params.Add("refresh", strconv.FormatBool(refresh))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, merchantFetchURL+"?"+params.Encode(), nil)
+	if err != nil {
+		log.Printf("merchantFetch 构造请求失败: %v", err)
+		return "", false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("merchantFetch 请求失败: %v", err)
+		return "", false
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 上限 1MB
+	if err != nil {
+		log.Printf("merchantFetch 读响应失败: %v", err)
+		return "", false
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("merchantFetch HTTP %d, 响应前 200 字节: %q", resp.StatusCode, truncateBytes(body, 200))
+		return "", false
+	}
+	return string(body), true
 }
 
 // truncateBytes 截断字节串用于日志(避免刷屏),超长时加省略号。
@@ -353,8 +461,11 @@ func truncateBytes(b []byte, n int) string {
 // 参数:force=1 强制回源当前可查槽(烧第三方 token,前端「强制刷新」用)。
 // 响应结构见 merchantRespJSON。
 func (s *Server) handleMerchant(w http.ResponseWriter, r *http.Request) {
-	if s.eggAPIKey == "" {
-		http.Error(w, "服务端未配置查询令牌(启动时加 -egg-api-key)", http.StatusServiceUnavailable)
+	// 只有咸鱼源需要令牌:好游快爆源抓的是公开页面,没令牌也能查 —— 缺令牌时
+	// 提示里给出这条路,免得管理员以为服务坏了只能去申请第三方令牌。
+	if merchantNeedKey(s.merchantSource()) && s.eggAPIKey == "" {
+		http.Error(w, "服务端未配置查询令牌(启动时加 -egg-api-key,或在管理面板切换到无需令牌的好游快爆源)",
+			http.StatusServiceUnavailable)
 		return
 	}
 	now := time.Now()
@@ -363,6 +474,7 @@ func (s *Server) handleMerchant(w http.ResponseWriter, r *http.Request) {
 	day := merchantDayStart(now)
 	out := merchantRespJSON{
 		Now:    now.Unix(),
+		Source: s.merchantSource(),
 		Status: merchantDayStatus(now),
 	}
 	if out.Status == "idle" {

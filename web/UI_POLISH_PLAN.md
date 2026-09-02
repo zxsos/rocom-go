@@ -293,6 +293,59 @@ mac/win/linux/安卓多端渲染一致。
 
 预期效果：键盘用户操作弹窗不"迷失焦点"，与 P1 的二级菜单键盘操作形成完整链路。
 
+### 4.4 主题切换：从按钮处圆形扩散 —— ✅ 已完成
+
+需求：点顶栏主题按钮换深/亮时，新主题**从按钮那里慢慢蔓延开**，而不是整屏瞬变。
+
+实施记录：
+- 用 **View Transitions API**（不引库）：`document.startViewTransition()` 截下「旧主题」
+  与「新主题」两张整页快照，让**新**快照以按钮中心为圆心做
+  `clip-path: circle(0 → 覆盖整屏)` 展开 —— 新色从按钮里长出来，把旧色推到屏幕外。
+  时长新增令牌 `--dur-theme: 620ms`（比 `--dur-slow` 再长一档：它是唯一的全屏动效，
+  320ms 会显得「唰」一下盖过去）。
+- 圆心/半径由 `hooks/useTheme.js` 在点击时**内联注入** `--theme-x/y/r`：
+  - 圆心取 `e.currentTarget.getBoundingClientRect()` 的中心 —— 故 `App.jsx` 必须写
+    `onClick={cycleTheme}`（事件即圆心来源），包一层 `() => cycleTheme()` 就丢了事件；
+  - 半径取到视口**四角**的最远距离（`Math.hypot(max(x, w-x), max(y, h-y))`），
+    短一点会在对角留一条月牙形旧色残边。
+- 三个坑：
+  1. **必须 `flushSync(() => setTheme(next))`**：回调返回后浏览器立刻截新快照，
+     而 React 18 的自动批处理会把更新推到微任务 —— 快照可能截到旧主题，
+     表现为「圆张开了，里面铺开的还是原来那个颜色」。另在回调末尾按新模式再落一次
+     `data-theme`（幂等），不依赖 effect 的调度时序。
+  2. **必须关掉 UA 默认的交叉淡入**（`::view-transition-old/new(root)` 写
+     `animation: none; mix-blend-mode: normal`）：否则圆还没张到的地方也跟着整体变淡，
+     观感是「先整屏闪一层灰再扩散」；`mix-blend-mode` 不改则是 plus-lighter 越叠越亮。
+  3. `theme-spread` class 与三个变量的清理要同时挂 `vt.ready.catch()` 与
+     `vt.finished.then()` —— 连续快点时第一次过渡会被抢占，只有 `finished` 会漏掉残留。
+- 三条退化路径（动画可以没有，功能不能丢）：无 `startViewTransition`、
+  `prefers-reduced-motion: reduce`、**换了模式但生效颜色没变**（浅色浏览器里
+  auto → light）—— 最后那条尤其要不得：全程看不到任何变化，而过渡期间页面是快照
+  （连按钮图标都要等过渡结束才换），620ms 的观感就是「点了没反应」，故直接瞬时切。
+- 验收（两套，谁也替不了谁）：
+  - `scripts/verify-theme-spread.mjs`（静态，已并进 `npm run verify`）：守住
+    「关默认淡入」「裁的是 new 而不是 old」「半径覆盖最远角」「用了 flushSync」
+    「reduced-motion 有降级」等 8 类静默失效。**变异测试 8/8 全被抓到**。
+  - `scripts/verify-theme-spread-browser.mjs`（真 Chromium，不依赖后端）：
+    断言动画真的挂在 `::view-transition-new(root)` 上（选择器匹配得上）、
+    中途 clip-path 半径介于 0 与满半径之间（真的在逐帧长大）、收尾清理干净，
+    外加三条退化路径与一条**像素证据**（中途截图取色：圆内 A 点已是新主题、
+    圆外 B 点仍是旧主题）。
+  - 变异测试（5 条，记录真实的覆盖率而不是好看的数字）：
+    - 选择器写错 / 不关默认淡入 / 去掉收尾清理 / 去掉「颜色不变就不播」→ 4 条全被抓到；
+    - **「去掉 flushSync」当前抓不到** —— Chromium 上 React 赶得及在截快照前提交，
+      故 flushSync 属**防御性**写法（成本为零，防的是并发渲染让出或 React 改调度）；
+    - 像素证据那一节是补这块短板的：实测「给 old 快照加 z-index 盖住 new」这条
+      （网上常见写法，方向搞反就是它）**只有像素检查抓得到** —— 圆照常张开、
+      半径照常插值，其余断言全绿，但屏幕上压根没有颜色变化。
+  - 测法踩过的坑：**取样不能用 rAF / 固定 sleep 对齐时间轴** —— headless 下 rAF
+    会滞后，整条取样时间轴被推后，「中途」取到的是动画第 0 帧（半径 0，看着像没跑）。
+    改成按 `animation.currentTime` 轮询推进；等清理同理改成轮询（view-transition 的
+    finished 比动画自身晚一两帧）。
+
+预期效果：换主题不再是莫名其妙的整屏瞬变，颜色从手指点下的那个按钮蔓延开，
+「是我刚才那一下点的」这件事看得见。
+
 ---
 
 ## 5. P6 · 可访问性审计（优先级 P1）

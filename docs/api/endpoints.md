@@ -130,7 +130,16 @@
 | `POST /api/merchant/sub` | — | ✓ | 订阅/更新（body: `email`, `keywords`） |
 | `DELETE /api/merchant/sub` | — | ✓ | 退订 |
 
-> 第三方令牌与 SMTP 配置在服务端。未配置时相关接口返回 **503**，前端提示未配置。
+`GET /api/merchant` 顶层多一个 `source` 字段：当前生效的数据源标识（`xianyu` / `haoyou`）。
+**前端不展示它** —— 两个源出自不同第三方，但玩家无从判断该信哪个，标注只会平添困惑；
+该字段是为排查留的（收到「货单不对」的反馈时，`curl` 一下就知道当时是哪个源在供数）。
+两源返回的**货单结构一致**（好游快爆源在服务端归一化了，见 `docs/data.md` 第 6 节）；
+差异只在于商品图的来源 —— 咸鱼源是本站 `/img/` 相对路径，好游快爆源是 biligame 外链，
+`image` 字段两种取值都支持（外链在订阅邮件里不内嵌，直接输出 URL，故可能被邮件客户端拦截）。
+
+> 第三方令牌与 SMTP 配置在服务端。未配置令牌时：`source` 为 `xianyu` 的接口返回 **503**
+> （前端提示未配置，或建议切到无需令牌的好游快爆源）；`source` 为 `haoyou` 时照常返回 ——
+> 该源抓的是公开页面，不需要令牌。
 
 ## 账号安全与排行榜
 
@@ -166,6 +175,8 @@
 | `GET /api/admin/merchant-subs` | admin | 商人邮件推送名单 |
 | `DELETE /api/admin/merchant-subs` | admin | 删除某邮箱订阅（`?email=`） |
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
+| `GET /api/admin/merchant-source` | admin | 远行商人数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
+| `POST /api/admin/merchant-source` | admin | 切换数据源（body: `source`）；会清空已缓存货单并按新源重抓当前轮 |
 | `GET /api/admin/annotations/pending` | admin | 待审标注列表（`?kind=skill\|feature\|event`） |
 | `POST /api/admin/annotations/{id}/review` | admin | 审核标注（body: `approve`） |
 

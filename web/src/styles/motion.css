@@ -1,0 +1,202 @@
+/* 各页面的入场过渡编排。
+ *
+ * 为什么集中在一个文件:入场是**横切关注点**,散到各页面 CSS 里会各自发明
+ * 一套缓动与时长,最后每个页面的"手感"都不一样,而这是最需要统一的东西。
+ * 更重要的是 —— 编排的节奏差异(谁快谁慢、谁先谁后)**要对着看才调得出来**,
+ * 分开写就永远调不出层次。
+ *
+ * 设计原则(与项目既有动效保持一致,见 base.css 的 route-enter、
+ * events.css 的 event-in):
+ *
+ * 1. 用项目既有的 --dur-* / --ease-out,不另造时长体系;
+ * 2. fill-mode 用 both —— 否则首帧会闪一下未变换的状态再跳到动画起点;
+ * 3. stagger 只对**前 N 项**递增(N 取 6~8),其后统一延迟。一屏几十条
+ *    若每条都加 30ms,末尾要晚一秒才出现,看着像卡了(events.css 已验证过);
+ * 4. 只做一次,不循环 —— 入场装饰反复播放会变成噪音;
+ * 5. reduced-motion 下**整个关掉**(见文件末尾):纯装饰,关掉不丢任何信息。
+ *
+ * ⚠️ 与 --dur-* 的约定冲突时以本文件为准?不 —— 本文件**只用**它们。
+ *    若要调节奏,改 base.css 里那几个变量,让全站一起变。
+ */
+
+/* ——— 1. 花种页:花是「长」出来的 ———
+ * 花瓣开放是有机的,故用了全站唯一一处带过冲(overshoot)的缓动:
+ * 尾段 1.03 让卡片轻轻"绽开"再落定。别的地方都用 --ease-out,
+ * 回弹只在这里出现,才显得是刻意而非手滑。 */
+@keyframes bloom-in {
+  from { opacity: 0; transform: translateY(10px) scale(.965); }
+  to { opacity: 1; transform: none; }
+}
+/* ⚠️ 挂在 .flower-card 而非 .flower-chip:后者是卡片**内部**的小标签
+   (Lv / 绑定宠物 / 挑战次数),一张卡有好几个 —— 给标签做入场动画,
+   每张卡会连续闪好几下,而不是卡片整张入场。(踩过:最初就写错了。) */
+.flower-card {
+  animation: bloom-in var(--dur-slow) cubic-bezier(.22, 1.02, .36, 1) both;
+}
+/* 前 8 朵依次绽放;其后的统一延迟,免得末尾越等越久。
+   基延迟 60ms:让页面的标题/筛选栏先落定,花再一朵朵开 ——
+   若与页面容器同时起步,会显得整页在"抖"。
+   注意列表分「特殊」「普通」两节,各自是一个 .flower-grid,
+   故 nth-child 在每节内独立计数 —— 两节各自从头 stagger,符合阅读顺序。 */
+.flower-card:nth-child(1) { animation-delay: 60ms; }
+.flower-card:nth-child(2) { animation-delay: 90ms; }
+.flower-card:nth-child(3) { animation-delay: 120ms; }
+.flower-card:nth-child(4) { animation-delay: 150ms; }
+.flower-card:nth-child(5) { animation-delay: 180ms; }
+.flower-card:nth-child(6) { animation-delay: 210ms; }
+.flower-card:nth-child(7) { animation-delay: 240ms; }
+.flower-card:nth-child(n + 8) { animation-delay: 270ms; }
+
+/* ——— 2. 精灵蛋:孵化 ———
+ * 蛋是"破壳"而非"绽放",故起点更紧(scale .9)、位移更小,
+ * 配轻微过冲 —— 像从壳里弹出来。时长比花种短(--dur-base),
+ * 孵蛋是干脆的一下,不该拖。 */
+@keyframes hatch-in {
+  from { opacity: 0; transform: translateY(6px) scale(.9); }
+  to { opacity: 1; transform: none; }
+}
+.egg-card {
+  animation: hatch-in var(--dur-base) cubic-bezier(.2, 1.06, .38, 1) both;
+}
+.egg-card:nth-child(1) { animation-delay: 40ms; }
+.egg-card:nth-child(2) { animation-delay: 70ms; }
+.egg-card:nth-child(3) { animation-delay: 100ms; }
+.egg-card:nth-child(4) { animation-delay: 130ms; }
+.egg-card:nth-child(5) { animation-delay: 160ms; }
+.egg-card:nth-child(6) { animation-delay: 190ms; }
+.egg-card:nth-child(n + 7) { animation-delay: 220ms; }
+
+/* ——— 3. 远行商人:货架陈列 ———
+ * 商品是"摆上货架",规整、等距,故用标准 --ease-out 不带过冲,
+ * 位移稍大(14px)体现"放上去"的纵向感。 */
+@keyframes shelf-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.merchant-item {
+  animation: shelf-in var(--dur-base) var(--ease-out) both;
+}
+.merchant-item:nth-child(1) { animation-delay: 40ms; }
+.merchant-item:nth-child(2) { animation-delay: 65ms; }
+.merchant-item:nth-child(3) { animation-delay: 90ms; }
+.merchant-item:nth-child(4) { animation-delay: 115ms; }
+.merchant-item:nth-child(5) { animation-delay: 140ms; }
+.merchant-item:nth-child(6) { animation-delay: 165ms; }
+.merchant-item:nth-child(n + 7) { animation-delay: 190ms; }
+
+/* ——— 4. 图鉴炫彩:收集册翻页 ———
+ * 卡牌"滑入"而非"浮现":带 6px 横向位移,像从册子右侧推进来。
+ * 这是全站唯一一处横向入场 —— 只为收集册保留,别处别用,
+ * 否则横向动效泛滥会让整个站看着"飘"。 */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(6px) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.hb-card {
+  animation: slide-in var(--dur-slow) var(--ease-out) both;
+}
+.hb-card:nth-child(1) { animation-delay: 50ms; }
+.hb-card:nth-child(2) { animation-delay: 85ms; }
+.hb-card:nth-child(3) { animation-delay: 120ms; }
+.hb-card:nth-child(4) { animation-delay: 155ms; }
+.hb-card:nth-child(5) { animation-delay: 190ms; }
+.hb-card:nth-child(6) { animation-delay: 225ms; }
+.hb-card:nth-child(7) { animation-delay: 260ms; }
+.hb-card:nth-child(n + 8) { animation-delay: 295ms; }
+
+/* ——— 5. 管理员柱状图:柱子「长」出来 ———
+ * ⚠️ 这是全站唯一**有信息量**的入场动效,其余都是纯装饰。
+ * 柱状图表达的是数量,故柱子从零高度长起来(scaleY 0→1)直接演示了
+ * "数据从无到有";若改用淡入,动画就与语义无关了。
+ *
+ * transform-origin 必须是 bottom —— 否则柱体会从中心向上下两头长,
+ * 看起来像被拉伸而不是增长。
+ * 柱体自身不动,只有行依次出现,故 stagger 挂在 .admin-bar-row 上。 */
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.admin-bar-row .admin-bar-fill {
+  transform-origin: bottom;
+  animation: bar-grow var(--dur-slow) var(--ease-out) both;
+}
+.admin-bar-row:nth-child(1) .admin-bar-fill { animation-delay: 60ms; }
+.admin-bar-row:nth-child(2) .admin-bar-fill { animation-delay: 110ms; }
+.admin-bar-row:nth-child(3) .admin-bar-fill { animation-delay: 160ms; }
+.admin-bar-row:nth-child(4) .admin-bar-fill { animation-delay: 210ms; }
+.admin-bar-row:nth-child(5) .admin-bar-fill { animation-delay: 260ms; }
+.admin-bar-row:nth-child(n + 6) .admin-bar-fill { animation-delay: 310ms; }
+
+/* ——— 6. 排行榜:冲线 ———
+ * 名次有先后,故整行从左侧滑入(12px),像选手依次冲过终点。
+ * 前三名延迟更短、更"急",与后面的拉开节奏 —— 名次本身就是叙事。 */
+@keyframes rank-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+.rank-row {
+  animation: rank-in var(--dur-base) var(--ease-out) both;
+}
+.rank-row:nth-child(1) { animation-delay: 50ms; }
+.rank-row:nth-child(2) { animation-delay: 80ms; }
+.rank-row:nth-child(3) { animation-delay: 110ms; }
+.rank-row:nth-child(4) { animation-delay: 155ms; }
+.rank-row:nth-child(5) { animation-delay: 200ms; }
+.rank-row:nth-child(n + 6) { animation-delay: 245ms; }
+
+/* ——— 7. 盒子地图:格子逐个点亮 ———
+ * 网格用 scale 而非位移:格子是"被点亮",缩放最贴合;
+ * 位移会让网格在入场时整体偏移,边界看着在晃。
+ * 时长用 --dur-fast(最短):格子多,慢了会拖出一阵"波纹"。
+ * stagger 步长也最小(18ms),因为格子密的视觉密度高。 */
+@keyframes tile-in {
+  from { opacity: 0; transform: scale(.88); }
+  to { opacity: 1; transform: none; }
+}
+.boxmap-grid > * {
+  animation: tile-in var(--dur-fast) var(--ease-out) both;
+}
+.boxmap-grid > *:nth-child(1) { animation-delay: 30ms; }
+.boxmap-grid > *:nth-child(2) { animation-delay: 48ms; }
+.boxmap-grid > *:nth-child(3) { animation-delay: 66ms; }
+.boxmap-grid > *:nth-child(4) { animation-delay: 84ms; }
+.boxmap-grid > *:nth-child(5) { animation-delay: 102ms; }
+.boxmap-grid > *:nth-child(6) { animation-delay: 120ms; }
+.boxmap-grid > *:nth-child(7) { animation-delay: 138ms; }
+.boxmap-grid > *:nth-child(n + 8) { animation-delay: 156ms; }
+
+/* ——— 8. 宠物列表:表格行顺次落位 ———
+ * 表格是密集数据,动效必须**最轻** —— 用 --dur-fast 且只有 4px 位移。
+ * 这里若用花种那种 10px + scale,几十行一起动会晃眼。
+ * ⚠️ transform 作用在 <tr> 上在部分浏览器无效,故挂在单元格上。 */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.pets tbody tr {
+  animation: row-in var(--dur-fast) var(--ease-out) both;
+}
+.pets tbody tr:nth-child(1) { animation-delay: 30ms; }
+.pets tbody tr:nth-child(2) { animation-delay: 48ms; }
+.pets tbody tr:nth-child(3) { animation-delay: 66ms; }
+.pets tbody tr:nth-child(4) { animation-delay: 84ms; }
+.pets tbody tr:nth-child(5) { animation-delay: 102ms; }
+.pets tbody tr:nth-child(n + 6) { animation-delay: 120ms; }
+
+/* ——— 降级:关掉全部入场编排 ———
+ * 这些都是纯装饰(唯一的例外是柱状图,但它的**终态**就是正确数值,
+ * 关掉动画只是不演示"长出来"的过程,数据一毫不丢)。
+ * 故此处比 base.css 那条全局降级更彻底:直接 animation: none,
+ * 元素停在最终状态(fill-mode both 已保证不依赖动画才可见)。 */
+@media (prefers-reduced-motion: reduce) {
+  .flower-card,
+  .egg-card,
+  .merchant-item,
+  .hb-card,
+  .admin-bar-row .admin-bar-fill,
+  .rank-row,
+  .boxmap-grid > *,
+  .pets tbody tr {
+    animation: none !important;
+  }
+}

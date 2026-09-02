@@ -480,6 +480,18 @@ export function adminMerchantSubDelete(email) {
     })
 }
 
+// adminMerchantSource 远行商人数据源:{source, keySet, sources:[{id, name, needKey}]}。
+// sources 由后端下发(合法标识只有后端能校验),前端只负责展示文案。
+export const adminMerchantSource = () => adminFetch('/api/admin/merchant-source').then(async (r) => {
+  if (!r.ok) throw await adminError(r, '拉取数据源失败')
+  return r.json()
+})
+
+// adminMerchantSourceSet 切换远行商人数据源。
+// 后端切换时会清空当日已缓存货单并按新源重新获取,故这个调用比一般的保存慢一点,
+// 前端要给出「保存中」的状态(见 MerchantSourceCard)。
+export const adminMerchantSourceSet = (source) => postJSON('/api/admin/merchant-source', { source })
+
 // adminTestMail 发送测试邮件验证 SMTP 配置(错误信息透传后端 SMTP 具体报错)。
 // subject/body 可自定义,为空则后端用默认标题/内容。
 export const adminTestMail = (email, subject, body) =>
