@@ -303,12 +303,31 @@ func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool) {
 	}
 	// 页面上没有请求的这一档:休市时段(0-8 点)页面只显示昨天全天,当天的档要等
 	// 开市后才出现。这是「该槽此刻无货」而非故障,故按 ok=true + 空货单返回。
+	//
+	// 但必须**记下页面实际给了哪些档**:「整点后还没换档(滞后)」与「这一档压根不
+	// 在页面上(缺档)」的排查方向完全不同,而站在外面看都是「没发邮件」—— 不记
+	// 下来就只能靠猜。
+	log.Printf("merchantFetch 好游快爆源缺档: 需要 %s, 页面上只有 %s",
+		slotStart.Format("01-02 15:04"), haouyouSlotDesc(slots))
 	out, err := haoyouEnvelopeJSON(nil, slotStart, slotStart.Add(merchantSlotStep))
 	if err != nil {
 		log.Printf("merchantFetch 好游快爆源归一化失败: %v", err)
 		return "", false
 	}
 	return out, true
+}
+
+// haouyouSlotDesc 把页面上的档期列成 "09-02 08:00~12:00(2件);09-02 12:00~16:00(…)" 供日志用。
+func haouyouSlotDesc(slots []haoyouSlot) string {
+	if len(slots) == 0 {
+		return "无"
+	}
+	parts := make([]string, 0, len(slots))
+	for _, sl := range slots {
+		parts = append(parts, fmt.Sprintf("%s~%s(%d件)",
+			sl.start.Format("01-02 15:04"), sl.end.Format("15:04"), len(sl.goods)))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // haoyouFetchPage 抓取页面原文(带 UA、超时与体积上限)。

@@ -363,7 +363,8 @@
 /* 距离行:玩家↔宠物直线距离(米)。比坐标行亮一档,是点资料卡时最关心的信息。 */
 .map-wild-tip .twd { color: var(--fg); opacity: .9; }
 .map-wild-tip .tws { color: var(--red); }
-/* 悬浮面板里的炫彩色卡:比角标圆盘内的 14×8 大得多(280×154 原始比例的 1/2),点开即可看清配色。
+/* 悬浮面板里的炫彩色卡:比角标圆盘内的 14×8 大得多(280×154 原始比例的 1/2),点开即可看清配色
+   (点它弹放大预览,预览里另有「在 rkpet 看 3D 效果」外链)。
    GlassChip 容器与角标同款定位要求——span 默认 inline 时宽高不生效、子层 absolute inset:0
    会相对最近的定位祖先铺满整个悬浮面板,故必须 position:relative + display:block + overflow:hidden;
    i/img 子层也要显式 absolute + inset:0,否则 inline 空元素塌成 0×0,色卡渲染空白。 */
@@ -371,6 +372,10 @@
   position: relative; display: block; overflow: hidden;
   width: 140px; height: 77px;
   margin-top: 3px;
+  /* 资料卡整体是 pointer-events:none(免得挡住下面标记的点击),色卡是卡内**唯一**
+     需要点起来的东西 —— 点它弹出放大预览,里面有「在 rkpet 看 3D 效果」外链。
+     故只给色卡放开点击,卡片其余部分仍可穿透,原意不变。 */
+  pointer-events: auto; cursor: zoom-in;
 }
 .map-wild-tip .map-wild-tip-chip > i, .map-wild-tip .map-wild-tip-chip > img {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%;
