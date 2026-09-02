@@ -1,10 +1,14 @@
 package server
 
 import (
+	"bytes"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -52,6 +56,74 @@ func fakeMerchantAPI(t *testing.T, body string, status int) *int {
 	merchantFetchURL = srv.URL
 	t.Cleanup(func() { merchantFetchURL = old })
 	return hits
+}
+
+// TestMerchantFetchLogsEveryAttempt 同一轮内连续回源,日志必须逐次给出递增的尝试
+// 序号,且每个出口(空 / 有货)都留下一条。
+//
+// 存在理由:整点后第三方滞后约 1 分钟才切到新一轮,于是切换窗口内前几次回源**必然
+// 拿到空**。日志里若没有递增序号,「第 4 次才拿到」与「一次命中」长得一模一样 ——
+// 而那正是区分「第三方慢」与「我们压根没去查」的唯一依据。序号不递增,这条线索就没了。
+//
+// 断言日志文本而非返回值:回源结果本身(ok/empty)已被其它用例覆盖,这里守的是
+// 「日志能否把一整轮的获取过程还原出来」—— 光有返回值正确、日志看不出过程,照样排查不了。
+func TestMerchantFetchLogsEveryAttempt(t *testing.T) {
+	const emptyBody = `{"code":200,"data":{"item_count":0,"items":[]}}`
+	const goodsBody = `{"code":200,"data":{"item_count":2,"items":` +
+		`[{"name":"残缺魔镜"},{"name":"适格钥匙"}]}}`
+
+	s := newTestServer(t)
+	// 按调用次序返回:前两次空,第三次起有货(模拟整点后第三方滞后切换)。
+	var n int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n++
+		w.Header().Set("Content-Type", "application/json")
+		if n <= 2 {
+			_, _ = io.WriteString(w, emptyBody)
+			return
+		}
+		_, _ = io.WriteString(w, goodsBody)
+	}))
+	defer srv.Close()
+	oldURL := merchantFetchURL
+	merchantFetchURL = srv.URL
+	defer func() { merchantFetchURL = oldURL }()
+
+	// 接管 log 输出以断言文本内容(不改动全局 logger 之外的状态)。
+	var buf bytes.Buffer
+	oldOut, oldFlags := log.Writer(), log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
+
+	// 槽取昨天且避开今天 8:00(已让给订阅测试,见 testDay 的说明)。
+	slot := merchantDaySlots(testDay(-1))[1]
+	if ok, empty := s.merchantFetch(slot, true); !ok || !empty {
+		t.Fatalf("第 1 次应回源成功且为空, 实际 ok=%v empty=%v", ok, empty)
+	}
+	if ok, empty := s.merchantFetch(slot, true); !ok || !empty {
+		t.Fatalf("第 2 次应回源成功且为空, 实际 ok=%v empty=%v", ok, empty)
+	}
+	if ok, empty := s.merchantFetch(slot, true); !ok || empty {
+		t.Fatalf("第 3 次应回源成功且有货, 实际 ok=%v empty=%v", ok, empty)
+	}
+
+	got := buf.String()
+	for i := 1; i <= 3; i++ {
+		if !strings.Contains(got, fmt.Sprintf("尝试#%d", i)) {
+			t.Errorf("日志缺少第 %d 次尝试的序号:\n%s", i, got)
+		}
+	}
+	if c := strings.Count(got, "结果=空货单"); c != 2 {
+		t.Errorf("应有 2 条空货单结果, 实际 %d 条:\n%s", c, got)
+	}
+	if !strings.Contains(got, "结果=有货 2 件") {
+		t.Errorf("日志缺少有货结果:\n%s", got)
+	}
+	// 阶段耗时必须真的打出来:只有序号没有耗时,还是看不出慢在哪一段。
+	if !strings.Contains(got, "总计=") {
+		t.Errorf("日志缺少各阶段耗时:\n%s", got)
+	}
 }
 
 // TestMerchantShouldFetch 当前槽的重查窗口与冷却,以及「已结束的槽永不回源」。
@@ -233,7 +305,7 @@ func TestMerchantCurrentSlot(t *testing.T) {
 // 同时也钉住其余必填参数:key 与 format=json 缺一不可。
 func TestMerchantFetchSendsRefresh(t *testing.T) {
 	s := newTestServer(t)
-	s.eggAPIKey = "test-key" // merchantFetch 的必填查询参数;真 token 不在测试里出现
+	s.eggAPIKey = "test-key"                // merchantFetch 的必填查询参数;真 token 不在测试里出现
 	slot := merchantDaySlots(testDay(0))[5] // 避开别处占用的槽
 	const goods = `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`
 

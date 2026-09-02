@@ -308,7 +308,7 @@ func TestFetchHaoyouPicksRequestedSlot(t *testing.T) {
 	)
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok := s.fetchHaoyou(day.Add(8*time.Hour), true)
+	body, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true)
 	if !ok {
 		t.Fatal("fetchHaoyou 失败(应拿到正常响应)")
 	}
@@ -389,7 +389,7 @@ func TestFetchHaoyouPicksRequestedSlot(t *testing.T) {
 
 	// 反向再取一次另一档:只是「挑到了某一档」还不够 —— 直接取页面第一档的实现
 	// 也能过上面的断言。必须证明**请求的那一档**才被取出来。
-	body2, ok := s.fetchHaoyou(day.Add(20*time.Hour), true)
+	body2, ok, _ := s.fetchHaoyou(day.Add(20*time.Hour), true)
 	if !ok {
 		t.Fatal("取 20:00 档失败")
 	}
@@ -420,7 +420,7 @@ func TestFetchHaoyouLastSlotLabel(t *testing.T) {
 	})
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok := s.fetchHaoyou(last, true)
+	body, ok, _ := s.fetchHaoyou(last, true)
 	if !ok {
 		t.Fatal("fetchHaoyou 失败")
 	}
@@ -463,7 +463,7 @@ func TestFetchHaoyouMissingSlotIsEmpty(t *testing.T) {
 	})
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok := s.fetchHaoyou(day.Add(16*time.Hour), true) // 页面没有 16:00 这一档
+	body, ok, _ := s.fetchHaoyou(day.Add(16*time.Hour), true) // 页面没有 16:00 这一档
 	if !ok {
 		t.Fatal("页面缺该档应判为「无货」(ok=true),而不是失败")
 	}
@@ -479,7 +479,7 @@ func TestFetchHaoyouHTTPError(t *testing.T) {
 	day := haoyouDay()
 	fakeHaoyouAPI(t, "", http.StatusInternalServerError)
 
-	if body, ok := s.fetchHaoyou(day.Add(8*time.Hour), true); ok {
+	if body, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true); ok {
 		t.Errorf("HTTP 500 时应返回 ok=false, 实际 ok=true body=%q", body)
 	}
 }
@@ -504,7 +504,7 @@ func TestFetchHaoyouSendsUA(t *testing.T) {
 	haoyouURL = srv.URL
 	t.Cleanup(func() { haoyouURL = old })
 
-	if _, ok := s.fetchHaoyou(day.Add(8*time.Hour), true); !ok {
+	if _, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true); !ok {
 		t.Fatal("fetchHaoyou 失败")
 	}
 	if got == "" {

@@ -48,7 +48,7 @@ func fakeSMTP(t *testing.T, s *Server, delay time.Duration) (func() []string, fu
 	s.smtp = newSMTPSender("from@qq.com", "pass")
 	var mu sync.Mutex
 	var sent, htmls []string
-	s.smtp.sendFn = func(to, subject, html string, imgs []merchantMailImg) error {
+	s.smtp.sendFn = func(to, subject, html string) error {
 		mu.Lock()
 		sent = append(sent, to)
 		htmls = append(htmls, html)
@@ -146,7 +146,7 @@ func TestMerchantNotifyRetryAfterFailure(t *testing.T) {
 	s.smtp = newSMTPSender("from@qq.com", "pass")
 	var mu sync.Mutex
 	var attempts int
-	s.smtp.sendFn = func(to, subject, html string, imgs []merchantMailImg) error {
+	s.smtp.sendFn = func(to, subject, html string) error {
 		mu.Lock()
 		attempts++
 		n := attempts

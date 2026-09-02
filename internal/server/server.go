@@ -65,8 +65,15 @@ type Server struct {
 	merchantClaimMu sync.Mutex
 	merchantClaimed map[int64]time.Time
 
+	// 远行商人本轮的回源尝试次数:槽开始时间戳 → 已尝试几次(见 merchant.go)。
+	// 用途:日志里给出「第几次才拿到货单」—— 整点后第三方滞后切换时,没有序号就
+	// 分不出「第 4 次才拿到」与「一次命中」,而那正是判断第三方是否异常的依据。
+	merchantTryMu sync.Mutex
+	merchantTries map[int64]int
+
 	// 远行商人订阅邮件提醒:发件 QQ 邮箱与 SMTP 授权码(-merchant-smtp-user/-merchant-smtp-pass),
-	// 空=订阅提醒不可用(前端提示,商家数据仍正常)。串行发信,避免 QQ 邮箱并发触发限流(见 state.go)。
+	// 空=订阅提醒不可用(前端提示,商家数据仍正常)。一批订阅者共用一个 SMTP 会话串行发信,
+	// 既省掉重复的握手与认证,又不增加并发连接(QQ 邮箱对并发连接敏感,见 state.go)。
 	smtp *smtpSender
 
 	injectMu sync.Mutex

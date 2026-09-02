@@ -6,11 +6,14 @@ import { fmtTime } from '../../utils/format'
 // 业务节奏:每天 8 点开张、0 点收摊,8/12/16/20 四个整点各上架一轮新货并售卖 4 小时;
 // 只有 00:00~08:00 是打烊休市(页面此时显示昨日四轮全天回顾)。
 
-// 图片字段兼容两种形式:http(s) 外链直接用;否则按本地 /img/ 相对路径解析。
+// 商品图只认 http(s) 外链:两个数据源的图都是 patchwiki.biligame.com 的 https
+// 直链(2026-09-03 用咸鱼源真实响应核对过),不存在本地相对路径。
+//
+// 早先这里还兼容「按 /img/ 相对路径解析」,那半条是死分支,已删。若第三方改回
+// 相对路径,表现是商品图静默不显示(不报错),排查时先看 items[].image 的取值。
 export const imgSrc = (it) => {
-  const v = it && it.image
-  if (!v) return ''
-  return /^https?:\/\//i.test(v) ? v : '/img/' + v
+  const v = (it && it.image) || ''
+  return /^https?:\/\//i.test(v) ? v : ''
 }
 
 // msTime 第三方的时间戳是毫秒,fmtTime 要秒,这里除 1000 再交给它。

@@ -72,7 +72,23 @@ ALLOWED_REMOVED_FUNCS = {
     # fix:第三方滞后补货。缓存判定由「是否有记录」升级为「是否该回源」,该函数被
     # merchantShouldFetch 取代(多了进行中窗口/冷却两个维度,不是原地改写)。
     "merchantCached": "fix:被 merchantShouldFetch 取代(当前槽需按冷却重查)",
+    # perf:SMTP 连接复用。底层由「一封一个会话」改为「一批一个会话」,单封入口统一
+    # 走 sendBatch([]smtpMail{...})[0],smtpSendMail 不再存在(其职责拆成
+    # dial / realSession.send / sendBatch 三处:建会话、发一封、编排整批)。
+    "smtpSendMail": "perf:SMTP 连接复用,拆成 dial + realSession.send + sendBatch",
+    # 删死代码:两个数据源的商品图都是 patchwiki.biligame.com 的 https 直链
+    # (2026-09-03 用咸鱼源真实响应核对过),「本地相对路径 → 读 embed 的 webp →
+    # 内嵌成 CID 附件」这条分支从未被执行。连带删掉 merchantMailImg 类型、
+    # merchantMailMessage 的 multipart/related + base64,以及 merchantMailBody
+    # 里行内 @img: 标记(无生产者,两处调用点传的都是纯文本)。
+    # 理由与「第三方改回相对路径时的回归信号」写在 merchantMailItemImg 的注释里。
+    "merchantImgHTML": "删死代码:行内 @img: 标记的渲染(标记无生产者,内嵌已删)",
+    "merchantImgTag": "删死代码:同上,商品图 <img> 标签的两个尺寸变体已内联到各自渲染处",
 }
+
+# 上面那批删死代码连带删掉的**类型声明**是残余行(类型不属于任何函数),
+# 删了要登记,否则会被报成「残余内容丢失」(登记在 ALLOWED_LINE_PATTERNS)。
+
 
 # 重构后新增的函数:函数名 -> 新增理由。
 # 脚本的价值是「除登记在案者外不许变」,新增同样要登记 —— 否则每次新功能都会
@@ -93,14 +109,44 @@ ALLOWED_NEW_FUNCS = {
     "merchantSourceValid": "feat:双数据源,源标识合法性校验(管理端点写入与启动时载入共用)",
     "merchantNeedKey": "feat:双数据源,该源是否必须配令牌(只有咸鱼源需要,好游快爆抓公开页面)",
     "merchantSourceName": "feat:双数据源,源标识→中文名(映射留后端,免得与前端漂移)",
+    # feat:回源日志加「每阶段耗时 + 本轮获取过程」。
+    # 存在理由:第三方回源慢时,「网络慢」与「第三方服务端慢」的应对完全不同(前者换线路,
+    # 后者只能等或改拿缓存),只记总耗时分不出这两种;而整点后第三方滞后切换,前几次回源
+    # 必然拿到空 —— 没有递增序号就分不出「第 4 次才拿到」与「一次命中」。
+    # 方法名在脚本里就是裸名(接收者不计入),故登记 "String" —— 它是 merchantTiming 的。
+    "String": "feat:merchantTiming.String,输出各阶段耗时;连接复用时显式写「连接复用」而非三个 0.0ms",
+    "merchantHTTPGet": "feat:带阶段计时的统一 GET,两源共用(原先好游快爆侧自己发请求,无计时)",
+    "merchantDur": "feat:耗时格式化(亚毫秒给一位小数;负值钳 0 —— httptrace 回调未触发时相减为负)",
+    "merchantLogFetch": "feat:回源结果统一日志出口(失败/解析错/空/有货),格式一致才能按 slot 把整轮过程连着看",
+    "merchantTryInc": "feat:本轮回源尝试序号(整点后第三方滞后切换时,「试了几次才拿到」是判断它是否异常的依据)",
+    "merchantBodyItemCount": "feat:缓存货单的商品件数,供「空货单但保留既有货单」的日志说明保留了几件",
     "merchantSetSource": "feat:双数据源,切换(落库+清空槽缓存+按新源重抓当前轮)",
     # 同上(feat:远行商人双数据源),管理面板的读写端点:GET 读当前源与源清单,
     # POST 切换。源清单一并下发而非法前端硬编码 —— 合法标识只有后端能校验。
     "handleAdminMerchantSource": "feat:双数据源,管理端点的读写(GET 当前源+源清单 / POST 切换)",
+    # perf:SMTP 连接复用(一批订阅者共用一个会话,省掉 N-1 次握手与认证)。
+    # 方法名在脚本里是裸名(接收者不计入),故登记为 send/reset/close/discard。
+    "sendBatch": "perf:连接复用,整批一个会话连发多封,返回逐封错误",
+    "sendMerchantMailBatch": "perf:连接复用,merchantNotify 的批量入口(内容区套模板后转 sendBatch)",
+    "dialSession": "perf:连接复用,建会话的注入点(测试用 dialFn 换掉真连)",
+    "dial": "perf:连接复用,建一条可连发多封的会话(拨号+问候+认证)",
+    "send": "perf:连接复用,realSession.send —— 单封 I/O,每封刷新 deadline",
+    "reset": "perf:连接复用,realSession.reset —— 失败后复位事务以便接着发",
+    "close": "perf:连接复用,realSession.close —— QUIT 后关连接(正常收尾)",
+    "discard": "perf:连接复用,realSession.discard —— 连接已废直接关,不发 QUIT",
+    "countErrs": "perf:连接复用,sendBatch 汇总日志里数失败封数",
 }
 
 # 有意删除的零散代码行(正则,匹配归一化后的行)。两侧都剔除后再比对。
 ALLOWED_LINE_PATTERNS = [
+    # 删死代码(同上,商品图内嵌那套):merchantMailImg 类型声明及其两个字段、
+    # 连同它的文档注释,以及 merchantItem.Image 字段注释里「邮件里 CID 内嵌」那句
+    # (现已改为「非 http(s) 一律不显示」)。旧文案留着会引导人写回内嵌。
+    r"//merchantMailImg邮件内嵌图片附件\(cid引用\+原始webp字节\)",
+    r"typemerchantMailImgstruct\{",
+    r"cidstring",
+    r"data\[\]byte",
+    r"Imagestring`json:\"image\"`//商品图:http\(s\)外链原样;否则为本站/img/相对路径\(邮件里CID内嵌\)",
     r"typesnapstruct\{",   # sweepInjects 里的死代码 type snap struct{...}
     r"vartodo\[\]snap",
     r"_=todo",
@@ -129,6 +175,9 @@ ALLOWED_LINE_PATTERNS = [
 ALLOWED_REMOVED_COMMENTS = [
     # fix:当前槽改为按冷却重查(第三方滞后补货),旧文案「命中缓存不再回源」已不成立
     r"命中缓存不再回源,防止反复烧第三方token",
+    # 删死代码:商品图内嵌那套(merchantMailImg + multipart + 行内 @img: 标记),
+    # 其文档注释一并删除 —— 留着会让人以为还在内嵌。
+    r"//merchantMailImg邮件内嵌图片附件\(cid引用\+原始webp字节\)",
 ]
 
 # 阶段 2(拆 Server 上帝对象)有意改写的函数。
@@ -190,6 +239,20 @@ INTENTIONALLY_CHANGED = {
     # feat:游玩记录明细加分页(limit/offset/total),默认值随之改为 50、上限 200;
     # 汇总仍按全量算、不随分页变化。合入时漏登记,2026-09-02 按 diff 补登。
     "handleAdminPlaySessions": "feat:游玩记录明细加分页(limit/offset/total),默认 50、上限 200",
+    # 删死代码:两个数据源的商品图都是 patchwiki.biligame.com 的 https 直链
+    # (2026-09-03 用咸鱼源真实响应核对过),「本地相对路径 → 读 embed 的 webp →
+    # 内嵌成 CID 附件」这条分支从未被执行。连带删掉 merchantMailImg 类型、
+    # merchantMailMessage 的 multipart/related + base64、以及 merchantMailBody
+    # 里行内 @img: 标记(无生产者,两处调用点传的都是纯文本)。
+    # 这批函数的签名随之收窄(drop imgs 参数),逐字节比对必然不符;内容正确性由
+    # merchant_smtp_test.go 的 TestSMTPMailImageIsExternalURL /
+    # TestSMTPMailMessageNoAttachment / TestSMTPMailExternalImgSrcEscaped /
+    # TestSMTPMailNonURLImageSkipped 四条覆盖。
+    "merchantMailBody": "删死代码:去掉 imgs 参数与行内 @img: 标记支持",
+    "merchantMailEscaped": "删死代码:不再处理 @img: 标记,退化为纯转义",
+    "merchantMailItemImg": "删死代码:只认 http(s) 外链,相对路径分支删除",
+    "merchantMailItemRow": "删死代码:imgs 参数删除",
+    "merchantMailMessage": "删死代码:删掉 multipart/related 与 base64 附件,回到单段 text/html",
 }
 
 # 阶段 2 的重命名:旧名 -> 新名。改名后按新名比对内容。
