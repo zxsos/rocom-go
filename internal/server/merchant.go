@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"strconv"
 	"time"
@@ -419,18 +421,23 @@ func (s *Server) merchantShouldFetch(slotStart, now time.Time) bool {
 // true = 让它绕过自己的缓存直接回源(拿到的是此刻真实货单),false = 拿它可能陈旧的快照。
 // 取值策略见 merchantShouldForceRefresh。
 func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
-	start := time.Now()
 	src := s.merchantSource()
+	// 本轮第几次尝试:整点后第三方滞后切换时,「试了几次才拿到」是判断它是否异常的
+	// 唯一依据 —— 只记总耗时看不出「第 4 次才拿到」与「一次命中」的区别。
+	try := s.merchantTryInc(slotStart)
+
 	// 两源形态不同,但都返回**同形**的响应体(好游快爆侧做了归一化,见
 	// merchant_haoyou.go),故从这里往下无需再区分是哪个源。
 	var body string
 	var ok bool
+	var tm merchantTiming
 	if src == merchantSrcHaoyou {
-		body, ok = s.fetchHaoyou(slotStart, refresh)
+		body, ok, tm = s.fetchHaoyou(slotStart, refresh)
 	} else {
-		body, ok = s.fetchXianyu(slotStart, refresh)
+		body, ok, tm = s.fetchXianyu(slotStart, refresh)
 	}
 	if !ok {
+		merchantLogFetch(slotStart, src, try, "回源失败", tm)
 		return false, false
 	}
 	// 校验并判定有货/无货:第三方成功码不统一,实测 code=0 与 code=200 都表示成功,
@@ -443,11 +450,11 @@ func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 	}
 	if err := json.Unmarshal([]byte(body), &out); err != nil {
 		log.Printf("merchantFetch JSON 解析失败: %v, 响应前 200 字节: %q", err, truncateBytes([]byte(body), 200))
+		merchantLogFetch(slotStart, src, try, "JSON解析失败", tm)
 		return false, false
 	}
 	empty := !((out.Code == 0 || out.Code == 200) && len(out.Data.Items) > 0)
 	if empty {
-		log.Printf("merchantFetch 第三方返回无货: code=%d items=%d", out.Code, len(out.Data.Items))
 		// 重查撞上第三方瞬时抽风(限流/业务错误/响应还没刷新)时,不能把已经展示的好数据
 		// 覆盖成空 —— 那会让页面上明明还有的货单整片消失。保留旧货单,只把回源时刻推到
 		// 现在(TouchMerchantSlot);不推的话重查冷却立刻失效,下一 tick 又判定该重查,
@@ -456,68 +463,192 @@ func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 		// 代价是「商品真全下架了仍显示旧货单」。宁可多显示也不要清掉:后者是可见的数据丢失,
 		// 前者最多让人多跑一趟。
 		if _, old, _, ok := s.store.GetMerchantSlot(slotStart.Unix()); ok && merchantBodyHasItems(old) {
-			log.Printf("merchantFetch 保留槽 %s 的既有货单(第三方本次返回空)", slotStart.Format("15:04"))
+			merchantLogFetch(slotStart, src, try,
+				fmt.Sprintf("空货单(保留既有 %d 件)", merchantBodyItemCount(old)), tm)
 			if err := s.store.TouchMerchantSlot(slotStart.Unix()); err != nil {
 				log.Printf("merchantFetch 刷新槽回源时刻失败: %v", err)
 			}
 			return true, true
 		}
+		merchantLogFetch(slotStart, src, try,
+			fmt.Sprintf("空货单(code=%d items=%d)", out.Code, len(out.Data.Items)), tm)
 	}
 	if err := s.store.PutMerchantSlot(slotStart.Unix(), empty, body); err != nil {
 		log.Printf("merchantFetch 写槽缓存失败: %v", err)
 		return false, false
 	}
-	// 「什么时候拿到的货单」此前**没有任何日志** —— 只有失败/空货单才记,成功时一片
-	// 空白,于是「拿到货了没、几点拿到的、比整点晚多久」在日志里都查不到,只能靠翻邮件
-	// 或查库。这里补上,顺带给出滞后(距档期整点)与抓取耗时 —— 前者衡量第三方刷新有多慢,
-	// 后者衡量网络与解析,两者慢的原因与优化手段都不同。
-	//
-	// 空货单(empty)的情况走上面那条「第三方返回无货」的日志,不在这里重复。
+	// 有货时补一条结果日志:此前只有失败/空货单才记,成功时日志一片空白,于是
+	// 「拿到货了没、几点拿到的、比整点晚多久」都查不到,只能靠翻邮件或查库。
+	// 空货单(empty)已在上面记过,不在这里重复。
 	if !empty {
-		// 滞后用 fmtDuration(拆成分秒)而非裸秒数:判断「慢不慢」时分秒比四位秒数直观得多。
-		// 它同时把负数钳到 0 —— 生产只对已开始的槽回源,不会为负;但测试会用未来槽,
-		// 不钳的话日志里会出现「整点后=-13108s」这种看着像 bug 的输出。
-		log.Printf("merchantFetch 拿到货单 slot=%s 源=%s 商品=%d 整点后=%s 耗时=%.2fs",
-			slotStart.Format("01-02 15:04"), merchantSourceName(src), len(out.Data.Items),
-			fmtDuration(time.Since(slotStart)), time.Since(start).Seconds())
+		merchantLogFetch(slotStart, src, try, fmt.Sprintf("有货 %d 件", len(out.Data.Items)), tm)
 	}
 	return true, empty
 }
 
-// fetchXianyu 回源咸鱼源(JSON 接口),返回响应原文。签名与 fetchHaoyou 一致,
-// 供 merchantFetch 按当前源分派。
+// merchantLogFetch 打一行回源结果:本轮第几次尝试 + 距整点多久 + 结果 + 各阶段耗时。
+//
+// 抽成函数是为了让所有出口(回源失败 / 解析错 / 空 / 有货)共用同一格式 —— 格式一旦
+// 不统一,排查时就无法按 slot 把**一整轮的获取过程** grep 出来连着看。
+//
+// 整点后用 fmtDuration(拆成分秒)而非裸秒数:判断「慢不慢」时分秒直观得多,且它会把
+// 负数钳到 0(测试会用未来槽,不钳会出现「整点后=-13108s」这种看着像 bug 的输出)。
+func merchantLogFetch(slotStart time.Time, src string, try int, result string, tm merchantTiming) {
+	log.Printf("merchantFetch slot=%s 源=%s 尝试#%d 整点后=%s 结果=%s [%s]",
+		slotStart.Format("01-02 15:04"), merchantSourceName(src), try,
+		fmtDuration(time.Since(slotStart)), result, tm)
+}
+
+// merchantBodyItemCount 返回缓存的第三方原始 JSON 里的商品件数(解析不出返回 0)。
+// 供「空货单但保留了既有货单」的日志说明保留下来的究竟是几件。
+func merchantBodyItemCount(data string) int {
+	var out struct {
+		Data struct {
+			Items []json.RawMessage `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(data), &out); err != nil {
+		return 0
+	}
+	return len(out.Data.Items)
+}
+
+// merchantTiming 是单次回源的 HTTP 各阶段耗时(各字段是**分段**值,相加即 Total)。
+//
+// 存在理由:回源慢的时候,「网络慢」与「第三方服务端慢」的应对完全不同 —— 前者换线路,
+// 后者只能等它或改用 refresh=false 拿缓存。只记一个总耗时分不出这两种,而实测里
+// 服务端那一段才是大头(咸鱼源 0.33s 里占约 0.29s)。分段口径与 curl -w 的
+// time_* 一致,便于两边对照。
+type merchantTiming struct {
+	DNS   time.Duration // 域名解析
+	Conn  time.Duration // TCP 连接建立
+	TLS   time.Duration // TLS 握手
+	Wait  time.Duration // 请求发出 → 收到首字节(第三方服务端处理)
+	Read  time.Duration // 读响应体
+	Total time.Duration // 全程
+}
+
+// String 输出 "dns=1ms 连接=8ms tls=19ms 服务端=293ms 读取=1ms 总计=322ms"。
+func (t merchantTiming) String() string {
+	// 连接复用(keep-alive)时 DNS/连接/TLS 三段都不触发、全为零。此时显式写
+	// 「连接复用」而不是三个 0.0ms —— 后者会被读成「解析几乎不耗时」,而真相是
+	// 这次压根没建连接。两者对优化的意义相反:省掉握手是好事,不该看成一个零值。
+	if t.DNS == 0 && t.Conn == 0 && t.TLS == 0 {
+		return fmt.Sprintf("连接复用 服务端=%s 读取=%s 总计=%s",
+			merchantDur(t.Wait), merchantDur(t.Read), merchantDur(t.Total))
+	}
+	return fmt.Sprintf("dns=%s 连接=%s tls=%s 服务端=%s 读取=%s 总计=%s",
+		merchantDur(t.DNS), merchantDur(t.Conn), merchantDur(t.TLS),
+		merchantDur(t.Wait), merchantDur(t.Read), merchantDur(t.Total))
+}
+
+// merchantDur 把时长写成便于扫读的形式:不足 1ms 给一位小数,否则取整毫秒。
+// 负值钳到 0:分段是相减算出来的,httptrace 的回调在某些路径(连接复用、无 DNS)
+// 下不触发,相减得到负数 —— 那种「负耗时」看着像 bug,实际只是该段没走到。
+func merchantDur(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Millisecond {
+		return fmt.Sprintf("%.1fms", float64(d.Microseconds())/1000)
+	}
+	return fmt.Sprintf("%dms", d.Milliseconds())
+}
+
+// merchantHTTPGet 发起一次带阶段计时的 GET,返回响应体与各阶段耗时。
+//
+// timeout 是整体超时;maxBody 是响应体上限(防异常大响应吃内存);headers 是额外
+// 请求头(好游快爆源必须带 UA,见 haoyouUA)。
+//
+// 非 200 时**仍然返回响应体**:HTTP 错误页/错误 JSON 的前两百字节是判断「令牌失效
+// 还是接口改版」的唯一线索,丢掉就只能靠猜(见 fetchXianyu 的调用处)。
+func merchantHTTPGet(rawURL string, timeout time.Duration, maxBody int64, headers map[string]string) ([]byte, merchantTiming, error) {
+	var tm merchantTiming
+	start := time.Now()
+	var tDNS, tConn, tTLS, tFirst time.Time
+	trace := &httptrace.ClientTrace{
+		DNSStart:          func(httptrace.DNSStartInfo) { tDNS = time.Now() },
+		DNSDone:           func(httptrace.DNSDoneInfo) { tm.DNS = time.Since(tDNS) },
+		ConnectStart:      func(_, _ string) { tConn = time.Now() },
+		ConnectDone:       func(_, _ string, _ error) { tm.Conn = time.Since(tConn) },
+		TLSHandshakeStart: func() { tTLS = time.Now() },
+		TLSHandshakeDone:  func(tls.ConnectionState, error) { tm.TLS = time.Since(tTLS) },
+		GotFirstResponseByte: func() {
+			tFirst = time.Now()
+			// Wait 是首字节之前扣掉网络三段后剩下的部分 = 第三方服务端处理。
+			tm.Wait = tFirst.Sub(start) - tm.DNS - tm.Conn - tm.TLS
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, tm, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	req = req.WithContext(httptrace.WithClientTrace(ctx, trace))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		tm.Total = time.Since(start)
+		return nil, tm, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	tm.Total = time.Since(start)
+	// 首字节都没收到就失败了(超时/DNS 失败)时 tFirst 是零值,此时不能用它算读耗时。
+	if !tFirst.IsZero() {
+		tm.Read = time.Since(tFirst)
+	}
+	if err != nil {
+		return nil, tm, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return body, tm, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return body, tm, nil
+}
+
+// merchantTryInc 递增并返回某槽「本轮回源过几次」。
+//
+// 存在理由:整点后第三方滞后约 1 分钟才切到新一轮(两个源都实测确认),于是切换
+// 窗口内的前几次回源**必然拿到空** —— 日志里若没有序号,「第 4 次才拿到」与
+// 「一次命中」长得一模一样,而这正是判断「第三方慢」还是「我们没去查」的依据。
+// 表只按当前营业日使用,顺手清掉往日条目,不会长驻增长。
+func (s *Server) merchantTryInc(slotStart time.Time) int {
+	s.merchantTryMu.Lock()
+	defer s.merchantTryMu.Unlock()
+	if s.merchantTries == nil {
+		s.merchantTries = map[int64]int{}
+	}
+	yesterday := merchantDayStart(time.Now()).AddDate(0, 0, -1).Unix()
+	for slot := range s.merchantTries {
+		if slot < yesterday {
+			delete(s.merchantTries, slot)
+		}
+	}
+	s.merchantTries[slotStart.Unix()]++
+	return s.merchantTries[slotStart.Unix()]
+}
+
+// fetchXianyu 回源咸鱼源(JSON 接口),返回响应原文与各阶段耗时。签名与 fetchHaoyou
+// 一致,供 merchantFetch 按当前源分派。
 //
 // refresh 对应第三方的 refresh 参数:true = 让它绕过自己的缓存直接回源(拿到的是
 // 此刻真实货单),false = 拿它可能陈旧的快照。取值策略见 merchantShouldForceRefresh。
-func (s *Server) fetchXianyu(slotStart time.Time, refresh bool) (string, bool) {
+func (s *Server) fetchXianyu(slotStart time.Time, refresh bool) (string, bool, merchantTiming) {
 	params := url.Values{}
 	params.Add("key", s.eggAPIKey)
 	params.Add("format", "json")
 	params.Add("refresh", strconv.FormatBool(refresh))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, merchantFetchURL+"?"+params.Encode(), nil)
+	body, tm, err := merchantHTTPGet(merchantFetchURL+"?"+params.Encode(), 10*time.Second, 1<<20, nil)
 	if err != nil {
-		log.Printf("merchantFetch 构造请求失败: %v", err)
-		return "", false
+		log.Printf("merchantFetch 咸鱼源回源失败: %v, 响应前 200 字节: %q", err, truncateBytes(body, 200))
+		return "", false, tm
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("merchantFetch 请求失败: %v", err)
-		return "", false
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 上限 1MB
-	if err != nil {
-		log.Printf("merchantFetch 读响应失败: %v", err)
-		return "", false
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("merchantFetch HTTP %d, 响应前 200 字节: %q", resp.StatusCode, truncateBytes(body, 200))
-		return "", false
-	}
-	return string(body), true
+	return string(body), true, tm
 }
 
 // truncateBytes 截断字节串用于日志(避免刷屏),超长时加省略号。

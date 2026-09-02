@@ -22,12 +22,9 @@ package server
 // merchantItem 没有对应字段,暂不落库。
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
@@ -275,13 +272,13 @@ func haoyouEnvelopeJSON(goods []haoyouGood, start, end time.Time) (string, error
 //
 // 返回 (body, ok):ok=false 表示抓取失败(网络/HTTP/归一化出错),调用方按
 // 「第三方不可用」处理、不写库;ok=true 时 body 一定可被下游解析(可能是空货单)。
-func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool) {
+func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool, merchantTiming) {
 	_ = refresh
 
-	page, err := haoyouFetchPage()
+	page, tm, err := haoyouFetchPage()
 	if err != nil {
 		log.Printf("merchantFetch 好游快爆源抓取失败: %v", err)
-		return "", false
+		return "", false, tm
 	}
 	slots := parseHaoyou(page)
 	if len(slots) == 0 {
@@ -297,9 +294,9 @@ func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool) {
 		out, err := haoyouEnvelopeJSON(sl.goods, sl.start, sl.end)
 		if err != nil {
 			log.Printf("merchantFetch 好游快爆源归一化失败: %v", err)
-			return "", false
+			return "", false, tm
 		}
-		return out, true
+		return out, true, tm
 	}
 	// 页面上没有请求的这一档:休市时段(0-8 点)页面只显示昨天全天,当天的档要等
 	// 开市后才出现。这是「该槽此刻无货」而非故障,故按 ok=true + 空货单返回。
@@ -312,9 +309,9 @@ func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool) {
 	out, err := haoyouEnvelopeJSON(nil, slotStart, slotStart.Add(merchantSlotStep))
 	if err != nil {
 		log.Printf("merchantFetch 好游快爆源归一化失败: %v", err)
-		return "", false
+		return "", false, tm
 	}
-	return out, true
+	return out, true, tm
 }
 
 // haouyouSlotDesc 把页面上的档期列成 "09-02 08:00~12:00(2件);09-02 12:00~16:00(…)" 供日志用。
@@ -330,22 +327,12 @@ func haouyouSlotDesc(slots []haoyouSlot) string {
 	return strings.Join(parts, "; ")
 }
 
-// haoyouFetchPage 抓取页面原文(带 UA、超时与体积上限)。
-func haoyouFetchPage() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), haoyouTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, haoyouURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", haoyouUA)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, haoyouMaxBody))
+// haoyouFetchPage 抓取页面原文(带 UA、超时与体积上限),并返回各阶段耗时。
+//
+// 走 merchantHTTPGet 而非自己发请求:阶段计时只有那一处实现,两源的日志格式也才一致。
+// 副作用是拿回了错误响应体 —— 原先非 200 直接丢掉 body,站点改版/被墙时无从判断,
+// 现在调用方可按需打出来。
+func haoyouFetchPage() ([]byte, merchantTiming, error) {
+	return merchantHTTPGet(haoyouURL, haoyouTimeout, haoyouMaxBody,
+		map[string]string{"User-Agent": haoyouUA})
 }

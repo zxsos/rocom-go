@@ -3,13 +3,10 @@ package server
 import (
 	"fmt"
 	"html"
-	"io/fs"
 	"mime"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
 )
 
 const merchantMailFromName = "远哥来了"
@@ -36,16 +33,12 @@ func (m *smtpSender) from() string {
 	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + m.user + ">"
 }
 
-// merchantMailImg 邮件内嵌图片附件(cid 引用 + 原始 webp 字节)。
-type merchantMailImg struct {
-	cid  string
-	data []byte
-}
-
-// merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •;
-// 行内 @img:<path> 商品图标记渲染为 <img src="cid:...">,图片字节收集到 imgs,
-// 由 sendMerchantMail 以 multipart/related 附件发送)。
-func merchantMailBody(body string, imgs *[]merchantMailImg) string {
+// merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •)。
+//
+// 商品图只出现在新货提醒里(merchantMailContent),纯文本路径(订阅验证 / 管理员
+// 测试邮件)用不上 —— 早先这里支持行内 `@img:<path>` 标记并把它内嵌成附件,但
+// 标记没有任何生产者(两处调用点传的都是纯文本),连同内嵌那套一并删掉了。
+func merchantMailBody(body string) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		trimmed := strings.TrimLeft(line, " ")
@@ -53,7 +46,7 @@ func merchantMailBody(body string, imgs *[]merchantMailImg) string {
 		if strings.HasPrefix(trimmed, "- ") {
 			trimmed = "• " + strings.TrimPrefix(trimmed, "- ")
 		}
-		esc := merchantMailEscaped(trimmed, imgs)
+		esc := merchantMailEscaped(trimmed)
 		if lead > 0 {
 			esc = strings.Repeat("&nbsp;", lead) + esc
 		}
@@ -90,57 +83,9 @@ func merchantMailWrap(s string, maxBytes int) string {
 	return b.String()
 }
 
-// merchantMailEscaped 转义一行文本,并把行内的 @img:<path> 商品图标记替换成 <img>(不转义)。
-func merchantMailEscaped(s string, imgs *[]merchantMailImg) string {
-	if !strings.Contains(s, "@img:") {
-		return html.EscapeString(s)
-	}
-	var b strings.Builder
-	rest := s
-	for {
-		i := strings.Index(rest, "@img:")
-		if i < 0 {
-			b.WriteString(html.EscapeString(rest))
-			break
-		}
-		b.WriteString(html.EscapeString(rest[:i]))
-		rest = rest[i+len("@img:"):]
-		j := strings.IndexAny(rest, " \t")
-		path := rest
-		if j >= 0 {
-			path, rest = rest[:j], rest[j:]
-		} else {
-			rest = ""
-		}
-		if src := merchantImgHTML(path, imgs); src != "" {
-			b.WriteString(src)
-		}
-	}
-	return b.String()
-}
-
-// merchantImgHTML 把商品图路径渲染为邮件 <img>:http(s) 外链直接引用;
-// 本地相对路径(本站 /img/ 前缀)读 embed 的 webp,以 CID 引用收集到 imgs
-// (收件端无需访问本站即可显示,且不受 SMTP 单行 998 字节限制)。
-// 读不到图片时返回空串(不显示)。
-func merchantImgHTML(src string, imgs *[]merchantMailImg) string {
-	if src == "" {
-		return ""
-	}
-	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
-		return merchantImgTag(src)
-	}
-	if b, err := fs.ReadFile(gamedata.ImageFS(), src); err == nil && len(b) > 0 {
-		cid := fmt.Sprintf("merchant%d", len(*imgs)+1)
-		*imgs = append(*imgs, merchantMailImg{cid: cid, data: b})
-		return merchantImgTag("cid:" + cid)
-	}
-	return ""
-}
-
-// merchantImgTag 生成商品图 <img> 标签(src 是最终可用的 URL 或 cid: 引用)。
-func merchantImgTag(src string) string {
-	return `<img src="` + src + `" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:10px;vertical-align:middle;margin:0 10px 0 2px;">`
+// merchantMailEscaped 转义一行文本。
+func merchantMailEscaped(s string) string {
+	return html.EscapeString(s)
 }
 
 // merchantKindTextMap 第三方商品 kind(英文) → 中文显示;未收录的未知值原样返回,
@@ -254,12 +199,13 @@ func merchantGroupItems(items []merchantItem) (allDay []merchantItem, groups []m
 
 // merchantMailContent 构造新货提醒的内容区 HTML(嵌入 merchantMailHTMLTpl 的 %s):
 // 商人名大标题 + 营业日/本轮,商品按「全天 / 标准时段 / 其他」分组展示。
-// 全天商品不打具体时间点(组标题已表达),商品图以 CID 引用收集到 imgs。
+// 全天商品不打具体时间点(组标题已表达)。商品图只取 http(s) 外链,其余值一律不显示
+// (见 merchantMailItemImg)。
 //
 // slotStart/fetchedAt 用于展示「数据获取时间」及其相对档期整点的滞后 —— 探测第三方
 // 货单刷新延迟期间(临时,见 merchant_probe.go)这是邮件里最要紧的一行,收件人把邮件
 // 转给他人分析时无需再去翻日志。两者任一是零值时该行不输出(单测走这条路径)。
-func merchantMailContent(name, day, slot string, slotStart, fetchedAt time.Time, items []merchantItem, imgs *[]merchantMailImg) string {
+func merchantMailContent(name, day, slot string, slotStart, fetchedAt time.Time, items []merchantItem) string {
 	var b strings.Builder
 	// 每行以 CRLF 结尾:HTML 里裸 CRLF 渲染为空白,不产生可见换行,但保证
 	// 任何单行(组标题/商品行)都不超过 RFC 5321 的 998 字节限制。
@@ -277,16 +223,16 @@ func merchantMailContent(name, day, slot string, slotStart, fetchedAt time.Time,
 		b.WriteString(`<div style="text-align:center;font-size:12px;color:` + color + `;margin:2px 0 2px;">` + html.EscapeString(txt) + `</div>` + "\r\n")
 	}
 	allDay, groups, other := merchantGroupItems(items)
-	merchantMailGroup(&b, "全天售卖", allDay, imgs)
+	merchantMailGroup(&b, "全天售卖", allDay)
 	for _, g := range groups {
-		merchantMailGroup(&b, g.Title, g.Items, imgs)
+		merchantMailGroup(&b, g.Title, g.Items)
 	}
-	merchantMailGroup(&b, "其他时段", other, imgs)
+	merchantMailGroup(&b, "其他时段", other)
 	return b.String()
 }
 
 // merchantMailGroup 输出一个时段分组:金色小标题 + 商品行列表。
-func merchantMailGroup(b *strings.Builder, title string, items []merchantItem, imgs *[]merchantMailImg) {
+func merchantMailGroup(b *strings.Builder, title string, items []merchantItem) {
 	if len(items) == 0 {
 		return
 	}
@@ -294,14 +240,14 @@ func merchantMailGroup(b *strings.Builder, title string, items []merchantItem, i
 	// 模板里的 \r\n 是四个字面字符,收件端会把它当文本显示出来。
 	fmt.Fprintf(b, `<div style="font-size:13px;font-weight:700;color:#a06a10;margin:16px 0 8px;padding-left:8px;border-left:3px solid #f0b429;">%s</div>`+"\r\n", html.EscapeString(title))
 	for _, it := range items {
-		merchantMailItemRow(b, it, imgs)
+		merchantMailItemRow(b, it)
 	}
 }
 
 // merchantMailItemRow 输出单个商品行:图 + 名称 + (类型 · 价格 · 限购)。
-func merchantMailItemRow(b *strings.Builder, it merchantItem, imgs *[]merchantMailImg) {
+func merchantMailItemRow(b *strings.Builder, it merchantItem) {
 	imgTag := ""
-	if src := merchantMailItemImg(it, imgs); src != "" {
+	if src := merchantMailItemImg(it); src != "" {
 		imgTag = `<img src="` + src + `" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:#f7efdb;">`
 	}
 	var meta []string
@@ -336,18 +282,20 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%d 分 %d 秒", int(d.Minutes()), int(d.Seconds())%60)
 }
 
-// merchantMailItemImg 商品图 URL:http(s) 外链原样;本地 embed 路径读 webp 以 CID 收集。
-func merchantMailItemImg(it merchantItem, imgs *[]merchantMailImg) string {
-	if it.Image == "" {
-		return ""
-	}
+// merchantMailItemImg 商品图的 <img src>:只认 http(s) 外链(转义后返回),
+// 其余取值返回空串(不显示图片,商品行照常输出)。
+//
+// 为什么不放宽:**两个数据源的商品图都是 patchwiki.biligame.com 的 https 直链**
+// (2026-09-03 用咸鱼源真实响应核对过;好游快爆源是同一个图床)。早先这里还有一条
+// 「本地相对路径 → 读 embed 的 webp → 内嵌成 CID 附件」的分支,那是死代码:
+// 没有任何源会产出相对路径,故一并删除 —— 连带 merchantMailImg 类型与
+// merchantMailMessage 里的 multipart/related + base64 附件。
+//
+// 若将来第三方改回相对路径,表现是**邮件里静默没图**(不报错、发信照成功),
+// 而不是这里返回错误 —— 排查时先看 items[].image 的取值。
+func merchantMailItemImg(it merchantItem) string {
 	if strings.HasPrefix(it.Image, "http://") || strings.HasPrefix(it.Image, "https://") {
 		return html.EscapeString(it.Image)
-	}
-	if data, err := fs.ReadFile(gamedata.ImageFS(), it.Image); err == nil && len(data) > 0 {
-		cid := fmt.Sprintf("merchant%d", len(*imgs)+1)
-		*imgs = append(*imgs, merchantMailImg{cid: cid, data: data})
-		return "cid:" + cid
 	}
 	return ""
 }

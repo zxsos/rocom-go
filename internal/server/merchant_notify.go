@@ -19,7 +19,7 @@ type merchantItem struct {
 	TimeLabel string `json:"time_label"`
 	StartTime int64  `json:"start_time"` // 毫秒(北京时间语义),time_label 缺失时推断时段用
 	EndTime   int64  `json:"end_time"`
-	Image     string `json:"image"` // 商品图:http(s) 外链原样;否则为本站 /img/ 相对路径(邮件里 CID 内嵌)
+	Image     string `json:"image"` // 商品图:两源都是 patchwiki.biligame.com 的 https 直链;非 http(s) 一律不显示
 }
 
 // merchantClaimCooldown 是同一槽两次认领之间的最小间隔。
@@ -183,11 +183,17 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		return
 	}
 
-	// 发信是串行的(smtpSender 内 m.mu 串行化,避免并发连接被 QQ 邮箱限流),
-	// 而每个订阅者都要重新走一遍完整的 SMTP 会话(TLS 握手 + 认证 + 传数据)。
-	// 故总耗时 ≈ 人数 × 单封耗时 —— 逐人计时,慢在哪个人、哪一段一目了然。
+	// ---------------------------------------------------------------- 第一趟:构造
+	//
+	// 先把所有人的正文都构造完再发信,**而不是边构造边发**。构造要读本地图片文件
+	// (毫秒级但非零),而 SMTP 会话一旦建好就该连续发完 —— 让一条已认证的连接在
+	// 构造正文时空转,容易被服务端判空闲踢掉,那样复用反而更糟。
+	//
+	// 代价是这批正文与内嵌图要同时在内存里:订阅者是十来人的量级、图也就几张,
+	// 完全可接受;真到了几百人再改回边构造边发也不迟。
 	notifyStart := time.Now()
-	sent, failed := 0, 0
+	buildCosts := make([]time.Duration, len(pend))
+	mails := make([]merchantMail, len(pend))
 	for i, p := range pend {
 		// merchant_name 第三方已含完整显示名(如「远行商人「云上仙岛」」),这里直接
 		// 使用不再硬编码前缀,避免出现「远行商人 远行商人 上架了新商品」的重复。
@@ -195,9 +201,6 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		if name == "" {
 			name = "远行商人"
 		}
-		var imgs []merchantMailImg
-		// 正文构造(含读内嵌图)单独计时:图多、图大时这一步也不可忽略,
-		// 但它与网络耗时是两回事 —— 前者要减图,后者要复用连接。
 		t0 := time.Now()
 		// fetchedAt 是这批货单的回源时刻(槽缓存里的最后一次成功回源)。探测模式下
 		// 它就是要测的东西:与档期整点一减,即是第三方的滞后。邮件里显式写出,
@@ -206,15 +209,25 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			merchantDayStart(slotStart).Format("2006-01-02"),
 			slotStart.Format("15:04")+" ~ "+slotStart.Add(merchantSlotStep).Format("15:04"),
 			slotStart, time.Unix(fetchedAt, 0),
-			p.news, &imgs)
-		buildCost := time.Since(t0)
-
+			p.news)
+		buildCosts[i] = time.Since(t0)
 		// 退订签名只在 HTML 模板尾部保留一份(见 merchantMailHTMLTpl),正文不再重复。
-		subject := "远行商人新货上架(" + slotStart.Format("15:04") + " 轮)"
-		t0 = time.Now()
-		err := s.smtp.sendMerchantMailHTML(p.email, subject, content, imgs)
-		sendCost := time.Since(t0)
+		mails[i] = merchantMail{
+			to:      p.email,
+			subject: "远行商人新货上架(" + slotStart.Format("15:04") + " 轮)",
+			content: content,
+		}
+	}
 
+	// ---------------------------------------------------------------- 第二趟:发信
+	//
+	// 整批共用一个 SMTP 会话(见 smtpSender.sendBatch):握手与认证这类固定开销
+	// 只付一次,而不是每人一遍。返回的 errs 与 mails 一一对应 —— 一个人的失败
+	// 不影响其他人,也不影响自己之后的重试。
+	errs := s.smtp.sendMerchantMailBatch(mails)
+	sent, failed := 0, 0
+	for i, err := range errs {
+		p := pend[i]
 		if err == nil {
 			sent++
 			names := make([]string, 0, len(p.news))
@@ -233,10 +246,12 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			log.Printf("merchantNotify 发信失败 slot=%s to=%s: %v", slotStart.Format("15:04"), p.email, err)
 		}
 		// 逐人一行:订阅者通常不多,而这行是判断「慢在个别人还是普遍现象」的依据
-		// (个别人慢 = 他那封的图多/网络抖动;普遍慢 = 连接复用或邮件体积的问题)。
-		log.Printf("merchantNotify 发信 #%d/%d slot=%s to=%s 构造=%.2fs 发信=%.2fs 商品=%d 图=%d %s",
+		// (个别人慢 = 他那封的图多/网络抖动;普遍慢 = 建会话或邮件体积的问题)。
+		// 「发信」那一列没了 —— 整批只有一次网络往返,逐人的数字不再有意义,
+		// 耗时一律看下面那行汇总(以及 smtp 批量发信那行)。
+		log.Printf("merchantNotify 发信 #%d/%d slot=%s to=%s 构造=%.2fs 商品=%d %s",
 			i+1, len(pend), slotStart.Format("15:04"), p.email,
-			buildCost.Seconds(), sendCost.Seconds(), len(p.news), len(imgs),
+			buildCosts[i].Seconds(), len(p.news),
 			map[bool]string{true: "失败", false: "成功"}[err != nil])
 	}
 	log.Printf("merchantNotify 完成 slot=%s 待发=%d 成功=%d 失败=%d 总耗时=%.2fs",

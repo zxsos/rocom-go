@@ -43,6 +43,9 @@ rocom-key.pem
 # 系统回收站(误放于工作区)
 /.Trash-0/
 
+# 本地虚拟 env(含 SMTP 授权码等密钥,勿提交)
+/.env.local
+
 # Python
 __pycache__/
 mdldbg

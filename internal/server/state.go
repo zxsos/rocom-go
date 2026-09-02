@@ -408,16 +408,21 @@ func (sn *snapshotStore) forget(acc string) {
 	sn.trialMu.Unlock()
 }
 
-// smtpSender 串行发送远行商人订阅邮件。
+// smtpSender 发送远行商人订阅邮件。
 //
-// 串行(而非并发)是刻意的:QQ 邮箱对并发连接敏感,容易判为异常触发限流。
+// 串行为主、连接复用:一批订阅者共用一个 SMTP 会话(见 sendBatch)—— 握手与认证
+// 是固定开销,每人重来一遍纯属浪费。刻意**不并发**:QQ 邮箱对并发连接敏感,
+// 容易判为异常触发限流;复用连接则既省了那部分开销,又不增加并发连接数。
 type smtpSender struct {
 	mu   sync.Mutex
 	user string // 发件 QQ 邮箱;空=订阅提醒不可用
 	pass string // SMTP 授权码
 
-	// 测试注入:非 nil 时 smtpSendMail 改走它而不真连 QQ SMTP(见 merchant_notify_test.go)。
-	sendFn func(to, subject, html string, imgs []merchantMailImg) error
+	// 测试注入:非 nil 时 sendBatch 改走它而不真连 QQ SMTP(见 merchant_notify_test.go)。
+	sendFn func(to, subject, html string) error
+	// dialFn 非 nil 时 sendBatch 用它建会话(见 merchant_smtp_test.go);nil = 真连。
+	// 与 sendFn 分开:sendFn 在更前面短路(只测内容),dialFn 才能测到复用/复位/重连。
+	dialFn func() (smtpSession, error)
 }
 
 func newSMTPSender(user, pass string) *smtpSender {
