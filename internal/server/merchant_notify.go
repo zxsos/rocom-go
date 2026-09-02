@@ -85,6 +85,11 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(data), &out); err != nil {
+		// 换源后这里最值得盯:库里存的是**第三方原始 JSON**,若新源的输出与
+		// 约定不符(比如归一化漏字段、站点改版直接吐 HTML),此前是静默返回 ——
+		// 表现就是「数据看着有,但邮件永远不发」,且日志里什么都没有。
+		log.Printf("merchantNotify 货单解析失败 slot=%s: %v(响应前 200 字节: %q)",
+			slotStart.Format("01-02 15:04"), err, truncateBytes([]byte(data), 200))
 		return
 	}
 	// 本营业日更早槽已出现过的商品名(8 点轮无更早槽 → 全部算新增)。
@@ -114,6 +119,7 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 	// 先算出全部待办再统一认领发信权,避免「第一个人没新货」就把整槽的发信权占掉。
 	subs, err := s.store.ListMerchantSubs()
 	if err != nil {
+		log.Printf("merchantNotify 读订阅列表失败 slot=%s: %v", slotStart.Format("01-02 15:04"), err)
 		return
 	}
 	type pending struct {
@@ -139,6 +145,11 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 	}
 	// 认领本槽发信权:拦住并发触发的重复发信(同一槽每档都会被回源与补扫各触发一次)。
 	if !s.merchantClaim(slotStart) {
+		// 这里被挡通常是对的(刚发过,10 分钟内不再发)。但**换源**时容易踩到:
+		// merchantSetSource 会立刻异步回源当前轮并触发通知,若此前 10 分钟内已经发过
+		// 这一轮,切源那次就被静默挡掉 —— 表现同样是「切了源却没邮件」。故记下来。
+		log.Printf("merchantNotify 本槽在冷却期内已发过,跳过 slot=%s(待发 %d 人)",
+			slotStart.Format("01-02 15:04"), len(pend))
 		return
 	}
 

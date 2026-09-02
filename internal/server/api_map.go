@@ -53,6 +53,15 @@ func (s *Server) SetLastWildPets(account string, payload *WildPayload) {
 	s.snap.setWild(account, payload)
 }
 
+// GetLastWildPets 返回某账号缓存的最近一次野生宠标记;无记录返回 nil。
+//
+// 与 GetLastPosition 对称:wildpets 是**广播**而非请求-响应,测试够不着它;而广播的
+// 内容正是这份缓存(SetLastWildPets 与 Broadcast 在同一处调用),故读它就等于断言
+// 推出去的载荷。调用方**不得**原地修改返回值 —— 它是共享快照。
+func (s *Server) GetLastWildPets(account string) *WildPayload {
+	return s.snap.getWild(account)
+}
+
 // handleWildPets 返回当前账号最近一次野生宠物标记(异色/炫彩、污染、满声音);无记录返回 null。
 // 与位置不同,这里不做过期抹除:标记本身已带 stale 标志(实体离开 AOI 后由管线置位并限时保留)。
 func (s *Server) handleWildPets(w http.ResponseWriter, r *http.Request) {

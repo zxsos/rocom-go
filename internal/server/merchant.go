@@ -20,13 +20,14 @@ import (
 //   - 查询槽按 4h 对齐 8 点:8/12/16/20 四轮都回源第三方,次日 0/4 两个槽休市不查;
 //   - 结果按槽缓存进 SQLite(store 的 merchant_slots),缓存保留 2 天,写入时顺手清理更早记录;
 //   - 回源规则见 merchantShouldFetch,两条核心约束:
-//       * **已结束的槽永不回源** —— 回源拿到的是「现在」的货单,写进历史槽就是伪造数据;
-//       * **进行中的槽按 merchantRefetch 冷却重查、限 merchantRefetchWin 窗口** ——
-//         第三方自己有缓存,轮次开始后新上的商品滞后才出现,只查一次会永久错过;
-//         重查统一带 refresh=true 让它真正回源(见 merchantForceRefresh),否则
-//         拿回的始终是它那份旧快照,重查等同空转;
-//   - 触发回源两条路径:merchantLoop 每 15 分钟检查当前槽(覆盖「早上 8 点自动查第一次」),
-//     以及玩家打开页面时 handleMerchant 按当前时间补查/重查当前轮;
+//   - **已结束的槽永不回源** —— 回源拿到的是「现在」的货单,写进历史槽就是伪造数据;
+//   - **进行中的槽按 merchantRefetch 冷却重查、限 merchantRefetchWin 窗口** ——
+//     第三方自己有缓存,轮次开始后新上的商品滞后才出现,只查一次会永久错过;
+//     重查统一带 refresh=true 让它真正回源(见 merchantForceRefresh),否则
+//     拿回的始终是它那份旧快照,重查等同空转;
+//   - 触发回源两条路径:merchantLoop 轮询当前槽(覆盖「早上 8 点自动查第一次」与整点后的
+//     密集重试,见 merchantPoll / merchantCatchupEvery),以及玩家打开页面时
+//     handleMerchant 按当前时间补查/重查当前轮;
 //   - 订阅提醒:有货槽写入后对比本营业日更早轮与**本槽已通知过的商品**找出「新增商品」,
 //     对订阅者(邮箱+关键词,空关键词=全部)发 QQ 邮箱邮件;每个商品对每邮箱只提醒一次
 //     (merchant_notified.items 去重,见 store.MerchantNotifiedItems)。SMTP 未配置时静默跳过。
@@ -57,6 +58,35 @@ const (
 	// 兜底用:第三方滞后多久没有保证,不能让一个槽无限期地每 10 分钟烧一次 token。
 	// 取 90 分钟 = 实测滞后 56 分钟 + 余量,且远小于槽长 4h,轮次后半段不再打扰第三方。
 	merchantRefetchWin = 90 * time.Minute
+
+	// merchantPoll 定时任务的轮询间隔:只做「判定要不要回源」,回不回由
+	// merchantShouldFetch 说了算(它同时管着冷却与窗口),故调小它**不会**增加
+	// 第三方请求 —— 额外的成本只是每秒若干次本地时间比较与一次 SQLite 主键读。
+	//
+	// 为什么是 15 秒而不是 15 分钟:第三方在整点后约 1 分钟才切换到新一轮
+	// (两个源都实测确认),而 merchantCatchupEvery 是 30 秒 —— 轮询必须明显细于
+	// 它,否则「每 30 秒重试」会被轮询粒度拖成「每 15 分钟」。
+	merchantPoll = 15 * time.Second
+
+	// merchantCatchupEvery 是「档期刚开始、还没拿到货单」时的重试间隔。
+	//
+	// 存在理由:两个源都在整点后约 1 分钟才切到新一轮(08:00 档实测 32~62 秒;
+	// 12:00 换档同样约 1 分钟,已由订阅邮件「整点后 2 分 16 秒」佐证)。
+	// 于是**整点后的第一次回源几乎必然拿到空货单** —— 若就此套用 merchantRefetch
+	// 那个 10 分钟冷却,新货单要等到整点后 10 分钟才进库,比不轮询还慢。
+	//
+	// 故「空」在切换窗口内按「还没切」处理,用这个短间隔重试;一旦拿到货单
+	// (empty=false),就回到 10 分钟冷却去追第三方滞后补上的新货 —— 两者语义不同,
+	// 不能共用一套节奏。
+	merchantCatchupEvery = 30 * time.Second
+
+	// merchantCatchupWin 是切换窗口的长度(从槽开始算起)。
+	//
+	// 取 5 分钟 = 实测滞后约 1 分钟的 5 倍余量:源偶尔慢一点也能兜住,不至于退回
+	// 10 分钟冷却。窗口内最坏多打 10 次第三方(5min/30s),加上之后的补货重查,
+	// 单轮最坏约 18 次 —— 但这是**源异常**时的代价,正常情况下窗口内只打 2 次
+	// (第一次空、第二次拿到),单轮总量与改前(约 9 次)基本一致。
+	merchantCatchupWin = 5 * time.Minute
 
 	// merchantForceRefresh 回源时是否带 refresh=true(让第三方绕过自己的缓存)。
 	//
@@ -226,17 +256,27 @@ func merchantDayStatus(now time.Time) string {
 	return "open"
 }
 
-// merchantLoop 定时补查:每 15 分钟检查一次当前槽,按 merchantShouldFetch 判定是否回源
-// (8 点开张后自动完成首次查询;进行中的槽还会按冷却重查,追第三方滞后补上的新货);
-// 随后补扫当日有货槽重发未投递的订阅提醒(兜底首次发信失败/事后补发)。
+// merchantLoop 定时补查:按 merchantPoll 频繁轮询,是否真的回源由 merchantShouldFetch
+// 判定(它管着切换窗口的密集重试与之后的补货冷却,故轮询快并不会多打第三方)。
+//
+// 轮询频率与「拿货单的速度」直接相关:第三方整点后约 1 分钟才切新一轮,而 merchantPoll
+// 是 15 秒 —— 于是新档最长 15 秒被发现、约 30 秒内重试拿到(第三方切好后的下一次重试)。
+// 改前是每 15 分钟撞一次运气,最坏要等 15 分钟。
+//
+// merchantResend(补发失败邮件的补扫)**不跟着变密**,仍按 merchantCheck 每 15 分钟一次:
+// 它要遍历本营业日所有已开始的槽并读订阅列表,每分钟跑一次纯属浪费;而且补发本就是
+// 兜底,晚十几分钟不影响。两者节奏不同,故分开计时而非共用一个 ticker。
 func (s *Server) merchantLoop() {
 	s.merchantEnsure(time.Now())
-	t := time.NewTicker(merchantCheck)
+	t := time.NewTicker(merchantPoll)
 	defer t.Stop()
-	for range t.C {
-		now := time.Now()
+	nextResend := time.Now().Add(merchantCheck)
+	for now := range t.C {
 		s.merchantEnsure(now)
-		s.merchantResend(now)
+		if !now.Before(nextResend) {
+			nextResend = now.Add(merchantCheck)
+			s.merchantResend(now)
+		}
 	}
 }
 
@@ -334,26 +374,41 @@ func merchantSlotLive(slotStart, now time.Time) bool {
 	return slotStart.Add(merchantSlotStep).After(now)
 }
 
-// merchantShouldFetch 判断某槽此刻是否该回源第三方。三条判据,依次是:
+// merchantShouldFetch 判断某槽此刻是否该回源第三方。四条判据,依次是:
 //
 //  1. **已结束的槽永不回源**(merchantSlotLive)。这是硬规则,不是优化 ——
 //     回源拿到的是当前货单,写进历史槽就是伪造数据。
 //  2. **没查过的槽补查**(无缓存记录)。覆盖「服务在轮次中途才启动」与「8 点开张首查」。
-//  3. **已查过但仍在窗口内、且距上次回源 ≥ merchantRefetch** → 重查。
+//  3. **空货单 + 仍在切换窗口内** → 按 merchantCatchupEvery 密集重试。
+//     这条是「整点后尽快拿到新货单」的关键(见下)。
+//  4. **已查过(非空)且仍在窗口内、且距上次回源 ≥ merchantRefetch** → 重查。
 //     覆盖第三方滞后补货:轮次开始后新上的商品要过一阵才出现在它的响应里。
 //     窗口 merchantRefetchWin 之外一律不重查,避免一个槽无限期烧 token。
+//
+// 为什么第 3 条必须单独存在 —— 这是本次重构里唯一反直觉的地方:
+// 两个源都在整点后约 1 分钟才切到新一轮,于是**整点后的第一次回源几乎必然拿到空**。
+// 若此时套用第 4 条那个 10 分钟冷却,新货单就得等到整点后 10 分钟才进库 —— 比不
+// 轮询还慢。故「还没拿到货单」与「已拿到、等补货」是两件事,必须分开定节奏:
+// 前者是等第三方切换(几十秒量级),后者是等它补货(十分钟量级)。
 func (s *Server) merchantShouldFetch(slotStart, now time.Time) bool {
 	if !merchantSlotLive(slotStart, now) {
 		return false
 	}
-	_, _, fetchedAt, ok := s.store.GetMerchantSlot(slotStart.Unix())
+	// 这里要读 empty:它区分「查过但无货」与「查过且有货」。注意它**不是**「数据里
+	// 有没有商品」—— merchantFetch 在第三方返回空时会保留旧货单并返回 empty=true,
+	// 但那种情况不写库,故库里的 empty 仍准确表示「该槽存的就是空货单」。
+	empty, _, fetchedAt, ok := s.store.GetMerchantSlot(slotStart.Unix())
 	if !ok {
 		return true
 	}
 	if now.Sub(slotStart) >= merchantRefetchWin {
 		return false
 	}
-	return now.Sub(time.Unix(fetchedAt, 0)) >= merchantRefetch
+	since := now.Sub(time.Unix(fetchedAt, 0))
+	if empty && now.Sub(slotStart) < merchantCatchupWin {
+		return since >= merchantCatchupEvery
+	}
+	return since >= merchantRefetch
 }
 
 // merchantFetch 回源第三方并写入槽缓存,顺带清理 2 天前的过期记录。

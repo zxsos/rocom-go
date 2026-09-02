@@ -98,6 +98,24 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 	return s, nil
 }
 
+// Close 关闭数据库连接池。
+//
+// 为什么需要它:New 会启动 checkpointLoop,而 Server 还另有 merchantLoop、排行榜结算等
+// 后台 goroutine,它们都持有本库。**测试**里这些 goroutine 无从停止(没有 Stop 机制),
+// 于是 t.TempDir() 清理时数据库文件仍被占用,报 “directory not empty” 让用例随机失败
+// —— 表现为 flaky,且与被测逻辑毫无关系。测试收尾前关掉连接池即可让目录删干净。
+//
+// 生产代码**不要**调:进程退出即释放,主动关反而会让仍在跑的后台任务开始报错。
+// 关闭后再查询会返回 "sql: database is closed" 错误,不 panic。
+func (s *Store) Close() error {
+	err1 := s.db.Close()
+	err2 := s.rdb.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
+
 // checkpointInterval 是主动 checkpoint 的间隔。
 //
 // 早期实现每 30s 跑一次 PRAGMA wal_checkpoint(PASSIVE):每次都含一次 fsync,在慢磁盘

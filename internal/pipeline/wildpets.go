@@ -295,9 +295,11 @@ func (p *Pipeline) onBattleFinish(conn, acc string, body []byte, now time.Time) 
 // wildsDebounce 是野生宠物图层广播的合并窗口。
 //
 // 取值依据(实测一份 604 秒 pcap,0x0414 共 11282 条、其中 2878 条带实体进出):
-//     50ms → 407 次(14.1%)   200ms → 260 次(9.0%)
-//    100ms → 356 次(12.4%)   500ms → 199 次(6.9%)
-//    150ms ≈ 300 次          1s    → 146 次(5.1%)
+//
+//	 50ms → 407 次(14.1%)   200ms → 260 次(9.0%)
+//	100ms → 356 次(12.4%)   500ms → 199 次(6.9%)
+//	150ms ≈ 300 次          1s    → 146 次(5.1%)
+//
 // 边际收益递减明显,50ms 就已经吃掉大部分抖动。取 150ms 是**兼顾提醒及时性**:
 // 稀有宠出现提醒(见 web/src/pages/map/wildNotify.js)走的就是这条推送,窗口开太大
 // 会「玩家都跑过去了才响」。150ms 人眼无感,却已合并掉约九成突发。
@@ -406,6 +408,11 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			m.GlassValue = w.glassValue
 		}
 		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
+			// 形态编号与是否异色:色卡的「在 rkpet 看 3D 效果」外链靠这两项拼 URL
+			// (缺编号没链接、缺 shiny 则 3D 是普通配色)。反查不到形态时不给编号,
+			// 前端按无按钮处理 —— 比给个错号强。
+			m.BaseConfID = base
+			m.Shiny = w.mutation&scene.MutationShiny != 0
 			if info, ok := p.db.PetBase(base); ok {
 				m.Name = info.Name
 				// 体重单位与 PetData 一致(÷1000 千克),百分位口径同宠物列表。

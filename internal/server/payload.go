@@ -107,10 +107,24 @@ type WildPayload struct {
 
 // WildMark 是一只稀有野生宠的标记。
 type WildMark struct {
-	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
-	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
-	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / big / small / high / low
+	ID   string `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
+	Name string `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
+	Img  string `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
+	// 形态编号(petbase id),用于「在 rkpet 看 3D 效果」的外链 —— 大地图与宠物列表
+	// 的色卡弹出预览里那条按钮靠它拼 URL,没有它按钮就不显示。
+	//
+	// ⚠️ 不要从 Img 的 HeadIcon/<n>.webp 反推这个号 —— 那只是图片**文件名**,与形态
+	// 编号之间没有换算关系(多个形态常共用同一张素材):实测 names.json 的 images 里
+	// 1112 个形态中 461 个的 h 与形态编号不同(如 3242 的图是 3012),220 个有异色头像
+	// 的里 75 个 sh 不以形态编号开头。反推会静默地把外链指向别的宠物,页面却一切正常。
+	BaseConfID uint32 `json:"baseConfId,omitempty"`
+	// 是否异色。rkpet 外链靠它加 shiny=1,否则 3D 模型是普通配色 —— 而异色炫彩恰恰
+	// 是炫彩里最常见的情况,缺了它链接就指向错配色。与 PetData.Shiny 同一口径。
+	//
+	// ⚠️ 与那边一样:前端**不可**拿 Img 反推异色(多个形态共用素材,普通图与异色图
+	// 文件名没有可靠对应关系,见 BaseConfID 的注释),只看这个字段。
+	Shiny  bool     `json:"shiny,omitempty"`
+	Kinds  []string `json:"kinds"` // 命中的类别:colorful / shiny / pollution / big / small / high / low
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`

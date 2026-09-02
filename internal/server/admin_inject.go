@@ -205,21 +205,23 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 
 	id := "admin-inject-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	mark := WildMark{
-		ID:       id,
-		Name:     info.Name,
-		Img:      s.db.PetImageByBase(req.Base, req.Kind == "shiny").Head,
-		Kinds:    []string{req.Kind},
-		U:        u,
-		V:        v,
-		X:        wx,
-		Y:        wy,
-		Z:        wz,
-		Lv:       req.Level,
-		Voice:    voice,
-		Height:   height,
-		Weight:   weight,
-		Mutation: mutation,
-		Inject:   true, // 前端据此显示撤销按钮与视觉提示
+		ID:         id,
+		Name:       info.Name,
+		BaseConfID: req.Base,            // 色卡的「在 rkpet 看 3D 效果」外链要用;这里直接就是形态编号
+		Shiny:      req.Kind == "shiny", // 同上:异色要给外链加 shiny=1,否则 3D 是普通配色
+		Img:        s.db.PetImageByBase(req.Base, req.Kind == "shiny").Head,
+		Kinds:      []string{req.Kind},
+		U:          u,
+		V:          v,
+		X:          wx,
+		Y:          wy,
+		Z:          wz,
+		Lv:         req.Level,
+		Voice:      voice,
+		Height:     height,
+		Weight:     weight,
+		Mutation:   mutation,
+		Inject:     true, // 前端据此显示撤销按钮与视觉提示
 	}
 	// 体重百分位与真实野生宠同一口径(pet.SizePercentile),前端资料卡才能显示「体重 xx%」。
 	if info.WeightHigh > info.WeightLow {
