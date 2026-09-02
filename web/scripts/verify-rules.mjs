@@ -207,6 +207,74 @@ console.log('\n[9] 显示名')
 console.log('\n[10] 事件来源枚举')
 eq('四种来源与服务端 catchWayName 一致', SUB_KINDS, ['捕捉', '孵蛋', '赠送获得', '获得'])
 
+// —— 11. 双滑块:拖一端的钳制 ——
+console.log('\n[11] 双滑块钳制')
+{
+  const W = R.DIM_BY_K.weightPct   // 0~100
+  const V = R.DIM_BY_K.voice       // -100~100
+  // 下限拖到上限右边 → 钳成退化区间(不能翻转)
+  eq('下限拖过上限 → 钳到上限', R.clampRange('min', 80, 60, W), [60, 60])
+  eq('上限拖过下限 → 钳到下限', R.clampRange('max', 20, 60, W), [60, 60])
+  eq('正常拖动下限', R.clampRange('min', 30, 90, W), [30, 90])
+  eq('正常拖动上限', R.clampRange('max', 90, 30, W), [30, 90])
+  eq('拖出取值域下界 → 钳回', R.clampRange('min', -50, 80, W), [0, 80])
+  eq('拖出取值域上界 → 钳回', R.clampRange('max', 999, 20, W), [20, 100])
+  // 嗓音域是负的,最容易写错
+  eq('嗓音域:下限拖过上限', R.clampRange('min', 50, -20, V), [-20, -20])
+  eq('嗓音域:正常区间', R.clampRange('max', 96, -96, V), [-96, 96])
+}
+
+// —— 12. 重合时哪个滑块在上层 ——
+console.log('\n[12] 滑块叠放顺序')
+{
+  const W = R.DIM_BY_K.weightPct
+  const V = R.DIM_BY_K.voice
+  // 区间整体偏左 → 上限在上(用户多半想往右扩)
+  eq('偏左时上限在上', R.sliderTop(0, 2, W), 'max')
+  eq('偏左下界时上限在上', R.sliderTop(10, 20, W), 'max')
+  // 整体偏右 → 下限在上(想往左缩)
+  eq('偏右时下限在上', R.sliderTop(98, 100, W), 'min')
+  eq('偏右下界时下限在上', R.sliderTop(70, 90, W), 'min')
+  // 嗓音域以 0 为中心
+  eq('嗓音偏负时上限在上', R.sliderTop(-100, -96, V), 'max')
+  eq('嗓音偏正时下限在上', R.sliderTop(96, 100, V), 'min')
+  eq('嗓音居中时上限在上', R.sliderTop(-10, 10, V), 'max')
+}
+
+// —— 13. 预设档位 ——
+console.log('\n[13] 预设档位')
+{
+  const { RULE_PRESETS, RULE_SCHEMES, schemeRules } = R
+  ok('预设非空', RULE_PRESETS.length >= 8, `实际 ${RULE_PRESETS.length}`)
+  // 预设必须在各自维度的取值域内,且 min<=max —— 否则点了就是条非法规则
+  let bad = []
+  for (const p of RULE_PRESETS) {
+    const d = R.DIM_BY_K[p.dim]
+    if (!d || p.min < d.min || p.max > d.max || p.min > p.max) bad.push(p.label)
+  }
+  eq('全部预设的区间合法且在取值域内', bad, [])
+  // 同维度内的预设 label 不能重名(重名会导致方案筛选时多选)
+  const dup = RULE_PRESETS.map((p) => p.label).filter((v, i, a) => a.indexOf(v) !== i)
+  eq('预设名称不重复', [...new Set(dup)], [])
+  // 每个维度都要有预设,否则「添加」时那一组是空的
+  for (const d of R.RANGE_DIMS) {
+    ok(`维度「${d.n}」有预设`, RULE_PRESETS.some((p) => p.dim === d.k))
+  }
+  // 方案
+  ok('方案非空', RULE_SCHEMES.length >= 3)
+  const medal = schemeRules(RULE_SCHEMES.find((s) => s.k === 'medal'))
+  eq('「奖牌四件套」展开为 4 条', medal.length, 4)
+  // 方案里的规则必须带预设的区间与配色(不是空壳),且名字对得上
+  eq('奖牌四件套 = 大块头/小不点/婉转声/粗嗓门',
+    medal.map((r) => r.label).sort(), ['婉转声', '小不点', '粗嗓门', '大块头'].sort())
+  eq('方案规则沿用预设区间(大块头 98~100)',
+    (() => { const b = medal.find((r) => r.label === '大块头'); return [b.min, b.max] })(), [98, 100])
+  eq('方案规则全部启用', medal.every((r) => r.on === true), true)
+  // 方案展开的规则必须能被清洗函数接受(否则点了方案会得到非法规则)
+  eq('方案展开后能过 sanitize', schemeRules(RULE_SCHEMES[0]).length, sanitizeRangeRules(schemeRules(RULE_SCHEMES[0])).length)
+  eq('「清空」展开为空数组', schemeRules(RULE_SCHEMES.find((s) => s.k === 'none')), [])
+}
+
 await server.close()
 console.log(fail === 0 ? '\n✓ 全部通过' : `\n✗ ${fail} 项未通过`)
 process.exit(fail === 0 ? 0 : 1)

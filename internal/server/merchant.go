@@ -419,11 +419,13 @@ func (s *Server) merchantShouldFetch(slotStart, now time.Time) bool {
 // true = 让它绕过自己的缓存直接回源(拿到的是此刻真实货单),false = 拿它可能陈旧的快照。
 // 取值策略见 merchantShouldForceRefresh。
 func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
+	start := time.Now()
+	src := s.merchantSource()
 	// 两源形态不同,但都返回**同形**的响应体(好游快爆侧做了归一化,见
 	// merchant_haoyou.go),故从这里往下无需再区分是哪个源。
 	var body string
 	var ok bool
-	if s.merchantSource() == merchantSrcHaoyou {
+	if src == merchantSrcHaoyou {
 		body, ok = s.fetchHaoyou(slotStart, refresh)
 	} else {
 		body, ok = s.fetchXianyu(slotStart, refresh)
@@ -464,6 +466,20 @@ func (s *Server) merchantFetch(slotStart time.Time, refresh bool) (bool, bool) {
 	if err := s.store.PutMerchantSlot(slotStart.Unix(), empty, body); err != nil {
 		log.Printf("merchantFetch 写槽缓存失败: %v", err)
 		return false, false
+	}
+	// 「什么时候拿到的货单」此前**没有任何日志** —— 只有失败/空货单才记,成功时一片
+	// 空白,于是「拿到货了没、几点拿到的、比整点晚多久」在日志里都查不到,只能靠翻邮件
+	// 或查库。这里补上,顺带给出滞后(距档期整点)与抓取耗时 —— 前者衡量第三方刷新有多慢,
+	// 后者衡量网络与解析,两者慢的原因与优化手段都不同。
+	//
+	// 空货单(empty)的情况走上面那条「第三方返回无货」的日志,不在这里重复。
+	if !empty {
+		// 滞后用 fmtDuration(拆成分秒)而非裸秒数:判断「慢不慢」时分秒比四位秒数直观得多。
+		// 它同时把负数钳到 0 —— 生产只对已开始的槽回源,不会为负;但测试会用未来槽,
+		// 不钳的话日志里会出现「整点后=-13108s」这种看着像 bug 的输出。
+		log.Printf("merchantFetch 拿到货单 slot=%s 源=%s 商品=%d 整点后=%s 耗时=%.2fs",
+			slotStart.Format("01-02 15:04"), merchantSourceName(src), len(out.Data.Items),
+			fmtDuration(time.Since(slotStart)), time.Since(start).Seconds())
 	}
 	return true, empty
 }

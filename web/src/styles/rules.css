@@ -49,36 +49,83 @@
 .rrule-mini.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .rrule-mini.danger:hover { border-color: var(--red); color: var(--red); background: rgba(248, 81, 73, .1); }
 
-/* —— 区间条:整条是维度取值域,高亮段是当前区间 ——
-   4px 细条 + 端点微光,不抢文字的注意力,但扫一眼就能看出区间落在哪、有多宽。 */
-.rrule-bar {
-  position: relative; height: 4px; border-radius: 2px;
-  background: var(--bg-3); overflow: hidden;
+/* —— 双滑块:整条是维度取值域,高亮段是当前区间,两端可拖 ——
+   上一版这里只能看不能拖,改区间得去数字框填,是交互上最别扭的一处。 */
+.rslider { position: relative; flex: 1; min-width: 0; height: 16px; }
+.rslider-track {
+  position: absolute; left: 0; right: 0; top: 6px; height: 4px;
+  border-radius: 2px; background: var(--bg-3);
 }
-.rrule-bar-fill {
-  position: absolute; top: 0; bottom: 0; border-radius: 2px;
+.rslider-fill {
+  position: absolute; top: 6px; height: 4px; border-radius: 2px;
   /* 一点内发光:深色底图上的纯色细条容易显得干瘪 */
   box-shadow: 0 0 6px -1px currentColor;
-  transition: left .12s var(--ease-out), width .12s var(--ease-out);
+  pointer-events: none;
+}
+/* 两个 range 完全重叠:容器设 pointer-events:none,只给 thumb 设 auto ——
+   否则上层 input 的轨道会整片盖住下层,另一个端点永远拖不动。 */
+.rslider-input {
+  position: absolute; inset: 0; width: 100%; height: 16px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent;
+  pointer-events: none;
+}
+/* 重合时由 sliderTop() 决定哪个在上(见 utils/rules.js),保证两端都够得着 */
+.rslider-input.top { z-index: 2; }
+.rslider-input:focus { outline: none; }
+.rslider-input::-webkit-slider-thumb {
+  -webkit-appearance: none; pointer-events: auto;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--fg); border: 1px solid var(--bg-1);
+  cursor: grab; box-shadow: var(--shadow-sm);
+  transition: transform .1s var(--ease-out);
+}
+.rslider-input::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.rslider-input:active::-webkit-slider-thumb { cursor: grabbing; }
+.rslider-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--fg); border: 1px solid var(--bg-1);
+  cursor: grab; box-shadow: var(--shadow-sm);
+}
+/* 键盘可达:原生 range 支持方向键,给个聚焦环 */
+.rslider-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* —— 底部:维度 + 下限 ~ 上限 + 命中数 —— */
-.rrule-foot { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+/* 整套方案:一行 chip,点一下替换全部规则 */
+.rrule-schemes { display: flex; flex-wrap: wrap; gap: 5px; }
+.rrule-schemes .chip { font-size: 11px; padding: 2px 8px; }
+
+/* 预设选择区:按维度分组的常用档位 */
+.rrule-presets {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 7px 8px; border: 1px dashed var(--line); border-radius: var(--radius);
+}
+.rrule-preset-group { display: flex; flex-direction: column; gap: 4px; }
+.rrule-preset-group > .muted { font-size: 11px; }
+.rrule-preset-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+}
+/* 滑块行:维度标签(可点切换)+ 滑块 */
+.rrule-slide { display: flex; align-items: center; gap: 6px; }
 .rrule-dim {
-  flex: none; width: auto; padding: 3px 5px; font-size: 12px;
-  background: var(--bg-3); cursor: pointer;
+  flex: none; font-size: 11px; color: var(--fg-dim); cursor: pointer;
+  padding: 1px 5px; border-radius: 5px;
+  background: var(--bg-3); border: 1px solid transparent;
+  font-family: inherit;
 }
-.rrule-num {
-  flex: 1; min-width: 0; width: auto;
-  padding: 3px 5px; font-size: 12px; text-align: center;
+.rrule-dim:hover { border-color: var(--accent); color: var(--accent); }
+
+/* —— 头部里的读数与命中数 ——
+   区间读数是拖动的即时反馈;命中数是「这条筛出了几只」,两者都随操作变化,
+   故都用等宽数字 —— 否则位数变化时整行会左右跳动。 */
+.rrule-val {
+  flex: none; font-size: 11px;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
-.rrule-tilde { flex: none; font-size: 11px; }
-/* 命中数靠右,等宽数字 —— 实时变化时不会因字宽跳动 */
 .rrule-n {
-  flex: none; min-width: 20px; text-align: right;
+  flex: none; min-width: 18px; text-align: right; font-size: 11px;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 11px;
 }
 
 /* 底部操作:添加 / 恢复默认 */

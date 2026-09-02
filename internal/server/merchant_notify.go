@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
+
+// smtpUnconfiguredOnce 让「未配置 SMTP 发件邮箱」只提示一次(理由见 merchantNotify)。
+var smtpUnconfiguredOnce sync.Once
 
 type merchantItem struct {
 	Name      string `json:"name"`
@@ -72,10 +76,22 @@ func (s *Server) merchantClaim(slotStart time.Time) bool {
 // SMTP 未配置(发件邮箱为空)时静默返回,不影响商家数据本身。
 func (s *Server) merchantNotify(slotStart time.Time) {
 	if !s.smtp.configured() {
+		// 只提示**一次**:这条对排查有价值(没配 SMTP 就永远不会有邮件),但
+		// merchantNotify 每轮回源都会走一遍 —— 不收敛的话,一个不打算用邮件功能的
+		// 部署每天会打几十条同样的话,把真正要紧的发信耗时日志淹掉。
+		// (merchantResend 开头已过滤掉这种情况,故这里只在回源成功后触发。)
+		smtpUnconfiguredOnce.Do(func() {
+			log.Printf("merchantNotify 跳过: 未配置 SMTP 发件邮箱(需 -merchant-smtp-user/-pass),订阅提醒不会发送")
+		})
 		return
 	}
 	empty, data, fetchedAt, ok := s.store.GetMerchantSlot(slotStart.Unix())
-	if !ok || empty {
+	if !ok {
+		log.Printf("merchantNotify 跳过 slot=%s: 该槽还没有缓存记录", slotStart.Format("01-02 15:04"))
+		return
+	}
+	if empty {
+		log.Printf("merchantNotify 跳过 slot=%s: 该槽查过但无货", slotStart.Format("01-02 15:04"))
 		return
 	}
 	var out struct {
@@ -127,6 +143,10 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		news  []merchantItem
 	}
 	var pend []pending
+	// unnotified 记「所有订阅者里最多的未通知新货数」,用来区分下面两种「pend 为空」:
+	//   - 为 0:这些都通知过了 —— 正常;
+	//   - > 0:有新货却没人收到 —— 反常(多半是订阅关键词配置与预期不符),值得记一笔。
+	unnotified := 0
 	for _, sub := range subs {
 		notified := s.store.MerchantNotifiedItems(slotStart.Unix(), sub.Email)
 		var news []merchantItem
@@ -135,12 +155,22 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 				news = append(news, it)
 			}
 		}
+		if len(news) > unnotified {
+			unnotified = len(news)
+		}
 		if len(news) == 0 || !merchantSubMatch(sub.Keywords, news) {
 			continue // 没有他没见过的商品,或关键词没命中,不打扰
 		}
 		pend = append(pend, pending{sub.Email, news})
 	}
 	if len(pend) == 0 {
+		// 只在**有新货却没人收到**时记。若只是「都已通知过」则不记 —— merchantResend
+		// 每 15 分钟把每个有货槽都过一遍,那种情况记下来纯属刷屏,反而把要紧的
+		// 发信耗时日志淹掉。
+		if unnotified > 0 {
+			log.Printf("merchantNotify 跳过 slot=%s: %d 件未通知新货,但无订阅者关键词命中(订阅数=%d)",
+				slotStart.Format("01-02 15:04"), unnotified, len(subs))
+		}
 		return
 	}
 	// 认领本槽发信权:拦住并发触发的重复发信(同一槽每档都会被回源与补扫各触发一次)。
@@ -153,7 +183,12 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		return
 	}
 
-	for _, p := range pend {
+	// 发信是串行的(smtpSender 内 m.mu 串行化,避免并发连接被 QQ 邮箱限流),
+	// 而每个订阅者都要重新走一遍完整的 SMTP 会话(TLS 握手 + 认证 + 传数据)。
+	// 故总耗时 ≈ 人数 × 单封耗时 —— 逐人计时,慢在哪个人、哪一段一目了然。
+	notifyStart := time.Now()
+	sent, failed := 0, 0
+	for i, p := range pend {
 		// merchant_name 第三方已含完整显示名(如「远行商人「云上仙岛」」),这里直接
 		// 使用不再硬编码前缀,避免出现「远行商人 远行商人 上架了新商品」的重复。
 		name := out.Data.MerchantName
@@ -161,6 +196,9 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			name = "远行商人"
 		}
 		var imgs []merchantMailImg
+		// 正文构造(含读内嵌图)单独计时:图多、图大时这一步也不可忽略,
+		// 但它与网络耗时是两回事 —— 前者要减图,后者要复用连接。
+		t0 := time.Now()
 		// fetchedAt 是这批货单的回源时刻(槽缓存里的最后一次成功回源)。探测模式下
 		// 它就是要测的东西:与档期整点一减,即是第三方的滞后。邮件里显式写出,
 		// 便于人工核对(探测日志另有逐次的时间线,两者互为印证)。
@@ -169,9 +207,16 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			slotStart.Format("15:04")+" ~ "+slotStart.Add(merchantSlotStep).Format("15:04"),
 			slotStart, time.Unix(fetchedAt, 0),
 			p.news, &imgs)
+		buildCost := time.Since(t0)
+
 		// 退订签名只在 HTML 模板尾部保留一份(见 merchantMailHTMLTpl),正文不再重复。
 		subject := "远行商人新货上架(" + slotStart.Format("15:04") + " 轮)"
-		if err := s.smtp.sendMerchantMailHTML(p.email, subject, content, imgs); err == nil {
+		t0 = time.Now()
+		err := s.smtp.sendMerchantMailHTML(p.email, subject, content, imgs)
+		sendCost := time.Since(t0)
+
+		if err == nil {
+			sent++
 			names := make([]string, 0, len(p.news))
 			for _, it := range p.news {
 				names = append(names, it.Name)
@@ -182,11 +227,20 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 				log.Printf("merchantNotify 记录已通知商品失败 slot=%s to=%s: %v", slotStart.Format("15:04"), p.email, err)
 			}
 		} else {
+			failed++
 			// 发信失败不 Mark:补扫(merchantResend)或下次触发仍会重试。
 			// 之前这里是静默吞错,查无可查(邮件没到 = 授权码过期/被限流/网络瞬断都无痕迹)。
 			log.Printf("merchantNotify 发信失败 slot=%s to=%s: %v", slotStart.Format("15:04"), p.email, err)
 		}
+		// 逐人一行:订阅者通常不多,而这行是判断「慢在个别人还是普遍现象」的依据
+		// (个别人慢 = 他那封的图多/网络抖动;普遍慢 = 连接复用或邮件体积的问题)。
+		log.Printf("merchantNotify 发信 #%d/%d slot=%s to=%s 构造=%.2fs 发信=%.2fs 商品=%d 图=%d %s",
+			i+1, len(pend), slotStart.Format("15:04"), p.email,
+			buildCost.Seconds(), sendCost.Seconds(), len(p.news), len(imgs),
+			map[bool]string{true: "失败", false: "成功"}[err != nil])
 	}
+	log.Printf("merchantNotify 完成 slot=%s 待发=%d 成功=%d 失败=%d 总耗时=%.2fs",
+		slotStart.Format("15:04"), len(pend), sent, failed, time.Since(notifyStart).Seconds())
 }
 
 // merchantSubMatch 判断订阅关键词是否命中新增商品:空关键词 = 订阅全部(大小写不敏感子串匹配)。
