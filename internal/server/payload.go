@@ -158,6 +158,46 @@ type WildAllMark struct {
 	Stale bool    `json:"stale,omitempty"`
 }
 
+// GatherPayload 是实时采集物图层:此刻玩家周围**真正刷着**的采集物。
+//
+// 与 POI 图层的「采集物」是两回事,前端两层并存:
+//   - POI 图层(GET /api/pois):3552 个**候选刷新点**,回答「这儿会有」;
+//   - 本图层(GET /api/gathers):服务器当下下发的实体,回答「这会儿有」。
+//
+// 两者差得很远 —— 实测两份 pcap,玩家 87m 内平均 13~19 个候选点里只有 4~6 个
+// 真有实体(刷出率三到四成)。故实时层的价值恰在「替玩家滤掉那七成空的候选点」。
+//
+// 语义是**纯实时**,与野生宠的灰点备忘相反:实体离开 AOI 或被采走就当场撤掉,
+// 不留「最后所见」。理由:采集物采完会按刷新规则再刷(刷新行全部带 refresh_rule),
+// 「图上还挂着」会让人白跑一趟;而它再刷时服务器会重新下发 enter,标记自然回来。
+type GatherPayload struct {
+	Account    string       `json:"account"`
+	SceneResID int32        `json:"sceneResId"`
+	Gathers    []GatherMark `json:"gathers"`
+}
+
+// GatherMark 是当前视野里的一个采集物实体。
+type GatherMark struct {
+	ID string `json:"id"` // actor_id;uint64 超出 JS 安全整数,用字符串
+	// R 是刷新点 id(= POI.R = 实体的 npc_content_cfg_id),可与 POI 图层的候选点
+	// 对上,前端据此把「此刻有」与「这儿会有」叠着画。
+	R int32 `json:"r"`
+	// N 是品种名(向阳花/黑晶琉璃…)。取自点位表,不是逐点命名:官方表里采集物
+	// 没有点位级名字,同品种几十上百个点全叫同一个名。
+	N string `json:"n"`
+	// Icon 是品种图标路径 worldmap/<原名>.webp;未 embed 时空串(前端回退到图层图标)。
+	// 实体自己不带品种信息,全靠 R 对回点位表拿到这两项。
+	Icon string  `json:"icon,omitempty"`
+	U    float64 `json:"u"`
+	V    float64 `json:"v"`
+	// X/Y/Z 是实体下发时的世界坐标(厘米)。实体位置比候选点准 —— 候选点是
+	// AREA_CONF 的圆心,实际实体在附近几米内偏移(实测不影响 20m 内的采走判定,
+	// 但画出来还是以实体为准)。
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+	Z int32 `json:"z"`
+}
+
 // HomePayload 是家园小窝图层。
 type HomePayload struct {
 	Account string     `json:"account"`

@@ -56,7 +56,8 @@
 | 方法 路径 | 鉴权 | 账号 | 说明 |
 | --- | --- | --- | --- |
 | `GET /api/position` | — | ✓ | 最近一次位置；过期则抹掉 `vu`/`vv`/`path` |
-| `GET /api/pois` | — | — | 某场景（`?res=`）大地图 POI 图层 |
+| `GET /api/pois` | — | — | 某场景（`?res=`）大地图 POI 图层（**候选点**，回答「哪儿会有」） |
+| `GET /api/gathers` | — | ✓ | 此刻视野内的**实时采集物**（回答「这会儿有」，与 `pois` 的采集物图层互补） |
 | `GET /api/wildpets` | — | ✓ | 最近一次野生宠物标记 |
 | `GET /api/paint` | — | ✓ | 涂地覆盖位图（`?res=&layer=`，cells 为 base64 位图） |
 | `DELETE /api/paint` | — | ✓ | 清空涂地，并广播 `{reset:true}` |

@@ -46,7 +46,8 @@ export default function MapPage() {
   return (
     <div className="map-page">
       <div className="map-layout">
-        <LayerPanel pois={engine.pois} wilds={engine.wilds} paint={engine.paint} routes={engine.routes}
+        <LayerPanel pois={engine.pois} wilds={engine.wilds} gathers={engine.gathers}
+          paint={engine.paint} routes={engine.routes}
           collapsed={collapsed} onClose={() => setCollapsed(true)} onFocusZone={engine.hasMap ? focusZone : null} />
 
         <MapViz engine={engine} pip={pip}

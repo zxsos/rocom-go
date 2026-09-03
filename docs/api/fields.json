@@ -275,6 +275,34 @@
       ]
     }
   },
+  "gathers": {
+    "desc": "此刻视野内的实时采集物(花/草/菌/矿/果树)",
+    "endpoint": "GET /api/gathers",
+    "sample": "internal/server/testdata/contract/gathers.json",
+    "shape": {
+      "account": "str",
+      "gathers": [
+        {
+          "icon": "str",
+          "id": "str",
+          "n": "str",
+          "r": "int",
+          "u": "float",
+          "v": "float",
+          "x": "int",
+          "y": "int",
+          "z": "int"
+        }
+      ],
+      "sceneResId": "int"
+    }
+  },
+  "gathers-null": {
+    "desc": "无实时采集物记录(返回 null,而非空对象)",
+    "endpoint": "GET /api/gathers",
+    "sample": "internal/server/testdata/contract/gathers-null.json",
+    "shape": "null"
+  },
   "handbook-glasses": {
     "desc": "图鉴炫彩收集",
     "endpoint": "GET /api/handbook-glasses",

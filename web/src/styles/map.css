@@ -174,6 +174,31 @@
 }
 /* 收集模式下「已确认还在」的可收集点(星星/零件):描一圈金色,与尚未走到过的候选点区分开。 */
 .map-poi.sure { filter: drop-shadow(0 0 3px var(--c-star)) drop-shadow(0 0 6px var(--c-star)); }
+
+/* 实时采集物(此刻真刷着的那几个)。与 .map-poi 同源同形,但**加一圈亮边把它抬出来**:
+   它常常叠在 POI 图层的候选点上(同一个品种的候选点可能有几十个),没有视觉区分时
+   玩家分不清哪个是「这会儿真有」、哪个只是「这儿会有」。
+   采完即撤、不留灰点(见 useGathers.js),故不需要 .sure 那类状态样式。 */
+.map-gather {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  transform: translate(-50%, -50%);
+  user-select: none; -webkit-user-drag: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55))
+    drop-shadow(0 0 3px var(--c-star)) drop-shadow(0 0 6px rgba(255, 215, 120, .75));
+}
+.map-gather img { width: auto; height: 30px; display: block; }
+/* 品种图标缺失时的兜底圆点:不留空白,免得图上有个说不出是什么的洞。 */
+.map-gather-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--c-star); box-shadow: 0 0 0 2px rgba(255, 255, 255, .85);
+}
+/* 图层面板里的色块(与标记同一套视觉:金色描边的圆点) */
+.map-gather-swatch {
+  flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--c-star); box-shadow: 0 0 0 2px rgba(255, 215, 120, .55);
+}
+/* 图层开关下方的一行说明 */
+.map-gather-hint { font-size: 12px; line-height: 1.5; padding: 0 2px; opacity: .8; }
 /* 野生宠物标记:圆形头像 + 类别描边,**无底色**。描边色由 JS 按命中图层算
    (见 useWildPets 的 wildRing):主描边 = 最稀有的那层,次一层再加一圈 box-shadow
    外环——组合数太多,不走 CSS 类。头像本身用 .map-wild-face 的 radial-gradient
@@ -818,3 +843,16 @@
 .map-zone-row.done .map-zone-btn { border-style: dashed; }
 .map-zone-row.done .map-zone-num b { color: #3ddc97; }
 .map-zone-row.done .map-zone-miss { color: #3ddc97; }
+
+/* 单选态提示条:必须给显式出口,否则用户切进「只看这个」后不知道怎么退 */
+.map-gather-solo {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  margin: 4px 0; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid var(--c-star); background: rgba(255, 213, 74, .1);
+  color: var(--c-star); font-size: 13px;
+}
+.map-gather-solo button {
+  border: 0; background: none; color: inherit; cursor: pointer;
+  font: inherit; font-size: 12px; padding: 2px 4px; border-radius: 4px;
+}
+.map-gather-solo button:hover { background: rgba(127, 127, 127, .18); }

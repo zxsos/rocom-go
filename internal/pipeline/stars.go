@@ -332,6 +332,9 @@ func (p *Pipeline) onSceneSnapshot(m capture.Message, acc string) {
 	ts.snapAt = m.Time
 	p.saveStars(acc, states)
 	p.observeWilds(m.Session, acc, m.AppBody, m.Time, true) // 快照里的野生宠物同批收下
+	// 快照里的采集物同样同批收下:进场景/传送落地后第一屏就是靠它,不必等走近触发
+	// 第一条 AOI 通知(实测跨进边界到实体真正下发还有中位 6.3s 的滞后,见 wildpets.go)。
+	p.observeGathers(m.Session, acc, m.AppBody, m.Time, true)
 }
 
 // onPendantReq 记录 c2s 挂件交互(触碰石像上浮现的星):请求直接带石像刷新行 id,

@@ -135,12 +135,14 @@ type snapshotStore struct {
 	homeMu   sync.Mutex
 	flowerMu sync.Mutex
 	trialMu  sync.Mutex
+	gatherMu sync.Mutex
 
 	pos    map[string]*PositionPayload // 账号 -> 最近一次位置
 	wild   map[string]*WildPayload     // 账号 -> 最近一次野生宠物标记
 	home   map[string]*HomePayload     // 账号 -> 最近一次家园小窝图层
 	flower map[string]*FlowerPayload   // 账号 -> 最近一次花种 BOSS 分组
 	trial  map[string]*TrialPayload    // 账号 -> 最近一次草系试炼状态
+	gather map[string]*GatherPayload   // 账号 -> 最近一次实时采集物
 }
 
 func newSnapshotStore() *snapshotStore {
@@ -150,6 +152,7 @@ func newSnapshotStore() *snapshotStore {
 		home:   map[string]*HomePayload{},
 		flower: map[string]*FlowerPayload{},
 		trial:  map[string]*TrialPayload{},
+		gather: map[string]*GatherPayload{},
 	}
 }
 
@@ -389,6 +392,21 @@ func (sn *snapshotStore) dropFlowerWorld(acc, key string) bool {
 	return true
 }
 
+func (sn *snapshotStore) setGather(acc string, v *GatherPayload) {
+	if acc == "" || v == nil {
+		return
+	}
+	sn.gatherMu.Lock()
+	sn.gather[acc] = v
+	sn.gatherMu.Unlock()
+}
+
+func (sn *snapshotStore) getGather(acc string) *GatherPayload {
+	sn.gatherMu.Lock()
+	defer sn.gatherMu.Unlock()
+	return sn.gather[acc]
+}
+
 // forget 删除账号的全部快照(删账号时用)。
 func (sn *snapshotStore) forget(acc string) {
 	sn.posMu.Lock()
@@ -406,6 +424,9 @@ func (sn *snapshotStore) forget(acc string) {
 	sn.trialMu.Lock()
 	delete(sn.trial, acc)
 	sn.trialMu.Unlock()
+	sn.gatherMu.Lock()
+	delete(sn.gather, acc)
+	sn.gatherMu.Unlock()
 }
 
 // smtpSender 发送远行商人订阅邮件。

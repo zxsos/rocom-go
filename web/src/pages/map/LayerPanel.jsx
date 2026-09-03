@@ -12,7 +12,7 @@ import ZonePanel from './ZonePanel'
 // 跑图路线组(useRoutes.js):B站泽口博士的收集路线,仅卡洛西亚大陆(10003)有数据;
 // 点开才见路线列表,每条可单独开关叠加,选择存 localStorage。
 // 复用宠物列表那套 .filters:所有宽度统一为侧滑抽屉(collapsed 控制开合,桌面也对齐手机端)。
-export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onClose, onFocusZone }) {
+export default function LayerPanel({ pois, wilds, gathers, paint, routes, collapsed, onClose, onFocusZone }) {
   const { kinds, poiOn, togglePoi, collectOn, toggleCollect, zoneStats } = pois
   const dualNum = wilds.num.dual || 0
   const dualGone = wilds.numStale.dual || 0
@@ -51,6 +51,24 @@ export default function LayerPanel({ pois, wilds, paint, routes, collapsed, onCl
             图层是「图上显示什么」,这里是「还差多少、差在哪」,点一行把地图移过去。
             放在图标图层下面,同属大地图静态收集物一类。 */}
         <ZonePanel stats={zoneStats} onFocus={onFocusZone} disabled={!onFocusZone} />
+        {/* 实时采集物:与上面「地图图标」里的采集物图层是同批东西的两种画法 ——
+            那是全部候选刷新点(回答「哪儿会有」,默认关),这是此刻真刷着的
+            (回答「这会儿有」)。紧挨着放,免得被误当成两个无关功能。 */}
+        <div className="filter-group">
+          <label>此刻可采</label>
+          <div className="map-layer-row">
+            <button className={'map-layer-btn' + (gathers.on ? ' on' : '')}
+              onClick={gathers.toggle}
+              title="服务器当下下发的采集物实体。采完会消失并按刷新规则再刷,故不留灰点">
+              <span className="map-gather-swatch" />
+              <span className="map-layer-name">实时采集物</span>
+              <span className="muted">{gathers.total}</span>
+            </button>
+          </div>
+          <div className="map-gather-hint muted">
+            只画此刻真刷着的(约三成候选点会真刷出),全部品种,不可筛选
+          </div>
+        </div>
         <div className="filter-group">
           {/* 清空按钮放进 label 内:复用 .filter-group > label 的既有 flex 布局
               (左侧装饰竖条靠 ::before),不必另加包裹层与配套样式。
