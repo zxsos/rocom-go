@@ -633,7 +633,9 @@ def _egg_tables():
 
     - egg_conf:  PET_EGG_CONF.id(= 宠物 conf_id) -> {n:物种名, hl/hh/wl/wh:蛋自身的
                  身高体重区间(百分位口径,与成体 PETBASE_CONF 区间不是一套数), t:孵化秒数,
-                 p:蛋品类 precious_egg_type(0=普通;异色/炫彩等见 egg_types)}
+                 p:蛋品类 precious_egg_type(0=普通;异色/炫彩等见 egg_types),
+                 m:外形 model_id(仅在 != id 时落盘;血脉变体/自选炫彩蛋/活动纪念蛋都指向
+                 别的条目,故同一 model 下可挂多个 conf_id——蛋长什么样只由它决定)}
     - egg_items: BAG_ITEM_CONF 里 type==8 的物品 -> {n:显示名, c:物种 conf_id(随机蛋为 0),
                  img:图标原名(egg/<原名>.webp), npc:窝上蛋 NPC 的 NPC_CONF id,
                  q:物品品质 item_quality, s:排序号 sort_id(两者都是游戏内「品质排序」的键)}
@@ -644,9 +646,13 @@ def _egg_tables():
     """
     econf, eitems, etypes, nests = {}, {}, {}, {}
     for k, v in rows("PET_EGG_CONF.json").items():
-        econf[k] = {"n": v.get("name", ""), "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
-                    "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0),
-                    "p": v.get("precious_egg_type", 0)}
+        e = {"n": v.get("name", ""), "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
+             "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0),
+             "p": v.get("precious_egg_type", 0)}
+        # model_id 与 id 相同的条目(基础形态)占多数,不重复落盘。
+        if int(v.get("model_id", 0)) != int(k):
+            e["m"] = v.get("model_id", 0)
+        econf[k] = e
     for k, v in rows("BAG_ITEM_CONF.json").items():
         if v.get("type") != EGG_ITEM_TYPE:
             continue
@@ -673,6 +679,19 @@ def _egg_tables():
         if texkey(v.get("small_icon") or v.get("icon")):
             t["img"] = texkey(v.get("small_icon") or v.get("icon"))
         etypes[str(v.get("precious_egg_type", 0))] = t
+    # EGG_TYPE_CONF 里没名字的品类(实测只有 4=活动纪念),靠它下面那些蛋在背包里的显示名补:
+    # 122 件「活动纪念精灵蛋」全叫一个名,这就是品类名。只有**全部相同**才采信 ——
+    # 普通蛋那批是「<物种>的蛋」,各自不同,凑不出品类名(随机蛋也归在 0 下,同名只会更乱)。
+    # 额外要求以「蛋」结尾且不含「的蛋」,免得某品类只剩一件物品时被误当成品类名。
+    names_by_type = {}
+    for e in eitems.values():
+        t = str(econf.get(str(e["c"]), {}).get("p", 0))
+        names_by_type.setdefault(t, set()).add(e["n"])
+    for t, names in names_by_type.items():
+        if t in etypes and not etypes[t].get("n") and len(names) == 1:
+            n = names.pop()
+            if n.endswith("蛋") and "的蛋" not in n:
+                etypes[t]["n"] = n
     for k, v in rows("FURNITURE_ITEM_CONF.json").items():
         if v.get("interact_type") == NEST_INTERACT_TYPE:
             nests[k] = v.get("name", "")

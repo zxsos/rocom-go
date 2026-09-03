@@ -359,6 +359,16 @@ CREATE TABLE IF NOT EXISTS merchant_source (
   updated_at INTEGER
 );
 
+-- 随机蛋「猜猜孵出谁」数据源配置(单行 id=1,范式同 merchant_source,见 store/egg_src.go):
+-- source 是当前生效的源(local / xianyu),空串=未配置、由服务端回退默认源。
+-- 与远行商人不同,这里切源**不需要清任何缓存**:两个源都是「每次请求实时算」,
+-- 没有跨源复用的缓存;本表不做清理,就一行。
+CREATE TABLE IF NOT EXISTS egg_source (
+  id INTEGER PRIMARY KEY,
+  source TEXT NOT NULL,
+  updated_at INTEGER
+);
+
 -- 查蛋 API(第三方图鉴,见 api_egg_query.go)使用统计:每次发起第三方请求记一行,
 -- 管理面板据此看今日消耗/成功率/谁在查。量小(一天几十次),不做清理。
 CREATE TABLE IF NOT EXISTS egg_queries (

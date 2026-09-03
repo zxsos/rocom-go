@@ -245,6 +245,11 @@ func Load() (*DB, error) {
 	eggConf := make(map[uint32]EggConf, len(raw.EggConf))
 	for k, v := range raw.EggConf {
 		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			// model_id 等于 conf_id 的基础形态在 names.json 里不落盘(占多数),
+			// 这里补成显式的自指,免得每个读它的地方都要处理「0 表示自己」。
+			if v.ModelID == 0 {
+				v.ModelID = uint32(id)
+			}
 			eggConf[uint32(id)] = v
 		}
 	}

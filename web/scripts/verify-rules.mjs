@@ -275,6 +275,129 @@ console.log('\n[13] 预设档位')
   eq('「清空」展开为空数组', schemeRules(RULE_SCHEMES.find((s) => s.k === 'none')), [])
 }
 
+// —— 变焦刻度(rangeScale)——
+//
+// 轨道被分段放大:两头的奖牌区各占 35%,中间段压扁(见 utils/rules.js)。
+// 这里的断言全部是**数值性质**,而这类性质出错时页面不会报错 ——
+// 滑块照样能拖、规则照样能存,只是「想要的区间拖不出来」。只有断言能抓。
+console.log('\n[9] 变焦刻度 rangeScale')
+{
+  for (const dim of R.RANGE_DIMS) {
+    const sc = R.rangeScale(dim)
+    const span = dim.max - dim.min
+
+    // 铺满:轨道两端必须正好是取值域两端,否则滑块拖到底也到不了极值
+    eq(`${dim.n}: 值域下界落在轨道 0`, sc.toPos(dim.min), 0)
+    eq(`${dim.n}: 值域上界落在轨道 1`, sc.toPos(dim.max), 1)
+
+    // 分段连续且铺满:后一段的 start 必须等于前一段的 end
+    const joined = sc.segs.every((s, i) => i === 0 || Math.abs(s.start - sc.segs[i - 1].end) < 1e-12)
+    ok(`${dim.n}: 各段首尾相接`, joined)
+    ok(`${dim.n}: 重点区+中间段覆盖整个取值域`,
+      Math.abs(sc.segs[0].a - dim.min) < 1e-9 &&
+      Math.abs(sc.segs[sc.segs.length - 1].b - dim.max) < 1e-9)
+
+    // 单调:轨道从左往右,取值只能变大不能变小。不单调的话拖动会「跳回去」,
+    // 而磁吸是唯一允许的例外(它是有意的吸附)。
+    let prev = -Infinity
+    let drops = []
+    for (let i = 0; i <= 2000; i++) {
+      const v = sc.toValue(i / 2000)
+      if (v < prev - 1e-9) {
+        // 只可能是磁吸在起作用:该位置的真值应当与某个奖牌边界足够近
+        const nearMark = sc.marks.some((m) => Math.abs(i / 2000 - m.pos) <= 0.02)
+        if (!nearMark) drops.push(`${(i / 20).toFixed(2)}%: ${prev} → ${v}`)
+      }
+      prev = v
+    }
+    eq(`${dim.n}: 取值随轨道单调不减(磁吸除外)`, drops.slice(0, 3), [])
+
+    // 往返:默认规则(奖牌窗口)必须能被精确复现 —— 这是最高频的用法,
+    // 拖一下把 98 变成 97.9 就等于筛不出奖牌了。
+    for (const r of R.DEFAULT_RANGE_RULES.filter((x) => x.dim === dim.k)) {
+      eq(`${dim.n}: 默认「${r.label}」往返不失真`,
+        [sc.toValue(sc.toPos(r.min)), sc.toValue(sc.toPos(r.max))], [r.min, r.max])
+    }
+
+    // 放大:重点区每单位取值摊到的轨道,必须远多于中间段
+    const focusSeg = sc.segs.find((s) => s.focus)
+    const gapSeg = sc.segs.find((s) => !s.focus)
+    const dens = (s) => (s.end - s.start) / (s.b - s.a)
+    ok(`${dim.n}: 重点区刻度比中间段细 5 倍以上`,
+      dens(focusSeg) > dens(gapSeg) * 5,
+      `${dens(focusSeg).toFixed(5)} vs ${dens(gapSeg).toFixed(5)}`)
+
+    // 中间段粗步进:拖出来的值必须落在放大后的网格上,而不是 43.7 这种噪音。
+    //
+    // 必须**整段扫一遍**,不能只抽查中点:中点(体重 50 / 嗓音 0)在粗细两个网格上
+    // 都成立,于是把 COARSE_MUL 改成 1(或干脆不分档)测试照样全绿 ——
+    // 而「非奖牌区 step 更大」正是这次需求本身,漏掉它等于没测。
+    const coarse = dim.step * 10
+    const offGrid = []
+    for (let i = 1; i < 200; i++) {
+      const p = gapSeg.start + ((gapSeg.end - gapSeg.start) * i) / 200
+      const v = sc.toValue(p)
+      // 段边界是「夹回本段」夹出来的,可能本就不在网格上,排除
+      if (v <= gapSeg.a + 1e-9 || v >= gapSeg.b - 1e-9) continue
+      if (Math.abs(v / coarse - Math.round(v / coarse)) > 1e-9) offGrid.push(String(v))
+    }
+    eq(`${dim.n}: 中间段的值全部落在粗网格上(step×10)`, offGrid.slice(0, 3), [])
+
+    // 反向确认重点区保持**细**步进:粗网格若被用到重点区,奖牌边界就凑不准了。
+    const fineSeg = sc.segs.find((s) => s.focus)
+    const fineOff = []
+    for (let i = 1; i < 200; i++) {
+      const p = fineSeg.start + ((fineSeg.end - fineSeg.start) * i) / 200
+      const v = sc.toValue(p)
+      if (v <= fineSeg.a + 1e-9 || v >= fineSeg.b - 1e-9) continue
+      if (Math.abs(v / dim.step - Math.round(v / dim.step)) > 1e-9) fineOff.push(String(v))
+    }
+    eq(`${dim.n}: 重点区的值落在细网格上(step)`, fineOff.slice(0, 3), [])
+
+    // 磁吸:奖牌边界要吸得住,也要能脱离
+    for (const m of sc.marks) {
+      eq(`${dim.n}: 磁吸点在轨道上取回自身`, sc.toValue(m.pos), m.v)
+    }
+    // 脱离:从边界挪开「半径的 3 倍」后,不该还粘在边界上。
+    // 不验这一条的话,把磁吸半径写大(比如 0.5)测试照样全绿,而用户就再也
+    // 拖不出「放宽一点点」的区间了 —— 那正是这次改动要保留的能力。
+    for (const m of sc.marks) {
+      const inner = sc.marks.filter((o) => o !== m)
+      for (const dir of [-0.06, 0.06]) {
+        const p = m.pos + dir
+        // 端点刻度(0 / 100)本身就在轨道两头,朝外挪会被夹回来 —— 那不是"脱离",
+        // 跳过即可。只测朝轨道内侧的那一边。
+        if (p < 0 || p > 1) continue
+        const v = sc.toValue(p)
+        // 若落点仍在**别的**刻度线的磁吸半径内,取到那个值也算脱离了这一个
+        const stillMagnet = inner.some((o) => Math.abs(p - o.pos) <= 0.015) && v !== m.v
+        ok(`${dim.n}: 离开边界 ${m.v} 后能取到别的值`,
+          v !== m.v || stillMagnet, `位置 ${(p * 100).toFixed(0)}% 仍得 ${m.v}`)
+      }
+    }
+  }
+
+  // 奖牌窗口的可用宽度:按比例的像素数 vs 变焦后的像素数。
+  // 这才是「在需要的区域太小了」那条抱怨的量化答案。
+  const w = R.rangeScale(R.DIM_BY_K.weightPct)
+  const px = w.toPos(100) - w.toPos(98)
+  ok('体重奖牌窗口摊到的轨道 ≥ 5%(按比例只有 2%)', px >= 0.05, `实际 ${(px * 100).toFixed(1)}%`)
+  const vv = R.rangeScale(R.DIM_BY_K.voice)
+  const vpx = vv.toPos(-96) - vv.toPos(-100)
+  ok('嗓音奖牌窗口摊到的轨道 ≥ 5%(按比例只有 2%)', vpx >= 0.05, `实际 ${(vpx * 100).toFixed(1)}%`)
+
+  // 奖牌边界 = 默认规则的端点:阈值只有一个来源,刻度与磁吸跟着它走
+  for (const dim of R.RANGE_DIMS) {
+    const want = []
+    for (const r of R.DEFAULT_RANGE_RULES) {
+      if (r.dim === dim.k) want.push(r.min, r.max)
+    }
+    eq(`${dim.n}: 刻度线 = 默认规则的端点`,
+      R.rangeScale(dim).marks.map((m) => m.v).sort((a, b) => a - b),
+      [...new Set(want)].sort((a, b) => a - b))
+  }
+}
+
 await server.close()
 console.log(fail === 0 ? '\n✓ 全部通过' : `\n✗ ${fail} 项未通过`)
 process.exit(fail === 0 ? 0 : 1)

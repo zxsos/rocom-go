@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   RANGE_DIMS, DIM_BY_K, RULE_PALETTE, RULE_PRESETS, RULE_SCHEMES,
-  DEFAULT_RANGE_RULES, newRuleId, rangeRuleLabel, clampRange, sliderTop,
+  DEFAULT_RANGE_RULES, newRuleId, rangeRuleLabel, clampRange, rangeScale, sliderTop,
 } from '../utils/rules'
 
 // RangeRules 体重/声音区间规则的编辑器(事件页与大地图共用同一份规则,见 hooks/useRangeRules)。
@@ -16,34 +16,60 @@ import {
 // 「+ 添加」改成从常用档位里点选(见 RULE_PRESETS),配上顶部整套方案(RULE_SCHEMES):
 // 自由度高不等于每次都从零配,多数时候选一个现成的再微调就够了。
 
+// 轨道分辨率:输入在**位置空间**(0~SLIDER_STEPS)上走,再由 rangeScale 换算成取值。
+//
+// 有了变焦刻度之后,input 的 min/max 就不能再用取值域了 —— 浏览器只认均匀分布,
+// 那样重点区的放大等于白做。故输入一律是「轨道上的第几格」,取值由尺子换算出来。
+const SLIDER_STEPS = 1000
+
 // RangeSlider 双滑块:两个原生 range 叠在一起,只用它们的 thumb 接收指针事件。
 //
 // 原生 range 只能给单值,故叠两个(下限/上限),容器设 pointer-events:none、
 // 只给 thumb 设 auto —— 不这么处理的话上层 input 的轨道会整片盖住下层,
 // 另一个端点就永远拖不动了。
+//
+// 轨道是**非线性**的(见 utils/rules.js 的 rangeScale):两头的奖牌区被放大,
+// 中间段压扁。故这里额外把重点区与奖牌刻度画出来 —— 刻度不均匀这件事必须让用户
+// 看见,否则只会以为拖动不准。
 function RangeSlider({ dim, min, max, color, onChange, label }) {
-  const span = dim.max - dim.min
-  const pct = (v) => ((v - dim.min) / span) * 100
+  const scale = useMemo(() => rangeScale(dim), [dim])
   const top = sliderTop(min, max, dim)
+  const lo = scale.toPos(min)
+  const hi = scale.toPos(max)
+
+  const at = (edge, pos) => {
+    const v = scale.toValue(pos / SLIDER_STEPS)
+    const [a, b] = clampRange(edge, v, edge === 'min' ? max : min, dim)
+    onChange(a, b)
+  }
+
   return (
     <div className="rslider">
       <div className="rslider-track" />
+      {/* 重点区:刻度被放大的那两段。画得比轨道略高略亮,像两段被架起来的放大镜 */}
+      {scale.segs.filter((s) => s.focus).map((s, i) => (
+        <div
+          key={i}
+          className="rslider-zone"
+          style={{ left: `${s.start * 100}%`, width: `${(s.end - s.start) * 100}%` }}
+        />
+      ))}
       <div
         className="rslider-fill"
-        style={{ left: `${pct(min)}%`, width: `${pct(max) - pct(min)}%`, background: color }}
+        style={{ left: `${lo * 100}%`, width: `${(hi - lo) * 100}%`, background: color }}
       />
+      {/* 奖牌边界:既是刻度线,也是磁吸点(拖到附近会吸附过去) */}
+      {scale.marks.map((m) => (
+        <i key={m.v} className="rslider-tick" style={{ left: `${m.pos * 100}%` }} />
+      ))}
       {(['min', 'max']).map((edge) => (
         <input
           key={edge}
           type="range"
           className={'rslider-input' + (top === edge ? ' top' : '')}
-          min={dim.min} max={dim.max} step={dim.step}
-          value={edge === 'min' ? min : max}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            const [lo, hi] = clampRange(edge, v, edge === 'min' ? max : min, dim)
-            onChange(lo, hi)
-          }}
+          min={0} max={SLIDER_STEPS} step={1}
+          value={Math.round((edge === 'min' ? lo : hi) * SLIDER_STEPS)}
+          onChange={(e) => at(edge, Number(e.target.value))}
           aria-label={`${label}${edge === 'min' ? '下限' : '上限'}`}
         />
       ))}
@@ -135,7 +161,12 @@ export default function RangeRules({ rules = [], setRules, counts }) {
             <div className="rrule-slide">
               <button
                 className="rrule-dim" onClick={() => switchDim(rule, rule.dim === 'voice' ? 'weightPct' : 'voice')}
-                title="切换维度(体重百分位 / 嗓音原值),区间按比例映射过去"
+                title={
+                  '切换维度(体重百分位 / 嗓音原值),区间按比例映射过去 —— 两头的奖牌窗口' +
+                  '在两侧是等比放置的,故「体重 98~100」切过去正好是「声音 96~100」。\n' +
+                  '轨道刻度不均匀:奖牌区被放大(底色更亮的两段,上面的刻度线是奖牌边界,' +
+                  '拖到附近会吸附),中间段压扁 —— 中间拖得快,两头拖得细。'
+                }
               >{dim.n}</button>
               <RangeSlider
                 dim={dim} min={rule.min} max={rule.max} color={rule.color}

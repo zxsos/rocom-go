@@ -221,34 +221,59 @@ function EggCard({ egg, now, onPet }) {
   const p = hatchProgress(egg, now)
   const src = egg.srcName ? `来源:${egg.srcName}` : ''
   const name = tidyEggName(egg.name)
-  // 随机蛋(神奇的蛋)的「猜猜孵出谁」:后端代理第三方图鉴 API(令牌在服务端,不进浏览器)。
-  // 查询结果按身高体重缓存(localStorage):已查过又刷新页面时,初始化直接恢复缓存结果,
-  // 不用再点「猜猜孵出谁」重新请求第三方。
-  const guessKey = [egg.heightM, egg.weightKg].map((v) => v ?? '').join('|')
+  // 随机蛋(神奇的蛋)的「猜猜孵出谁」。
+  //
+  // **用哪个数据源由服务端配置决定**(管理面板切换,见 EggSourceCard):前端传不了,
+  // 也不该能传 —— 数据源是对全服生效的运维选项,若能让请求参数覆盖,任何玩家都能
+  // 夹带 src=xianyu 去烧第三方额度(10 次/分钟)。
+  //
+  // 查询结果按身高体重+时长缓存(localStorage),刷新页面时立即恢复、不闪空白。
+  // 只缓存**本地源**的结果:咸鱼源要烧额度,不进缓存,故每次点都会真去问第三方。
+  const guessKey = [egg.heightM, egg.weightKg, egg.maxSecs].map((v) => v ?? '').join('|')
   const [match, setMatch] = useState(() => {
     if (!egg.random) return null
     const hit = readEggGuessCache(guessKey)
     return hit ? { loading: false, error: '', data: hit } : null
   }) // {loading,error,data}
-  const query = () => {
-    const hit = readEggGuessCache(guessKey)
-    if (hit) { // 同身高体重查过,直接复用缓存,不再请求第三方
-      setMatch({ loading: false, error: '', data: hit })
-      return
-    }
+  const query = useCallback(() => {
     setMatch({ loading: true, error: '', data: null })
-    queryEggMatch(egg.heightM, egg.weightKg)
-      .then((d) => { writeEggGuessCache(guessKey, d); setMatch({ loading: false, error: '', data: d }) })
+    queryEggMatch(egg.heightM, egg.weightKg, egg.maxSecs)
+      .then((d) => {
+        // 只缓存本地源:咸鱼源每次都要烧额度,缓存它等于偷偷替管理员决定「这份结果
+        // 可以复用多久」—— 那是他的令牌,不该由前端做主。
+        if (d.source === 'local') writeEggGuessCache(guessKey, d)
+        setMatch({ loading: false, error: '', data: d })
+      })
       .catch((e) => {
         const msg = e.message || '查询失败'
         if (/429|请求过于频繁/.test(msg)) {
-          // 限流:不占卡片位置,弹自制 toast 提醒(不阻塞页面)
+          // 限流只可能发生在咸鱼源:不占卡片位置,弹自制 toast 提醒(不阻塞页面)
           setMatch(null)
           toast('喂喂喂,当我Token不要钱吗,等会再查啊魂淡')
         } else {
           setMatch({ loading: false, error: msg, data: null })
         }
       })
+  }, [egg.heightM, egg.weightKg, egg.maxSecs, guessKey])
+
+  // 恢复出来的缓存可能是**另一个源**给的(管理员在面板切过源之后,localStorage 还在)。
+  // 故挂载后静默重查一次校正:本地源是内存查表,这次请求几乎不要钱;咸鱼源不写缓存,
+  // 走不到这条路(它的缓存值只可能来自上一次本地源查询,正是要被校正掉的那种)。
+  // 依赖写 [query] 而非 []:query 的依赖全是原始值,引用稳定,效果等同挂载一次,
+  // 如此写是为了让 lint 能验证闭包没捕获到过期变量。
+  const restoredRef = useRef(match?.data != null)
+  useEffect(() => {
+    if (!restoredRef.current) return
+    restoredRef.current = false
+    query()
+  }, [query])
+
+  const openQuery = () => {
+    // 咸鱼源的结果不进缓存,故命中缓存的一定是本地源的 —— 先立即渲染它(不闪空白),
+    // 再由上面那次静默刷新校正。
+    const hit = readEggGuessCache(guessKey)
+    if (hit) setMatch({ loading: false, error: '', data: hit })
+    query()
   }
   return (
     <div className="egg-card">
@@ -307,28 +332,40 @@ function EggCard({ egg, now, onPet }) {
                     <span>{match.error}</span>
                     <button className="btn" onClick={() => setMatch(null)}>关闭</button>
                   </div>
-                ) : match.data.data.total > 0 ? (
+                ) : match.data.total > 0 ? (
                   <>
                     <div className="muted egg-guess-line">
-                      匹配 {match.data.data.total} 条,来源 示例玩家
+                      匹配 {match.data.total} 条
+                      {match.data.source === 'xianyu' ? ',来源 示例玩家' : ',来源 本地解包数据'}
                     </div>
                     <div className="egg-guess-list">
-                      {[...(match.data.data.matches || [])]
-                        .sort((a, b) => (b.score || 0) - (a.score || 0))
-                        .map((m) => (
-                        <div key={m.pet_id} className="egg-guess-item">
-                          {/^https?:\/\//.test(m.img_name || '')
-                            ? <img className="egg-guess-img" src={m.img_name} alt="" loading="lazy" draggable={false} /> : null}
+                      {/* 后端已按匹配度排好序,这里不再重排。 */}
+                      {(match.data.matches || []).map((m) => (
+                        <div key={m.confId || m.name} className="egg-guess-item">
+                          {/* img 是后端给的完整可用值(本地站内路径 / 第三方外链),不再拼 /img/。 */}
+                          {m.img
+                            ? <img className="egg-guess-img" src={m.img} alt="" loading="lazy" draggable={false} /> : null}
                           <div className="egg-guess-txt">
-                            <div className="egg-guess-name">{m.pet_name}
-                              <span className="muted"> {[m.main_type, m.sub_type].filter(Boolean).join('/')}</span>
+                            <div className="egg-guess-name">{m.name}</div>
+                            {/* 本地源额外给出蛋落在候选区间内的百分位:两条都齐时才显示,
+                                第三方不提供这两维,故只显示 note(孵化时长文案)。 */}
+                            <div className="muted">
+                              {/* score 是后端算的 float,原样渲染会出「81.90337105999757」
+                                  这种长尾 —— 它只用于排序,精度到小数一位足够。 */}
+                              匹配度 {m.score?.toFixed(1) ?? '—'}
+                              {m.heightPct != null && m.weightPct != null
+                                ? ` · 百分位 身高${m.heightPct.toFixed(1)}% 体重${m.weightPct.toFixed(1)}%`
+                                : m.note ? ` · ${m.note}` : ''}
                             </div>
-                            <div className="muted">匹配度 {m.score} · {m.hatch_label}</div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <button className="btn" onClick={() => setMatch(null)}>关闭</button>
+                    {/* 用哪个数据源由管理面板配置,这里不提供切换入口:
+                        数据源是对全服生效的运维选项,不该让单个玩家按一下就改。 */}
+                    <div className="egg-guess-acts">
+                      <button className="btn" onClick={() => setMatch(null)}>关闭</button>
+                    </div>
                   </>
                 ) : (
                   <div className="egg-guess-line err">
@@ -338,8 +375,11 @@ function EggCard({ egg, now, onPet }) {
                 )}
             </div>
           ) : (
-            <button className="btn egg-guess-btn" onClick={query}
-              title="按蛋的身高/体重查第三方图鉴,猜可能孵出谁">猜猜孵出谁</button>
+            <button
+              className="btn egg-guess-btn"
+              onClick={openQuery}
+              title="按蛋的身高/体重/孵化时长反推可能孵出谁(数据源由管理面板配置)"
+            >猜猜孵出谁</button>
           )}
         </div>
       )}

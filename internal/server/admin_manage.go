@@ -172,6 +172,60 @@ func (s *Server) handleAdminMerchantSource(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// handleAdminEggSource 查蛋数据源:查询与切换。
+//
+//	GET  → {source, keySet, sources:[{id, name, needKey}]}
+//	POST {source} → 切换生效(见 eggSetSource)
+//
+// 与远行商人的切源不同,这里**不清任何缓存**:两个源都是每次请求实时算,
+// 没有跨源复用的缓存,故切源立即生效、也没有任何代价。
+func (s *Server) handleAdminEggSource(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		type srcJSON struct {
+			ID      string `json:"id"`
+			Name    string `json:"name"`
+			NeedKey bool   `json:"needKey"`
+		}
+		// 源的清单从后端下发而非前端硬编码:合法标识只有后端能校验,
+		// 让前端自己列一份迟早与校验逻辑漂移。
+		sources := []srcJSON{}
+		for _, id := range []string{eggSrcLocal, eggSrcXianyu} {
+			sources = append(sources, srcJSON{
+				ID: id, Name: eggSourceName(id), NeedKey: eggSourceNeedKey(id),
+			})
+		}
+		writeJSON(w, map[string]any{
+			"source":  s.eggSource(),
+			"keySet":  s.eggAPIKey != "",
+			"sources": sources,
+		})
+	case http.MethodPost:
+		var req struct {
+			Source string `json:"source"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "参数解析失败", http.StatusBadRequest)
+			return
+		}
+		req.Source = strings.TrimSpace(req.Source)
+		if !eggSourceValid(req.Source) {
+			http.Error(w, "未知的数据源:"+req.Source, http.StatusBadRequest)
+			return
+		}
+		if err := s.eggSetSource(req.Source); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true})
+	default:
+		http.Error(w, "不支持的请求方法", http.StatusMethodNotAllowed)
+	}
+}
+
 // handleAdminRuleDelete 删除一条黑白名单规则(?account=xxx)。
 func (s *Server) handleAdminRuleDelete(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {

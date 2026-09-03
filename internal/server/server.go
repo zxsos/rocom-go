@@ -55,6 +55,11 @@ type Server struct {
 	merchantSrc   string
 	merchantSrcMu sync.Mutex
 
+	// 当前生效的查蛋数据源(见 api_egg_query.go 的源常量):启动时从库载入,
+	// 切源时更新。同上,存内存镜像。
+	eggSrc   string
+	eggSrcMu sync.Mutex
+
 	// 「清空野生宠标记」的回调,由消费管线注册(见 SetWildsClearer)。
 	// 野生宠观测态在 pipeline 侧,server 靠这个钩子反向调用它。
 	wildsMu      sync.Mutex
@@ -110,6 +115,11 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 	s.merchantSrc = merchantSrcDefault
 	if v := st.MerchantSource(); merchantSourceValid(v) {
 		s.merchantSrc = v
+	}
+	// 查蛋数据源:同上,库里没配置或值非法时回退默认(本地)源。
+	s.eggSrc = eggSrcDefault
+	if v := st.EggSource(); eggSourceValid(v) {
+		s.eggSrc = v
 	}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
@@ -218,6 +228,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/merchant-source", s.handleAdminMerchantSource)
 	s.mux.HandleFunc("POST /api/admin/merchant-source", s.handleAdminMerchantSource)
 	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
+	s.mux.HandleFunc("GET /api/admin/egg-source", s.handleAdminEggSource)
+	s.mux.HandleFunc("POST /api/admin/egg-source", s.handleAdminEggSource)
 	// 标注模式(众包图鉴):玩家对未知技能/特性 id 提交名字,管理员审核后全服可见。
 	s.mux.HandleFunc("GET /api/annotations", s.handleGetAnnotations)
 	s.mux.HandleFunc("POST /api/annotations", s.handleSubmitAnnotation)

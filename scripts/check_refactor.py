@@ -124,6 +124,9 @@ ALLOWED_NEW_FUNCS = {
     # 同上(feat:远行商人双数据源),管理面板的读写端点:GET 读当前源与源清单,
     # POST 切换。源清单一并下发而非法前端硬编码 —— 合法标识只有后端能校验。
     "handleAdminMerchantSource": "feat:双数据源,管理端点的读写(GET 当前源+源清单 / POST 切换)",
+    # feat:查蛋双数据源(本地源/咸鱼源),范式同远行商人。默认本地源 —— 它不是
+    # 「退而求其次」,而是更准的那个:第三方读的是同一张表却不做时长筛选。
+    "handleAdminEggSource": "feat:查蛋双数据源,管理端点的读写(GET 当前源+源清单 / POST 切换)",
     # perf:SMTP 连接复用(一批订阅者共用一个会话,省掉 N-1 次握手与认证)。
     # 方法名在脚本里是裸名(接收者不计入),故登记为 send/reset/close/discard。
     "sendBatch": "perf:连接复用,整批一个会话连发多封,返回逐封错误",

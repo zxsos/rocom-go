@@ -570,6 +570,60 @@
 | `GET /api/paint` | `{res, layer, w, h, cell, corridor, safe, cells}`；`cells` 是 w×h 位的 base64 位图（每字节 8 格、低位在前）；无底图时 `w=0` |
 | `GET /api/merchant` | `{now, day, status:"open\|closed\|idle", today:[{start,end,label,empty,merchant}], prev:[...]}`，`merchant` 是第三方原始 JSON |
 | `GET /api/merchant/sub` | `{configured, subscribed, email, keywords}` |
-| `GET /api/eggs/query` | 第三方原始 JSON：`{code,msg,data:{matches:[{pet_id,pet_name,...}],total,source}}` |
+| `GET /api/eggs/query` | `{source, total, matches:[{name,img,hatchSecs,score,heightPct,weightPct,confId,note}]}`；**两个数据源共用此结构**，详见下节 |
 | `POST /api/account/verify` | `{ok, hasPin}` |
 | 各 admin 接口 | 见 `web/src/api.js` 的注释（前端侧已逐个注明响应形状） |
+
+### `GET /api/eggs/query` —— 两个数据源，一份契约
+
+随机蛋（神奇的蛋）`conf_id = 0`，猜它孵出谁。用哪个源由服务端配置决定
+（管理面板切换，见下节），默认**本地源**。两个源的响应结构一致，前端不分支：
+
+```json
+{ "source": "local", "total": 3,
+  "matches": [{ "name": "权杖-Ⅱ", "img": "/img/HeadIcon/3410.webp", "hatchSecs": 57600,
+                "score": 87.5, "heightPct": 25.0, "weightPct": 34.1,
+                "confId": 3410001, "note": "孵化 16 小时" }] }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `source` | `"local"`（本地源，默认）或 `"xianyu"`（咸鱼源） |
+| `total` | 候选条数，恒等于 `len(matches)`（**不是**第三方响应里的 `total`） |
+| `matches[].img` | **可直接赋给 `<img src>` 的完整值**：本地给 `/img/` 开头的站内路径、咸鱼源给外链。**与其它接口的相对路径语义不同，不要再套 `imgURL()`** |
+| `matches[].score` | 匹配度 0-100，**仅用于排序，不是概率**（合成测试下真值进前 3 只有约一半，且那是未去重口径） |
+| `matches[].heightPct` / `weightPct` | 蛋落在候选区间内的百分位，仅本地源提供；咸鱼源无此两维 |
+| `matches[].confId` | 物种 conf_id。咸鱼源的 `pet_id` 口径未必相同，**勿跨源比较** |
+| `matches[].note` | 本地给「孵化 N 小时」文案，咸鱼源给对方的 `hatch_label` |
+
+请求参数：`height`（米）、`weight`（千克）、`maxSecs`（孵满秒数），都取自前端
+`EggView`；**`maxSecs` 是最强的一维约束**（见 docs/data.md「随机蛋的区间藏在哪」），
+能传一定要传 —— 缺了就退化成纯尺寸匹配，候选会宽得多。
+
+**用哪个源由服务端配置决定，请求参数覆盖不了**（接口不收 `src`）：数据源是对全服
+生效的运维选项，若能让请求参数覆盖，任何玩家都能夹带 `src=xianyu` 去烧第三方额度
+（10 次/分钟）。切换走管理面板，见下节。
+
+咸鱼源未配令牌时返回 **503**，且**不落统计**（统计是给「烧了多少额度」看的，
+没发出去的请求不该计入）。本地源永不因缺令牌失败。
+
+### `GET|POST /api/admin/egg-source` —— 切换查蛋数据源
+
+管理员端点，范式同 `merchant-source`。
+
+```
+GET  → {source, keySet, sources:[{id, name, needKey}]}
+POST {source} → {ok:true}
+```
+
+| 源 | 说明 |
+| --- | --- |
+| `local`（默认） | 本地解包数据反推，**用 `maxSecs` 硬筛**。零外部依赖、无限流、离线可用；无系别 |
+| `xianyu` | 第三方图鉴。多给系别，但**不做时长筛选**，候选里会混入时长不符的物种；需 `-egg-api-key`，限流 10 次/分钟 |
+
+与切远行商人数据源不同，这里**不清任何缓存**：两个源都是每次请求实时算，
+没有跨源复用的缓存，故切换立即生效、也没有「切源后数据为空」这类代价。
+
+`GET` 的 `keySet` 表示服务端是否已配 `-egg-api-key`；若当前源 `needKey` 而
+`keySet=false`，管理面板会给出警示（该源当前取不到数据）。源清单由后端下发，
+前端不硬编码 —— 合法标识只有后端能校验。
