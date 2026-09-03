@@ -24,6 +24,7 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpPlayActsBatchNotify:
 		p.observeStars(m.Session, acc, m.AppBody)
 		p.observeWilds(m.Session, acc, m.AppBody, m.Time, false)
+		p.observeGathers(m.Session, acc, m.AppBody, m.Time, false)
 		p.observeHome(m.Session, acc, m.AppBody)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcPendantInteractReq:
 		p.onPendantReq(m)
@@ -64,6 +65,9 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		cs.stars = newStarTracker(res)
 		cs.wildSeen = nil                         // 涂地跟踪的实体同样按场景清零(见 paintSeen)
 		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(并推空列表,前端立刻清屏)
+		// 采集物是「此刻有」的实时态,整份作废而非置灰(留着就是一屏指向别处的假标记,
+		// 见 resetGathers)。
+		p.resetGathers(m.Session, acc, res, m.Time)
 	}
 	p.applyZoneProgress(m, acc)
 }
@@ -84,6 +88,7 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	cs.wildSeen = nil                              // 同上:涂地跟踪的实体也作废
 	cs.pos = tp.Pos                                // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
 	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
+	p.resetGathers(m.Session, acc, tp.ResID, m.Time) // 同上:传送不为旧实体补发 leave,采集物整份作废
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)
@@ -95,6 +100,7 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 func (p *Pipeline) onPlayActs(m capture.Message, acc string) {
 	p.observeStars(m.Session, acc, m.AppBody)
 	p.observeWilds(m.Session, acc, m.AppBody, m.Time, false)
+	p.observeGathers(m.Session, acc, m.AppBody, m.Time, false)
 	// 区域进/出:玩家真正踩进/离开区域触发体(3D 体积)时服务器才下发,是选层的权威依据。
 	acts := scene.ParseAreaActs(m.AppBody)
 	if len(acts) == 0 {

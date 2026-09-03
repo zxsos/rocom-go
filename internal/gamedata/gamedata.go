@@ -66,6 +66,10 @@ type DB struct {
 	poiKinds    []POIKind           // 大地图 POI 图层清单(有序,前端开关)
 	pois        map[uint32][]POI    // scene_res_cfg_id -> 该场景的 POI(世界坐标)
 	zones       map[string]string   // 区域(营地 id) -> 区域名;眠枭之星收集进度按此键统计
+	// gatherByR:刷新点 id -> 采集物点位。只收 gather 图层那批(见 GatherByRefresh)。
+	// 建索引而非遍历 pois:实体进出 AOI 是每秒若干条的突发(实测一份 57s 的 pcap 里
+	// 采集物 enter 就有 53 条),每条都线性扫 4226 个点位太浪费。
+	gatherByR map[int32]POI
 	// 精灵蛋与家园小窝(见 docs/data.md 3.6):
 	eggConf    map[uint32]EggConf // 物种 conf_id -> 蛋自身的身高体重区间与孵化时长
 	eggItems   map[uint32]EggItem // 背包蛋物品 id -> 显示名/物种/图标/品质
@@ -279,9 +283,21 @@ func Load() (*DB, error) {
 		}
 	}
 	pois := make(map[uint32][]POI, len(raw.POIs))
+	gatherByR := make(map[int32]POI, 4096)
 	for k, v := range raw.POIs {
-		if res, err := strconv.ParseUint(k, 10, 32); err == nil {
-			pois[uint32(res)] = v
+		res, err := strconv.ParseUint(k, 10, 32)
+		if err != nil {
+			continue
+		}
+		pois[uint32(res)] = v
+		for _, p := range v {
+			// 采集物点位是实体识别的依据:服务器下发的采集物实体带 npc_content_cfg_id,
+			// 与 POI.R 同一个 id,据此查出品种名与图标(见 GatherByRefresh)。
+			// 只收 gather 图层:星/零件那批另有用途(收集判定),混进来会让「这是采集物」
+			// 的判断变成「这是任何已收录点位」,把玩家/NPC 之外的东西也认成采集物。
+			if p.K == gatherKind {
+				gatherByR[p.R] = p
+			}
 		}
 	}
 	return &DB{
@@ -292,6 +308,7 @@ func Load() (*DB, error) {
 		layers:         layers,
 		poiKinds:       raw.POIKinds,
 		pois:           pois,
+		gatherByR:      gatherByR,
 		zones:          raw.Zones,
 		species:        raw.Species,
 		nature:         raw.Nature,

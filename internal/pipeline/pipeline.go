@@ -60,6 +60,7 @@ type connState struct {
 	layer      *layerState               // 分层地图去抖状态(见 layerDebounce)
 	stars      *starTracker              // 眠枭之星观测态(换场景/传送即重置)
 	wilds      *wildTracker              // 野生宠物图层观测态(同上,见 wildpets.go)
+	gathers    *gatherTracker            // 实时采集物观测态(同上,见 gathers.go)
 	pos        scene.Position            // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
 	wildSeen   map[uint64]scene.Position // 当前 AOI 里**全部**野生宠实体的位置(涂地用,不只稀有那几只)
 	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
@@ -78,6 +79,10 @@ type connState struct {
 	// 实体进出 AOI 会突发(实测同一只宠反复进出占 53.6%),逐条广播等于把整份视野
 	// 列表重发几十遍,故攒一攒再发(见 wildsDebounce 与 flushDirtyWilds)。
 	wildsDirtyAt time.Time
+	// gathersDirtyAt:实时采集物图层的待广播时刻,语义同 wildsDirtyAt。
+	// 单独一个字段而非复用:两者的合并窗口虽同量级,但触发时机与载荷内容不同,
+	// 共用一个「脏标记」会让任一侧的广播把另一侧也拖着发一遍。
+	gathersDirtyAt time.Time
 }
 
 // acctState 是单个账号的消费状态。
@@ -199,6 +204,7 @@ func (p *Pipeline) Run(eng *capture.Engine) {
 				// 若还在窗口里就再也不会有下一条消息来触发它了 —— 这里无条件补发一次,
 				// 否则回放结束时地图会停在最后一次广播的状态(少几只宠)。
 				p.flushAllDirtyWilds()
+				p.flushAllDirtyGathers()
 				// 把剩余连接断开通知处理完(正常退出,不留悬挂会话)。
 				for cid := range eng.CloseCh {
 					p.onConnClose(cid)
@@ -337,13 +343,16 @@ func (p *Pipeline) handle(m capture.Message) {
 			p.handlePet(m, acc)
 		}
 		p.flushDirtyWilds(m.Time)
+		p.flushDirtyGathers(m.Time)
 		return
 	}
 	p.handlePet(m, acc)
 
 	// 野生宠物图层的合并窗口由消息推进(无独立定时器):实体进出 AOI 是突发,
 	// 逐条广播会把整份视野列表重发几十遍(详见 wildsDebounce 的实测数据)。
+	// 采集物走同一批 0x0414 消息,窗口一并推进(见 gathersDebounce)。
 	p.flushDirtyWilds(m.Time)
+	p.flushDirtyGathers(m.Time)
 }
 
 // allowed 判断账号是否允许处理:黑名单优先拒绝;白名单非空时仅白名单内账号放行;无规则时

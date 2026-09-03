@@ -5,6 +5,11 @@ import { useAsyncData } from '../../hooks/useAsyncData'
 // 空数据的兜底常量:引用稳定,免得每次渲染都造新对象、打穿下游的 useMemo。
 const NO_POIS = { kinds: [], pois: [], zones: [] }
 
+// GATHER_KIND 是采集物图层的键,与后端 poi_kinds 的 k、POI.K 同源。
+// 导出给 useGathers 复用:那边判断「这是不是采集物点位」要用同一个键,
+// 两处各写一份字符串,改一处漏一处就会静默错(表现为筛选对某个图层失效)。
+export const GATHER_KIND = 'gather'
+
 // —— POI 图层(炼金釜/魔力之源/守护地/眠枭庇护所/眠枭之星/不咕钟零件)——
 // 点位与图标由后端按场景下发(GET /api/pois,u/v 已按底图投影,同玩家位置那套),前端只管开关与摆放。
 // 默认开哪些由后端 kinds[].on 给(魔力之源 + 炼金釜);用户改过之后记住选择(眠枭之星有几百个点,
@@ -85,7 +90,12 @@ export function usePois(account, res) {
 
   // 本场景有点位的图层才给开关(如魔法学院只有魔力之源);标记只画开启的图层。
   // 这些都只随 poi 数据走,useMemo 缓存,位置推送不触发重算。
-  const kinds = useMemo(() => poi.kinds.filter((k) => k.num > 0), [poi])
+  //
+  // 排除 gather:3552 个候选点全画出来糊成一片,没有实用价值 ——
+  // 想知道「此刻能采什么」有实时采集物图层(见 useGathers.js),它只画服务器
+  // 当下真下发的那几个(实测刷出率三到四成)。候选点**仍会加载**并用于品种清单
+  // (allPois),只是不再提供「全部画出来」这个开关。
+  const kinds = useMemo(() => poi.kinds.filter((k) => k.num > 0 && k.k !== GATHER_KIND), [poi])
   const iconOf = useMemo(() => Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon])), [poi])
   const doneZones = useMemo(
     () => new Set((poi.zones || []).filter((z) => z.tot > 0 && z.got >= z.tot).map((z) => z.camp)),
@@ -131,6 +141,9 @@ export function usePois(account, res) {
     const collected = (p) => starSt[p.r] === ST_COLLECTED || (p.zone?.length > 0 && p.zone.every((c) => doneZones.has(c)))
     return poi.pois
       .filter((p) => {
+        // 候选点一律不画:开关已从面板移除(见 kinds 的注释),这里再挡一道,
+        // 免得用户早先手动开过、localStorage 里留着 'gather' 又画满一屏。
+        if (p.k === GATHER_KIND) return false
         if (!poiOn.has(p.k)) return false
         if (!p.r || !collectOn.has(p.k)) return true
         return !collected(p)

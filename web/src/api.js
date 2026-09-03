@@ -145,6 +145,17 @@ export async function clearWildPets() {
   await fetch('/api/wildpets?' + buildQuery(), { method: 'DELETE' })
 }
 
+// getGathers 返回当前账号**此刻视野内**的采集物(花/草/菌/矿/果树):
+//   {sceneResId, gathers:[{id,r,n,icon,u,v,x,y,z}]}
+//
+// 与 getPois 的「采集物」图层互补而非重复:那边是全部**候选刷新点**(3552 个,回答
+// 「哪儿会有」),这里只给服务器当下真下发的实体(回答「这会儿有」)。实测刷出率
+// 只有三到四成,故这层的价值正是替玩家滤掉那七成空的候选点。
+//
+// 之后由 SSE gathers 整份覆盖(实体进出是突发的,后端按 150ms 窗口合并后推全量);
+// 从未收到过任何实体时返回 null。
+export const getGathers = () => getJSON('/api/gathers?' + buildQuery(), null)
+
 // getPaint 返回某场景某层的涂地覆盖位图(玩家走过的地方,见 docs/data.md 3.8):
 //   {res, layer, w, h, cell, corridor, safe, cells}——cells 是 w*h 位的位图 base64(每字节 8 格、低位在前);
 // 无底图的场景 w=0。之后的新格子由 SSE paint 增量推来。

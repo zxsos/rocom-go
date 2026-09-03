@@ -36,6 +36,11 @@ ENDPOINTS = {
     "position-fresh": ("GET /api/position", "最近位置(未过期,含速度与轨迹)"),
     "position-stale": ("GET /api/position", "最近位置(已过期,抹掉 vu/vv/path)"),
     "wildpets": ("GET /api/wildpets", "最近一次野生宠物标记"),
+    # 与 POI 图层(pois)互补:那边是全部候选刷新点,这里只给此刻真下发的实体。
+    "gathers": ("GET /api/gathers", "此刻视野内的实时采集物(花/草/菌/矿/果树)"),
+    # 与 gathers 成对:这份是「从未收到过实体」的 null 形态。少一条,「把 null 改成
+    # 空对象」这类改动就能静默溜过 golden —— 前端据此区分「还没数据」与「附近没有」。
+    "gathers-null": ("GET /api/gathers", "无实时采集物记录(返回 null,而非空对象)"),
     "home": ("GET /api/home", "最近一次家园小窝图层"),
     "flowers": ("GET /api/flowers", "最近一次花种分组(已剥 cur/worlds)"),
     "flowers-slots": ("GET /api/flowers/slots", "花种世界存档槽位列表"),

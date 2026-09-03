@@ -146,5 +146,23 @@ func (db *DB) CollectibleKind(k string) bool {
 // POIs 返回某场景的全部 POI(世界坐标);无底图的场景不收录,返回 nil。
 func (db *DB) POIs(resID uint32) []POI { return db.pois[resID] }
 
+// gatherKind 是采集物图层的键(与 poi_kinds 的 k、POI.K 同源)。
+const gatherKind = "gather"
+
+// GatherByRefresh 按刷新点 id 查采集物点位;不是采集物点位时返回 false。
+//
+// 判据是**刷新点 id 命中采集物点位表**,而非实体的 npc_cfg_id 落在某张 NPC 白名单里:
+// 后者要维护一份随版本增删的 id 表(一个品种还可能有多个 npc_cfg_id —— 实测黄石榴石
+// 就有 50900/50901/50902 三个),且拿不到品种名与图标,还得再查一次点位。
+// 前者的 id 与服务器下发的 npc_content_cfg_id 天然是同一个(2026-09 两份 pcap 实测:
+// 73 个采集物实体全部命中,且品种名与 docs/data.md 记的完全对上)。
+//
+// 代价:官方没配进点位表的品种(如实测发现的 50047)认不出来 —— 那是生成脚本的
+// 缺口(见 scripts/gen_gamedata.py 的 GATHER_GENRES),该修的是表,不是这里的判据。
+func (db *DB) GatherByRefresh(refreshID int32) (POI, bool) {
+	p, ok := db.gatherByR[refreshID]
+	return p, ok
+}
+
 // ZoneName 返回区域名(键为该区域营地(魔力之源)的刷新点 id,即服务器收集进度里的区域键)。
 func (db *DB) ZoneName(camp int32) string { return db.zones[key(uint32(camp))] }

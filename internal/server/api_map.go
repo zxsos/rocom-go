@@ -228,6 +228,31 @@ type poiPoint struct {
 	St   int     `json:"st,omitempty"`   // 收集状态:0 未确认 / 1 未收集 / 2 已收集
 }
 
+// SetLastGathers 缓存某账号最近一次实时采集物(由消费管线在广播 gathers 时调用),
+// 供实时地图页加载时经 GET /api/gathers 即时回显。
+func (s *Server) SetLastGathers(account string, payload *GatherPayload) {
+	if account == "" {
+		return
+	}
+	s.snap.setGather(account, payload)
+}
+
+// GetLastGathers 返回某账号最近一次实时采集物;无记录返回 nil。
+// 与 GetLastWildPets 同理:广播内容就是这份缓存,读它即断言推出去的载荷。
+// 调用方**不得**原地修改返回值 —— 它是共享快照。
+func (s *Server) GetLastGathers(account string) *GatherPayload {
+	return s.snap.getGather(account)
+}
+
+// handleGathers 返回当前账号此刻视野内的采集物(GET /api/gathers);无记录返回 null。
+//
+// 与 /api/pois 的「采集物」图层是两个东西且互补:那边是全部候选刷新点(3552 个,
+// 回答「哪儿会有」),这里只是服务器当下真下发的实体(回答「这会儿有」)。
+// 见 GatherPayload 的说明。
+func (s *Server) handleGathers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.snap.getGather(s.acct(r)))
+}
+
 // zoneProgress 是某区域的眠枭之星收集进度(服务器口径,合并同区域的独立星/光点/石像)。
 type zoneProgress struct {
 	Camp int32  `json:"camp"` // 区域键(营地 id),与 poiPoint.Zone 的元素对应

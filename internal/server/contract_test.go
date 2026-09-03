@@ -265,6 +265,35 @@ func TestContractWildPets(t *testing.T) {
 	checkGolden(t, "wildpets", get(t, s, "/api/wildpets?account="+contractAcc), nil)
 }
 
+// TestContractGathers 钉住实时采集物端点的字段名。
+//
+// 与 TestContractWildPets 同理:键名写错(gathers 写成 gather)前端读到 undefined,
+// 而 Go 编译照样过。这层是新增的,且**静默失败时与「附近没有采集物」无法区分**
+// (页面只是空着),故必须由 golden 钉住它真的产出内容。
+func TestContractGathers(t *testing.T) {
+	s := newTestServer(t)
+	s.SetLastGathers(contractAcc, &GatherPayload{
+		Account:    contractAcc,
+		SceneResID: 10003,
+		Gathers: []GatherMark{
+			// 正常形态:品种名与图标都在(图标须是拼好的路径,不是原始文件名)。
+			{ID: "9284181347180715165", R: 801079, N: "可可果树",
+				Icon: "worldmap/100211.webp", U: 0.4, V: 0.6, X: 386181, Y: 630422, Z: 6468},
+			// 品种图标缺失:icon 应缺席(omitempty),前端据此回退到通用标记。
+			{ID: "9284181347180715166", R: 801078, N: "无花果树",
+				U: 0.5, V: 0.3, X: 394284, Y: 634246, Z: 7607},
+		},
+	})
+	checkGolden(t, "gathers", get(t, s, "/api/gathers?account="+contractAcc), nil)
+}
+
+// TestContractGathersNull 从未收到过实体时返回 null(而非空对象)。
+// 前端据 null 与 []gathers 区分「还没有数据」与「附近确实没有」。
+func TestContractGathersNull(t *testing.T) {
+	s := newTestServer(t)
+	checkGolden(t, "gathers-null", get(t, s, "/api/gathers?account="+contractAcc), nil)
+}
+
 func TestContractHome(t *testing.T) {
 	s := newTestServer(t)
 	pct := 55.5
