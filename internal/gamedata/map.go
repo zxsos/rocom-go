@@ -57,6 +57,7 @@ type POI struct {
 	Y    int32   `json:"y"`    // 世界坐标 Y
 	Z    int32   `json:"z"`    // 世界坐标 Z(高度):收集判定据此挡住「站在洞穴层星点正上方的地表」的平面误判
 	N    string  `json:"n"`    // 名称(悬停显示)
+	I    string  `json:"i"`    // 图标原始文件名(仅采集物:每点带自己品种的图标,而非整层共用一个)
 	Zone []int32 `json:"zone"` // 候选区域营地 id 列表(仅眠枭之星;管辖区重叠带上的点会有多个,见 docs/data.md 3.4)
 }
 

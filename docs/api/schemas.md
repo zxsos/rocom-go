@@ -567,7 +567,7 @@
 
 | 接口 | 结构 |
 | --- | --- |
-| `GET /api/pois?res=` | `{kinds:[{k,n,icon,on,num}], pois:[{k,u,v,n}]}`；场景无底图时两者皆空 |
+| `GET /api/pois?res=` | `{kinds:[{k,n,icon,on,num}], pois:[{k,u,v,n,i}]}`；`i` 仅采集物有(逐点品种图标，同层不同品种各不相同)，其余图层用 `kinds[].icon`；场景无底图时两者皆空 |
 | `GET /api/paint` | `{res, layer, w, h, cell, corridor, safe, cells}`；`cells` 是 w×h 位的 base64 位图（每字节 8 格、低位在前）；无底图时 `w=0` |
 | `GET /api/merchant` | `{now, day, status:"open\|closed\|idle", today:[{start,end,label,empty,merchant}], prev:[...]}`，`merchant` 是第三方原始 JSON |
 | `GET /api/merchant/sub` | `{configured, subscribed, email, keywords}` |

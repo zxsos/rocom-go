@@ -222,6 +222,7 @@ type poiPoint struct {
 	U    float64 `json:"u"`
 	V    float64 `json:"v"`
 	N    string  `json:"n"`
+	I    string  `json:"i,omitempty"`    // 图标路径(仅采集物:每点自带品种图标,其余图层共用图层图标)
 	R    int32   `json:"r,omitempty"`    // 刷新点 id(星星:前端据此接收状态增量)
 	Zone []int32 `json:"zone,omitempty"` // 候选区域营地 id 列表;全部收满才可隐藏(重叠带语义见 docs/data.md 3.4)
 	St   int     `json:"st,omitempty"`   // 收集状态:0 未确认 / 1 未收集 / 2 已收集
@@ -255,6 +256,9 @@ func (s *Server) handlePois(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		pt := poiPoint{K: p.K, U: u, V: v, N: p.N}
+		if p.I != "" { // 采集物:点位自带品种图标,未 embed 时空串(前端回退到图层图标)
+			pt.I = s.db.POIIconOf(p.I)
+		}
 		if s.db.CollectibleKind(p.K) {
 			pt.R, pt.Zone, pt.St = p.R, p.Zone, states[p.R]
 		}

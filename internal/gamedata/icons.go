@@ -63,3 +63,7 @@ func (db *DB) MedalIcon(medalID uint32) string {
 
 // POIIcon 返回 POI 图层的图标路径 worldmap/<原名>.webp;未 embed 时空串。
 func (db *DB) POIIcon(kind POIKind) string { return db.iconPath("worldmap", kind.Icon) }
+
+// POIIconOf 返回指定原始文件名的 worldmap 图标路径。采集物图层一个层装 48 个品种,
+// 每个点带自己品种的图标(POI.I),不共用图层图标;未 embed 时空串(前端回退到图层图标)。
+func (db *DB) POIIconOf(name string) string { return db.iconPath("worldmap", name) }
