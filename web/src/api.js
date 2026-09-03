@@ -272,41 +272,6 @@ export const delMerchantSub = async () => {
 // getEvolution 返回某 petbase(base_conf_id)所属进化链(按阶段升序)。
 export const getEvolution = (base) => getJSON('/api/evolution?base=' + base)
 
-// —— 标注模式(众包图鉴)——
-
-// getAnnotations 全服**已审核**的标注(共享图鉴),前端据此把协议里的未知 id 显示成名字。
-//   kind: 'skill' | 'feature';返回 {items:[{id,kind,code,name,desc,createdAt}]}
-export const getAnnotations = (kind) => getJSON('/api/annotations?kind=' + kind, { items: [] })
-
-// getAnnotationCandidates 标注弹窗的搜索候选词典(全量,一次性下发)。
-//   kind: 'skill' → items:[{id,name}](全量技能目录,见 gamedata.SkillCatalog);
-//   kind: 'feature' → items:[{name,desc}](wiki 特性词典,只有名字没有 288xxx id)。
-export const getAnnotationCandidates = (kind) =>
-  getJSON('/api/annotation-candidates?kind=' + kind, { items: [] })
-
-// submitAnnotation 玩家提交一条标注,进入待审(管理员审核后全服可见)。
-// name 应为候选里选中的名字;同一人对同一 (kind,code,name) 重复提交后端返回 409。
-export async function submitAnnotation(kind, code, name, desc) {
-  const r = await fetch('/api/annotations?' + buildQuery(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind, code, name, desc }),
-  })
-  if (!r.ok) throw await httpError(r, '提交失败', { 409: '你已提交过这条标注' })
-  return r.json()
-}
-
-// adminPendingAnnotations 管理员查看某类的待审标注 {items:[…]}。
-export const adminPendingAnnotations = (kind) => adminFetch('/api/admin/annotations/pending?kind=' + kind).then(async (r) => {
-  if (!r.ok) throw await adminError(r, '拉取待审标注失败')
-  return r.json()
-})
-
-// adminReviewAnnotation 管理员审核标注:approve=true 通过(同 code 其余待审自动拒绝),
-// false 拒绝。
-export const adminReviewAnnotation = (id, approve) =>
-  postJSON('/api/admin/annotations/' + id + '/review', { approve })
-
 // —— SSE:全站共用一条连接 ——
 // 一个页面往往有好几处要实时数据(地图页就有位置、POI、野生宠、家园小窝、涂地五处,再开个
 // 宠物详情弹窗就是六处)。每处各开一条 EventSource 会撞上浏览器「同域 6 条 HTTP/1.1 连接」

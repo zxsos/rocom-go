@@ -16,6 +16,8 @@
     (30/4 反查得「埋伏」,真身是「乱打」),只能按 id 精确查。
 
 **这是过渡方案**:权威来源是游戏解包的 SKILL_CONF(id→中文名,与协议同源)。
+现已解包(scripts/gen_skillnames_official.py / 本脚本 ROCOM_SKILL_CONF 分支都走
+官方表):skill_id → 名全部来自官方;skills/innate/stone/blood 仍用第三方表。
 等 scripts/unpack.sh 解出后应改走解包数据,并删掉本脚本与 fetch_skill_ids.py。
 
 为什么不进 names.json:names.json 全部来自解包 Bin 配置,数据源与更新节奏都不同,
@@ -63,34 +65,54 @@ SKILL_IDS = os.environ.get(
 SKILL_JSON = os.environ.get(
     "ROCOM_SKILL_GUIDE", os.path.expanduser("~/Downloads/rocom/skillGuideData.json")
 )
+# 官方解包技能表(可选):存在时 skill_id -> 名走官方(SKILL_CONF 与协议同源、
+# 含试炼 788 段整段),skillIds.json 只作为无官方数据时的第三方兜底 ——
+# 详见同目录 gen_skillnames_official.py。
+SKILL_CONF = os.environ.get(
+    "ROCOM_SKILL_CONF",
+    r"D:/rocom/parsed/NRC/Content/ScriptC/Data/Bin/BinDataCompressed/SKILL_CONF.json",
+)
 NAMES = "internal/gamedata/data/names.json"
 OUT_DIR = "internal/gamedata/data"
 OUT = os.path.join(OUT_DIR, "skills.json")
 
+need_ids = not os.path.exists(SKILL_CONF)
 for path, how in (
-    (SKILL_IDS, "先跑: uv run python scripts/fetch_skill_ids.py"),
+    ((SKILL_IDS, "先跑: uv run python scripts/fetch_skill_ids.py") if need_ids else ()),
     (SKILL_JSON, "获取: curl -o ~/Downloads/rocom/skillGuideData.json \\\n"
                  "        https://arkmeng.cn/storage/files/skillGuideData.json"),
 ):
     if not os.path.exists(path):
-        sys.exit(f"缺技能数据: {path}\n{how}\n(或设 ROCOM_SKILL_IDS / ROCOM_SKILL_GUIDE 指向已有文件)")
+        sys.exit(f"缺技能数据: {path}\n{how}\n(或设 ROCOM_SKILL_IDS / ROCOM_SKILL_GUIDE / ROCOM_SKILL_CONF 指向已有文件)")
 if not os.path.exists(NAMES):
     sys.exit(f"缺 {NAMES} —— 请先跑 scripts/gen_gamedata.py")
 
-with open(SKILL_IDS, encoding="utf-8") as f:
-    id_raw = json.load(f)
 with open(SKILL_JSON, encoding="utf-8") as f:
     skills = json.load(f)
 with open(NAMES, encoding="utf-8") as f:
     names = json.load(f)
 
-# ---- 1. skill_id -> 技能名(主映射,来自 fetch_skill_ids.py)----
-id2name = {}
-for s in id_raw.get("skills", []):
-    id2name[int(s["skillId"])] = s["name"]
+# ---- 1. skill_id -> 技能名(主映射)----
+# 有官方 SKILL_CONF 就用它(权威、与协议同源、含 788 试炼段整段);否则回退第三方
+# fetch_skill_ids.py 的 skillIds.json(资料站,aismile.dev)。两种都作为回填技能表
+# skill_id 的底表,试炼专属 id 除外(见下)。
+if need_ids:
+    with open(SKILL_IDS, encoding="utf-8") as f:
+        id_raw = json.load(f)
+    id2name = {int(s["skillId"]): s["name"] for s in id_raw.get("skills", [])}
+else:
+    with open(SKILL_CONF, encoding="utf-8") as f:
+        id2name = {
+            int(k): v["name"]
+            for k, v in json.load(f)["RocoDataRows"].items()
+            if (v.get("name") or "").strip()
+        }
 
-# 试炼专属 id(788 段):资料站的技能表**整段没有**这些 id,但抓包实测它们就是
-# 某个技能 —— 草系徽章试炼有一套自己的技能池,池里的技能走 788xxxx 编号。
+# 试炼专属 id(788 段):官方 SKILL_CONF 已整段收录(74 条全有名字,含 7880012=
+# 炙热波动;上面的官方分支一次拿全)。EXTRA_SKILL_IDS 只是**无官方数据**时的
+# 第三方兜底 —— 13 条名字与官方逐一核对过一致,保留作校验与保险。
+# (无官方数据时:资料站技能表整段没有这些 id,但抓包实测它们就是某个技能,
+# 草系徽章试炼有一套自己的技能池,池里的技能走 788xxxx 编号。)
 # 融合**不会**改变 base_skill_id(只改 fused_power/fusion_count),所以这不是
 # 融合产物;融合态技能也能用基础 id 查到名 —— 早先以为「融合生成新 id」是错的。
 #
@@ -243,9 +265,10 @@ for acc in (stone, blood):
         lst.sort()
 
 out = {
-    "_source": "skillIds.json(aismile.dev)+skillGuideData.json(arkmeng.cn),"
-               "均为第三方资料站的过渡方案;解出 SKILL_CONF 后应替换",
-    "_note": "names: 技能 id -> 名(试炼等只给 id 的场景直接查)。"
+    "_source": "names: 官方 SKILL_CONF 解包表(设 ROCOM_SKILL_CONF 时,否则 skillIds"
+               ".json aismile.dev);skills/innate/stone/blood: skillGuideData.json"
+               "(arkmeng.cn,第三方资料站的过渡方案)",
+    "_note": "names: 技能 id -> 名(试炼等只给 id 的场景直接查,官方同源,含 788 段)。"
              "skills: 全局技能表,条目是数组 [名, 属性, 威力, 能耗, 效果下标, 技能id];"
              "技能id=0 表示该技能在资料站是重名的(如借用有 4 个变体),无从判断是哪一个;"
              "威力/能耗是字符串,无威力者为 —。"

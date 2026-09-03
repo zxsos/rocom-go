@@ -6,25 +6,20 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/store"
 	"github.com/whoisnian/rocom-capture/internal/trial"
 )
 
-// 本文件锁住「节点事件卡片」的两块新增内容,它们都是**靠标注才有**的,
-// 而 golden 契约测试锁不住:
+// 本文件锁住「节点事件卡片」的内容,而 golden 契约测试锁不住:
 //
 //  1. 抽取池(pool/used)与 5 个 id 的名字 —— 换奖励就是在这 5 个里重抽,
 //     只看当前那条 reward 无法预判重掷会出什么;
-//  2. 事件对应哪只精灵(pet)—— 协议只给 event_conf_id。官方 GRASS_TRIAL_EVENT_CONF
-//     (gen_trial_official.py 落表,gamedata.TrialEventPetBase)内的直接给,
-//     表外的靠 kind=event 的标注补(官方与协议同源,标注不覆盖官方)。
+//  2. 事件对应哪只精灵(pet)—— 协议只给 event_conf_id,靠官方
+//     GRASS_TRIAL_EVENT_CONF(gen_trial_official.py 落表,gamedata.TrialEventPetBase)
+//     给出:普通遭遇(100k/110k 等)与首领(200k)入表,NPC 整队/祝福/商人等特殊
+//     事件不在表里,查不到即缺失(前端显示占位)。
 //
-// 前者是透传(漏了只是少字段);pet 是「官方映射/查库 + 反查形态 + 取头像」链路,
+// 前者是透传(漏了只是少字段);pet 是「官方映射 + 反查形态 + 取头像」链路,
 // 任何一步错了都静默变回占位,故在此断言端到端结果。
-//
-// 本文件里走**标注路径**的用例都刻意用官方表外的 event id(299xxx,不在
-// GRASS_TRIAL_EVENT_CONF.json,见 gen_trial_official.py)—— 官方表内的会走官方映射、
-// 标注根本不生效,测不到标注链路;官方路径见 TestTrialEventPetFromOfficialConf。
 
 // trialEventBody 拼 GrassTrialNodeSelection:field1=node_events[],
 // 每个事件 field1=slot_index / field2=event_conf_id / field3=reward_id /
@@ -61,19 +56,6 @@ func trialRunWithSelection(sel *trial.Selection) *trialRun {
 	}
 }
 
-// approveEventAnnotation 直接写库并审核通过一条 event 标注。
-// 走 store 而非 HTTP:这里要的是「审核通过后管线能看到」这一条链路。
-func approveEventAnnotation(t *testing.T, p *Pipeline, code int64, name string) {
-	t.Helper()
-	a, err := p.st.SubmitAnnotation(store.Annotation{Kind: "event", Code: code, Name: name, Submitter: testAcc})
-	if err != nil {
-		t.Fatalf("提交标注: %v", err)
-	}
-	if err := p.st.ReviewAnnotation(a.ID, true, "test"); err != nil {
-		t.Fatalf("审核标注: %v", err)
-	}
-}
-
 // findPetWithFeature 找一个「wiki 收录了特性」的精灵形态,返回形态 id 与特性名。
 // 动态找而非写死 id:解包数据换版本后 id 会变,写死会让测试随机变红。
 func findPetWithFeature(t *testing.T, db *gamedata.DB) (uint32, string) {
@@ -87,17 +69,48 @@ func findPetWithFeature(t *testing.T, db *gamedata.DB) (uint32, string) {
 	return 0, ""
 }
 
-// TestTrialOptionNamesFromAnnotation 锁住本功能的收益:**标出精灵,特性名自动带上**。
+// officialEventCandidates 是官方事件候选:落在 GRASS_TRIAL_EVENT_CONF(100k/110k 等
+// 普通遭遇段与 200k 首领段)内的都可能。测试只在某个候选当前还在表里时跑 ——
+// 数据随版本会变,查不到就跳过而不是让测试随机红。
+func officialEventCandidates() []uint32 {
+	return []uint32{100001, 110041, 110116, 120001, 130056, 200001}
+}
+
+// findOfficialEvent 返回一个当前官方表内的事件(表外/缺数据时跳过)。
+func findOfficialEvent(t *testing.T, p *Pipeline) (event uint32) {
+	t.Helper()
+	for _, e := range officialEventCandidates() {
+		if p.db.TrialEventPetBase(e) != 0 {
+			return e
+		}
+	}
+	t.Skip("候选事件都不在官方 events 表(版本更新?)")
+	return 0
+}
+
+// findOfficialEventWithKnownFeature 找一个官方表内事件,其对应精灵的 wiki 特性名
+// 已知 —— 「精灵 → 特性」桥接要拿这个名字,精灵没收录就测不出桥接。
+func findOfficialEventWithKnownFeature(t *testing.T, p *Pipeline) (event, base uint32, featName string) {
+	t.Helper()
+	for _, e := range officialEventCandidates() {
+		if b := p.db.TrialEventPetBase(e); b != 0 {
+			if n := p.db.FeatureNameOfBase(b); n != "" {
+				return e, b, n
+			}
+		}
+	}
+	t.Skip("没有「官方表内事件 → 精灵 → 已知特性名」的组合(features.json 缺数据?)")
+	return 0, 0, ""
+}
+
+// TestTrialOptionNamesFromOfficialEvent 锁住「官方表内事件直接带出精灵」后的收益:
+//   - 事件 → 精灵:卡片显示头像与名字(pet);
+//   - 精灵 → 特性:池里那条 288xxx 走「精灵 → 特性」表带上名字。
 //
-// 一条 event 标注同时省掉两步 ——
-//   - 事件 → 精灵:卡片显示头像与名字;
-//   - 精灵 → 特性:池里那条 288xxx 走「精灵 → 特性」表带上名字,玩家不必再标一次。
-//
-// 这是「开局就能自动绑定一个特性」的落点,也是整个改动唯一真正的省事之处。
-func TestTrialOptionNamesFromAnnotation(t *testing.T) {
+// 这正是实时视图对表内事件无需任何人工补全的地方。
+func TestTrialOptionNamesFromOfficialEvent(t *testing.T) {
 	p, _ := newTestPipeline(t)
-	base, featName := findPetWithFeature(t, p.db)
-	petName := p.db.PetFullName(base)
+	event, base, featName := findOfficialEventWithKnownFeature(t, p)
 
 	// 池:1 个特性 + 4 个技能(换奖励就在这 5 个里重抽)
 	catalog := p.db.SkillCatalog()
@@ -107,11 +120,8 @@ func TestTrialOptionNamesFromAnnotation(t *testing.T) {
 	skills := []uint32{catalog[0].ID, catalog[1].ID, catalog[2].ID, catalog[3].ID}
 	feat := uint32(288001)
 	pool := append([]uint32{feat}, skills...)
-	// 用官方表外的事件 id:官方表内(如 130056)的遭遇不走标注、也无需玩家标注
-	event := uint32(299999)
 
-	approveEventAnnotation(t, p, int64(event), petName)
-	body := trialEventBody(1, event, skills[0], 40, pool, 2016)
+	body := trialEventBody(1, event, skills[0], 40, pool)
 	sel := trial.ParseSelection(body)
 	if sel == nil || len(sel.Events) != 1 {
 		t.Fatalf("解析节点选项失败: %+v", sel)
@@ -123,10 +133,10 @@ func TestTrialOptionNamesFromAnnotation(t *testing.T) {
 	}
 	o := out.Options[0]
 	if o.Pet == nil {
-		t.Fatal("已标注事件却没有 pet —— 反查形态或取头像失败")
+		t.Fatal("官方表内的事件却没有 pet —— 官方映射没接上(trialEventPet 应先查官方表)")
 	}
 	if o.Pet.Base != base {
-		t.Errorf("pet.base = %d, 期望 %d(%s)", o.Pet.Base, base, petName)
+		t.Errorf("pet.base = %d, 期望 %d", o.Pet.Base, base)
 	}
 	// 池完整下发:换奖励的候选要看得见
 	if len(o.Pool) != 5 {
@@ -138,18 +148,16 @@ func TestTrialOptionNamesFromAnnotation(t *testing.T) {
 			t.Errorf("技能 %d 名 = %q, 期望 %q", id, got, catalog[i].Name)
 		}
 	}
-	// 特性名来自「精灵 → 特性」表桥接:标了精灵才有
+	// 特性名来自「精灵 → 特性」表桥接:有 pet 就有名
 	if got := o.Names[feat]; got != featName {
-		t.Errorf("特性 %d 名 = %q, 期望 %q(标出精灵后应自动带上)", feat, got, featName)
+		t.Errorf("特性 %d 名 = %q, 期望 %q(精灵已知时应自动带上)", feat, got, featName)
 	}
 }
 
-// TestTrialOptionNeedsAnnotation 锁住**官方表外的事件没标注时不猜**:
-// pet 缺失、特性无名(技能名仍然是有的 —— 那是查表查的,与标注无关)。
-// 猜一个精灵名字比留空更糟:玩家会以为那是服务器说的。
-// (官方表内的事件由官方直接给 pet,不算「猜」,见 TestTrialEventPetFromOfficialConf;
-// 110041 已在官方表,这里改用表外的 299998。)
-func TestTrialOptionNeedsAnnotation(t *testing.T) {
+// TestTrialOptionNoPetOutsideOfficial 锁住官方表外的事件(新版本/漏解包)在
+// 取消标注后**不再有补全来源**:pet 缺失、特性无名(技能名仍然有 —— 那是查表查的,
+// 与事件映射无关)。猜一个精灵名字比留空更糟:玩家会以为那是服务器说的。
+func TestTrialOptionNoPetOutsideOfficial(t *testing.T) {
 	p, _ := newTestPipeline(t)
 	catalog := p.db.SkillCatalog()
 	if len(catalog) < 2 {
@@ -165,27 +173,27 @@ func TestTrialOptionNeedsAnnotation(t *testing.T) {
 
 	o := out.Options[0]
 	if o.Pet != nil {
-		t.Errorf("未标注时 pet 应为 nil,实际 %+v", o.Pet)
+		t.Errorf("官方表外的事件 pet 应为 nil,实际 %+v", o.Pet)
 	}
 	if _, ok := o.Names[288001]; ok {
-		t.Error("未标注时特性不该有名字(精灵未知,无从桥接)")
+		t.Error("官方表外的事件特性不该有名字(精灵未知,无从桥接)")
 	}
 	if got := o.Names[catalog[0].ID]; got != catalog[0].Name {
-		t.Errorf("技能 %d 名 = %q, 期望 %q(技能名与标注无关,应照常给)", catalog[0].ID, got, catalog[0].Name)
+		t.Errorf("技能 %d 名 = %q, 期望 %q(技能名与事件映射无关,应照常给)", catalog[0].ID, got, catalog[0].Name)
 	}
 }
 
-// TestTrialEventPetFromOfficialConf 锁住本次改动的核心收益:官方表内的事件
-// (GRASS_TRIAL_EVENT_CONF,gen_trial_official.py 落表)**无需任何标注**就能直接
-// 显示对应精灵 —— 与协议同源,玩家不用再对着游戏画面标 event 了。
+// TestTrialEventPetFromOfficialConf 锁住实时视图的核心收益:官方表内的事件
+// (GRASS_TRIAL_EVENT_CONF,gen_trial_official.py 落表)直接显示对应精灵 ——
+// 与协议同源,无需任何人工补全。
 //
-// 数据随版本会变:哪天 110041 不在官方表里了,该事件就退化回标注链路,故查不到即跳过。
+// 数据随版本会变:哪天 110041 不在官方表里了就跳过(改用其它表内候选的用例覆盖)。
 func TestTrialEventPetFromOfficialConf(t *testing.T) {
 	p, _ := newTestPipeline(t)
 	const event = 110041
 	base := p.db.TrialEventPetBase(event)
 	if base == 0 {
-		t.Skip("事件 110041 已不在官方 events 表(版本更新?),退回标注链路")
+		t.Skip("事件 110041 已不在官方 events 表(版本更新?)")
 	}
 	body := trialEventBody(1, event, 1001, 40, []uint32{1001})
 	sel := trial.ParseSelection(body)
@@ -210,11 +218,9 @@ func TestTrialEventPetFromOfficialConf(t *testing.T) {
 // 这时拿精灵的特性名去绑必然绑错一条。标错比不标更糟,故整条都不给。
 func TestTrialOptionAmbiguousFeatureNotNamed(t *testing.T) {
 	p, _ := newTestPipeline(t)
-	base, _ := findPetWithFeature(t, p.db)
-	// 官方表外的事件 id(110116 已在官方表,标注不生效),让 pet 由标注给出
-	approveEventAnnotation(t, p, 299997, p.db.PetFullName(base))
+	event := findOfficialEvent(t, p)
 
-	body := trialEventBody(3, 299997, 288001, 40, []uint32{288001, 288002})
+	body := trialEventBody(3, event, 288001, 40, []uint32{288001, 288002})
 	sel := trial.ParseSelection(body)
 	if sel == nil {
 		t.Fatal("解析节点选项失败")
@@ -222,7 +228,7 @@ func TestTrialOptionAmbiguousFeatureNotNamed(t *testing.T) {
 	out := p.trialRunPayload(trialRunWithSelection(sel), nil)
 	o := out.Options[0]
 	if o.Pet == nil {
-		t.Fatal("已标注事件却没有 pet")
+		t.Fatal("官方表内的事件却拿不到 pet")
 	}
 	for _, id := range []uint32{288001, 288002} {
 		if n, ok := o.Names[id]; ok {
@@ -231,7 +237,7 @@ func TestTrialOptionAmbiguousFeatureNotNamed(t *testing.T) {
 	}
 }
 
-// TestTrialPetFeatureNameBridged 锁住试炼**宠物**那侧的同款桥接:
+// TestTrialPetFeatureNameBridged 锁住试炼**宠物**那侧的桥接:
 // 天生特性带上名字,试炼中获得的**不带**(那些是节点随机给的,与精灵无关)。
 func TestTrialPetFeatureNameBridged(t *testing.T) {
 	p, _ := newTestPipeline(t)

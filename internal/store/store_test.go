@@ -23,6 +23,8 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("打开数据库: %v", err)
 	}
+	// 不 Close 的话 SQLite 句柄一直占着文件,Windows 上 TempDir 清理必然失败
+	t.Cleanup(func() { _ = st.Close() })
 	return st
 }
 

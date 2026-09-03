@@ -230,12 +230,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
 	s.mux.HandleFunc("GET /api/admin/egg-source", s.handleAdminEggSource)
 	s.mux.HandleFunc("POST /api/admin/egg-source", s.handleAdminEggSource)
-	// 标注模式(众包图鉴):玩家对未知技能/特性 id 提交名字,管理员审核后全服可见。
-	s.mux.HandleFunc("GET /api/annotations", s.handleGetAnnotations)
-	s.mux.HandleFunc("POST /api/annotations", s.handleSubmitAnnotation)
-	s.mux.HandleFunc("GET /api/annotation-candidates", s.handleAnnotationCandidates)
-	s.mux.HandleFunc("GET /api/admin/annotations/pending", s.handleListPendingAnnotations)
-	s.mux.HandleFunc("POST /api/admin/annotations/{id}/review", s.handleReviewAnnotation)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。

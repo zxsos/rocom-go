@@ -255,6 +255,9 @@ type TrialRun struct {
 	Coin        uint32          `json:"coin"`
 	Chapters    []uint32        `json:"chapters,omitempty"`
 	Effects     []uint32        `json:"effects,omitempty"` // 本局生效的试炼词条
+	// EffectsNames 是词条 effect_id -> 名(官方 GRASS_TRIAL_EFFECT_CONF):协议只给
+	// id,「本周词条 1001」若不翻译就只剩数字,玩家看不出词条在改什么规则。
+	EffectsNames map[uint32]string `json:"effectNames,omitempty"`
 	Boss        bool            `json:"boss,omitempty"`    // 已进 BOSS 战
 	Pet         *TrialPet       `json:"pet,omitempty"`
 	Options     []TrialOption   `json:"options,omitempty"` // 当前节点的候选事件
@@ -300,8 +303,8 @@ type TrialOppPet struct {
 
 // TrialPet 是试炼里的宠物副本。
 //
-// 技能只有 id 与融合后的数值,**没有名字**:游戏技能名表尚未接入本项目
-// (names.json 里没有,见 docs/data.md「待校准」),故前端按 id 展示。
+// 技能的 id 与名字(见 TrialSkill)由 skills.json 提供 —— 该表 7xxxxx 段技能
+// 只覆盖到已实证的那批,查不到的 id 靠前端众包标注补(标注类型 skill)。
 type TrialPet struct {
 	Gid      uint32       `json:"gid"`
 	Name     string       `json:"name"`
@@ -347,11 +350,16 @@ type TrialPet struct {
 type TrialSkill struct {
 	ID     uint32   `json:"id"`               // base_skill_id
 	Name   string   `json:"name,omitempty"`   // 技能中文名;查不到时缺失(见下)
+	Desc   string   `json:"desc,omitempty"`   // 官方效果文案(SKILL_CONF.desc 纯文本);供技能行常驻展示
 	Power  uint32   `json:"power"`            // 融合后威力
 	Cost   uint32   `json:"cost"`             // 融合后能耗
 	Fusion uint32   `json:"fusion,omitempty"` // 融合次数(0=未融合)
 	Slot   uint32   `json:"slot"`             // 槽位(1 起)
 	Merged []uint32 `json:"merged,omitempty"` // 被融合进来的技能 id
+	// MergedNames 是被融合技能里查得到名字的:id -> 名。协议只给 id(技能合并时
+	// 前端实时视图的「+N」那行直接拼 raw id 没法看),这里把 skills.json 能命中的
+	// 翻译好随包下发;查不到的仍只留在 Merged 里,由前端按 id 展示。
+	MergedNames map[uint32]string `json:"mergedNames,omitempty"`
 }
 
 // TrialReward 的 id 也有中文名(技能/特性),但特性(id 288xxx)目前无名称表,
@@ -369,12 +377,18 @@ type TrialOption struct {
 	Reward uint32 `json:"reward"` // reward_id(技能 7xxxxx / 特性 288xxx / 碎片 20xx-30xx)
 	// Names 是本卡片里查得到中文名的 id -> 名字,覆盖 Reward / Pool / Extra。
 	//
-	// 技能名来自 skills.json(覆盖率 98.7%);特性名则要**先标出精灵**才能查 ——
-	// 走「精灵 → 特性」表(见 gamedata.FeatureNameOfBase),这正是标注精灵省下的
-	// 那一步:池里那条 288xxx 不用玩家再标一次。查不到的 id 不进这张表,
-	// 前端显示裸 id 并给标注入口。
-	Names      map[uint32]string `json:"names,omitempty"`
-	Level      uint32            `json:"level,omitempty"`
+	// 技能名来自 skills.json(官方 SKILL_CONF 同源,试炼 788 段整段在内);
+	// 碎片效果名(20xx 特调 / 30xx 事件奖励)来自官方 GRASS_TRIAL_EFFECT_CONF;
+	// 特性名则要**先标出精灵**才能查 —— 走「精灵 → 特性」表(见
+	// gamedata.FeatureNameOfBase),这正是标注精灵省下的那一步:池里那条 288xxx
+	// 不用玩家再标一次。查不到的 id 不进这张表,前端显示裸 id 并给标注入口。
+	Names map[uint32]string `json:"names,omitempty"`
+	// Descs 是本卡片里**技能类** id 的官方效果文案(id -> desc,查得到才进表)。
+	//
+	// 与 Names 互补:Names 管「叫什么」,Descs 管「是干嘛的」——技能 chip 悬停
+	// (以及候选池/奖励行)贴出效果,玩家不查游戏也能看懂。特性/碎片没有效果文案。
+	Descs map[uint32]string `json:"descs,omitempty"`
+	Level uint32            `json:"level,omitempty"`
 	EventCost  uint32            `json:"eventCost,omitempty"`  // 重掷该事件的报价
 	RewardCost uint32            `json:"rewardCost,omitempty"` // 重掷奖励的报价
 	Extra      []uint32          `json:"extra,omitempty"`      // 额外奖励(多是碎片)
@@ -389,12 +403,17 @@ type TrialOption struct {
 	Used []uint32 `json:"used,omitempty"`
 	// Pet 是本事件对应的精灵(头像+名字)。
 	//
-	// ⚠️ 协议**不下发**它:GrassTrialNodeEvent 只有 event_conf_id,到精灵的映射
-	// 表在游戏配置里(未解包)。故这一项只能靠**标注**补(标注类型 event,
-	// 玩法见 internal/server/api_annotations.go)—— 标注里填的精灵名经
-	// gamedata.PetByName 反查成形态 id,取到头像才带;没标注就缺失,
-	// 前端显示占位并给标注入口。别把它当成"服务器说是这只"。
+	// ⚠️ 协议**不下发**它:GrassTrialNodeEvent 只有 event_conf_id。到精灵的映射
+	// 来自解包后的官方 GRASS_TRIAL_EVENT_CONF(gamedata.TrialEventPetBase,普通
+	// 遭遇/首领段可直接命中);官方表查不到就缺失,前端显示占位。
+	// 别把它当成"服务器说是这只"。
 	Pet *TrialOppPet `json:"pet,omitempty"`
+	// EventName 是特殊事件的可读名(如「魔力之源」)。
+	//
+	// 与 Pet 互补:有 Pet 说明官方 events 表把它映射成了某只精灵(头像本身就是
+	// 名字);这类事件(商人/魔力之源等)官方 events 表查不到精灵、又确实有个
+	// 事件名,靠 gamedata.TrialEventName 补上 —— 否则槽位只能显示裸 event id。
+	EventName string `json:"eventName,omitempty"`
 }
 
 // TrialBless 是祝福节点(先选选项,再在候选技能里挑一个)。
@@ -409,8 +428,17 @@ type TrialBless struct {
 type TrialReward struct {
 	Event uint32   `json:"event"`
 	ID    uint32   `json:"id"`
-	Extra []uint32 `json:"extra,omitempty"`
-	Coin  uint32   `json:"coin"`
+	// Name 是奖励的中文名(技能 7xxxxx / 碎片效果 20xx-30xx 查得到时):
+	// 特性 288xxx 无名称表故不带,前端回退 kind+id。
+	Name string `json:"name,omitempty"`
+	// Desc 是主奖励的效果文案:奖励是技能时才带(其余类型无 desc),
+	// 悬停即可看这技能是干嘛的。
+	Desc string `json:"desc,omitempty"`
+	// Names 是 Extra 里查得到中文名的 id -> 名字(来源同 Name),让额外奖励那排
+	// 碎片也能显示「魔攻特调」而不是「碎片 2016」。查不到的 id 不进这张表。
+	Names map[uint32]string `json:"names,omitempty"`
+	Extra []uint32          `json:"extra,omitempty"`
+	Coin  uint32            `json:"coin"`
 }
 
 // TrialShopItem 是章末商店的一件商品。

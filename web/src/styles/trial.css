@@ -136,6 +136,10 @@
   font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
   overflow: hidden; text-overflow: ellipsis;
 }
+.trial-skill-desc {
+  /* 技能官方效果文案:灰小字、独立一行,不悬停也看得到 */
+  font-size: 12px; color: var(--fg-dim); line-height: 1.5;
+}
 .trial-skill-meta {
   display: flex; gap: 8px; font-size: 12px; color: var(--fg-dim);
   font-variant-numeric: tabular-nums;
@@ -186,7 +190,7 @@
   font-variant-numeric: tabular-nums;
 }
 .trial-opt-cost { color: var(--gold); }
-/* 抽取池:5 个 id(1 特性 + 4 技能)换行平铺,每个都是可标注的胶囊 */
+/* 抽取池:5 个 id(1 特性 + 4 技能)换行平铺,查不到名字的按 id 展示 */
 .trial-opt-pool {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   width: 100%; border-top: 1px dashed var(--line); padding-top: 6px;
@@ -307,8 +311,8 @@
 /* 特性只有 id(名字表未接入),用边框色区分天生/获得,免得一串数字分不清哪来的 */
 .trial-feat-innate { border-color: var(--accent); }
 .trial-feat-gained { opacity: .85; }
-/* 名字来自 wiki「精灵 → 特性」表桥接:虚线边框 + 尾标,与玩家标注过的(实线)区分 ——
-   两条路的可靠度不同,看着一样会让人把反查结果当成核实过的事实。 */
+/* 名字来自 wiki「精灵 → 特性」表桥接:虚线边框 + 尾标 ——
+   按精灵反查出来的,不像官方表那样有 id 校验,故弱化提示。 */
 .trial-feat-wiki { border-style: dashed; color: var(--fg-dim); }
 .trial-enc-err { color: var(--danger); font-size: 12px; margin: 2px 0 6px; }
 

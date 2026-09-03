@@ -53,6 +53,7 @@ type skillRaw [6]any
 type skillsDB struct {
 	effects []string               // 共享效果描述池
 	names   map[uint32]string      // skill_id -> 技能名
+	descs   map[uint32]string      // skill_id -> 官方效果文案(SKILL_CONF.desc,纯文本)
 	skills  []skillRaw             // 全局技能表(每个技能只存一份)
 	innate  map[uint32][][2]uint32 // petbase_id -> [技能下标, 学会等级]
 	stone   map[uint32][]uint32    // petbase_id -> 技能下标(技能石可学)
@@ -73,6 +74,7 @@ func loadSkills() *skillsDB {
 	var raw struct {
 		Effects []string               `json:"effects"`
 		Names   map[string]string      `json:"names"`
+		Descs   map[string]string      `json:"descs"`
 		Skills  []skillRaw             `json:"skills"`
 		Innate  map[string][][2]uint32 `json:"innate"`
 		Stone   map[string][]uint32    `json:"stone"`
@@ -86,6 +88,14 @@ func loadSkills() *skillsDB {
 	for k, v := range raw.Names {
 		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
 			db.names[uint32(id)] = v
+		}
+	}
+	for k, v := range raw.Descs {
+		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
+			if db.descs == nil {
+				db.descs = map[uint32]string{}
+			}
+			db.descs[uint32(id)] = v
 		}
 	}
 	db.innate = parseIdxPairs(raw.Innate)
@@ -163,6 +173,18 @@ func (db *DB) SkillName(skillID uint32) string {
 		return ""
 	}
 	return db.skills.names[skillID]
+}
+
+// SkillDesc 返回某技能 id 的官方效果文案(SKILL_CONF.desc,已剥成纯文本),
+// 供技能名旁边展示「这个技能是干嘛的」。查不到返回空串 —— 调用方回退 title。
+//
+// 技能 id 与 descs 的键同一编号体系(与协议 base_skill_id 同源),所以只要
+// SkillName 能命中,desc 也一定能命中(官方表每个技能都有 desc,1918/1918 非空)。
+func (db *DB) SkillDesc(skillID uint32) string {
+	if db.skills == nil {
+		return ""
+	}
+	return db.skills.descs[skillID]
 }
 
 // InnateSkills 返回某形态天生会的技能,按学会等级降序(同级按名);
@@ -247,15 +269,14 @@ func (db *DB) HasInnateSkills(petbaseID uint32) bool {
 	return db.skills != nil && len(db.skills.innate[petbaseID]) > 0
 }
 
-// SkillCatalogEntry 是技能候选目录里的一条(标注模式搜索候选用)。
+// SkillCatalogEntry 是技能目录里的一条。
 type SkillCatalogEntry struct {
 	ID   uint32 `json:"id"`
 	Name string `json:"name"`
 }
 
 // SkillCatalog 返回全部技能(含重名技能)的 id -> 名目录,按 id 升序。
-// 标注模式里玩家对未知技能 id 从这份目录搜索选取名字;也供宠物详情等场景
-// 做「全量技能名表」展示。
+// 供宠物详情等场景做「全量技能名表」展示。
 func (db *DB) SkillCatalog() []SkillCatalogEntry {
 	sdb := db.skills
 	if sdb == nil {

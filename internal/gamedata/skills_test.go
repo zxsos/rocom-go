@@ -187,8 +187,8 @@ func TestSkillName(t *testing.T) {
 			t.Errorf("SkillName(%d) = %q, 期望 %q", id, got, want)
 		}
 	}
-	// 试炼专属 id(788 段):资料站整段缺失,靠抓包实证 + 人工在游戏里核对逐个
-	// 登记,见 gen_skills.py 的 EXTRA_SKILL_IDS
+	// 试炼专属 id(788 段):官方 SKILL_CONF 整段收录(74 个),非手抄(见
+	// scripts/gen_skillnames_official.py;早先 EXTRA_SKILL_IDS 只有 13 条,已淘汰)
 	for id, want := range map[uint32]string{
 		7880000: "力量增效", 7880007: "热身运动", 7880008: "藤绞",
 		7880011: "引燃", 7880018: "霜降", 7880026: "毒孢子",
@@ -203,6 +203,27 @@ func TestSkillName(t *testing.T) {
 	// 不存在的 id
 	if got := db.SkillName(1); got != "" {
 		t.Errorf("不存在的 id 应返回空串, 得到 %q", got)
+	}
+}
+
+// TestSkillDesc 断言官方效果文案映射:descs 与 names 同键全量(SKILL_CONF.desc
+// 剥标签后的纯文本),技能名查得到则效果文案也必有。
+func TestSkillDesc(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(db.skills.descs) == 0 {
+		t.Fatal("descs 映射为空:data/skills.json 没解析出效果文案")
+	}
+	for id, want := range map[uint32]string{
+		7880012: "造成魔伤，敌方获得4层灼烧，应对状态：本次技能威力和赋予灼烧翻倍。",
+		200000:  "回合末恢复10能量。",
+		1:       "", // 表外 id 查不到
+	} {
+		if got := db.SkillDesc(id); got != want {
+			t.Errorf("SkillDesc(%d) = %q, 期望 %q", id, got, want)
+		}
 	}
 }
 

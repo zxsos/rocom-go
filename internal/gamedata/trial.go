@@ -16,7 +16,13 @@ import (
 //  1. floors:按 node_index 索引的层类型(普通/首领/商人/NPC);
 //  2. pools:各章普通池与 22 名首领(能显示头像);
 //  3. npc:第 7 层 NPC 的候选阵容(按难度 × 章);
-//  4. events:官方事件 → 精灵(实时视图把事件号翻译成头像,免人工标注)。
+//  4. events:官方事件 → 精灵(实时视图把事件号直接翻译成头像);
+//  5. event_names:特殊事件 → 事件名(商人/魔力之源这类非单只精灵遭遇,events 表
+//     查不到,给实时视图一个可读名而不是裸 id);
+//  6. effects:试炼效果(GRASS_TRIAL_EFFECT_CONF)effect_id → 名 —— 1000 段是
+//     每周词条(融合次数/技能冷却…),20xx 是精灵个体属性特调(物攻特调/速度特调/
+//     生命特调…,奖励里的碎片就是它们),30xx 是事件类效果。协议到处只给 effect_id
+//     (词条、奖励、额外奖励),前端靠这份表把 id 翻译成能看懂的话。
 //
 // 层类型的对应关系是**实测得出的**,不是照抄 wiki —— 见 gen_trial.py 文件头
 // 的两条证据(node_index 6 无战斗、node_index 7 对手是 NPC)。wiki 说每章 7 层、
@@ -76,7 +82,9 @@ type trialDB struct {
 	pools    map[uint32][]uint32                   // 章序号 -> 普通池 petbase
 	bosses   []uint32                              // 22 名首领 petbase
 	npc      map[uint32]map[uint32][]TrialOpponent // 难度 -> 章序号 -> 候选阵容
-	events   map[uint32]uint32                     // 官方 event_conf_id -> 精灵 petbase(GRASS_TRIAL_EVENT_CONF)
+	events     map[uint32]uint32 // 官方 event_conf_id -> 精灵 petbase(GRASS_TRIAL_EVENT_CONF)
+	eventsName map[uint32]string // 特殊 event_conf_id -> 事件名(魔力之源等,无单只精灵可映射)
+	effects    map[uint32]string // 试炼效果 effect_id -> 名(GRASS_TRIAL_EFFECT_CONF:词条/特调)
 }
 
 // loadTrial 解析内嵌的试炼配置;缺失或格式不符时返回空表(不影响其余功能)。
@@ -96,7 +104,9 @@ func loadTrial() *trialDB {
 			Name     string                     `json:"name"`
 			Chapters map[string][]TrialOpponent `json:"chapters"`
 		} `json:"npc"`
-		Events map[string]uint32 `json:"events"`
+		Events     map[string]uint32 `json:"events"`
+		EventNames map[string]string `json:"event_names"`
+		Effects    map[string]string `json:"effects"`
 	}
 	if err := json.Unmarshal(trialJSON, &raw); err != nil {
 		return db
@@ -143,6 +153,22 @@ func loadTrial() *trialDB {
 	for k, v := range raw.Events {
 		if n, err := strconv.ParseUint(k, 10, 32); err == nil {
 			db.events[uint32(n)] = v
+		}
+	}
+	if len(raw.EventNames) > 0 {
+		db.eventsName = make(map[uint32]string, len(raw.EventNames))
+	}
+	for k, v := range raw.EventNames {
+		if n, err := strconv.ParseUint(k, 10, 32); err == nil {
+			db.eventsName[uint32(n)] = v
+		}
+	}
+	if len(raw.Effects) > 0 {
+		db.effects = make(map[uint32]string, len(raw.Effects))
+	}
+	for k, v := range raw.Effects {
+		if n, err := strconv.ParseUint(k, 10, 32); err == nil {
+			db.effects[uint32(n)] = v
 		}
 	}
 	return db
@@ -206,11 +232,35 @@ func (db *DB) TrialNPCOpponents(modeID, chapterIdx uint32) []TrialOpponent {
 //
 // 数据来自客户端 GRASS_TRIAL_EVENT_CONF(gen_trial_official.py 落表):普通遭遇
 // (100k/110k 段)与首领(200k 段)官方直接给精灵;**NPC 阵容(300xxx+,整队)/
-// 祝福/商人等事件不是单只精灵,查不到返回 0** —— 调用方应退回众包标注或占位
-// (见 pipeline.trialEventPet)。表外返回 0 同样意味着"官方没这个事件"。
+// 祝福/商人等事件不是单只精灵,查不到返回 0**(见 pipeline.trialEventPet)。
+// 表外返回 0 同样意味着"官方没这个事件"。
 func (db *DB) TrialEventPetBase(eventConfID uint32) uint32 {
 	if db.trial == nil {
 		return 0
 	}
 	return db.trial.events[eventConfID]
+}
+
+// TrialEventName 返回特殊事件(event_conf_id)的可读名,如「魔力之源」。
+//
+// 与 TrialEventPetBase 互补:普通遭遇/首领能映射出精灵(显示头像),这类特殊事件
+// (商人/魔力之源等)没有单只精灵可映射,靠本方法给名字。查不到返回空串,调用方
+// 退回「事件 {id}」。
+func (db *DB) TrialEventName(eventConfID uint32) string {
+	if db.trial == nil {
+		return ""
+	}
+	return db.trial.eventsName[eventConfID]
+}
+
+// TrialEffectName 返回试炼效果(effect_id)的名字,如 1001=融合次数、2016=魔攻特调。
+//
+// 数据来自官方 GRASS_TRIAL_EFFECT_CONF:1000 段是每周词条、20xx 是属性特调(奖励
+// 里拿到的碎片就是它)、30xx 是事件类效果。协议给 effect_id 的地方(词条/奖励/
+// 额外奖励)都能用;查不到返回空串,调用方退回显示 id。
+func (db *DB) TrialEffectName(effectID uint32) string {
+	if db.trial == nil {
+		return ""
+	}
+	return db.trial.effects[effectID]
 }
