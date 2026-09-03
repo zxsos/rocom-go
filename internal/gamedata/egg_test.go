@@ -57,6 +57,62 @@ func TestEggModelConf(t *testing.T) {
 	}
 }
 
+// TestEggNamesPresent 断言蛋表的名字**没有成片丢失**。
+//
+// 为什么值得测:这些名字全部来自 scripts/gen_gamedata.py 读解包配置,而生成脚本
+// 重跑时若上游表的 name 字段取不到值,`v.get("name", "")` 会**静默落空串** ——
+// 没有报错、不写日志,生成出来的是个看起来结构完好的 names.json。
+//
+// 这个事故真的发生过一次(2026-09-03 拉取的那批提交回归):
+//   - egg_conf  917 条物种名**全部**变成空串;
+//   - egg_items 628 条「喵喵的蛋」变成「的蛋」—— 模板 "{0}的蛋" 里的 {0} 落到空串,
+//     于是只剩后缀。
+//
+// 而后端测试当时只有两条挂了(查蛋的),因为只有它们按名字断言。页面上的表现是
+// 蛋列表一片空白、候选列表空 —— 不报错,只是"没数据"。
+//
+// 阈值取 1% 而非「一条都不能空」:解包数据本身可能有少量条目真的没名字,
+// 断言过严会让它成为常态噪音。要防的是**成片丢失**,不是零星几条。
+func TestEggNamesPresent(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	const maxEmptyRatio = 0.01
+
+	// 蛋配置:物种名
+	if n := len(db.eggConf); n > 0 {
+		var empty int
+		for _, c := range db.eggConf {
+			if c.Name == "" {
+				empty++
+			}
+		}
+		if float64(empty)/float64(n) > maxEmptyRatio {
+			t.Errorf("egg_conf 有 %d/%d 条没有物种名 —— 多半是生成脚本重跑时上游字段取不到值", empty, n)
+		}
+	}
+	// 背包蛋物品:显示名。除"没名字"外还要挡"丢了前缀" —— 后者是模板 {0} 落空
+	// 的特征,字形上是「的蛋」这种没有物种名的残缺名。
+	if n := len(db.eggItems); n > 0 {
+		var empty, broken int
+		for _, e := range db.eggItems {
+			switch {
+			case e.Name == "":
+				empty++
+			case e.Name == "的蛋":
+				broken++
+			}
+		}
+		if float64(empty)/float64(n) > maxEmptyRatio {
+			t.Errorf("egg_items 有 %d/%d 条没有显示名", empty, n)
+		}
+		if broken > 0 {
+			t.Errorf("egg_items 有 %d 条显示名只剩「的蛋」—— 模板 {0} 的物种名是空的", broken)
+		}
+	}
+}
+
 // TestEggTypeNames 断言每个品类都有名字(已知的普通蛋/噩梦除外)。
 // 品类 4(活动纪念)是这次补的:它的名字不在 EGG_TYPE_CONF 里,而是从 122 件
 // 「活动纪念精灵蛋」的背包显示名反推出来的 —— 少了这一步,前端角标的 tooltip 就是空的。
