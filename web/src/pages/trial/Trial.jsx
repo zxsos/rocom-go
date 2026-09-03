@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { getTrial, getTrialEncounters, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useAsyncData } from '../../hooks/useAsyncData'
-import { ImgAvatar } from '../../components/icons'
+import { ImgAvatar, imgURL } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
 import { fmtTime } from '../../utils/format'
 import { UnknownChip, useAnnotations } from '../../components/annotations'
@@ -135,7 +135,8 @@ export default function Trial() {
 //     故未遇见的保持原色、已遇见的压暗。wiki 那边反着来(高亮已遇见)是因为它
 //     主要用于「我刷到了什么」,这里更关心「还差什么」。
 //
-// 数据来自第三方 wiki(精灵池)+ 抓包记录(遇到情况),故顶部标注更新时间。
+// 数据来自客户端官方配置(精灵池,gen_trial_official.py 生成)+ 抓包记录(遇到情况)。
+// 顶部标注数据源与更新时间。
 function EncountersView({ data, onReload }) {
   const [ch, setCh] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -146,7 +147,7 @@ function EncountersView({ data, onReload }) {
   if (!books.length) {
     return (
       <div className="empty">
-        没有试炼精灵池数据(需先跑 scripts/fetch_trial_data.py 与 gen_trial.py)
+        没有试炼精灵池数据(需先跑 scripts/gen_trial_official.py 生成 internal/gamedata/data/trial.json)
       </div>
     )
   }
@@ -163,7 +164,10 @@ function EncountersView({ data, onReload }) {
   return (
     <div>
       {data.updated && (
-        <div className="muted trial-note">精灵池来自 wiki,{data.updated},可能与当前版本有出入</div>
+        <div className="muted trial-note" title={data.source}>
+          章节/普通池/首领来自客户端官方配置 · {data.updated}
+          {data.activity ? <span> · 当前活动:{data.activity}</span> : null}
+        </div>
       )}
       <div className="trial-tabs">
         {books.map((b) => (
@@ -176,6 +180,9 @@ function EncountersView({ data, onReload }) {
           </button>
         ))}
       </div>
+      {cur.image && (
+        <img className="trial-banner" src={imgURL(cur.image)} alt={cur.name} loading="lazy" />
+      )}
       <div className="trial-enc-head">
         <button
           className="btn trial-enc-refresh"
@@ -192,6 +199,7 @@ function EncountersView({ data, onReload }) {
         </div>
         <span className="muted">{pct}%</span>
       </div>
+      {cur.intro && <p className="trial-intro">{cur.intro}</p>}
       {err && <div className="trial-enc-err">{err}</div>}
       {normal.length > 0 && (
         <section className="trial-group">

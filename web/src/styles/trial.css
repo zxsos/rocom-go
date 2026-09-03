@@ -271,6 +271,16 @@
 
 /* —— 遇见记录:三章各一张精灵图,遇到过的置灰 —— */
 
+/* 章头大图(官方冒险日志封面)与见闻录文案(gen_trial_official.py 写入 trial.json) */
+.trial-banner {
+  width: 100%; max-height: 220px; object-fit: cover;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); box-shadow: var(--shadow-sm);
+}
+.trial-intro {
+  margin: 8px 2px 0; font-size: 13px; line-height: 1.65; color: var(--fg-dim);
+}
+
 /* 章头:名字 + 进度条 + 百分比 */
 .trial-enc-head {
   display: flex; align-items: center; gap: 10px;

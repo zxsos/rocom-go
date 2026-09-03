@@ -252,3 +252,30 @@ func TestTrialPoolsHaveNoLeaderForms(t *testing.T) {
 		}
 	}
 }
+
+// TestTrialEvents 守护「官方事件 → 精灵」映射(实时视图免标注的前提):
+//   - events 非空且目标都在我方 petbase 里(名字/头像查得到);
+//   - 只有普通遭遇(100k/110k)与首领(200k)入表,300xxx+ 的 NPC 整队事件不该有
+//     (它们不是单只精灵,查到了反而会把整队错认成一只);
+//   - 表外事件返回 0(TrialEventPetBase 的约定)。
+func TestTrialEvents(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(db.trial.events) == 0 {
+		t.Fatal("events 为空 —— 实时视图的事件号全得退回人工标注")
+	}
+	for eid, base := range db.trial.events {
+		if _, ok := db.PetBase(base); !ok {
+			t.Errorf("事件 %d -> petbase %d 不在我方 petbase 里", eid, base)
+		}
+		if eid >= 300000 {
+			t.Errorf("事件 %d 进了 events —— NPC/特殊段不该有(非单只精灵)", eid)
+		}
+	}
+	t.Logf("events: %d 条事件 -> 精灵", len(db.trial.events))
+	if got := db.TrialEventPetBase(0); got != 0 {
+		t.Errorf("表外事件应返回 0, 得到 %d", got)
+	}
+}

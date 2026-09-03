@@ -735,28 +735,42 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 	return out
 }
 
-// trialEventPet 查某事件对应哪只精灵;查不到返回 nil(前端显示占位)。
+// trialEventPet 返回某节点事件(event_conf_id)对应的精灵对手;查不到返回 nil(前端占位)。
 //
-// 协议只给 event_conf_id,到精灵的那张映射表在游戏配置里(未解包),故只能靠
-// **标注**补:标注类型 event,code 是 event_conf_id,名字是精灵形态全名。
-// 名字再经 gamedata.PetByName 反查成形态 id,才拿得到头像。
-//
-// 每次组载荷都查一次库(一个节点 3 条而已),不做缓存:标注是众包的,管理员审
-// 核通过后下一次推送就该生效;缓存住就得等人想起来重启。
+// 两层解析:
+//  1. **官方 GRASS_TRIAL_EVENT_CONF**(gen_trial_official.py 落表,见
+//     gamedata.TrialEventPetBase):普通遭遇/首领事件直接给出精灵 —— 与协议同源,
+//     免人工标注。NPC 整队(300xxx+)/祝福/商人等事件不在表里(返回 0),落到下一步。
+//  2. 众包标注兜底:官方表外的遭遇(新版本/漏解包),玩家照游戏画面标 kind=event,
+//     名字是精灵形态全名,再经 PetByName 反查成形态。标注在 DB 里,审核通过即生效;
+//     每次组载荷查一次库(一个节点 3 条而已),不做缓存。官方表内的事件被标注了
+//     **不覆盖官方** —— 官方与协议同源,玩家标注只在官方缺失时才有意义。
 func (p *Pipeline) trialEventPet(eventConfID uint32) *server.TrialOppPet {
+	if base := p.db.TrialEventPetBase(eventConfID); base != 0 {
+		return trialOppPetOf(p.db, base)
+	}
 	a, ok := p.st.ApprovedAnnotation("event", int64(eventConfID))
 	if !ok {
 		return nil
 	}
-	base, info, ok := p.db.PetByName(a.Name)
+	base, _, ok := p.db.PetByName(a.Name)
 	if !ok {
 		return nil // 标注的名字对不上任何形态(多半是 wiki 别名),宁缺勿错
+	}
+	return trialOppPetOf(p.db, base)
+}
+
+// trialOppPetOf 按 petbase 组装事件对手精灵(形态全名 + 头像);查不到元数据返回 nil。
+func trialOppPetOf(db *gamedata.DB, base uint32) *server.TrialOppPet {
+	info, ok := db.PetBase(base)
+	if !ok {
+		return nil
 	}
 	pet := &server.TrialOppPet{Base: base, Name: info.Name}
 	if info.Form != "" {
 		pet.Name += "_" + info.Form
 	}
-	if im := p.db.PetImageByBase(base, false); im.Head != "" {
+	if im := db.PetImageByBase(base, false); im.Head != "" {
 		pet.Img = im.Head
 	}
 	return pet
