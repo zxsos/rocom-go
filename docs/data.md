@@ -1580,7 +1580,28 @@ s2c 0x1346 DATA 明文 body
   (乱序/单独翻某页不触发,避免误删),且只删对账开始前就存在(`updated_at` 早于本轮起始)的宠物,
   放过对账期间刚捕获入库的新宠。
 
-### 草系试炼的静态配置(`scripts/fetch_trial_data.py` + `scripts/gen_trial.py`)
+### 草系试炼的静态配置(`scripts/gen_trial_official.py`)
+
+2026-09-03 起,`internal/gamedata/data/trial.json` 改由 **`scripts/gen_trial_official.py`**
+从**客户端官方配置**生成(`BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,PERIOD,LOG}_CONF`):
+
+- 章节名/场景(`scene_id`)/章节封面与见闻录文案 → `GRASS_TRIAL_{CHAPTER,LOG}_CONF`,
+  封面 webp 走 `scripts/gen_icons.py` 的 `badge` 组(`img/badge/…`,gen 时自动对账存在性);
+- 层结构与 `floors`(8 节点,node0 起点)与官方 `node_struct` **逐节点校验一致**;
+- 22 名首领(第 4 层 `node_event` 200001~200022 →「_草系徽章-首领形态」8101~8122)
+  与各章普通池(`chapter_event` 战斗事件 → 事件精灵名 → 我方 petbase);
+- 活动周期 → `GRASS_TRIAL_PERIOD_CONF`(页面与接口顶部的 `source`/`activity`);
+- 第 7 层 NPC 阵容客户端**没有静态表**(仍是服务器下发),沿用 wiki 实测阵容透传;
+  gen 时校验透传 id 与官方 `node_struct.node_event` 完全一致(如 300005 研究员)。
+
+普通池口径差异:`official 按 chapter_event 事件解析`,数量 160/234/132;wiki 是玩家
+把普通层实测+部分阵容成员**合并**的 188/295/177,比官方多。官方池外的实战照面
+由页面「其他遭遇(extra)」分组兜底,不会丢记录。
+
+原 wiki 抓取版(`scripts/fetch_trial_data.py` + `scripts/gen_trial.py`)保留作对照;
+下方记录的是 wiki 版时代的实测结论,凡标注经官方表验证的均已核过,仍有效。
+
+#### wiki 版历史说明(已被官方脚本取代)
 
 草系徽章试炼的层结构、各章精灵池、22 名首领、第 7 层 NPC 阵容,由
 `internal/gamedata/trial.go` 提供,`data/trial.json` 由 `gen_trial.py` 生成。
@@ -1606,6 +1627,9 @@ s2c 0x1346 DATA 明文 body
 
 - **wiki 的 opponent id(300xxx)与协议 `npc_id`(实测 86023)不是同一套编号**,
   无从绑定,故只能给候选池、不能断言当前遭遇的是哪一个。
+  官方解包后核出:wiki 的 opponent id 正是 `GRASS_TRIAL_EVENT` 的 event id
+  (`node_struct.node7.node_event`),gen_trial_official.py 据此校验透传的 NPC 阵容;
+  阵容的**宠列表**仍只能来自玩家实测 —— 客户端不静态存、由服务器下发。
 - **键用章节序号(1/2/3),不用 wiki 的 chapter id**。三套编号互不通用:
   协议恒为 3000/3001/3002;wiki 池是 1000/1001/1002;wiki 各难度下又按难度分段
   (mode 10001 下是 2000/2001/2002,10002 下是 3000/3001/3002)。拿 id 当键必错。

@@ -17,6 +17,8 @@
   - worldmap: 下方 WORLDMAP 清单(人工挑选的大地图 POI 精灵)          → img/worldmap/
   - medal:    MEDAL_CONF.icon(BagItem 奖牌小图,整张贴图)            → img/medal/
   - egg:      BAG_ITEM_CONF 里 type==8 的精灵蛋 icon(整张贴图)      → img/egg/
+  - badge:    GRASS_TRIAL_LOG_CONF.image(草系徽章试炼章节封面,整张贴图)
+    → img/badge/;文件名与 gen_trial_official.py 写进 trial.json 的 chapters.image 一致
 
 webp 转码确定性(同 libwebp 下同源字节一致),默认跳过已存在;--force 强制重编(见 gen_images.py)。
 前置:scripts/unpack.sh 全量解包(uasset → 属性 .json,纹理 → PNG,同名同目录)。
@@ -241,6 +243,7 @@ def main():
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     total += gen_group("egg", egg_icon_refs(), copy_texture)
     total += gen_group("egg", eggtype_icon_refs(), crop_sprite)
+    total += gen_group("badge", icon_refs("GRASS_TRIAL_LOG_CONF", "image"), copy_texture)
     print(f"-> {OUT_ROOT}(--force 可强制重编)")
     if total == 0:
         sys.exit(f"未产出任何 webp:确认 {SRC} 下已有 unpack.sh 的全量解包产物。")

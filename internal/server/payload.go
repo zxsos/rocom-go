@@ -495,7 +495,9 @@ type TrialEncountersPayload struct {
 	Account  string               `json:"account"`
 	Ts       int64                `json:"ts"`
 	Chapters []TrialEncounterBook `json:"chapters,omitempty"`
-	Updated  string               `json:"updated,omitempty"` // 静态配置的更新时间(数据可能已过期)
+	Updated  string               `json:"updated,omitempty"`  // 静态配置的更新时间(数据可能已过期)
+	Source   string               `json:"source,omitempty"`   // 静态配置数据来源(章节/首领/普通池官方,第 7 层阵容玩家实测)
+	Activity string               `json:"activity,omitempty"` // 官方活动周期说明(GRASS_TRIAL_PERIOD 当前期)
 }
 
 // TrialEncounterBook 是某一章的一张图。
@@ -514,6 +516,9 @@ type TrialEncounterBook struct {
 	//
 	// **不计入 Total/Seen**:那两个字段的口径是「池子里还剩多少」,把来源
 	// 不明的条目塞进分母会让进度百分比失去意义。故单独展示。
+	// Image/Intro 是官方章节封面(GRASS_TRIAL_LOG_CONF)与见闻录文案,仅展示用。
+	Image string              `json:"image,omitempty"` // 章节封面,相对 data/img 的路径(badge/…)
+	Intro string              `json:"intro,omitempty"` // 官方章节文案(见闻录开启段)
 	Extra []TrialEncounterPet `json:"extra,omitempty"`
 }
 

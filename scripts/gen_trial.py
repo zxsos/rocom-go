@@ -7,6 +7,12 @@
 而是玩家维护的 wiki 攻略页(CC BY-NC-SA 4.0)。故独立成 trial.json 而非并入
 names.json,并在生成物里标注来源与更新时间。
 
+**2026-09-03 起已被 scripts/gen_trial_official.py 取代**(改读客户端官方配置
+`GRASS_TRIAL_{CONF,CHAPTER,EVENT,PERIOD,LOG}_CONF`):官方能直接给出层结构
+(见下方实测,与官方 `node_struct` 逐节点一致)、章节/场景/活动周期、22 名首领与
+各章普通池;第 7 层 NPC 阵容客户端无静态表,仍由该脚本用 wiki 实测阵容透传并校验。
+本脚本与 fetch_trial_data.py 保留作对照/回滚,下方实测结论经官方表核验仍有效。
+
 ## 层类型是怎么确定的(关键,别弄错)
 
 wiki 说每章 **7 层**,而协议里每章是 **8 个节点**(node_index 0~7)。两者口径不同,

@@ -15,10 +15,16 @@ import (
 //
 //  1. 抽取池(pool/used)与 5 个 id 的名字 —— 换奖励就是在这 5 个里重抽,
 //     只看当前那条 reward 无法预判重掷会出什么;
-//  2. 事件对应哪只精灵(pet)—— 协议不下发,靠 kind=event 的标注补。
+//  2. 事件对应哪只精灵(pet)—— 协议只给 event_conf_id。官方 GRASS_TRIAL_EVENT_CONF
+//     (gen_trial_official.py 落表,gamedata.TrialEventPetBase)内的直接给,
+//     表外的靠 kind=event 的标注补(官方与协议同源,标注不覆盖官方)。
 //
-// 前者是透传(漏了只是少字段),后者是「查库 + 反查形态 + 取头像」三步,
+// 前者是透传(漏了只是少字段);pet 是「官方映射/查库 + 反查形态 + 取头像」链路,
 // 任何一步错了都静默变回占位,故在此断言端到端结果。
+//
+// 本文件里走**标注路径**的用例都刻意用官方表外的 event id(299xxx,不在
+// GRASS_TRIAL_EVENT_CONF.json,见 gen_trial_official.py)—— 官方表内的会走官方映射、
+// 标注根本不生效,测不到标注链路;官方路径见 TestTrialEventPetFromOfficialConf。
 
 // trialEventBody 拼 GrassTrialNodeSelection:field1=node_events[],
 // 每个事件 field1=slot_index / field2=event_conf_id / field3=reward_id /
@@ -101,7 +107,8 @@ func TestTrialOptionNamesFromAnnotation(t *testing.T) {
 	skills := []uint32{catalog[0].ID, catalog[1].ID, catalog[2].ID, catalog[3].ID}
 	feat := uint32(288001)
 	pool := append([]uint32{feat}, skills...)
-	event := uint32(130056)
+	// 用官方表外的事件 id:官方表内(如 130056)的遭遇不走标注、也无需玩家标注
+	event := uint32(299999)
 
 	approveEventAnnotation(t, p, int64(event), petName)
 	body := trialEventBody(1, event, skills[0], 40, pool, 2016)
@@ -137,9 +144,11 @@ func TestTrialOptionNamesFromAnnotation(t *testing.T) {
 	}
 }
 
-// TestTrialOptionNeedsAnnotation 锁住**没标注时不猜**:
+// TestTrialOptionNeedsAnnotation 锁住**官方表外的事件没标注时不猜**:
 // pet 缺失、特性无名(技能名仍然是有的 —— 那是查表查的,与标注无关)。
 // 猜一个精灵名字比留空更糟:玩家会以为那是服务器说的。
+// (官方表内的事件由官方直接给 pet,不算「猜」,见 TestTrialEventPetFromOfficialConf;
+// 110041 已在官方表,这里改用表外的 299998。)
 func TestTrialOptionNeedsAnnotation(t *testing.T) {
 	p, _ := newTestPipeline(t)
 	catalog := p.db.SkillCatalog()
@@ -147,7 +156,7 @@ func TestTrialOptionNeedsAnnotation(t *testing.T) {
 		t.Fatalf("技能目录只有 %d 条,样本不足", len(catalog))
 	}
 	pool := []uint32{288001, catalog[0].ID, catalog[1].ID}
-	body := trialEventBody(2, 110041, catalog[0].ID, 40, pool)
+	body := trialEventBody(2, 299998, catalog[0].ID, 40, pool)
 	sel := trial.ParseSelection(body)
 	if sel == nil {
 		t.Fatal("解析节点选项失败")
@@ -166,6 +175,35 @@ func TestTrialOptionNeedsAnnotation(t *testing.T) {
 	}
 }
 
+// TestTrialEventPetFromOfficialConf 锁住本次改动的核心收益:官方表内的事件
+// (GRASS_TRIAL_EVENT_CONF,gen_trial_official.py 落表)**无需任何标注**就能直接
+// 显示对应精灵 —— 与协议同源,玩家不用再对着游戏画面标 event 了。
+//
+// 数据随版本会变:哪天 110041 不在官方表里了,该事件就退化回标注链路,故查不到即跳过。
+func TestTrialEventPetFromOfficialConf(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	const event = 110041
+	base := p.db.TrialEventPetBase(event)
+	if base == 0 {
+		t.Skip("事件 110041 已不在官方 events 表(版本更新?),退回标注链路")
+	}
+	body := trialEventBody(1, event, 1001, 40, []uint32{1001})
+	sel := trial.ParseSelection(body)
+	if sel == nil {
+		t.Fatal("解析节点选项失败")
+	}
+	o := p.trialRunPayload(trialRunWithSelection(sel), nil).Options[0]
+	if o.Pet == nil {
+		t.Fatal("官方表内的事件拿不到 pet —— 官方映射没接上(trialEventPet 应先查官方表)")
+	}
+	if o.Pet.Base != base {
+		t.Errorf("pet.base = %d, 期望官方映射 %d", o.Pet.Base, base)
+	}
+	if o.Pet.Name == "" {
+		t.Error("pet 缺名字(官方映射的精灵应在 petbase 里)")
+	}
+}
+
 // TestTrialOptionAmbiguousFeatureNotNamed 锁住「池里出现多条特性时都不给名」。
 //
 // 一只精灵只有一个自身特性 —— 池里出现两条 288xxx,说明我们对 pool 的理解是错的,
@@ -173,9 +211,10 @@ func TestTrialOptionNeedsAnnotation(t *testing.T) {
 func TestTrialOptionAmbiguousFeatureNotNamed(t *testing.T) {
 	p, _ := newTestPipeline(t)
 	base, _ := findPetWithFeature(t, p.db)
-	approveEventAnnotation(t, p, 110116, p.db.PetFullName(base))
+	// 官方表外的事件 id(110116 已在官方表,标注不生效),让 pet 由标注给出
+	approveEventAnnotation(t, p, 299997, p.db.PetFullName(base))
 
-	body := trialEventBody(3, 110116, 288001, 40, []uint32{288001, 288002})
+	body := trialEventBody(3, 299997, 288001, 40, []uint32{288001, 288002})
 	sel := trial.ParseSelection(body)
 	if sel == nil {
 		t.Fatal("解析节点选项失败")
