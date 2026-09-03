@@ -194,3 +194,127 @@ export function sliderTop(min, max, dim) {
   const mid = (dim.min + dim.max) / 2
   return (min + max) / 2 <= mid ? 'max' : 'min'
 }
+
+// —— 滑块的「变焦刻度」——
+//
+// 体重/声音的取值域绝大部分用不上:真正在意的是两头的奖牌窗口 ——
+// 体重 [0,2] 与 [98,100]、嗓音 [-100,-96] 与 [96,100](见 DEFAULT_RANGE_RULES);
+// 嗓音那两段合起来也只占取值域的 4%(8/200)。按比例铺在 200px 的轨道上两头各
+// 4~8px —— 想停在 98.0 而不是 98.3 基本靠运气,而中间那 90% 几乎没人会去拖。
+//
+// 故把轨道**非线性地**分给重点区:两个重点区各占一大块,中间那段压扁。拖动同样
+// 一像素,在中间走得多、在两头走得少 —— 也就是「非奖牌区 step 更大」。
+// 轨道仍是一条连贯的线,只是刻度不均匀,所以 RangeSlider 会把重点区与奖牌边界
+// 画在轨道上(见 .rslider-zone / .rslider-tick):不画出来的话,用户只会觉得
+// 「拖动不准」,而不知道刻度是故意不均匀的。
+
+// FOCUS_ZONES 需要放大的区间(闭区间)。取「奖牌窗口 + 一点余量」——
+// 余量只求「偶尔放宽标准」够得着:给太多,两头就被摊薄得不够用了。
+export const FOCUS_ZONES = {
+  weightPct: [[0, 10], [90, 100]],
+  voice: [[-100, -88], [88, 100]],
+}
+
+// FOCUS_SHARE 两个重点区**合计**占轨道的比例,剩下的按值域跨度分给中间段。
+// 0.7 是手感值:体重每个重点区 10 个单位摊到 70px(200px 轨道),奖牌窗口那
+// 2 个单位有 14px;中间 80 个单位只剩 60px —— 约 9 倍的差。
+const FOCUS_SHARE = 0.7
+
+// COARSE_MUL 中间段的步进放大倍数。中间段一像素能走好几个单位,再给重点区那档
+// 精度只会拖出 43.7 这种没有意义的数。
+const COARSE_MUL = 10
+
+// MAGNET_POS 磁吸半径(按轨道比例):拖到奖牌边界附近 ±1.5% 轨道内,直接吸附到
+// 边界值。奖牌是截断判定(97.9 不算大块头),差 0.1 就筛不出来,手拖不稳;
+// 半径刻意留得小,想放宽标准往外多拖一点就脱离吸附了。
+const MAGNET_POS = 0.015
+
+// rangeScale 造一把分段线性的尺子,在**取值**与**轨道比例(0~1)**之间换算。
+//
+// 返回 { segs, toPos, toValue, marks }:
+//   - segs  分段结果(含各自占的轨道起止),给 RangeSlider 画重点区底色;
+//   - marks 奖牌边界在轨道上的位置,画刻度线、同时是磁吸点;
+//   - toPos / toValue 互逆(量化与磁吸除外)。
+//
+// 为什么是分段线性而不是一条平滑曲线:重点区与中间段的边界要的是**硬拐点**,
+// 这样每个重点区内部的刻度才是均匀的 —— 用户在一个区内的手感一致,不会出现
+// 「越靠近奖牌越慢」这种难以预期的变化。
+export function rangeScale(dim) {
+  const zones = (FOCUS_ZONES[dim.k] || [])
+    .map(([a, b]) => [Math.max(a, dim.min), Math.min(b, dim.max)])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0])
+
+  // 切成交替的段,铺满整个取值域(重点区之间、以及两端之外自动成为「中间段」)。
+  const segs = []
+  let cur = dim.min
+  for (const [a, b] of zones) {
+    if (a > cur) segs.push({ focus: false, a: cur, b: a })
+    if (b > cur) segs.push({ focus: true, a: Math.max(a, cur), b })
+    cur = Math.max(cur, b)
+  }
+  if (cur < dim.max) segs.push({ focus: false, a: cur, b: dim.max })
+  if (segs.length === 0) segs.push({ focus: false, a: dim.min, b: dim.max })
+
+  // 分轨道:重点区均分 FOCUS_SHARE,中间段按值域跨度分剩下的。
+  const nf = segs.filter((s) => s.focus).length
+  const gapSpan = segs.reduce((n, s) => n + (s.focus ? 0 : s.b - s.a), 0)
+  const focusShare = nf === 0 ? 0 : gapSpan === 0 ? 1 : FOCUS_SHARE
+  let at = 0
+  for (const s of segs) {
+    const w = s.focus
+      ? focusShare / nf
+      : gapSpan === 0 ? 0 : ((1 - focusShare) * (s.b - s.a)) / gapSpan
+    s.start = at
+    s.end = at + w
+    at = s.end
+  }
+  segs[segs.length - 1].end = 1 // 收掉浮点误差,保证满量程正好落在 1
+
+  const last = segs[segs.length - 1]
+  // 边界值归入**后**一段:两侧的 t 分别算出 1 和 0,落点是同一个位置,故不影响连续性。
+  const segByValue = (x) => segs.find((s, i) => x < s.b || i === segs.length - 1) || last
+  const segByPos = (p) => segs.find((s, i) => p < s.end || i === segs.length - 1) || last
+
+  const toPos = (v) => {
+    const x = Math.min(dim.max, Math.max(dim.min, v))
+    const s = segByValue(x)
+    const t = s.b === s.a ? 0 : (x - s.a) / (s.b - s.a)
+    return s.start + t * (s.end - s.start)
+  }
+
+  // 奖牌边界 = 默认规则的端点(DEFAULT_RANGE_RULES 是阈值的唯一来源):
+  // 既是刻度线的位置,也是磁吸点。默认规则一改,这两处跟着走。
+  const marks = []
+  for (const r of DEFAULT_RANGE_RULES) {
+    if (r.dim !== dim.k) continue
+    for (const v of [r.min, r.max]) if (!marks.some((m) => m.v === v)) marks.push({ v, pos: toPos(v) })
+  }
+  marks.sort((a, b) => a.v - b.v)
+
+  const toValue = (p) => {
+    const x = Math.min(1, Math.max(0, p))
+    const s = segByPos(x)
+    const t = s.end === s.start ? 0 : (x - s.start) / (s.end - s.start)
+    const raw = s.a + t * (s.b - s.a)
+    // 量化到所在段的步进:中间段放大一档,重点区保持维度自身的精度。
+    // 取整走**全局网格**(round(v/step)*step)而不是「段内相对」,这样中间段出来的
+    // 是 -20 / 0 / 60 这类整数,而非 -18 / -8 / 2 这种看着像随手填的数。
+    const step = s.focus ? dim.step : dim.step * COARSE_MUL
+    let out = round1(Math.round(raw / step) * step)
+    // 夹回本段:网格点可能落到段外(如嗓音中间段 step=10,靠左端会算出 -90,
+    // 而 -90 属于左边的重点区),夹回来才能保证段边界是够得到的。
+    out = Math.min(s.b, Math.max(s.a, out))
+    // 磁吸:取**最近**的边界,而不是第一个够近的。
+    let best = -1
+    let bd = MAGNET_POS
+    for (let i = 0; i < marks.length; i++) {
+      const d = Math.abs(x - marks[i].pos)
+      if (d <= bd) { bd = d; best = i }
+    }
+    if (best >= 0) out = marks[best].v
+    return Math.min(dim.max, Math.max(dim.min, out))
+  }
+
+  return { segs, toPos, toValue, marks }
+}

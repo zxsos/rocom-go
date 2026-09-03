@@ -130,7 +130,7 @@
 .egg-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s linear; }
 .egg-eta { font-size: 12px; opacity: .8; flex: none; white-space: nowrap; }
 
-/* 随机蛋「猜猜孵出谁」:第三方图鉴查询结果(令牌在服务端,见 api_egg_query.go) */
+/* 随机蛋「猜猜孵出谁」:默认走本地解包数据反推,第三方复核是可选(见 api_egg_query.go) */
 .egg-guess { margin-top: 8px; }
 .egg-guess-btn { width: 100%; }
 .egg-guess-res { border-top: 1px solid var(--line); padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
@@ -141,6 +141,8 @@
 .egg-guess-img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex: none; background: var(--bg-3); }
 .egg-guess-txt { min-width: 0; }
 .egg-guess-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 结果下方两个按钮(第三方复核 / 关闭)并排,换行时靠左对齐 */
+.egg-guess-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* 双亲快照:固定两行高度(没有也留着),卡片才不会一张高一张矮 */
 .egg-parents {

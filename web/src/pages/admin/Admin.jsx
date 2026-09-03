@@ -12,6 +12,7 @@ import RulesCard from './RulesCard'
 import { InjectWildCard, InjectFlowerCard } from './InjectCards'
 import MerchantSubsCard from './MerchantSubsCard'
 import MerchantSourceCard from './MerchantSourceCard'
+import EggSourceCard from './EggSourceCard'
 import AnnotationsCard from './AnnotationsCard'
 import PinCard from './PinCard'
 
@@ -139,6 +140,7 @@ export default function Admin() {
       <RulesCard onUnauthed={kickIfUnauthed} />
       <MerchantSubsCard onUnauthed={kickIfUnauthed} />
       <MerchantSourceCard onUnauthed={kickIfUnauthed} />
+      <EggSourceCard onUnauthed={kickIfUnauthed} />
       <PinCard accounts={accounts} onAccountsChanged={loadAccounts} />
 
       <div className="admin-section-title">众包图鉴</div>

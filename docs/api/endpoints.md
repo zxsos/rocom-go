@@ -77,7 +77,7 @@
 | 方法 路径 | 鉴权 | 账号 | 说明 |
 | --- | --- | --- | --- |
 | `GET /api/eggs` | — | ✓ | 背包精灵蛋（库里即背包现状） |
-| `GET /api/eggs/query` | — | ✓ | 查随机蛋可能孵出的物种（代理第三方，令牌在服务端） |
+| `GET /api/eggs/query` | — | ✓ | 查随机蛋可能孵出的物种（数据源由服务端配置，管理面板切换） |
 | `GET /api/handbook-glasses` | — | ✓ | 图鉴炫彩收集（按品种聚合，图鉴号升序） |
 
 ## 标注模式（众包图鉴）
@@ -182,6 +182,8 @@
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
 | `GET /api/admin/merchant-source` | admin | 远行商人数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
 | `POST /api/admin/merchant-source` | admin | 切换数据源（body: `source`）；会清空已缓存货单并按新源重抓当前轮 |
+| `GET /api/admin/egg-source` | admin | 查蛋数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
+| `POST /api/admin/egg-source` | admin | 切换查蛋数据源（body: `source`，`local`\|`xianyu`）；立即生效，不清缓存 |
 | `GET /api/admin/annotations/pending` | admin | 待审标注列表（`?kind=skill\|feature\|event`） |
 | `POST /api/admin/annotations/{id}/review` | admin | 审核标注（body: `approve`） |
 

@@ -10,12 +10,12 @@ import (
 // glassBookItem 是炫彩图鉴页按品种聚合的一条记录:该品种抓到过的全部炫彩变体
 // (普通/隐藏各一个列表,value 已去重并保序)。
 type glassBookItem struct {
-	Base   uint32  `json:"base"` // 品种 pet_base_id
-	Name   string  `json:"name"` // 品种名(petbase,未知时为空)
-	Book   uint32  `json:"book"` // 图鉴编号(排序用)
-	Head   string  `json:"head"` // 小头像 /img/<此路径>(未知时为空)
-	Stage  uint32  `json:"stage"` // 进化阶段(分享图「只取最高形态」判定用)
-	Evo    uint32  `json:"evo"`   // 进化链分组 id(0=单形态无链;同链共享,见 gamedata.PetBaseInfo)
+	Base   uint32  `json:"base"`   // 品种 pet_base_id
+	Name   string  `json:"name"`   // 品种名(petbase,未知时为空)
+	Book   uint32  `json:"book"`   // 图鉴编号(排序用)
+	Head   string  `json:"head"`   // 小头像 /img/<此路径>(未知时为空)
+	Stage  uint32  `json:"stage"`  // 进化阶段(分享图「只取最高形态」判定用)
+	Evo    uint32  `json:"evo"`    // 进化链分组 id(0=单形态无链;同链共享,见 gamedata.PetBaseInfo)
 	Common []int32 `json:"common"` // 普通炫彩 glass_value 列表(空=无)
 	Hidden []int32 `json:"hidden"` // 隐藏炫彩 glass_value 列表(空=无)
 }
