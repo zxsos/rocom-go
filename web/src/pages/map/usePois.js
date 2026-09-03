@@ -135,7 +135,8 @@ export function usePois(account, res) {
         if (!p.r || !collectOn.has(p.k)) return true
         return !collected(p)
       })
-      .map((p) => ({ ...p, icon: iconOf[p.k], sure: collectOn.has(p.k) && starSt[p.r] === ST_UNCOLLECTED }))
+      // 采集物每个点自带品种图标(p.i,后端已拼好路径);其余图层共用图层图标。
+      .map((p) => ({ ...p, icon: p.i || iconOf[p.k], sure: collectOn.has(p.k) && starSt[p.r] === ST_UNCOLLECTED }))
   }, [poi, poiOn, collectOn, starSt, doneZones, iconOf])
 
   return { kinds, iconOf, marks, zoneStats, poiOn, togglePoi, collectOn, toggleCollect }

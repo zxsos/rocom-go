@@ -431,6 +431,9 @@ POI_KINDS = [
     {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png",        "collect": True},
     {"k": "star_purple", "n": "紫色眠枭之星",   "icon": "img_miaoxianzhixing_zi_png",           "collect": True},
     {"k": "part_bugu",   "n": "不咕钟零件",     "icon": "100946",                               "collect": True},
+    # 采集物(花/草/菌/矿/果树):一个图层收 48 个品种,每个点自带品种图标(见 GATHER_GENRES),
+    # 故此处的 icon 只在某品种缺图时兜底。点位三千余,默认关。
+    {"k": "gather",      "n": "采集物",         "icon": "img_MapIcon_PetPlant_png"},
 ]
 
 # 眠枭之星图层不走 WORLD_MAP 匹配,按 NPC_CONF id 白名单直取刷新行。口径 = 攻略/游戏总数:
@@ -463,8 +466,23 @@ STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_C
 # 与三方攻略全收集数一致)。实体判定与星/光点完全同套(未收集才刷、npc_content_cfg_id=刷新行 id,
 # pcap 实测),但**不在 WORLD_EXPLORING_STATISTIC_CONF 里**——服务器不给分区进度,
 # 收集模式只走逐点判定,故点位不带候选区域(zone)。
+# 采集物(花/草/菌/矿/果树):官方的「大地图采集物」就是 MEGAMAP_CONF 里 class==8 的那批
+# (48 个品种:向阳花/喵喵草/黑晶琉璃/可可果树…),每行给出品种名 genre 与图标 icon——图标列
+# 是 BagItem 编号(100211 可可果),与不咕钟零件同走 copy_texture(见 gen_icons.py 的
+# gather_icons),采集物图标因此就是它产出的那件物品的样子。
+# 品种 → NPC id 靠 MEGAMAP_GATHERING_CONF:它的 param_id 即采集物 NPC(50041 向阳花、
+# 50090 可可果树…,62 个),genre 与 MEGAMAP_CONF 的品种名逐字相同。点位与星星/零件同一条路
+# (NPC 白名单直取刷新行,refresh_type=1 → AREA_CONF 中心)。
+# 口径提醒:取到的是**候选刷新点**(3717 行,已排除 disable 与 refresh_rule==0 的 693 行),
+# 游戏按刷新规则从中刷出一部分,故图上标的是「哪儿会有」而非「此刻一定有」;同一品种常常
+# 有几十上百个候选点(黑晶琉璃 360、黄石榴石 284),不像星星那样是固定收齐的一批。
+GATHER_GENRES = {v["genre"]: str(v["icon"]) for v in rows("MEGAMAP_CONF.json").values()
+                 if v.get("class") == 8 and v.get("genre") and v.get("icon")}
+GATHER_NPCS = {v["param_id"]: v["genre"] for v in rows("MEGAMAP_GATHERING_CONF.json").values()
+               if v.get("genre") in GATHER_GENRES}
+
 # NPC_WHITELIST 是「按 npc id 白名单取点」图层的总表:星星在此之上另做奖励行/装饰石像排除。
-NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}}
+NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}, "gather": GATHER_NPCS}
 
 npc_pendant = rows("NPC_PENDANT_CONF.json")
 
@@ -597,7 +615,8 @@ for kind in POI_KINDS:
             # 石像只算真挂着星的(行 id 在挂件表里);装饰石像 NPC 不在 STAR_NPCS,此查为防混入
             if nid in STAR_STATUE and str(int(r["id"])) not in npc_pendant:
                 continue
-            todo.append(({"name": star[nid]}, int(r["id"])))
+            # 采集物:点位名即品种名(黑晶琉璃/向阳花…),另带该品种的图标(见 GATHER_GENRES)
+            todo.append(({"name": star[nid], "icon": GATHER_GENRES.get(star[nid], "")}, int(r["id"])))
     else:
         wids = {k for k, w in world_map.items() if icon in json.dumps(w, ensure_ascii=False)}
         # 地图元素行自带刷新点
@@ -617,6 +636,8 @@ for kind in POI_KINDS:
         #   (ActorInfo.npc.npc_base.npc_content_cfg_id),据此把实体对回这个点位。见 docs/data.md 3.4。
         # zone=候选区域营地 id 列表(仅眠枭之星;语义见上方区域注释)。
         e = {"k": kind["k"], "r": rid, "x": x, "y": y, "z": z, "n": name}
+        if kind["k"] == "gather" and owner.get("icon"):
+            e["i"] = owner["icon"]  # 逐点品种图标(48 种花/草/菌/矿),图层图标只作缺图兜底
         if kind["k"].startswith("star"):
             if zz := zones_of(x, y):
                 e["zone"] = zz

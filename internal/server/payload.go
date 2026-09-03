@@ -246,27 +246,27 @@ type TrialPayload struct {
 
 // TrialRun 是一局的镜像。
 type TrialRun struct {
-	TrialID     uint32          `json:"trialId"`
-	SlotID      uint32          `json:"slotId"` // 属性系图鉴槽位(1000=普、1001=草…)
-	SlotName    string          `json:"slotName,omitempty"`
-	ChapterID   uint32          `json:"chapterId"`  // 服务器下发(3000/3001/3002)
-	ChapterIdx  uint32          `json:"chapterIdx"` // 第几章(1 起),由 chapters 次序推出
-	NodeIndex   uint32          `json:"nodeIndex"`  // 本章第几个节点(0 起)
-	Coin        uint32          `json:"coin"`
-	Chapters    []uint32        `json:"chapters,omitempty"`
-	Effects     []uint32        `json:"effects,omitempty"` // 本局生效的试炼词条
+	TrialID    uint32   `json:"trialId"`
+	SlotID     uint32   `json:"slotId"` // 属性系图鉴槽位(1000=普、1001=草…)
+	SlotName   string   `json:"slotName,omitempty"`
+	ChapterID  uint32   `json:"chapterId"`  // 服务器下发(3000/3001/3002)
+	ChapterIdx uint32   `json:"chapterIdx"` // 第几章(1 起),由 chapters 次序推出
+	NodeIndex  uint32   `json:"nodeIndex"`  // 本章第几个节点(0 起)
+	Coin       uint32   `json:"coin"`
+	Chapters   []uint32 `json:"chapters,omitempty"`
+	Effects    []uint32 `json:"effects,omitempty"` // 本局生效的试炼词条
 	// EffectsNames 是词条 effect_id -> 名(官方 GRASS_TRIAL_EFFECT_CONF):协议只给
 	// id,「本周词条 1001」若不翻译就只剩数字,玩家看不出词条在改什么规则。
 	EffectsNames map[uint32]string `json:"effectNames,omitempty"`
-	Boss        bool            `json:"boss,omitempty"`    // 已进 BOSS 战
-	Pet         *TrialPet       `json:"pet,omitempty"`
-	Options     []TrialOption   `json:"options,omitempty"` // 当前节点的候选事件
-	RefreshCost uint32          `json:"refreshCost,omitempty"`
-	Bless       *TrialBless     `json:"bless,omitempty"`
-	Reward      *TrialReward    `json:"reward,omitempty"` // 待处理的节点奖励
-	Shop        []TrialShopItem `json:"shop,omitempty"`
-	Result      *TrialResult    `json:"result,omitempty"` // 上一局结算(Active=false 时)
-	Log         []TrialLogEntry `json:"log,omitempty"`    // 操作流水(最新在前)
+	Boss         bool              `json:"boss,omitempty"` // 已进 BOSS 战
+	Pet          *TrialPet         `json:"pet,omitempty"`
+	Options      []TrialOption     `json:"options,omitempty"` // 当前节点的候选事件
+	RefreshCost  uint32            `json:"refreshCost,omitempty"`
+	Bless        *TrialBless       `json:"bless,omitempty"`
+	Reward       *TrialReward      `json:"reward,omitempty"` // 待处理的节点奖励
+	Shop         []TrialShopItem   `json:"shop,omitempty"`
+	Result       *TrialResult      `json:"result,omitempty"` // 上一局结算(Active=false 时)
+	Log          []TrialLogEntry   `json:"log,omitempty"`    // 操作流水(最新在前)
 
 	// 以下三项来自**静态配置**(wiki,见 gamedata/trial.go),协议不发这些:
 	//   Floor      当前节点是什么(普通/首领/商人/NPC…)
@@ -304,7 +304,7 @@ type TrialOppPet struct {
 // TrialPet 是试炼里的宠物副本。
 //
 // 技能的 id 与名字(见 TrialSkill)由 skills.json 提供 —— 该表 7xxxxx 段技能
-// 只覆盖到已实证的那批,查不到的 id 靠前端众包标注补(标注类型 skill)。
+// 只覆盖到已实证的那批,查不到的 id 前端回退显示数字。
 type TrialPet struct {
 	Gid      uint32       `json:"gid"`
 	Name     string       `json:"name"`
@@ -380,22 +380,22 @@ type TrialOption struct {
 	// 技能名来自 skills.json(官方 SKILL_CONF 同源,试炼 788 段整段在内);
 	// 碎片效果名(20xx 特调 / 30xx 事件奖励)来自官方 GRASS_TRIAL_EFFECT_CONF;
 	// 特性名则要**先标出精灵**才能查 —— 走「精灵 → 特性」表(见
-	// gamedata.FeatureNameOfBase),这正是标注精灵省下的那一步:池里那条 288xxx
-	// 不用玩家再标一次。查不到的 id 不进这张表,前端显示裸 id 并给标注入口。
+	// gamedata.FeatureNameOfBase):官方事件表映射出精灵后,池里那条 288xxx
+	// 顺带就有名了。查不到的 id 不进这张表,前端显示裸 id。
 	Names map[uint32]string `json:"names,omitempty"`
 	// Descs 是本卡片里**技能类** id 的官方效果文案(id -> desc,查得到才进表)。
 	//
 	// 与 Names 互补:Names 管「叫什么」,Descs 管「是干嘛的」——技能 chip 悬停
 	// (以及候选池/奖励行)贴出效果,玩家不查游戏也能看懂。特性/碎片没有效果文案。
-	Descs map[uint32]string `json:"descs,omitempty"`
-	Level uint32            `json:"level,omitempty"`
+	Descs      map[uint32]string `json:"descs,omitempty"`
+	Level      uint32            `json:"level,omitempty"`
 	EventCost  uint32            `json:"eventCost,omitempty"`  // 重掷该事件的报价
 	RewardCost uint32            `json:"rewardCost,omitempty"` // 重掷奖励的报价
 	Extra      []uint32          `json:"extra,omitempty"`      // 额外奖励(多是碎片)
 	// Pool 是本事件的抽取池:该精灵「1 个自身特性 + 4 个技能」(协议 random_skills[])。
 	//
 	// 换奖励就是从这 5 个里重抽一个 —— 只看当前那条 Reward 无法预判重掷会出什么,
-	// 故整池下发:玩家能提前把 5 个 id 都标注好,也能看出重掷还可能出什么。
+	// 故整池下发:玩家能提前看出重掷还可能出什么(当前抽到的是哪条,前端会标 current)。
 	// 字段名沿用协议的 random_skills,它是 repeated,长度待更多样本确认(预期 5)。
 	Pool []uint32 `json:"pool,omitempty"`
 	// Used 是本节点该槽位**已经抽过**的奖励(协议 used_reward_ids[]):重掷时服务器
@@ -426,8 +426,8 @@ type TrialBless struct {
 
 // TrialReward 是刚到账、等待玩家处理的奖励。
 type TrialReward struct {
-	Event uint32   `json:"event"`
-	ID    uint32   `json:"id"`
+	Event uint32 `json:"event"`
+	ID    uint32 `json:"id"`
 	// Name 是奖励的中文名(技能 7xxxxx / 碎片效果 20xx-30xx 查得到时):
 	// 特性 288xxx 无名称表故不带,前端回退 kind+id。
 	Name string `json:"name,omitempty"`
@@ -462,12 +462,17 @@ type TrialResult struct {
 
 // TrialLogEntry 是操作流水里的一条(时间倒序)。
 type TrialLogEntry struct {
-	Ts     int64    `json:"ts"`
-	Kind   string   `json:"kind"`             // node/refresh/battle/bless/reward/shop/boss/settle/start
-	Label  string   `json:"label"`            // 中文简述
-	IDs    []uint32 `json:"ids,omitempty"`    // 相关 id(随 kind 而异)
-	Action uint32   `json:"action,omitempty"` // 仅 reward:c2s 的处理动作
-	Coin   uint32   `json:"coin,omitempty"`
+	Ts    int64    `json:"ts"`
+	Kind  string   `json:"kind"`          // node/refresh/battle/bless/reward/shop/boss/settle/start
+	Label string   `json:"label"`         // 中文简述
+	IDs   []uint32 `json:"ids,omitempty"` // 相关 id(随 kind 而异)
+	// Name 是这条里「有名字的那个 id」的中文名(查表与页面其余处一致:技能走
+	// skills.json、碎片/效果走官方 GRASS_TRIAL_EFFECT_CONF;特性 288xxx 无名称表)。
+	// 流水存的是协议原样透传的数字(如 bless 的「0 / 7020440」),查得到时后端
+	// 在这层补齐;查不到才缺失,前端回退显示 ids 里的原始数字。
+	Name   string `json:"name,omitempty"`
+	Action uint32 `json:"action,omitempty"` // 仅 reward:c2s 的处理动作
+	Coin   uint32 `json:"coin,omitempty"`
 }
 
 // TrialHistory 是账号级试炼档案(0x1975 的聚合视图)。

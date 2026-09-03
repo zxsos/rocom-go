@@ -766,10 +766,42 @@ func (p *Pipeline) trialRunPayload(r *trialRun, damOf map[uint32]int32) *server.
 	}
 	for i := len(logs) - 1; i >= 0; i-- {
 		e := logs[i]
-		out.Log = append(out.Log, server.TrialLogEntry{Ts: e.ts, Kind: e.kind,
-			Label: e.label, IDs: e.ids, Action: e.action, Coin: e.coin})
+		ent := server.TrialLogEntry{Ts: e.ts, Kind: e.kind, Label: e.label,
+			IDs: e.ids, Action: e.action, Coin: e.coin}
+		// 流水里那类的 id 若能查名就带上:否则同一只宠物的技能在上方技能卡
+		// 有名字、流水里却只剩「0 / 7020440」这种数字(见 trialLogName)。
+		if n := p.trialLogName(e); n != "" {
+			ent.Name = n
+		}
+		out.Log = append(out.Log, ent)
 	}
 	return out
+}
+
+// trialLogName 把流水某条里「真正有名字的那个 id」翻成中文名(查名表与页面其余处
+// 一致:技能走 skills.json、碎片/效果走官方 GRASS_TRIAL_EFFECT_CONF)。
+//
+// 流水存的是抓包原样透传的数字(见 trialLogEntry),前端拿不到名字表、只能原样
+// 拼数字。这里在推送前补齐 —— 查不到的 id 返回空串,由前端回退显示原始数字。
+func (p *Pipeline) trialLogName(e trialLogEntry) string {
+	if len(e.ids) == 0 {
+		return ""
+	}
+	var id uint32
+	switch e.kind {
+	case "bless":
+		// ids = [effect, 选中的技能]。label(选择技能/合并技能)已经说清了 effect
+		// 是干嘛的,可读的只剩技能本身 —— 取最后一条,别拿 effect 编号(0/9)去查名。
+		id = e.ids[len(e.ids)-1]
+	case "reward", "shop":
+		id = e.ids[0]
+	default:
+		return ""
+	}
+	if n := p.db.TrialEffectName(id); n != "" {
+		return n
+	}
+	return p.db.SkillName(id)
 }
 
 // trialEventPet 返回某节点事件(event_conf_id)对应的精灵对手;查不到返回 nil(前端占位)。
@@ -810,20 +842,26 @@ func trialOppPetOf(db *gamedata.DB, base uint32) *server.TrialOppPet {
 //
 // 特性:没有内置名表,但**标出精灵之后就有了** —— 池里那条 288xxx 就是这只精灵
 // 自身的特性,拿形态去查「精灵 → 特性」表即得(见 gamedata.FeatureNameOfBase)。
-// 只在池里**恰好一个**特性 id 时才绑:一只精灵只有一个自身特性,出现多条说明
-// 我们对池的理解是错的,这时宁可都不给名字。
+// 只在池里**去重后恰好一个**特性 id 时才绑:一只精灵只有一个自身特性,出现多条
+// 不同 id 说明我们对池的理解是错的,这时宁可都不给名字。主奖励(reward)与池
+// (pool)是同一套编号 —— 当前抽到的那条会同时出现在两边,数条数前必须先按 id
+// 去重,否则最常见的「特性奖励」场景反而永远数出 2 条,名字带不上。
 func (p *Pipeline) trialOptionNames(o *server.TrialOption) {
 	ids := make([]uint32, 0, len(o.Pool)+len(o.Extra)+1)
 	ids = append(ids, o.Reward)
 	ids = append(ids, o.Pool...)
 	ids = append(ids, o.Extra...)
 	var feats []uint32
+	seen := map[uint32]bool{}
 	for _, id := range ids {
 		if id == 0 {
 			continue
 		}
 		if trial.IsFeatureID(id) {
-			feats = append(feats, id)
+			if !seen[id] {
+				seen[id] = true
+				feats = append(feats, id)
+			}
 			continue
 		}
 		if n := p.db.TrialEffectName(id); n != "" {

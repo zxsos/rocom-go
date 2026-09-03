@@ -76,6 +76,17 @@ WORLDMAP_TEX = {
 }
 
 
+def gather_icons() -> dict:
+    """采集物(花/草/菌/矿/果树)的大地图钉:MEGAMAP_CONF.class==8 的 48 个品种。
+
+    与不咕钟零件同一机制——游戏大地图直接复用背包图标,icon 列就是 BagItem 编号
+    (如 100211 可可果),不在 WorldMapNpc 图集里,故走 copy_texture。
+    清单从表里读而非手抄编号:品种随版本增删时免得漏。
+    """
+    return {str(r["icon"]): r["genre"] for r in load_rows("MEGAMAP_CONF").values()
+            if r.get("class") == 8 and r.get("icon") and r.get("genre")}
+
+
 # ── 基础设施 ──────────────────────────────────────────────
 
 def load_rows(table: str) -> dict:
@@ -239,7 +250,7 @@ def main():
     total += gen_group("blood", icon_refs("PET_BLOOD_CONF", "icon"), crop_sprite)
     total += gen_group("static", list(STATIC), crop_sprite)
     total += gen_group("worldmap", list(WORLDMAP), crop_sprite)
-    total += gen_group("worldmap", list(WORLDMAP_TEX), copy_texture)
+    total += gen_group("worldmap", list(WORLDMAP_TEX) + list(gather_icons()), copy_texture)
     total += gen_group("medal", icon_refs("MEDAL_CONF", "icon"), copy_texture)
     total += gen_group("egg", egg_icon_refs(), copy_texture)
     total += gen_group("egg", eggtype_icon_refs(), crop_sprite)

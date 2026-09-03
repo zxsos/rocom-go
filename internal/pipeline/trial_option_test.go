@@ -237,6 +237,41 @@ func TestTrialOptionAmbiguousFeatureNotNamed(t *testing.T) {
 	}
 }
 
+// TestTrialOptionFeatureRewardNamed 锁住「当前奖励就是特性」这一最常见场景:
+// 该特性 id 会同时出现在主奖励(reward)与池(pool)里 —— 抽到的那条本来就是池
+// 里的一员。数特性条数前必须先按 id 去重,否则会数出 2 条,「恰好一条」的判定
+// 永远不成立,名字也永远带不上(实测小绒茧事件的「特性 288xxx」就因此只剩裸 id)。
+func TestTrialOptionFeatureRewardNamed(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	event, _, featName := findOfficialEventWithKnownFeature(t, p)
+
+	catalog := p.db.SkillCatalog()
+	if len(catalog) < 4 {
+		t.Fatalf("技能目录只有 %d 条,样本不足", len(catalog))
+	}
+	feat := uint32(288001)
+	skills := []uint32{catalog[0].ID, catalog[1].ID, catalog[2].ID, catalog[3].ID}
+	// 特性奖励:reward 就是池里那一条,协议两边都会带同一 id
+	pool := append([]uint32{feat}, skills...)
+	body := trialEventBody(1, event, feat, 40, pool)
+	sel := trial.ParseSelection(body)
+	if sel == nil || len(sel.Events) != 1 {
+		t.Fatalf("解析节点选项失败: %+v", sel)
+	}
+	out := p.trialRunPayload(trialRunWithSelection(sel), nil)
+	if len(out.Options) != 1 {
+		t.Fatalf("应有 1 个事件,实际 %d", len(out.Options))
+	}
+	o := out.Options[0]
+	if o.Pet == nil {
+		t.Fatal("官方表内的事件却没有 pet —— 官方映射没接上")
+	}
+	if got := o.Names[feat]; got != featName {
+		t.Errorf("特性奖励 %d 名 = %q, 期望 %q(reward 与 pool 重复不算两条特性)",
+			feat, got, featName)
+	}
+}
+
 // TestTrialPetFeatureNameBridged 锁住试炼**宠物**那侧的桥接:
 // 天生特性带上名字,试炼中获得的**不带**(那些是节点随机给的,与精灵无关)。
 func TestTrialPetFeatureNameBridged(t *testing.T) {

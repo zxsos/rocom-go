@@ -428,9 +428,16 @@ function LogDetail({ e }) {
     case 'refresh':
       return <span className="muted">类型 {e.ids[0]} · 剩 {e.coin}</span>
     case 'reward':
-      return <span className="muted">{rewardKind(e.ids[0])} {e.ids[0] || '—'}</span>
+      // 后端把这条奖励里查得到名字的 id 补在 e.name 里;查不到(特性等)才回退 kind+id
+      return <span className="muted">{e.name || `${rewardKind(e.ids[0])} ${e.ids[0] || '—'}`}</span>
     case 'shop':
-      return <span className="muted">{e.ids[0]}{e.coin ? ` · 剩 ${e.coin}` : ''}</span>
+      return <span className="muted">{e.name || e.ids[0]}{e.coin ? ` · 剩 ${e.coin}` : ''}</span>
+    case 'bless':
+      // bless 的 ids 语义随 effect 变:选技能时是 [effect, 技能],合并时只有 effect。
+      // label 已把 effect 说清(选择技能/合并技能),这里只展示那个技能
+      // (名字由后端查好,查不到仍是原始 id),effect 编号不再重复打一遍。
+      if (e.ids.length < 2) return null
+      return <span className="muted">{e.name || e.ids[1]}</span>
     case 'settle':
       return <span className="muted">用时 {fmtDuration(e.ids[1])}</span>
     default:
@@ -652,7 +659,8 @@ function IdChip({ id, name, used, current, desc }) {
 // 的内容,放在方框外,免得被读成"这只精灵的一项"。
 function OptionCard({ o }) {
   // 精灵:后端按官方 GRASS_TRIAL_EVENT_CONF 回填(带头像);官方表外的事件
-  // (NPC 阵容/祝福/商人等)没有单只精灵可映射,显示「事件 {id}」占位。
+  // (NPC 阵容/祝福/商人等)没有单只精灵可映射 —— 其中商人/魔力之源这类有官方
+  // 事件名(o.eventName),头像位就显示它;真的查不到名字才退回「事件 {id}」占位。
   const petName = (o.pet && o.pet.name) || ''
   const petImg = (o.pet && o.pet.img) || ''
   const pool = o.pool || []
@@ -680,16 +688,20 @@ function OptionCard({ o }) {
             )}
           </div>
           <div className="trial-opt-petname">
-            {petName || <span className="trial-chip" title={`未知事件 id ${o.event}`}>事件 {o.event}</span>}
+            {petName || o.eventName || <span className="trial-chip" title={`未知事件 id ${o.event}`}>事件 {o.event}</span>}
           </div>
         </div>
 
-        <div className="trial-opt-reward">
-          <span className="muted trial-opt-kind">{rewardKind(o.reward)}</span>
-          {name(o.reward)
-            ? <b className="trial-opt-name" title={desc(o.reward) ? `效果:${desc(o.reward)}` : ''}>{name(o.reward)}</b>
-            : <IdChip id={o.reward} desc={desc(o.reward)} />}
-        </div>
+        {/* reward=0(魔力之源这类无奖事件)时整行隐藏 —— 没有可抽的东西,露个
+            「0」只会让人以为抽到了什么 */}
+        {o.reward > 0 && (
+          <div className="trial-opt-reward">
+            <span className="muted trial-opt-kind">{rewardKind(o.reward)}</span>
+            {name(o.reward)
+              ? <b className="trial-opt-name" title={desc(o.reward) ? `效果:${desc(o.reward)}` : ''}>{name(o.reward)}</b>
+              : <IdChip id={o.reward} desc={desc(o.reward)} />}
+          </div>
+        )}
 
         <div className="trial-opt-meta">
           {o.level > 0 && <span>Lv {o.level}</span>}
