@@ -13,7 +13,6 @@ import { InjectWildCard, InjectFlowerCard } from './InjectCards'
 import MerchantSubsCard from './MerchantSubsCard'
 import MerchantSourceCard from './MerchantSourceCard'
 import EggSourceCard from './EggSourceCard'
-import AnnotationsCard from './AnnotationsCard'
 import PinCard from './PinCard'
 
 // 管理员面板(隐式入口:导航不显示,需手动输入 #/admin 进入)。
@@ -142,9 +141,6 @@ export default function Admin() {
       <MerchantSourceCard onUnauthed={kickIfUnauthed} />
       <EggSourceCard onUnauthed={kickIfUnauthed} />
       <PinCard accounts={accounts} onAccountsChanged={loadAccounts} />
-
-      <div className="admin-section-title">众包图鉴</div>
-      <AnnotationsCard onUnauthed={kickIfUnauthed} />
     </div>
   )
 }

@@ -13,17 +13,14 @@ import (
 // skills.json 兜底,特性此前没有任何名表,试炼页只能按 id 展示。
 // 资料站给的是特性名与描述,**没有 288xxx id**(详见 docs/data.md「特性名」)。
 //
-// 用途:
-//  1. 标注模式的**候选词典**:玩家对未知特性 id 搜索选取名字并提交,管理员审核后
-//     全服共享(见 internal/store 的 annotation 表与 server 的标注 API);
-//  2. 试炼抓包桥接:「精灵 → 特性名」索引配合「宠物与其天生特性 id 同时出现」
-//     的抓包数据,可反推 id -> 名字。
+// 用途:试炼抓包桥接 —— 「精灵 → 特性名」索引配合「宠物与其天生特性 id 同时出现」
+// 的抓包数据,可反推 id -> 名字。
 //
 //go:embed data/features.json
 var featuresJSON []byte
 
 // Feature 是一条特性词典条目:名字 + 描述 + 拥有该特性的精灵(按 wiki 收录)。
-// 注意没有协议 id —— 名字到 288xxx id 的映射靠标注/抓包补,不在本文件。
+// 注意没有协议 id —— 名字到 288xxx id 的映射靠抓包反推补,不在本文件。
 type Feature struct {
 	Name string   `json:"name"`
 	Desc string   `json:"desc"`
@@ -72,30 +69,6 @@ func loadFeatures() *featuresDB {
 		}
 	}
 	return db
-}
-
-// Features 返回全部特性词典条目(标注候选库的搜索源)。
-// 结果按名排序,直接用于 web 端「搜索选取」交互。
-func (db *DB) Features() []Feature {
-	fdb := db.features
-	if fdb == nil {
-		return nil
-	}
-	return fdb.features
-}
-
-// FeatureByName 按特性名查描述与拥有精灵;查不到返回空条目。
-// 用于标注提交前校验候选是否存在(词典里没有的名字不应凭空出现)。
-func (db *DB) FeatureByName(name string) (Feature, bool) {
-	fdb := db.features
-	if fdb == nil {
-		return Feature{}, false
-	}
-	i, ok := fdb.byName[name]
-	if !ok {
-		return Feature{}, false
-	}
-	return fdb.features[i], true
 }
 
 // PetFeatureName 返回某精灵页名的特性名。

@@ -1805,10 +1805,11 @@ URL 清单从 `sitemap-zh-hans-jini.xml` 取(594 个,含 `/form/N` 形态页),
 
 `FeatureNameOfBase` 只有两个调用点,都不涉及战斗变体:
 
-- `trialPetPayload`(`trial.go:842`)—— 查 `tp.BaseConfID`,那是**玩家自己的**
+- `trialPetPayload`—— 查 `tp.BaseConfID`,那是**玩家自己的**
   试炼宠物。玩家带进试炼的必然是自己养的精灵,不可能是 BOSS/测试形态;
-- `trialOptionNames`(`trial.go:797`)—— 查 `o.Pet.Base`,那是玩家**标注**出来的
-  事件精灵,对应"这一局能拿到什么",同样是普通可捕获的精灵。
+- `trialOptionNames`—— 查 `o.Pet.Base`,那是按官方事件表(`TrialEventPetBase`,
+  gen_trial_official.py 落表)映射出的精灵,对应"这一局能拿到什么",
+  同样是普通可捕获的精灵;官方表外的事件没有精灵,特性也不给名。
 
 故那 68 个查不到是**符合预期的**:它们是战斗配置里的对手,wiki 与 roco.world
 都不收录其特性(可能压根就没有常规特性,而是 BOSS 专属配置)。
@@ -1825,10 +1826,10 @@ URL 清单从 `sitemap-zh-hans-jini.xml` 取(594 个,含 `/form/N` 形态页),
 16000004 与 19000010 的 id 段看着仍是内部用途。为这点收益引入一层
 "同图鉴同阶段继承"的规则不划算:它本身就是新的出错点,而上次的教训
 (26 只精灵进化后特性升级,见下)正说明跨形态继承特性**容易错**。
-真需要时按 `kind=feature` 标注补即可。
+这 3 个就保持无特性名 —— 覆盖率不变,而引入继承规则的风险远大于收益。
 
 **关键限制:wiki 只给名字,不给 id。** 190 个名字里没有一个是 `288xxx` 段 ——
-`id → 名` 的正向映射只能靠两条路补(均不做进 features.json):
+`id → 名` 的正向映射只能靠下面这条路补(不做进 features.json):
 
 #### 桥接:精灵 → 特性(`gamedata.FeatureNameOfBase`)
 
@@ -1854,13 +1855,7 @@ URL 清单从 `sitemap-zh-hans-jini.xml` 取(594 个,含 `/form/N` 形态页),
 (早先这里写成"多是新区的形态",是没查分布就下的结论,已更正。)
 故碰到具体某只精灵查不到特性名时(如**学院呱呱** id=3620 / 图鉴 375,
 我方有、wiki 未收录),别去找"是不是新精灵"这类原因 —— 就是漏了,
-只能靠 `kind=feature` 的标补充。
-
-- **标注模式**:玩家在 web 端对未知特性 id 搜索选取名字提交,管理员审核后全服共享
-  (即本仓库「标注模式」功能,表结构见 docs/architecture.md);
-- **标注精灵**(`kind=event`)也能顺带省掉特性标注:事件标出是哪只精灵后,
-  该精灵抽取池里那条 `288xxx` 就走上面这条路自动带上名字
-  (见 `internal/pipeline/trial.go` 的 `trialOptionNames`)。
+只能保持 id 展示:试炼页对查不到的 288xxx 一律按 id 显示,不猜名字。
 
 ##### 匹配关系的实况(按 676 个有图鉴号的形态核过)
 

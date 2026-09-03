@@ -1,57 +1,4 @@
 {
-  "annotations-event": {
-    "desc": "全服已审核的试炼事件标注(事件 → 精灵)",
-    "endpoint": "GET /api/annotations?kind=event",
-    "sample": "internal/server/testdata/contract/annotations-event.json",
-    "shape": {
-      "items": [
-        {
-          "code": "int",
-          "createdAt": "int",
-          "id": "int",
-          "kind": "str",
-          "name": "str"
-        }
-      ],
-      "ts": "int"
-    }
-  },
-  "annotations-feature": {
-    "desc": "全服已审核的特性标注(众包图鉴)",
-    "endpoint": "GET /api/annotations?kind=feature",
-    "sample": "internal/server/testdata/contract/annotations-feature.json",
-    "shape": {
-      "items": [
-        {
-          "code": "int",
-          "createdAt": "int",
-          "desc": "str",
-          "id": "int",
-          "kind": "str",
-          "name": "str"
-        }
-      ],
-      "ts": "int"
-    }
-  },
-  "annotations-skill": {
-    "desc": "全服已审核的技能标注(众包图鉴)",
-    "endpoint": "GET /api/annotations?kind=skill",
-    "sample": "internal/server/testdata/contract/annotations-skill.json",
-    "shape": {
-      "items": [
-        {
-          "code": "int",
-          "createdAt": "int",
-          "desc": "str",
-          "id": "int",
-          "kind": "str",
-          "name": "str"
-        }
-      ],
-      "ts": "int"
-    }
-  },
   "boxes": {
     "desc": "盒子槽位布局",
     "endpoint": "GET /api/boxes",
@@ -941,6 +888,7 @@
     "sample": "internal/server/testdata/contract/trial-encounters.json",
     "shape": {
       "account": "str",
+      "activity": "str",
       "chapters": [
         {
           "boss": [
@@ -964,6 +912,8 @@
               "time": "int"
             }
           ],
+          "image": "str",
+          "intro": "str",
           "name": "str",
           "normal": [
             {
@@ -979,6 +929,7 @@
           "total": "int"
         }
       ],
+      "source": "str",
       "ts": "int",
       "updated": "str"
     }

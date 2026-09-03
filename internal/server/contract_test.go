@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"os"
@@ -57,7 +55,10 @@ func checkGolden(t *testing.T, name string, body []byte, scrub func(string) stri
 		t.Fatalf("读 golden %s 失败(先跑 UPDATE_CONTRACT=1 生成): %v", path, err)
 	}
 	// 写入时补了尾随换行,比对前去掉,免得每次都因一个 \n 判不一致。
-	if got != strings.TrimRight(string(want), "\n") {
+	// 顺手剥掉全部 \r:core.autocrlf=true 的机器 checkout 会把 golden 的每行行尾
+	// 都转成 CRLF(不只是尾行),留着会导致所有契约测试误报不一致。
+	wantStr := strings.TrimRight(strings.ReplaceAll(string(want), "\r", ""), "\n")
+	if got != wantStr {
 		t.Errorf("%s 响应与 golden 不一致\n--- golden ---\n%s\n--- got ---\n%s", name, want, got)
 	}
 }
@@ -493,7 +494,12 @@ func TestContractTrialEncountersEmpty(t *testing.T) {
 		"/api/trial/encounters?account="+contractAcc), &got); err != nil {
 		t.Fatalf("解析: %v", err)
 	}
-	want := map[string]bool{"account": true, "ts": true, "updated": true, "chapters": true}
+	// 顶层字段清单要跟 payload 同步加:source/activity 是官方配置提交(2026-09)加的,
+	// 白名单漏了它们会把「本来就是契约」的字段误报成多余。
+	want := map[string]bool{
+		"account": true, "ts": true, "updated": true, "chapters": true,
+		"source": true, "activity": true,
+	}
 	for k := range got {
 		if !want[k] {
 			t.Errorf("/api/trial/encounters(无记录) 多了字段 %q", k)
@@ -583,13 +589,13 @@ func contractTrial() *TrialPayload {
 					Extra: []uint32{2016},
 					Pool:  []uint32{288135, 7110340, 7020430, 7020440, 7160140},
 					Used:  []uint32{7040220},
-					// 技能名来自 skills.json;特性名来自「精灵 → 特性」表(要标出精灵才有)
+					// 技能名来自 skills.json;特性名来自「精灵 → 特性」表(事件能映射出精灵才有)
 					Names: map[uint32]string{7110340: "超导加速", 7020430: "见招拆招",
 						7020440: "触底强击", 7160140: "超级糖果"},
-					// 事件对应哪只精灵协议不给,只能标注 —— 标了才有 pet
+					// 事件对应哪只精灵协议不给,由官方事件表给出 —— 表内有才有 pet
 					Pet: &TrialOppPet{Base: 3031, Name: "奇丽花", Img: "HeadIcon/3031.webp"},
 				},
-				// 未标注的事件:pet 缺失、names 缺失,前端显示占位与标注入口
+				// 官方表外的事件:pet 缺失、names 缺失,前端显示「事件 id」占位
 				{Slot: 2, Event: 100017, Reward: 7040220, Level: 40},
 			},
 			RefreshCost: 2,
@@ -676,226 +682,6 @@ func TestContractFlowersHiddenFields(t *testing.T) {
 	}
 }
 
-// —— 标注模式(众包图鉴)——
-//
-// 契约要点是「**只下发已审核的**」:玩家提交的标注在管理员审核前不能出现在
-// /api/annotations 里(否则玩家 A 的猜测会被全服当成事实)。这条语义光看 golden
-// 看不出来(只看到 approved 那一条),故 TestAnnotationsReviewFlow 另作行为断言。
-
-// seedAnnotations 造三条标注:特性已审核 1 条、特性待审 1 条、技能已审核 1 条。
-// 待审那条是为了证明它**不会**出现在 GET /api/annotations 的响应里。
-func seedAnnotations(t *testing.T, s *Server) {
-	t.Helper()
-	if _, err := s.store.SubmitAnnotation(store.Annotation{
-		Kind: "feature", Code: 288135, Name: "助燃", Desc: "使用火系技能后，获得双攻+20%", Submitter: "UID:1",
-	}); err != nil {
-		t.Fatalf("写已审核特性标注: %v", err)
-	}
-	if _, err := s.store.SubmitAnnotation(store.Annotation{
-		Kind: "feature", Code: 288001, Name: "待审名字", Desc: "不该出现在响应里", Submitter: "UID:2",
-	}); err != nil {
-		t.Fatalf("写待审特性标注: %v", err)
-	}
-	if _, err := s.store.SubmitAnnotation(store.Annotation{
-		Kind: "skill", Code: 7999999, Name: "新技能名", Desc: "资料站未收录", Submitter: "UID:1",
-	}); err != nil {
-		t.Fatalf("写已审核技能标注: %v", err)
-	}
-	// 试炼事件 → 精灵。code 是 event_conf_id 而非精灵 id(标注的对象是事件),
-	// name 是精灵形态全名 —— 后端据此反查形态取头像,故名字口径不能错。
-	if _, err := s.store.SubmitAnnotation(store.Annotation{
-		Kind: "event", Code: 130056, Name: "奇丽花", Submitter: "UID:3",
-	}); err != nil {
-		t.Fatalf("写已审核事件标注: %v", err)
-	}
-	// 前两条(按插入序 id=1/2)里只审通过 id=1,以及技能那条 id=3、事件那条 id=4。
-	for _, id := range []int64{1, 3, 4} {
-		if err := s.store.ReviewAnnotation(id, true, "admin"); err != nil {
-			t.Fatalf("审核 id=%d: %v", id, err)
-		}
-	}
-}
-
-// scrubAnnotationTime 抹掉响应里的时间取值:顶层 ts 是响应时刻,createdAt 是提交时刻,
-// 两者每次跑都不同(与 scrubTS 同理,替换值保持 JSON 合法)。
-var annotationTimeRe = regexp.MustCompile(`"(ts|createdAt)": \d+`)
-
-func scrubAnnotationTime(s string) string { return annotationTimeRe.ReplaceAllString(s, `"$1": 0`) }
-
-func TestContractAnnotations(t *testing.T) {
-	s := newTestServer(t)
-	seedAnnotations(t, s)
-	checkGolden(t, "annotations-feature",
-		get(t, s, "/api/annotations?kind=feature"), scrubAnnotationTime)
-	checkGolden(t, "annotations-skill",
-		get(t, s, "/api/annotations?kind=skill"), scrubAnnotationTime)
-	// event 这一类是后加的,端点没被 golden 守护过 —— 若哪天有人动 kind 的校验
-	// 白名单(annotationKind)忘了带 event,这里会红。
-	// ⚠️ golden 只管得住后端:前端审核面板的类别列表是另一套硬编码,
-	// 漏了它不报错、只是「面板永远空着」,本次就踩过(见 AnnotationsCard.jsx)。
-	checkGolden(t, "annotations-event",
-		get(t, s, "/api/annotations?kind=event"), scrubAnnotationTime)
-}
-
-// TestAnnotationsReviewFlow 钉住审核语义:
-//  1. 未审核的标注不下发(golden 看不出「它本可以在却没在」,这里显式断言);
-//  2. 通过某条时,同一 (kind,code) 的其余待审自动转 rejected —— 一个 id 只有一个答案。
-func TestAnnotationsReviewFlow(t *testing.T) {
-	s := newTestServer(t)
-	for _, name := range []string{"甲", "乙"} {
-		if _, err := s.store.SubmitAnnotation(store.Annotation{
-			Kind: "feature", Code: 288022, Name: name, Submitter: "UID:1",
-		}); err != nil {
-			t.Fatalf("提交标注 %s: %v", name, err)
-		}
-	}
-
-	var got struct {
-		Items []struct {
-			Code int64  `json:"code"`
-			Name string `json:"name"`
-		} `json:"items"`
-	}
-	// ① 都还在待审,响应应为空
-	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
-		t.Fatalf("解析: %v", err)
-	}
-	if len(got.Items) != 0 {
-		t.Fatalf("待审标注不该下发,实际 %d 条: %+v", len(got.Items), got.Items)
-	}
-
-	// ② 审通过第一条(id=1),第二条(id=2)应自动转 rejected
-	if err := s.store.ReviewAnnotation(1, true, "admin"); err != nil {
-		t.Fatalf("审核: %v", err)
-	}
-	got.Items = nil
-	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
-		t.Fatalf("解析: %v", err)
-	}
-	if len(got.Items) != 1 || got.Items[0].Name != "甲" {
-		t.Fatalf("应只剩通过的「甲」一条,实际 %+v", got.Items)
-	}
-	// ③ 被自动拒绝的那条确实转成了 rejected(而不是仍留在 pending 里)
-	if items, err := s.store.PendingAnnotations("feature"); err != nil {
-		t.Fatalf("查待审: %v", err)
-	} else if len(items) != 0 {
-		t.Fatalf("同 code 的其余待审应被自动拒绝,仍有 %d 条 pending", len(items))
-	}
-}
-
-// TestAnnotationsFilterByKind 钉住 kind 过滤:技能标注不出现在特性列表里(反之亦然)。
-// 两者共用一张表,漏掉 WHERE kind 会互相串味 —— 而 golden 里 skill/feature 是分开的
-// 两个快照,恰好掩盖这类串味(串了也只是各自多一条,结构仍对得上)。
-func TestAnnotationsFilterByKind(t *testing.T) {
-	s := newTestServer(t)
-	seedAnnotations(t, s)
-	for _, c := range []struct {
-		kind     string
-		wantCode int64
-	}{{"feature", 288135}, {"skill", 7999999}} {
-		var got struct {
-			Items []struct {
-				Code int64 `json:"code"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(get(t, s, "/api/annotations?kind="+c.kind), &got); err != nil {
-			t.Fatalf("解析 %s: %v", c.kind, err)
-		}
-		if len(got.Items) != 1 || got.Items[0].Code != c.wantCode {
-			t.Fatalf("kind=%s 应只有 %d 一条,实际 %+v", c.kind, c.wantCode, got.Items)
-		}
-	}
-}
-
-// TestAnnotationSubmit 钉住玩家提交入口的校验与去重:
-//  1. 合法提交 → 进待审,不下发(golden 那套只覆盖 GET,提交路径是玩家唯一写入口);
-//  2. 非法 kind / code / name → 400(前端弹窗依赖这些状态码给出可读提示);
-//  3. 同一人对同一 (kind,code,name) 重复提交 → 409(防刷)。
-func TestAnnotationSubmit(t *testing.T) {
-	s := newTestServer(t)
-	postJSON := func(body string) int {
-		t.Helper()
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/annotations?account="+contractAcc, strings.NewReader(body))
-		s.Handler().ServeHTTP(rr, req)
-		return rr.Code
-	}
-
-	// ① 非法输入一律 400
-	for _, bad := range []string{
-		`{"kind":"xxx","code":288135,"name":"助燃"}`,   // kind 不在 skill/feature
-		`{"kind":"feature","code":0,"name":"助燃"}`,    // code 非正
-		`{"kind":"feature","code":288135,"name":""}`, // 空名字
-	} {
-		if code := postJSON(bad); code != 400 {
-			t.Errorf("非法提交 %s 应 400,实际 %d", bad, code)
-		}
-	}
-
-	// ② 合法提交 → 200,且**不下发**(待审)
-	ok := `{"kind":"feature","code":288135,"name":"助燃","desc":"使用火系技能后，获得双攻+20%"}`
-	if code := postJSON(ok); code != 200 {
-		t.Fatalf("合法提交应 200,实际 %d", code)
-	}
-	var got struct {
-		Items []struct {
-			Code int64 `json:"code"`
-		} `json:"items"`
-	}
-	if err := json.Unmarshal(get(t, s, "/api/annotations?kind=feature"), &got); err != nil {
-		t.Fatalf("解析: %v", err)
-	}
-	if len(got.Items) != 0 {
-		t.Fatalf("刚提交的标注还在待审,不该下发,实际 %+v", got.Items)
-	}
-
-	// ③ 重复提交 → 409(UNIQUE 约束)
-	if code := postJSON(ok); code != 409 {
-		t.Errorf("重复提交应 409,实际 %d", code)
-	}
-}
-
-// TestAnnotationReviewBroadcasts 钉住「审核后要广播」这条链路。
-//
-// 为什么必须广播:标注是全服共享的,而前端只在 App 挂载时拉一次。不广播的话
-// 管理员审完之后,玩家不手动刷新浏览器就看不到任何变化 —— 提交的人得不到反馈
-// (只会以为没生效),下一个遇到同一 id 的人又会再标一次,众包就空转了。
-// 这条链路坏掉时接口照样 200、数据照样入库,只有 SSE 静默不响,故必须测。
-func TestAnnotationReviewBroadcasts(t *testing.T) {
-	s := newTestServer(t)
-	sub := s.Hub().subscribe()
-	defer s.Hub().unsubscribe(sub)
-
-	if _, err := s.store.SubmitAnnotation(store.Annotation{
-		Kind: "feature", Code: 288135, Name: "助燃", Submitter: "UID:1",
-	}); err != nil {
-		t.Fatalf("提交标注: %v", err)
-	}
-
-	// 审核(通过):走 HTTP 入口,顺带确认管理员鉴权之外的整条链路
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/admin/annotations/1/review", strings.NewReader(`{"approve":true}`))
-	req.Header.Set("X-Admin-Token", testAdminToken(t, s))
-	s.Handler().ServeHTTP(rr, req)
-	if rr.Code != 200 {
-		t.Fatalf("审核应 200,实际 %d: %s", rr.Code, rr.Body)
-	}
-
-	// 广播应当到达订阅者;account 为空(全服共享,不按账号分发)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	got, ok := sub.pop(ctx)
-	if !ok {
-		t.Fatal("审核后没有收到任何广播 —— 前端不会刷新,标注对玩家不可见")
-	}
-	if got.typ != "annotations" {
-		t.Errorf("广播类型应为 annotations,实际 %q", got.typ)
-	}
-	if got.account != "" {
-		t.Errorf("共享标注的广播不该带账号(会被前端按账号过滤掉),实际 %q", got.account)
-	}
-}
-
 // testAdminToken 设好管理员密码并返回令牌,供需要鉴权的测试用例使用。
 func testAdminToken(t *testing.T, s *Server) string {
 	t.Helper()
@@ -915,96 +701,3 @@ func testAdminToken(t *testing.T, s *Server) string {
 }
 
 const testAdminPw = "contract-test-pw"
-
-// TestAnnotationNameCleaned 提交的名字必须**去掉所有空白** —— 这是中文游戏,
-// 技能/特性名里没有合法空格(现有 807 个名字含空格的为 0)。
-//
-// 起因:wiki 图鉴页为排版在字间插空格,玩家照抄后提交成「魔 法 增 效 」,
-// 末尾还常带一个空格。标注是给全服看名字的,名字脏了等于白标。
-//
-// 每个用例用**不同的 code**:清洗会把这些变体都归一成「魔法增效」,同一个 code
-// 下第二次提交会被 UNIQUE 约束判为重复(409)—— 那其实反过来证明清洗生效了,
-// 但会淹没「存成了什么」这个断言,故错开 code 让每例独立。
-func TestAnnotationNameCleaned(t *testing.T) {
-	s := newTestServer(t)
-	post := func(code int64, name string) (status int, stored string) {
-		body, _ := json.Marshal(map[string]any{
-			"kind": "skill", "code": code, "name": name,
-		})
-		rr := httptest.NewRecorder()
-		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST",
-			"/api/annotations?account="+contractAcc, bytes.NewReader(body)))
-		var out struct {
-			Item struct {
-				Name string `json:"name"`
-			} `json:"item"`
-		}
-		_ = json.Unmarshal(rr.Body.Bytes(), &out)
-		return rr.Code, out.Item.Name
-	}
-
-	cases := []struct {
-		in   string
-		want string
-	}{
-		{"魔 法 增 效", "魔法增效"},    // 字间空格(wiki 排版)
-		{"魔 法 增 效 ", "魔法增效"},   // 末尾还有空格
-		{"  魔法增效  ", "魔法增效"},   // 首尾空格
-		{"魔法增效", "魔法增效"},       // 干净的输入不受影响
-		{"魔\u3000法增效", "魔法增效"}, // 全角空格 U+3000
-		{"魔法\t增效", "魔法增效"},     // 制表符
-		{"魔 法  增   效", "魔法增效"}, // 多个连续空白
-	}
-	for i, c := range cases {
-		// 7880001 起顺延,避开别处占用的 code
-		status, got := post(int64(7880010+i), c.in)
-		if status != 200 {
-			t.Errorf("第 %d 例 %q 提交失败: %d", i+1, c.in, status)
-			continue
-		}
-		if got != c.want {
-			t.Errorf("第 %d 例: 提交 %q 存成 %q, 期望 %q", i+1, c.in, got, c.want)
-		}
-	}
-}
-
-// TestAnnotationNameCleanedDeduplicates 同一个 id 下,「魔 法 增 效」与「魔法增效」
-// 清洗后相同 → 第二次提交应判重复(409),而不是存成两条。
-// 这条守住 UNIQUE 约束与清洗的配合:若清洗只去首尾,两条会并存,页面上同一个
-// 技能会显示两个写法不同的名字。
-func TestAnnotationNameCleanedDeduplicates(t *testing.T) {
-	s := newTestServer(t)
-	post := func(name string) int {
-		body, _ := json.Marshal(map[string]any{
-			"kind": "skill", "code": 7880050, "name": name,
-		})
-		rr := httptest.NewRecorder()
-		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST",
-			"/api/annotations?account="+contractAcc, bytes.NewReader(body)))
-		return rr.Code
-	}
-	if got := post("魔 法 增 效"); got != 200 {
-		t.Fatalf("首次提交: %d, 期望 200", got)
-	}
-	if got := post("魔法增效"); got != 409 {
-		t.Errorf("清洗后重复的提交 = %d, 期望 409(清洗应让两者归一)", got)
-	}
-}
-
-// TestCleanAnnotationName 直接测清洗函数(上面的用例走 HTTP,失败时看不出
-// 是清洗的问题还是提交路径的问题)。
-func TestCleanAnnotationName(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"", ""},
-		{"   ", ""},      // 全是空白 → 空(会被「名字不能为空」拦下)
-		{"魔法增效", "魔法增效"}, // 无空白原样返回
-		{"魔 法 增 效", "魔法增效"},
-		{"魔　法增效", "魔法增效"},
-		{"a b", "ab"}, // 英文间的空格也一并去掉(现有名字无此情形,见函数注释)
-	}
-	for _, c := range cases {
-		if got := cleanAnnotationName(c.in); got != c.want {
-			t.Errorf("cleanAnnotationName(%q) = %q, 期望 %q", c.in, got, c.want)
-		}
-	}
-}

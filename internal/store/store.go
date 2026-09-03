@@ -407,26 +407,6 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
   glass_value INTEGER NOT NULL,
   PRIMARY KEY(account, pet_base_id, glass_type, glass_value)
 );
-
--- 全服共享标注(众包 + 管理员审核,见 annotations.go):玩家对协议里查不到名字的
--- 技能 id / 特性 id(288xxx)提交名字与描述,管理员审核通过后所有人可见。
--- 同一 (kind, code) 允许多条待审;approve 时同 code 其余 pending 自动转 rejected
--- (答案唯一)。status: pending / approved / rejected。
-CREATE TABLE IF NOT EXISTS annotations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind TEXT NOT NULL,          -- skill / feature
-  code INTEGER NOT NULL,       -- 协议 id:技能 base_skill_id / 特性 288xxx
-  name TEXT NOT NULL,
-  desc TEXT NOT NULL DEFAULT '',
-  submitter TEXT NOT NULL,     -- 提交的登录账号
-  status TEXT NOT NULL DEFAULT 'pending',
-  created_at INTEGER NOT NULL,
-  reviewed_by TEXT NOT NULL DEFAULT '',
-  reviewed_at INTEGER NOT NULL DEFAULT 0,
-  UNIQUE(kind, code, name, submitter)
-);
-CREATE INDEX IF NOT EXISTS idx_annotations_lookup ON annotations(kind, status);
-CREATE INDEX IF NOT EXISTS idx_annotations_code ON annotations(kind, code);
 `)
 	if err != nil {
 		return err
@@ -466,25 +446,6 @@ CREATE INDEX IF NOT EXISTS idx_annotations_code ON annotations(kind, code);
 	// 老表无此列,直接 ALTER 加列;新库建表已含该列,报 duplicate column 可忽略。
 	if _, err := s.db.Exec(`ALTER TABLE flower_challenges ADD COLUMN end_ts INTEGER NOT NULL DEFAULT 0`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
-		return err
-	}
-	// 清洗历史标注名字里的空白(一次性,幂等)。
-	//
-	// wiki 图鉴页为排版在字间插空格,玩家照抄后提交成「魔 法 增 效 」这类名字
-	// (末尾还常带空格)。标注是给全服看名字的,名字脏了等于白标。提交侧的清洗
-	// (server.cleanAnnotationName)救不了已入库的记录,故这里补一遍。
-	//
-	// SQLite 没有 regexp_replace,故嵌套 replace 逐个去掉空白:半角空格、全角空格
-	// (U+3000)、制表、换行。覆盖常见来源(网页复制多为这几种)。
-	//
-	// **WHERE 子句不能省**:限定只动「含空白的行」。省掉会让 UPDATE 扫全表,而
-	// replace 对无空白的名字本无效果 —— 看似等价,实则埋雷:哪天 SQL 被改成清空式
-	// 写法(如 SET name=''),没有 WHERE 就会**清空全服所有标注的名字**,那比带空格
-	// 严重得多。故把「不该被改动的行」也纳入断言(见 anno_clean_test.go)。
-	if _, err := s.db.Exec(`UPDATE annotations SET name = replace(replace(replace(replace(replace(
-		name, char(9), ''), char(10), ''), char(13), ''), char(12288), ''), ' ', '')
-		WHERE name LIKE '% %' OR name LIKE '%' || char(9) || '%' OR name LIKE '%' || char(10) || '%'
-		   OR name LIKE '%' || char(13) || '%' OR name LIKE '%' || char(12288) || '%'`); err != nil {
 		return err
 	}
 	return nil

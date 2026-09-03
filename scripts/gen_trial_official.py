@@ -75,6 +75,10 @@ evt = rows("GRASS_TRIAL_EVENT_CONF")
 conf = rows("GRASS_TRIAL_CONF")
 period = rows("GRASS_TRIAL_PERIOD_CONF")
 logs = rows("GRASS_TRIAL_LOG_CONF")
+try:  # 效果表(词条/特调);老解包没有该文件时留空,effects 键照出
+    eff = rows("GRASS_TRIAL_EFFECT_CONF")
+except FileNotFoundError:
+    eff = {}
 
 
 def base_of_name(nm: str):
@@ -267,10 +271,48 @@ print(f"  events: {len(events)} 个事件映射到精灵" +
       (f";{len(miss_events)} 个名字对不上我方 petbase: {miss_events[:5]}…" if miss_events else ""))
 if miss_events:
     warnings.append(f"events: {len(miss_events)} 个事件名未命中我方 petbase")
+
+# ---- 6.5 event_names:特殊事件名(实时视图槽位行「事件 {id}」的可读名) ----
+# events 只收能映射出**单只精灵**的战斗遭遇(100k/110k 普通 + 200k 首领,这以外
+# 还有 12x/13x 段遇见精灵)。剩下的段没有单只精灵可映射,但官方 EVENT_CONF 给得出
+# 名字 —— 祝福(500xxx)/商人(600xxx)/魔力之源(700xxx,如 700000=魔力之源)/NPC
+# (300xxx+,整队),一并收进 event_names,前端槽位行/「换事件」那条不再裸 id。
+# NPC 段官方名带前缀尾缀(草系徽章-研究员-1),清理成可读名(研究员/易西/罗兰)。
+event_names: dict[str, str] = {}
+for eid, r in evt.items():
+    nid = int(eid)
+    if 100000 <= nid < 300000:  # 已进 events 的战斗段,不需要事件名
+        continue
+    nm = (r.get("name") or "").strip()
+    if not nm:
+        continue
+    if 300000 <= nid < 500000:  # NPC 段:去「草系徽章-」前缀与「-难度」尾缀
+        base = nm
+        if base.startswith("草系徽章-"):
+            base = base[len("草系徽章-"):]
+        base = re.sub(r"-\d+$", "", base)
+        nm = base
+    event_names[eid] = nm
+print(f"  event_names: {len(event_names)} 个特殊事件名" +
+      (f"(例: {list(event_names.items())[:3]})" if event_names else ""))
+
+# ---- 6.7 effects:试炼效果名(GRASS_TRIAL_EFFECT_CONF)----
+# 协议到处只给 effect_id:顶部「本周词条」(1000 段,融合次数/技能冷却/回复限制…)、
+# 奖励/额外奖励里的碎片(20xx,其中 2015~2020 就是生命/速度/双攻双防特调)、
+# 30xx 事件效果。前端把这些 id 直接贴出来玩家看不懂,这里整表落一份 id -> 名。
+# 名字是官方文案(无 HTML/空名,58 条全有);重复名(如 1004/1005 都叫初出茅庐)
+# 是不同数值的同名词条,保留原名不去重。
+effects: dict[str, str] = {}
+for eid, r in eff.items():
+    nm = (r.get("name") or "").strip()
+    if nm:
+        effects[eid] = nm
+print(f"  effects: {len(effects)} 个试炼效果名" +
+      (f"(例: {list(effects.items())[:5]})" if effects else ""))
 diff_text = "  ".join(f"第{i}章官方 {len(v)}" for i, v in pools.items())
 out = {
-    "_source": "客户端官方配置:BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,PERIOD,LOG}_CONF"
-    "(CUE4Parse 解包,普通池/首领/章节/周期均来自官方);第 7 层 NPC 阵容为玩家实测(wiki)透传",
+    "_source": "客户端官方配置:BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,EFFECT,PERIOD,LOG}_CONF"
+    "(CUE4Parse 解包,普通池/首领/章节/周期/词条均来自官方);第 7 层 NPC 阵容为玩家实测(wiki)透传",
     "_updated": f"GRASS_TRIAL_* 官方配置,{GEN_DATE} 生成;旧 wiki 池见 gen_trial.py",
     "_note": "pools: 各章普通池的 petbase id —— 官方口径(按 chapter_event 战斗事件解析,"
     + diff_text + "),旧 wiki 口径 188/295/177;bosses: 22 名首领;npc: 难度 -> 章 -> 候选阵容"
@@ -278,7 +320,11 @@ out = {
     "chapters.image/intro/outro 来自 GRASS_TRIAL_LOG_CONF(封面图与见闻录文案)。"
     "events: 官方 event_conf_id -> 精灵(普通遭遇 100k/110k + 首领 200k 段,实时视图"
     "把事件号直接翻译成头像,免人工标注;NPC 阵容/祝福/商人非单只精灵不入表)。"
-    "精灵一律用我方 petbase id。",
+    "event_names: 特殊事件 -> 事件名(祝福 500xxx/商人 600xxx/魔力之源 700xxx/NPC"
+    " 300xxx 等无单只精灵的事件,槽位行/换事件需要可读名;NPC 段名去「草系徽章-」"
+    "前缀与「-难度」尾缀。精灵一律用我方 petbase id,事件名用官方 name)。"
+    "effects: 试炼效果 GRASS_TRIAL_EFFECT_CONF 的 id -> 名(1000 段词条 / 20xx 精灵"
+    "天赋与属性特调 / 30xx 事件效果;协议只给 id,实时视图据名显示)。",
     "floors": FLOORS,
     "chapters": chapter_names,
     "pools": pools,
@@ -286,6 +332,8 @@ out = {
     "npc": npc,
     "activity": activity,
     "events": events,
+    "event_names": event_names,
+    "effects": effects,
 }
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as f:
