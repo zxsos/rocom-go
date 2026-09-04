@@ -76,6 +76,7 @@ export default [
       'scripts/verify-account-width.mjs',
       'scripts/verify-account-mobile.mjs',
       'scripts/verify-theme-spread-browser.mjs',
+      'scripts/verify-page-boot.mjs', // 页面启动(白屏/黑屏)—— 前端产物缺件的唯一可见证据
     ],
     languageOptions: {
       ecmaVersion: 'latest',

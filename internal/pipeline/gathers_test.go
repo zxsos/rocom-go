@@ -7,6 +7,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/capture"
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/gcp"
+	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/scene"
 	"google.golang.org/protobuf/encoding/protowire"
 )
@@ -350,5 +351,223 @@ func TestGathersDebounceNotStarved(t *testing.T) {
 	got := srv.GetLastGathers(testAcc)
 	if got == nil || len(got.Gathers) != 3 {
 		t.Errorf("持续突发后标记数 = %d, 期望 3 —— 窗口被无限推后(饿死)了", len(got.Gathers))
+	}
+}
+
+// pickBody 构造 c2s 0x0137 的 NPC 交互请求:6 字节子头 + npc_id(1) / option_id(2)。
+//
+// 那 6 字节子头**不能省**:ParseNpcNextAct 先跳过它再解析(见 scene/home.go),
+// 少了就会把子头当成字段号去解 —— 解不出 npc_id,整条采摘链静默失效。
+// 这与 pcap 实测一致(0x0137 的 AppBody 开头恒有 6 字节)。
+func pickBody(npcID uint64, optionID int32) []byte {
+	b := make([]byte, 6) // c2sSubHeaderLen,内容随意
+	b = protowire.AppendTag(b, 1, protowire.VarintType)
+	b = protowire.AppendVarint(b, npcID)
+	b = protowire.AppendTag(b, 2, protowire.VarintType)
+	return protowire.AppendVarint(b, uint64(uint32(optionID)))
+}
+
+// rewardBody 构造 s2c 0x0243 奖励通知:ret_info(1) → goods_change_info(4) → changes(1)。
+// withGoods=false 时**只给空壳 ret_info** —— 这是投掷落空时服务器的真实响应
+// (实测 len=22),空壳与否正是「采到了」与「落空了」的唯一区别。
+func rewardBody(withGoods bool) []byte {
+	var chg []byte // goods_change_info 的内容
+	if withGoods {
+		// changes 是**子消息**(GoodsChangeItem),不是 varint —— 写成 varint 的话
+		// wire.Subs 取不到,判据恒为「无产出」,落空与采到就无从分辨了。
+		item := protowire.AppendTag(nil, 1, protowire.VarintType) // 内容随意,
+		item = protowire.AppendVarint(item, 1)                    // 判据只看有没有 changes
+		chg = protowire.AppendBytes(protowire.AppendTag(chg, 1, protowire.BytesType), item)
+	}
+	// 逐层往外包子消息:每层都得走 AppendBytes 带长度前缀,只 AppendTag 会解不出来。
+	ret := protowire.AppendBytes(protowire.AppendTag(nil, 4, protowire.BytesType), chg) // goods_change_info
+	return protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), ret) // ret_info
+}
+
+// gatherPickAt 在指定时刻喂一条 c2s 0x0137 采摘交互。
+func gatherPickAt(p *Pipeline, at time.Time, npcID uint64) {
+	p.handle(capture.Message{
+		Time:      at,
+		Direction: gcp.C2S,
+		Opcode:    scene.OpNpcNextActReq,
+		Session:   testSess,
+		AppBody:   pickBody(npcID, 50091),
+	})
+}
+
+// pushAt 在指定时刻推一次合并窗口(喂一条更晚的无关消息,见 markGathersDirty)。
+// 时刻由调用方给,避免 pushNow 那样每次都跳到「现在+1s」把时钟搅乱。
+func pushAt(p *Pipeline, at time.Time) {
+	p.handle(capture.Message{
+		Time:      at,
+		Direction: gcp.C2S,
+		Opcode:    scene.OpSceneMoveReq,
+		Session:   testSess,
+		AppBody:   moveBody(testX, testY, 0, 0, 0, true, 1001, nil),
+	})
+}
+
+// rewardAt 在指定时刻喂一条 s2c 0x0243 奖励通知。
+func rewardAt(p *Pipeline, at time.Time, withGoods bool) {
+	p.handle(capture.Message{
+		Time:      at,
+		Direction: gcp.S2C,
+		Opcode:    pet.OpGoodsRewardNotify,
+		Session:   testSess,
+		AppBody:   rewardBody(withGoods),
+	})
+}
+
+// TestGathersPickedTreeDropped 果树采到产出后要当场撤标记。
+//
+// 这是本文件最要紧的一条:果树采完**服务器不撤实体**(实测采完站着不动一直没有
+// actor_leave),而它一天才刷新 —— 标记挂着就是告诉玩家「那儿还有」,走过去扑空。
+// 非果树采完 60~90ms 就自己有 leave,这条只影响果树。
+func TestGathersPickedTreeDropped(t *testing.T) {
+	p, srv := newTestPipeline(t)
+	samples := gatherSamples(t, p.db)
+	tree := samples[0] // 可可果树
+	login(t, p, 1)
+	p.handle(msg(gcp.S2C, scene.OpEnterSceneRsp, enterSceneBody(1001, testRes, 0)))
+
+	const id = 9200
+	t0 := time.Now()
+	p.handle(msg(gcp.S2C, scene.OpPlayActsNotify,
+		actsBody([][]byte{gatherActor(id, 50090, tree.R, tree.X, tree.Y, tree.Z)})))
+	// 时刻必须**单调递增**:pushNow 会把时钟推到「现在+1s」,若之后再用 time.Now()
+	// 记交互时刻,时间就倒流了 —— 合并窗口与超时判定都会失效。
+	pushAt(p, t0.Add(500*time.Millisecond))
+	if got := srv.GetLastGathers(testAcc); got == nil || len(got.Gathers) != 1 {
+		t.Fatalf("准备失败: 标记数 = %d, 期望 1", len(got.Gathers))
+	}
+
+	gatherPickAt(p, t0.Add(time.Second), id)
+	// 果树走投掷流程,产出在交互后 1.5~2.7s 才落地(实测)。
+	rewardAt(p, t0.Add(3*time.Second), true)
+	pushAt(p, t0.Add(4*time.Second))
+
+	got := srv.GetLastGathers(testAcc)
+	if got == nil || len(got.Gathers) != 0 {
+		t.Errorf("采完并确认产出后仍有 %d 个标记, 期望 0 —— 果树采完服务器不撤实体, 得靠奖励确认撤",
+			len(got.Gathers))
+	}
+}
+
+// TestGathersPickMissKeepsMark 投掷落空时**必须保留标记**。
+//
+// 这是上一条的另一半,也是最容易被漏掉的一条:落空时服务器照样发 0x0243,只是个
+// 空壳(ret_info 里没有 changes,实测 len=22)。若只判「来了 0x0243」就撤标记,
+// 没打中的树会从地图上消失 —— 那比不撤更糟(不撤最多是玩家多跑一趟,
+// 误撤则是一整天都看不到那棵树)。
+//
+// 只测「有产出才撤」不测这条,测试就是永远绿灯的:删掉 changes 判据,
+// TestGathersPickedTreeDropped 照样通过。
+func TestGathersPickMissKeepsMark(t *testing.T) {
+	p, srv := newTestPipeline(t)
+	samples := gatherSamples(t, p.db)
+	tree := samples[0]
+	login(t, p, 1)
+	p.handle(msg(gcp.S2C, scene.OpEnterSceneRsp, enterSceneBody(1001, testRes, 0)))
+
+	const id = 9210
+	t0 := time.Now()
+	p.handle(msg(gcp.S2C, scene.OpPlayActsNotify,
+		actsBody([][]byte{gatherActor(id, 50090, tree.R, tree.X, tree.Y, tree.Z)})))
+	pushAt(p, t0.Add(500*time.Millisecond))
+
+	gatherPickAt(p, t0.Add(time.Second), id)
+	rewardAt(p, t0.Add(3*time.Second), false) // 空壳:什么都没采到
+	pushAt(p, t0.Add(4*time.Second))
+
+	got := srv.GetLastGathers(testAcc)
+	if got == nil || len(got.Gathers) != 1 {
+		t.Errorf("落空后标记数 = %d, 期望 1 —— 没打中的树还在那儿, 撤掉就找不回来了",
+			len(got.Gathers))
+	}
+}
+
+// TestGathersPickNoRewardKeepsMark 连空壳都不发时(服务器静默),标记同样保留。
+//
+// 落空有两种表现:发空壳 0x0243,或**什么都不发**(实测两份 pcap 里各有两种)。
+// 与上一条合起来才覆盖完整。
+func TestGathersPickNoRewardKeepsMark(t *testing.T) {
+	p, srv := newTestPipeline(t)
+	samples := gatherSamples(t, p.db)
+	tree := samples[0]
+	login(t, p, 1)
+	p.handle(msg(gcp.S2C, scene.OpEnterSceneRsp, enterSceneBody(1001, testRes, 0)))
+
+	const id = 9220
+	t0 := time.Now()
+	p.handle(msg(gcp.S2C, scene.OpPlayActsNotify,
+		actsBody([][]byte{gatherActor(id, 50090, tree.R, tree.X, tree.Y, tree.Z)})))
+	pushAt(p, t0.Add(500*time.Millisecond))
+
+	gatherPickAt(p, t0.Add(time.Second), id)
+	// 不喂任何 0x0243
+	pushAt(p, t0.Add(4*time.Second))
+
+	if got := srv.GetLastGathers(testAcc); got == nil || len(got.Gathers) != 1 {
+		t.Errorf("无奖励通知后标记数 = %d, 期望 1", len(got.Gathers))
+	}
+}
+
+// TestGathersPickStaleNotConfirmed 超时的产出不算数。
+//
+// 玩家采完 A 后跑向 B,隔了很久才采 B —— 那时 A 早已判定落空(标记保留,正确)。
+// 若超时不生效,很久之后某次无关的奖励会把 A 的标记撤掉。
+func TestGathersPickStaleNotConfirmed(t *testing.T) {
+	p, srv := newTestPipeline(t)
+	samples := gatherSamples(t, p.db)
+	tree := samples[0]
+	login(t, p, 1)
+	p.handle(msg(gcp.S2C, scene.OpEnterSceneRsp, enterSceneBody(1001, testRes, 0)))
+
+	const id = 9230
+	t0 := time.Now()
+	p.handle(msg(gcp.S2C, scene.OpPlayActsNotify,
+		actsBody([][]byte{gatherActor(id, 50090, tree.R, tree.X, tree.Y, tree.Z)})))
+	pushAt(p, t0.Add(500*time.Millisecond))
+
+	gatherPickAt(p, t0.Add(time.Second), id)
+	rewardAt(p, t0.Add(gatherPickTimeout+2*time.Second), true) // 超过 5s 窗口
+	pushAt(p, t0.Add(gatherPickTimeout+3*time.Second))
+
+	if got := srv.GetLastGathers(testAcc); got == nil || len(got.Gathers) != 1 {
+		t.Errorf("超时的产出撤掉了标记(标记数 = %d, 期望 1)—— 那次产出不属于这次交互",
+			len(got.Gathers))
+	}
+}
+
+// TestGathersPickIgnoresNonGather 交互对象是别的 NPC(家园小窝、星星)时不能误记。
+// 0x0137 是通用的 NPC 交互通道,家园收蛋也走它(见 home.go),认错了会撤掉无辜的标记。
+//
+// 断言**待确认槽**而非最终标记数:delete 一个不存在的 actor_id 是 no-op,故「标记还在」
+// 这条即使去掉采集物校验也照样成立 —— 那样这条就是永远绿灯的。真正要保证的是
+// 待确认槽不被无关 NPC 占住:否则下一次产出会被错记到这个不存在的 id 上
+// (表现为:玩家采了 A,某次无关奖励把 A 撤了,而 A 其实没采到)。
+func TestGathersPickIgnoresNonGather(t *testing.T) {
+	p, srv := newTestPipeline(t)
+	samples := gatherSamples(t, p.db)
+	tree := samples[0]
+	login(t, p, 1)
+	p.handle(msg(gcp.S2C, scene.OpEnterSceneRsp, enterSceneBody(1001, testRes, 0)))
+
+	const id = 9240
+	t0 := time.Now()
+	p.handle(msg(gcp.S2C, scene.OpPlayActsNotify,
+		actsBody([][]byte{gatherActor(id, 50090, tree.R, tree.X, tree.Y, tree.Z)})))
+	pushAt(p, t0.Add(500*time.Millisecond))
+
+	gatherPickAt(p, t0.Add(time.Second), 999999) // 一个不在采集物表里的 actor
+	if got := p.conn(testSess).gathers.pendingPick; got != 0 {
+		t.Errorf("待确认槽被无关 NPC 占住了: pendingPick = %d, 期望 0", got)
+	}
+
+	rewardAt(p, t0.Add(3*time.Second), true)
+	pushAt(p, t0.Add(4*time.Second))
+
+	if got := srv.GetLastGathers(testAcc); got == nil || len(got.Gathers) != 1 {
+		t.Errorf("交互了别的 NPC 却撤掉了采集物标记(标记数 = %d, 期望 1)", len(got.Gathers))
 	}
 }

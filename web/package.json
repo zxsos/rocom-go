@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "check:css": "node scripts/check-css-vars.mjs",
     "verify": "node scripts/check-css-vars.mjs && node scripts/verify-rules.mjs && node scripts/verify-slider.mjs && node scripts/verify-motion.mjs && node scripts/verify-motion-enter.mjs && node scripts/verify-map-vp.mjs && node scripts/verify-pip.mjs && node scripts/verify-pages.mjs && node scripts/verify-subscribe.mjs && node scripts/verify-switch.mjs && node scripts/verify-sse.mjs && node scripts/verify-sigil.mjs && node scripts/verify-theme-spread.mjs",
-    "verify:browser": "node scripts/verify-route-enter.mjs && node scripts/verify-map-vp-browser.mjs && node scripts/verify-map-browser.mjs && node scripts/verify-map-motion-browser.mjs tap-move && node scripts/verify-pip-canvas.mjs && node scripts/verify-admin-browser.mjs && node scripts/verify-account-width.mjs && node scripts/verify-account-mobile.mjs",
+    "verify:browser": "node scripts/verify-page-boot.mjs && node scripts/verify-route-enter.mjs && node scripts/verify-map-vp-browser.mjs && node scripts/verify-map-browser.mjs && node scripts/verify-map-motion-browser.mjs tap-move && node scripts/verify-pip-canvas.mjs && node scripts/verify-admin-browser.mjs && node scripts/verify-account-width.mjs && node scripts/verify-account-mobile.mjs",
     "verify:paging": "node scripts/verify-admin-paging.mjs",
     "verify:live": "bash ../scripts/capture_sse.sh $(node -e \"console.log(process.env.ROCOM_PCAP||'/workspace/_private-inbox-DO-NOT-TOUCH/rocom-20260829-224409.pcap')\") /tmp/sse-live.txt 4942 && node scripts/verify-live-sse.mjs /tmp/sse-live.txt"
   },

@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -285,6 +286,19 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// SPA fallback
+	//
+	// assets/ 走到这里是**故障而非正常路由**:这些文件名带内容 hash,index.html 引用
+	// 了就一定该存在。缺失意味着构建产物不完整 —— 常见于 vite 的 emptyOutDir 清空
+	// 产物目录后 npm run build 中途失败,而 `//go:embed all:web` 对缺失文件**不报错**,
+	// 于是二进制带着缺件编出来。后果极隐蔽:这里返回 200 + text/html,浏览器按 HTML
+	// 规范拒绝把 HTML 当 module script 执行,React 从不挂载 —— 页面全黑,而服务端
+	// 日志一条异常都没有(2026-09-04 线上事故)。故必须显式告警,让它在日志里可见。
+	//
+	// 部署期的防线在 scripts/deploy.sh 的 check_frontend_assets(编译前校验,拦在根因);
+	// 这里是兜底,覆盖手工替换二进制等绕过脚本的路径。
+	if strings.HasPrefix(path, "assets/") {
+		log.Printf("警告: 静态资源缺件,已回退到 index.html: %s — 前端产物不完整(重新 npm run build 后再编译)", path)
+	}
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFileFS(w, r, sub, "index.html")
 }

@@ -82,8 +82,8 @@ func (s *Store) MerchantNotifiedItems(slot int64, email string) map[string]bool 
 // MarkMerchantNotified 记录某槽已通知该邮箱哪些商品(在既有清单上追加,不覆盖),
 // 顺带清理 2 天前的去重记录(与槽缓存同节奏)。
 //
-// names 是本次成功投递的商品名;调用方保证它与库里已有的清单不相交(新增商品就是「全量 −
-// 更早轮 − 已通知」算出来的),故追加不会产生重复。
+// names 是本次成功投递的商品名;调用方保证它与库里已有的清单不相交(待发清单就是
+// 「本槽全量 − 本槽已通知」算出来的),故追加不会产生重复。
 func (s *Store) MarkMerchantNotified(slot int64, email string, names []string) error {
 	if _, err := s.db.Exec(`INSERT INTO merchant_notified(slot, email, items) VALUES(?,?,?)
 		ON CONFLICT(slot, email) DO UPDATE SET items=excluded.items || ',' || merchant_notified.items`,

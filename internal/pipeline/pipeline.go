@@ -318,6 +318,13 @@ func (p *Pipeline) handle(m capture.Message) {
 	p.handleEgg(m, acc)
 	p.handleTrial(m, acc)
 
+	// 采集物的采摘确认走 0x0243 奖励通知。不能挂在 handleEgg 里 —— 那里只在
+	// **解析出蛋**时才继续,而采摘产出的是果子/花草,一条都没有就会提前 return。
+	// 也不进 handleScene:0x0243 不是场景消息,放进去会让那张 switch 的语义失真。
+	if m.Direction == gcp.S2C && m.Opcode == pet.OpGoodsRewardNotify {
+		p.confirmGatherPick(m.Session, acc, m.AppBody, m.Time)
+	}
+
 	if p.handleScene(m, acc) {
 		// 0x132c 战斗结束通知同时是「场景」与「宠物」两路消息:场景侧清野怪标记
 		// (onBattleFinish),宠物侧解析内嵌 goods_reward 的新宠物入库/清花种详情

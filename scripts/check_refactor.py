@@ -197,7 +197,11 @@ INTENTIONALLY_CHANGED = {
     "sendMerchantMail": "阶段2:接收者改为 *smtpSender",
     "sendMerchantMailHTML": "阶段2:接收者改为 *smtpSender",
     # 阶段 2:调用点改为 s.snap.* / s.smtp.*
-    "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*;fix:去重粒度由整槽改为每商品(补货要能补发)",
+    # fix:隔档补货要能再提醒(2026-09-03 线上故障)。去掉「对比本营业日更早轮的商品名」
+    # 那条跨档去重(`seen`),去重收敛为**每槽每商品** —— 只认 merchant_notified,
+    # 它按 槽+邮箱+商品名 记,天然只挡本槽。同一批货隔档重新上架时不再被静默吞掉。
+    # 待发清单由 news 改名 fresh(它不再是「相对更早轮的新增」,而是「本槽未通知过的」)。
+    "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*;fix:去重粒度由整槽改为每商品(补货要能补发);fix:去掉跨档 seen 去重(隔档补货要能再提醒)",
     "merchantResend": "阶段2:发信调用点改为 s.smtp.send*",
     # fix:第三方滞后补货。改为只回源当前轮(更早的轮永不回源,拿回来的是当前货单=伪造历史),
     # 并按 merchantShouldFetch 判定(取代原先「有缓存就跳过」)。

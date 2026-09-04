@@ -7,6 +7,7 @@ import (
 
 	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/server"
+	"github.com/whoisnian/rocom-capture/internal/wire"
 )
 
 // ---- 实时地图的采集物图层(花/草/菌/矿/果树)----
@@ -39,6 +40,12 @@ import (
 type gatherTracker struct {
 	marks map[uint64]*gatherMark // actor_id -> 标记
 	res   int32                  // 当前场景 res(投影要用)
+
+	// 采摘确认:最近一次交互的采集物,等奖励通知确认「真的掉东西了」。
+	// 语义与家园收蛋的 pendingEgg 同构(见 home.go),用途不同 —— 那里是为了记双亲,
+	// 这里是为了**撤标记**(果树采完服务器不撤实体,见本文件顶部)。
+	pendingPick  uint64    // 待确认的 actor_id;0=无
+	pendingSince time.Time // 交互时刻,超时即判定落空
 }
 
 // gatherMark 是当前视野里的一个采集物实体。
@@ -104,6 +111,83 @@ func (p *Pipeline) observeGathers(conn, acc string, body []byte, now time.Time, 
 	if changed {
 		p.markGathersDirty(conn, now)
 	}
+}
+
+// gatherPickTimeout 是「交互之后等产出」的超时。
+//
+// 取 5 秒的依据(2026-09-04 三份 pcap 实测):
+//   - 非果树:交互后 60~90ms 服务器就撤实体,产出同秒到达;
+//   - 果树:走投掷流程(0x0202/0x02fb),产出在交互后 1.5~2.7s 才落地;
+//   - 落空:服务器**什么都不发**,或只发一条空壳奖励。
+//
+// 5 秒覆盖果树投掷的全程,又远小于玩家跑向下一棵树的间隔(实测 ≥3s 但也常有十几秒),
+// 不至于把下一次采摘的产出错认到这一棵上。
+const gatherPickTimeout = 5 * time.Second
+
+// noteGatherPick 记下「玩家正在采这个采集物」,等奖励通知确认后撤标记。
+//
+// 为什么需要它:非果树采完服务器立刻撤实体(实测 60~90ms),但**果树不撤** ——
+// 它要等投掷落地,而落地后服务器只给奖励、不撤实体(实测采完站着不动就一直没有
+// leave)。果树一天才刷新,采完就是没了,标记却一直挂着,玩家跑过去扑空。
+//
+// 覆盖而非排队:同一时刻只认一个待确认。连点时后来的覆盖前面的,前面那次因此
+// 判定「落空」而**保留标记** —— 这是刻意选的失败方向:漏撤的树等玩家走开时靠
+// AOI leave 兜底(结果正确),而误撤会让明明还在的树从地图上消失(结果错误且无法挽回)。
+func (p *Pipeline) noteGatherPick(conn string, body []byte, now time.Time) {
+	cs := p.conns[conn]
+	if cs == nil || cs.gathers == nil {
+		return
+	}
+	npcID, _, ok := scene.ParseNpcNextAct(body)
+	if !ok {
+		return
+	}
+	ts := cs.gathers
+	// 只跟踪已知采集物:交互对象可能是任何 NPC(家园小窝、星星…)。
+	if _, ok := ts.marks[npcID]; !ok {
+		return
+	}
+	ts.pendingPick, ts.pendingSince = npcID, now
+}
+
+// confirmGatherPick 收到奖励通知时调用:带产出即撤掉待确认那棵的标记。
+//
+// 判据是**有没有产出**,不是「有没有奖励包」:落空时服务器照样发 0x0243,只是个空壳
+// (实测 len=22,ret_info 里没有 goods_change_info);真掉东西时包里带 changes。
+// 若只看「来了 0x0243」就撤,投掷落空的树会被误撤 —— 那比不撤更糟。
+func (p *Pipeline) confirmGatherPick(conn, acc string, reward []byte, now time.Time) {
+	cs := p.conns[conn]
+	if cs == nil || cs.gathers == nil {
+		return
+	}
+	ts := cs.gathers
+	if !gatherRewardHasGoods(reward) {
+		return // 空壳:什么都没采到,标记保留
+	}
+	if ts.pendingPick == 0 || now.Sub(ts.pendingSince) > gatherPickTimeout {
+		return // 没有待确认 / 已超时(产出不属于这次交互)
+	}
+	id := ts.pendingPick
+	ts.pendingPick = 0
+	if _, ok := ts.marks[id]; !ok {
+		return
+	}
+	delete(ts.marks, id)
+	p.markGathersDirty(conn, now)
+}
+
+// gatherRewardHasGoods 判断奖励通知里有没有真的掉出东西。
+// 结构:ret_info(1) → goods_change_info(4) → changes(1),有 changes 才算有产出。
+func gatherRewardHasGoods(body []byte) bool {
+	ret := wire.SubMsg(body, 1) // ret_info
+	if ret == nil {
+		return false
+	}
+	chg := wire.SubMsg(ret, 4) // goods_change_info
+	if chg == nil {
+		return false
+	}
+	return len(wire.Subs(chg, 1)) > 0 // changes
 }
 
 // resetGathers 换场景/传送时整份作废(并推空列表,前端立刻清屏)。

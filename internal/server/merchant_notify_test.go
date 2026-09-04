@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-// 本文件守住「同一营业日槽里,同一件商品对同一收件人只提醒一次」。
+// 本文件守住「同一槽里,同一件商品对同一收件人只提醒一次」。
+//
+// 「同一槽」这个范围要盯紧:去重**不跨档**(merchant_notified 按 槽+邮箱+商品名 记)。
+// 远行商人一天四档(8/12/16/20),同一批货会隔档重新上架 —— 那时**必须再提醒一次**,
+// 见 TestMerchantNotifyRestockInLaterSlot;而同一槽内的多次回源只发没发过的那几件,
+// 见 TestMerchantNotifyLateArrivingItems。两条合起来才是完整契约 —— 缺任何一条,
+// 改动都会往错误的方向收敛(要么漏发、要么重复打扰),而另一条不会报错。
 //
 // 存在理由(两条,缺一不可):
 //  1. merchant_notified 只在**发信成功之后**才 Mark(发信失败要留给 merchantResend 补扫
@@ -122,6 +128,51 @@ func TestMerchantNotifyDifferentSlots(t *testing.T) {
 
 	if got := sent(); len(got) != 2 {
 		t.Fatalf("两个槽共发出 %d 封, 期望 2 封: %v", len(got), got)
+	}
+}
+
+// TestMerchantNotifyRestockInLaterSlot 隔档补货:同一批货在更晚的档重新上架时,
+// **必须再提醒一次** —— 对每个订阅者那都是一次新的购买机会。
+//
+// 2026-09-03 线上故障:16:00 档的 蓝晶碧玺/魔力果/神奇的蛋 与 08:00 档一字不差,而
+// merchantNotify 原先按「本营业日更早槽已出现过的商品名」去重,把整档静默吞掉 —— 日志里
+// 连一行都没有(该出口只在「有货但关键词没命中」时才记),排查时完全无从下手。
+// 去重改为**每槽每商品**后,这一档照常发信。
+//
+// 断言**正文**而不只数封数:只数封数的话,第二封发成空正文照样通过 —— 那正是
+// 「永远绿灯的测试」给人的虚假安全感。
+func TestMerchantNotifyRestockInLaterSlot(t *testing.T) {
+	s := newTestServer(t)
+	slot := seedMerchantNotify(t, s, "") // 空关键词 = 订阅全部
+	next := slot.Add(merchantSlotStep)
+	// 更晚的一档:商品与上一档**完全相同**(隔档补货),只有时段标签不同。
+	if err := s.store.PutMerchantSlot(next.Unix(), false,
+		`{"code":0,"data":{"merchant_name":"远行商人「云上仙岛」","items":[`+
+			`{"name":"残缺魔镜","kind":"prop","price":120,"limit":2,"time_label":"12:00-16:00"},`+
+			`{"name":"幽系血脉秘药","kind":"prop","price":80,"limit":1,"time_label":"12:00-16:00"}]}}`); err != nil {
+		t.Fatalf("写下一档槽缓存: %v", err)
+	}
+	sent, bodies := fakeSMTP(t, s, 0)
+
+	s.merchantNotify(slot)
+	s.merchantNotify(next)
+
+	if got := sent(); len(got) != 2 {
+		t.Fatalf("隔档补货共发出 %d 封, 期望 2(每档各一封): %v", len(got), got)
+	}
+	bs := bodies()
+	if len(bs) != 2 {
+		t.Fatalf("正文 %d 封, 期望 2 封", len(bs))
+	}
+	// 第二封必须真的带着这批货 —— 空正文也算「发了」,那等于没提醒。
+	for _, want := range []string{"残缺魔镜", "幽系血脉秘药"} {
+		if !strings.Contains(bs[1], want) {
+			t.Errorf("第二封缺 %q —— 隔档补货没提醒到", want)
+		}
+	}
+	// 下一档的已通知清单要独立记录,否则补扫会再发一封
+	if !s.store.MerchantNotifiedItems(next.Unix(), "player@qq.com")["残缺魔镜"] {
+		t.Error("下一档未记录已通知商品: 补扫会重复发一封")
 	}
 }
 
