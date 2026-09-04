@@ -1,21 +1,24 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
-import { getPets, getFilterOptions, getBoxes, getTeams, getPetPage, subscribe } from '../../api'
+import { getPets, getFilterOptions, getNameOptions, getBoxes, getTeams, getPetPage, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { SkeletonRows } from '../../components/Skeleton'
-import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter } from './filters'
+import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter, DEFAULT_VIEW, sanitizeView } from './filters'
 import FilterPanel from './FilterPanel'
 import BoxMap from './BoxMap'
 import PetTable from './PetTable'
-import PetCards from './PetCards'
+import PetGallery from './PetGallery'
 import ContextMenu from './ContextMenu'
 import Dropdown from '../../components/Dropdown'
 
 // 空数据的兜底常量:引用稳定,免得每次渲染造新对象打穿下游 memo。
 const NO_PETS = { total: 0, pets: [] }
 const NO_OPTIONS = {}
+// 6×6 性格方阵的空兜底:数据未到时组件收到 undefined,铺出来是一张全空的格子,
+// 会被误读成「这一版游戏没性格」。给一份结构完整的空阵,未到位时只是每格无名。
+const NO_NAME_OPTIONS = { nature: Array.from({ length: 6 }, () => new Array(6).fill('')) }
 const NO_BOXES = []
 const NO_TEAMS = { slots: [] }
 
@@ -35,6 +38,16 @@ export default function PetList() {
     setFilter((f) => (f.box ? { ...f, box: '', page: 1 } : f))
   }
   const [collapsed, setCollapsed] = useStoredFlag(sessionStorage, 'petListCollapsed', true)
+  // 视图开关(表格 / 陈列)。存 localStorage 而非 sessionStorage:这是"我习惯怎么看"
+  // 而不是"这次会话的临时状态",与筛选条件(关掉页面就该忘)性质相反。
+  //
+  // 为什么让用户选而不是按视口宽度自动切:原先是 760px 断点一刀切 —— 平板竖屏
+  // (宽 800px)被迫用横向滚动的表格,而窄窗口的桌面用户被迫用卡片。两者都是
+  // 猜错了意图:表格适合"逐列比一页",陈列适合"找那一只",这与屏幕宽度无关。
+  //
+  // 默认 DEFAULT_VIEW(表格)。注意默认值只对**没有存储记录**的浏览器生效 ——
+  // 已选过视图的用户保持其选择,新装/清过缓存的从默认值开始。
+  const [view, setView] = useStoredJSON(localStorage, 'petView', DEFAULT_VIEW, sanitizeView)
   const [sync, setSync] = useStoredFlag(localStorage, 'petSync', true) // 实时同步:游戏内操作自动跳转到对应宠物(默认开)
   const [detailGid, setDetailGid] = useState(null) // 详情弹窗的 gid(null=关闭)
   const [selected, setSelected] = useState(null) // 单击选中的 gid
@@ -53,8 +66,13 @@ export default function PetList() {
     useCallback(() => getPets(withCatch(filter)), [filter]),
     { fallback: NO_PETS, reloadKey: account },
   )
+  // 筛选下拉项:五维合并成一条 SELECT 再在 Go 侧去重排序(见后端 handleFilterOptions)。
+  // 性格矩阵另走 /api/name-options —— 它是**全局固定数据**(不随账号变化),
+  // 与按账号聚合的 filter-options 混在一起会让那份响应带上无谓的账号语义。
   const { data: options } = useAsyncData(useCallback(() => getFilterOptions(), []),
     { fallback: NO_OPTIONS, reloadKey: account })
+  const { data: nameOpts } = useAsyncData(useCallback(() => getNameOptions(), []),
+    { fallback: NO_NAME_OPTIONS })
   // 盒子与队伍是两路独立拉取,但总是一起重取(SSE 收到宠物变动时都要刷新),故合成一个 loadBoxes。
   const { data: boxes, refresh: loadBoxesData } = useAsyncData(useCallback(() => getBoxes(), []),
     { fallback: NO_BOXES, reloadKey: account })
@@ -212,7 +230,7 @@ export default function PetList() {
   return (
     <div className="list-layout">
       <FilterPanel
-        filter={filter} options={options} total={data.total}
+        filter={filter} options={{ ...options, natureMatrix: nameOpts.nature }} total={data.total}
         collapsed={collapsed} onClose={() => setCollapsed(true)}
         set={set} toggleType={toggleType} reset={reset}
       >
@@ -237,17 +255,43 @@ export default function PetList() {
           <button className="btn" onClick={() => set({ order: filter.order === 'asc' ? 'desc' : 'asc' })}>{filter.order === 'asc' ? '升序' : '降序'}</button>
           <button className={'btn' + (sync ? ' primary' : '')} title="开启后,游戏内捕捉/移动宠物会自动跳转并选中该宠物;关闭可避免打断当前筛选" onClick={() => setSync((v) => !v)}>同步</button>
           <div className="spacer" />
-          <span className="muted">共 {data.total} 只</span>
+          {/* 视图开关与「共 N 只」打包成一个不换行整体:窄屏下 flex-wrap 会让它们
+              各掉一行,而「共 N 只」读起来本该紧跟视图开关(它们都属于"当前列表的
+              状态")。打包后这个整体只作为一项参与换行,内部永不分家。 */}
+          <div className="list-tail">
+            {/* 默认视图排在最左:分段控件的首位会被读成"主推的那个",
+                与默认项错开时会让人以为当前视图是次要的那个。
+                ⚠️ 改 DEFAULT_VIEW 时必须同步调换这里的顺序(见 filters.js)。 */}
+            <div className="viewseg" role="group" aria-label="列表视图">
+              <button
+                type="button" className={'viewseg-b' + (view === 'gallery' ? ' on' : '')}
+                aria-pressed={view === 'gallery'}
+                title="陈列:宠物图为主,适合一屏扫多只、找变异与体型"
+                onClick={() => setView('gallery')}
+              >陈列</button>
+              <button
+                type="button" className={'viewseg-b' + (view === 'table' ? ' on' : '')}
+                aria-pressed={view === 'table'}
+                title="表格:逐列对齐,适合把这一页的百分位/声音竖着比"
+                onClick={() => setView('table')}
+              >表格</button>
+            </div>
+            <span className="muted">共 {data.total} 只</span>
+          </div>
         </div>
 
-        <PetTable pets={data.pets} selected={selected} sort={filter.sort} order={filter.order} onSort={sortBy} itemProps={itemProps} />
-        <PetCards pets={data.pets} selected={selected} itemProps={itemProps} />
+        {view === 'table'
+          ? <PetTable pets={data.pets} selected={selected} sort={filter.sort} order={filter.order} onSort={sortBy} itemProps={itemProps} />
+          : <PetGallery pets={data.pets} selected={selected} itemProps={itemProps} />}
 
         {/* 首次加载(还没有任何宠物数据)时铺骨架而不是「没有匹配的宠物」——
             后者是**结果**,加载中报结果会把空列表误读成「筛了个寂寞」。
             换筛选条件时 useAsyncData 保留旧数据,故只有真正从零开始那一次会见到骨架。 */}
         {data.pets.length === 0 && (loading
-          ? <SkeletonRows rows={6} h={44} gap={8} />
+          // 骨架形状跟着视图走:表格行是 44px 的扁条,陈列卡是 ~336px 的方块。
+          // 用同一份扁条骨架铺陈列视图会「先矮后高」地跳一下,而那不是加载变快了,
+          // 只是骨架没铺对形状 —— 观感上等同于假进度。
+          ? <SkeletonRows rows={6} h={view === 'table' ? 44 : 336} gap={8} />
           : <div className="empty">没有匹配的宠物</div>)}
 
         <div className="pager">

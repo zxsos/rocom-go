@@ -429,6 +429,38 @@ func (db *DB) EvolutionChain(petbaseID uint32) []ChainStep {
 // NatureEffect 返回性格的 +10%/-10% 维度(六维编号 1-6;0 表示无)。
 func (db *DB) NatureEffect(natureID uint32) NatureEffect { return db.natureEffect[key(natureID)] }
 
+// NatureMatrix 返回 6×6 性格方阵:第一维是**增益**维度编号-1(0-5),第二维是
+// **减益**维度编号-1(0-5),值即该格性格名;对角线(增減同一维,游戏内不存在)
+// 与数据缺失的格子为空串。
+//
+// 为什么按方阵给而不是给一份「性格 → {pos,neg}」清单:性格数据本身就是这张表
+// (31 个性格里 30 个非中性,恰好铺满 6×6 去掉对角线),前端要画的就是这个形状。
+// 让前端自己按 pos/neg 拼表会把「维度编号 ↔ 展示顺序」的对应关系复制一份到前端,
+// 两边一旦漂移,格子里的名字就全错位 —— 而错位后**看起来完全正常**(只是每格
+// 装着一个别的性格),无从发现。
+//
+// 维度编号(1-6)与六维的对应见 internal/server 的 iconMeta.Stat:1生命 2物攻 3魔攻
+// 4物防 5魔防 6速度。
+func (db *DB) NatureMatrix() [6][6]string {
+	var out [6][6]string
+	for k, name := range db.nature {
+		if name == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(k, 10, 64)
+		if err != nil {
+			continue
+		}
+		eff := db.natureEffect[key(uint32(id))]
+		pos, neg := eff.Pos, eff.Neg
+		if pos < 1 || pos > 6 || neg < 1 || neg > 6 || pos == neg {
+			continue // 中性或越界:不进方阵
+		}
+		out[pos-1][neg-1] = name
+	}
+	return out
+}
+
 // Species 返回种类名(conf_id)。
 func (db *DB) Species(confID uint32) string { return db.species[key(confID)] }
 

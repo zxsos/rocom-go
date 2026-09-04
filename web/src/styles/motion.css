@@ -183,6 +183,33 @@
 .pets tbody tr:nth-child(5) { animation-delay: 102ms; }
 .pets tbody tr:nth-child(n + 6) { animation-delay: 120ms; }
 
+/* ——— 9. 宠物列表:陈列卡顺次上架 ———
+ * 卡片是网格里的独立块级元素,transform 有效(表格行那个 4px 的克制是因为
+ * <tr> 上位移在部分浏览器无效),故位移可以给到 10px + 轻微缩放,像"摆上货架"。
+ *
+ * fill-mode 用 **backwards 而非 both**:both 会让动画跑完后继续锁住
+ * `transform: none`(forwards 那一半),而动画中的属性值优先级高于普通声明 ——
+ * 于是 .pet-card:hover 的 translateY(var(--lift)) 会被永久压掉,悬停抬升失效。
+ * backwards 只在 delay 期间兜住 from 态(防闪一下未动画的样子),结束后立刻交还
+ * 控制权;to 态本来就等于元素自然态,不需要 forwards 来维持。 */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.pet-card {
+  animation: card-in var(--dur-base) var(--ease-out) backwards;
+}
+.pet-card:nth-child(1) { animation-delay: 0ms; }
+.pet-card:nth-child(2) { animation-delay: 30ms; }
+.pet-card:nth-child(3) { animation-delay: 60ms; }
+.pet-card:nth-child(4) { animation-delay: 90ms; }
+.pet-card:nth-child(5) { animation-delay: 120ms; }
+.pet-card:nth-child(6) { animation-delay: 150ms; }
+.pet-card:nth-child(7) { animation-delay: 180ms; }
+.pet-card:nth-child(8) { animation-delay: 210ms; }
+/* 封顶在第 9 张:一屏最多也就这么几张,再往后递增只会让末尾平白多等。 */
+.pet-card:nth-child(n + 9) { animation-delay: 240ms; }
+
 /* ——— 降级:关掉全部入场编排 ———
  * 这些都是纯装饰(唯一的例外是柱状图,但它的**终态**就是正确数值,
  * 关掉动画只是不演示"长出来"的过程,数据一毫不丢)。
@@ -196,7 +223,8 @@
   .admin-bar-row .admin-bar-fill,
   .rank-row,
   .boxmap-grid > *,
-  .pets tbody tr {
+  .pets tbody tr,
+  .pet-card {
     animation: none !important;
   }
 }

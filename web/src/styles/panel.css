@@ -34,10 +34,44 @@
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 系别筛选按钮内的属性小图 */
 .chip-ic { width: 15px; height: 15px; object-fit: contain; }
-/* 性别 radio 一行 / 变异 checkbox 一行 */
-.radios, .checks { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.radio, .check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 13px; }
-.radio input, .check input { cursor: pointer; margin: 0; }
+/* 开关组(变异 / 性别 / 奖牌特征):gap 与 .chips 一致 —— 它们同属"一排可点的
+   筛选按钮",间距不同会让人以为不是一类控件。 */
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- 按键式筛选开关(见 FilterPanel.jsx 的 Toggle / Radio)----
+   原生 input 铺满整块并透明:整块按键都是命中区(>=32px,移动端 36px),
+   而键盘 Tab/空格与读屏的「已选中」播报仍由原生控件承担。
+
+   几何取 .chip 同款(胶囊 + padding):与同面板的系别按钮一眼同类。
+   选中态则取 --accent-soft 淡底 + 主色字,而不是 .chip.on 的实心主色 ——
+   这些开关常有多个同时选中(如奖牌特征可 4 个全开),实心会把面板糊成
+   一片主色、抢走系别与性格方阵的注意力;淡底在多选时仍清晰可辨且不喧宾夺主。
+   这与 .viewseg-b.on(视图开关选中)完全同色,即项目里「开关型选中」的统一语言。 */
+.toggle {
+  position: relative; display: inline-flex; align-items: center;
+  min-height: 32px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg-2); color: var(--fg-dim);
+  font-size: 13px; cursor: pointer; user-select: none;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.toggle:hover { border-color: var(--accent); color: var(--fg); }
+.toggle:active { transform: scale(.97); }
+/* input 铺满并透明:点按键任意位置都能切换,且保留原生语义与键盘可达 */
+.toggle > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.toggle.on {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+/* 焦点环:只在键盘聚焦时出现(与 .btn:focus-visible 同口径),鼠标点击不留环。
+   :has() 用于把 input 的焦点状态投射到整块按键上 —— 不支持时仅少个环,
+   不影响「选中了没」的显示(那由 React 加的 .on 负责)。 */
+.toggle:has(> input:focus-visible) {
+  outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+/* 性别符号在按键里:加大加粗与列表里一致(见 pet.css 的 .gender) */
+.toggle .gender { font-size: 1.15em; font-weight: 800; }
 .range { display: flex; align-items: center; gap: 6px; }
 .range input { width: 64px; }
 
@@ -82,6 +116,9 @@
     opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;
   }
   .filters-backdrop.show { opacity: 1; visibility: visible; }
+  /* 开关的触控基线:抽屉里是拇指操作,32px 偏小(与 .btn / .chip 的移动端规则同口径) */
+  .toggle { min-height: 36px; padding: 0 14px; }
+  .toggles { gap: 8px; }
 }
 
 /* 工具条上的「筛选/规则」抽屉入口:仅移动端显示 */

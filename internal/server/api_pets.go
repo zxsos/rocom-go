@@ -43,6 +43,10 @@ func (s *Server) parseFilter(q url.Values) store.Filter {
 	if ne := q.Get("natureExclude"); ne != "" {
 		f.NatureExclude = strings.Split(ne, ",")
 	}
+	// 性格多选:命中其中任一即算。与 Nature 互斥(前端矩阵只在点单格时用 Nature)。
+	if ni := q.Get("natureIn"); ni != "" {
+		f.NatureIn = strings.Split(ni, ",")
+	}
 	// 奖牌特征(数值判定,与地图奖牌筛选同口径):各参数为 "1" 时启用对应条件,多选=同时满足。
 	// 阈值固定为奖牌边界(大块头体重百分位≥98 / 小不点≤2 / 婉转声嗓音≥96 / 粗嗓门≤-96)。
 	if q.Get("medalBig") == "1" {
@@ -229,9 +233,13 @@ func (s *Server) handleMedals(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.medals)
 }
 
-// handleNameOptions 返回全量特长名(gamedata 全表,非按账号),供事件页高亮规则点选。
+// handleNameOptions 返回全量特长名(gamedata 全表,非按账号),供事件页高亮规则点选;
+// 另附 6×6 性格方阵,供宠物列表的性格矩阵筛选直接铺格子(见 gamedata.NatureMatrix)。
 func (s *Server) handleNameOptions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string][]string{"speciality": s.db.AllSpecialities()})
+	writeJSON(w, map[string]any{
+		"speciality": s.db.AllSpecialities(),
+		"nature":     s.db.NatureMatrix(),
+	})
 }
 
 // handleIcons 返回全局固定图标(六维属性小图 + 异色/炫彩/污染标记图),供前端一次性缓存。

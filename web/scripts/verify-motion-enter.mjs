@@ -40,6 +40,7 @@ const TABLE = [
   ['.rank-row', '.rank-list', 'rank-row', '排行榜行'],
   ['.boxmap-grid > *', '.boxmap-grid', 'boxmap-grid', '盒子地图格子'],
   ['.pets tbody tr', 'table.pets', 'pets', '宠物列表表格行'],
+  ['.pet-card', '.pet-grid', 'pet-card', '宠物陈列卡(非 .pt-*!那些是卡内区块)'],
 ]
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
