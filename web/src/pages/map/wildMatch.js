@@ -30,6 +30,19 @@ export function wildTags(p, rangeRules = []) {
   return out
 }
 
+// wildTagText 悬浮面板上那一行标签(空则「普通」)。
+//
+// **必须走这个函数,不要在调用点自己拼 wildTags(...)**。曾出过这个故障:
+// 悬浮面板(.twt)写了一行 `wildTags(p.kinds)`,而 wildTags 的第一个参数是
+// **宠物对象**(内部读 p.kinds)、第二个是 rangeRules —— 传 kinds 数组进去,
+// p.kinds 取到 undefined,规则又因漏传 rangeRules 全不命中,于是恒返回空,
+// 表现就是「图上描着大块头的环,点开却显示普通」。
+//
+// 画环(wildRing/wildShown)与文案是同一口径的两个投影,故这里与下面 wildShown
+// 共用同一份入参约定;verify-rules.mjs 有一条断言专门守「能画环的宠文案非空」。
+export const wildTagText = (p, rangeRules = []) =>
+  wildTags(p, rangeRules).join(' ') || '普通'
+
 // wildShown 判定一只宠当前能否在地图上「带环显示」——marks 过滤与稀有宠提醒共用的同一
 // 口径:开关图层(kinds 标签命中且该图层开关开)或区间规则命中(≥1 条;双牌开则 ≥2 条)
 // 任一命中即算。与 wildRing 的描边条件完全一致:能提醒的宠必然画得出环,画不出环的必不提醒。

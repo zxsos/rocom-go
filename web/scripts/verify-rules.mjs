@@ -91,10 +91,14 @@ console.log('\n[2] 区间判定')
 console.log('\n[3] 中间区间(旧版做不到的)')
 {
   const mid = { id: 'mid', dim: 'weightPct', min: 40, max: 60, label: '中等体型', color: '#fff', on: true }
-  ok('体重 40~60 能命中', matchRangeRule({ weightPct: 50 }, [mid]) || matchRangeRule({ weightPct: 50 }, mid))
-  // 旧版只有 big/small 两极,50% 谁都不命中 —— 这正是这次要补的能力
-  const legacyHit = 50 >= 98 || 50 <= 2
-  ok('旧版对 50% 确实无法命中(对照)', !legacyHit)
+  ok('体重 40~60 能命中', matchRangeRule({ weightPct: 50 }, mid))
+  // 旧版只有 big/small 两极(单值阈值 >=98 / <=2),50% 谁都不命中 —— 这正是要补的能力。
+  // 写成函数再代入样本,不能写 `50 >= 98 || 50 <= 2` 那种字面量:那是常量表达式,
+  // eslint 的 no-constant-binary-expression 会报,而且它压根没在验证规则 —— 改了
+  // DEFAULT_RANGE_RULES 的阈值它照样"通过",是条死断言。
+  const legacy = (pct) => pct >= 98 || pct <= 2
+  ok('旧版对 50% 确实无法命中(对照)', !legacy(50))
+  ok('旧版对极值仍能命中(回归:没把旧能力弄丢)', legacy(99) && legacy(1))
 }
 
 // —— 4. 事件页组合逻辑 ——
@@ -139,6 +143,67 @@ console.log('\n[5] 双牌(命中 ≥2 条规则)')
   eq('停用规则不计入双牌',
     M.isDualMedal({ weightPct: 99, voice: 99 }, DEFAULT_RANGE_RULES.map((r) => ({ ...r, on: false }))), false)
   void twoWeight
+}
+
+// —— 5b. 画环与文案必须是同一口径 ——
+//
+// 故障原型:悬浮面板(.twt)曾写成 `wildTags(p.kinds)` —— 第一个参数该是**宠物
+// 对象**(函数内部读 p.kinds),传了 kinds 数组,第二个参数 rangeRules 又漏传,
+// 于是恒返回空、落到兜底文案「普通」。表现就是用户看到的:
+//   **图上描着大块头的环(wildShown 判定对),点开却显示「普通」**。
+//
+// 故这里的断言不是「函数算得对」,而是**两条投影之间的一致性**:
+// 凡是能画环的宠,文案里必须说得出为什么 —— 不能一边描环一边说普通。
+console.log('\n[5b] 画环 ⇄ 文案 口径一致')
+{
+  const M = await server.ssrLoadModule('/src/pages/map/wildMatch.js')
+  const on = new Set(['mutation', 'pollution'])
+  // 覆盖:四类奖牌各一、双牌、异色、炫彩、异色炫彩、污染、以及谁都不中的普通值
+  const samples = [
+    { kinds: [], weightPct: 99, voice: 0, want: '大块头' },
+    { kinds: [], weightPct: 1, voice: 0, want: '小不点' },
+    { kinds: [], weightPct: 50, voice: 99, want: '婉转声' },
+    { kinds: [], weightPct: 50, voice: -99, want: '粗嗓门' },
+    { kinds: [], weightPct: 99, voice: 99 },                       // 双牌
+    { kinds: ['shiny'], weightPct: 50, voice: 0, want: '异色' },
+    { kinds: ['colorful'], weightPct: 50, voice: 0, want: '炫彩' },
+    { kinds: ['shiny', 'colorful'], weightPct: 50, voice: 0, want: '异色炫彩' },
+    { kinds: ['pollution'], weightPct: 50, voice: 0, want: '污染' },
+    { kinds: [], weightPct: 50, voice: 0 },                        // 谁都不中
+  ]
+  for (const s of samples) {
+    const shown = M.wildShown(s, on, DEFAULT_RANGE_RULES, false)
+    const text = M.wildTagText(s, DEFAULT_RANGE_RULES)
+    const label = `kinds=[${s.kinds}] w=${s.weightPct} v=${s.voice}`
+    // 核心断言:能画环 → 文案不能是「普通」(那等于描了环却说不出为什么)
+    if (shown) ok(`${label}: 能画环 → 文案非空`, text !== '普通', `实际「${text}」`)
+    else ok(`${label}: 不画环 → 文案为「普通」`, text === '普通', `实际「${text}」`)
+    if (s.want) ok(`${label}: 文案含「${s.want}」`, text.includes(s.want), `实际「${text}」`)
+  }
+  // 双牌文案要同时说两条(只说一条就看不出为什么算双牌)
+  const dual = M.wildTagText({ kinds: [], weightPct: 99, voice: 99 }, DEFAULT_RANGE_RULES)
+  ok('双牌:文案同时含两条奖牌名', dual.includes('大块头') && dual.includes('婉转声'), `实际「${dual}」`)
+}
+
+// —— 5c. 悬浮面板必须走 wildTagText(不得自行拼 wildTags)——
+//
+// 上一条断言测的是函数本身;这一条守住**调用点**。函数写得再对,调用点写错
+// (漏传 rangeRules / 传错第一个参数)页面照样错 —— 而那正是本次故障的形态,
+// 且纯函数测试是抓不到的。故直接读源码断言那一行调的是谁。
+console.log('\n[5c] 悬浮面板调用点')
+{
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync('src/pages/map/useMapEngine.jsx', 'utf8')
+  const twt = src.split('\n').find((l) => l.includes('className="twt"'))
+  ok('存在 .twt 这一行', !!twt)
+  if (twt) {
+    ok('.twt 调用 wildTagText(p, rangeRules)', twt.includes('wildTagText(p, rangeRules)'), `实际: ${twt.trim()}`)
+    ok('.twt 未自行拼 wildTags', !twt.includes('wildTags('), `实际: ${twt.trim()}`)
+  }
+  // 入参顺序:wildTags 的首参是宠物对象。曾传成 p.kinds(数组)导致内部 p.kinds
+  // 取到 undefined —— 这里守住 useMapEngine 里不再残留那种调用。
+  const bad = src.split('\n').filter((l) => /wildTags\(\s*p\.kinds/.test(l))
+  ok('无 wildTags(p.kinds) 这类错误调用', bad.length === 0, bad.join(' | '))
 }
 
 // —— 6. 命中标签(事件行标出「为什么亮了」) ——
@@ -284,7 +349,6 @@ console.log('\n[9] 变焦刻度 rangeScale')
 {
   for (const dim of R.RANGE_DIMS) {
     const sc = R.rangeScale(dim)
-    const span = dim.max - dim.min
 
     // 铺满:轨道两端必须正好是取值域两端,否则滑块拖到底也到不了极值
     eq(`${dim.n}: 值域下界落在轨道 0`, sc.toPos(dim.min), 0)

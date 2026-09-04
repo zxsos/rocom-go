@@ -93,6 +93,15 @@ func New(path string, gd *gamedata.DB) (*Store, error) {
 		rdb.Close()
 		return nil, err
 	}
+	// 合并历史碎片会话(断线重连被记成多条)。只在启动时跑一次:新会话已由
+	// StartPlaySession 在写入时直接续上,不会再积累碎片(见 sessionMergeWindow)。
+	// 这是**数据整理**而非必要条件,失败只记录、不阻止启动 —— 最坏情况是老碎片
+	// 继续分片显示,不影响抓包与解析。
+	if n, err := s.MergeRecentPlaySessions(sessionMergeWindow); err != nil {
+		log.Printf("合并历史游玩会话失败(不影响运行): %v", err)
+	} else if n > 0 {
+		log.Printf("已合并 %d 条碎片游玩会话(间隔 ≤ %v 视为同一次在线)", n, sessionMergeWindow)
+	}
 	s.loadRules()
 	go s.checkpointLoop()
 	return s, nil

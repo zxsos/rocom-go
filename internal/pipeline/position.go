@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"math"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
@@ -43,6 +44,8 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 		p.onBattleFinish(m.Session, acc, m.AppBody, m.Time)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
 		p.onMove(m, acc)
+	case m.Direction == gcp.S2C && m.Opcode == scene.OpOnlineVisitorInfoNotify:
+		p.onVisitorPos(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpQueryBossNpcInfoRsp:
 		p.onBossNpcInfo(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpTeamBattleInfoQueryRsp:
@@ -57,6 +60,10 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 
 // onEnterScene 处理进入场景回包:更新场景态并重置区域/星星观测,另取按区域的收集进度。
 func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
+	// 自己 uin 先落下(与 res 是否解析成功无关):它是被牵着走时从访客流认出自己的凭据。
+	if uin := scene.ParseSelfUin(m.AppBody, scene.SelfInfoInEnterSceneRsp); uin != 0 {
+		p.conn(m.Session).selfUin = uin
+	}
 	if _, res, room, ok := scene.ParseEnterScene(m.AppBody); ok {
 		cs := p.conn(m.Session)
 		cs.res, cs.room = res, room
@@ -85,6 +92,10 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 		return
 	}
 	cs := p.conn(m.Session)
+	// 传送通知同样带 self_info:跨场景传送后它是最早能拿到 uin 的地方。
+	if uin := scene.ParseSelfUin(m.AppBody, scene.SelfInfoInTeleport); uin != 0 {
+		cs.selfUin = uin
+	}
 	cs.res, cs.room = tp.ResID, tp.Room
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
@@ -153,6 +164,9 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	}
 	prev := cs.pos  // 涂地的贴身安全带要沿「上一包 → 这一包」这段路涂,故先留住旧位置
 	cs.pos = mr.Pos // 之后画到每只野生宠的走廊都从这儿起(实体通知里没有玩家坐标)
+	// 移动包在发 = 自己在操作,访客流该让位(见 riderGap / onVisitorPos)。
+	cs.lastMoveAt = m.Time
+	cs.riderPrevAt = m.Time
 	pos := p.buildPos(acc, res, cs.room, mr, m.Time)
 	// 分层地图:玩家当前所在区域(服务器区域进/出事件维护)命中某层的 area_func_id 即在该层,
 	// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
@@ -168,6 +182,96 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	// 涂地:贴身安全带沿这一段路涂,再把「玩家 ↔ 此刻视野里每只野生宠」的走廊涂上
 	// (见 docs/data.md 3.8)。人一动,同样几只宠的走廊也会扫过新的一片,故每包都涂一次。
 	p.paintSeen(m.Session, acc, res, p.movePath(prev, mr))
+}
+
+// riderGap 是判定「客户端已停发移动包」的静默时长。移动包最疏是 2.5-3s 一次心跳(推住摇杆
+// 不变向、或坐骑自行巡航时输入不变),取 4s 为界:既不会在自己正常操作的间隙抢戏,停发后也
+// 能在几秒内接上。实测被牵时停发最长 49s,远大于此。
+const riderGap = 4 * time.Second
+
+// riderStop 是判「这一秒没动」的位移阈值(厘米)。低于它就不给速度、不换向:访客流 1Hz
+// 的采样噪声也在几厘米量级,照着差分会让站着不动的箭头自己乱转。
+const riderStop = 30
+
+// onVisitorPos 处理 s2c 在线访客流(0x02e6):被牵着走/双人骑乘时,用它续上箭头。
+//
+// **为什么需要它**:被其他玩家牵着走或双人骑乘时,客户端不发移动包(0x0133)——位置由领队
+// 带动,自己这一侧没有输入可报。而服务器下发的访客流里仍每秒带着自己的真实坐标。实测
+// (PCAPdroid_01_9月_15_22_36,大世界卡洛西亚大陆 scene_res 10003):那份坐标与移动包
+// 同坐标系、数值连续,可直接投影上图。
+//
+// 症状正是「箭头不动、涂地却在长」:箭头只吃 cs.pos(仅移动包写入),涂地还吃 cs.wildSeen
+// (野生宠 AOI 通知持续刷新)。故这里接管后除推位置外,也照 onMove 那样扫星星、涂地。
+//
+// 自己正常操作时不接管:移动包峰值约 8 条/秒,比 1Hz 的访客流细得多,让高频那侧为准。
+func (p *Pipeline) onVisitorPos(m capture.Message, acc string) {
+	cs := p.conn(m.Session)
+	// selfUin 这道守卫是**深度防御**:即便去掉,Uin 也不会匹配上 —— scene 的 visitor 解析
+	// 只收 uin≠0 的条目(见 parseVisitorInfo),selfUin 为 0 时下面的查找必然落空。
+	// 留着是因为「不知道自己在找谁就别动」这条意图值得显式写出,不依赖别处的内部约束
+	// (变异测试也证实了它当前测不到,勿误以为它被覆盖了)。
+	if cs.selfUin == 0 || cs.res == 0 {
+		return
+	}
+	if !cs.lastMoveAt.IsZero() && m.Time.Sub(cs.lastMoveAt) < riderGap {
+		return // 移动包还在正常来:交给它
+	}
+	var self scene.Visitor
+	found := false
+	for _, v := range scene.ParseOnlineVisitors(m.AppBody) {
+		if v.Uin == uint32(cs.selfUin) {
+			self, found = v, true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	prev := cs.pos
+	// 差分算朝向与速度:访客流只有坐标。dt 取实际间隔,缺基准(首帧/时钟异常)时退回 1s
+	// —— 访客流本就是 1Hz,这是最贴近真值的兜底。
+	prevAt := cs.riderPrevAt
+	if prevAt.IsZero() {
+		prevAt = cs.lastMoveAt
+	}
+	dt := 1.0
+	if !prevAt.IsZero() {
+		if d := m.Time.Sub(prevAt).Seconds(); d >= 0.1 && d <= 10 {
+			dt = d
+		}
+	}
+	dx, dy, dz := float64(self.Pos.X-prev.X), float64(self.Pos.Y-prev.Y), float64(self.Pos.Z-prev.Z)
+	mr := scene.MoveReq{Pos: self.Pos}
+	// 朝向优先用服务器给的 dir.z(与移动包 to_rot 同口径,实测确实下发);缺失(全零)时才
+	// 退回用位移差分——差分只能给出「运动方向」,站着不动时根本无从算起。
+	mr.Yaw = self.Dir.Z
+	moved := math.Hypot(dx, dy) >= riderStop
+	if mr.Yaw == 0 && moved {
+		// 朝向角(度×10)= atan2(dy,dx)。y 轴向下(屏幕系),故 atan2 直接给出
+		// 「0=+X、顺时针增」的角,与移动包 Yaw 同口径(见 buildPos 的 Heading)。
+		mr.Yaw = int32(math.Atan2(dy, dx) * 1800 / math.Pi)
+	}
+	if mr.Yaw == 0 {
+		mr.Yaw = cs.riderYaw // 仍未得出(没动且服务器没给):沿用上一次,别把箭头掰回 0 度
+	}
+	if moved {
+		mr.Speed = scene.Position{X: int32(dx / dt), Y: int32(dy / dt), Z: int32(dz / dt)}
+		cs.riderYaw = mr.Yaw
+	} else {
+		mr.StopMove = true
+	}
+	cs.pos = self.Pos
+	cs.riderPrevAt = m.Time
+	pos := p.buildPos(acc, cs.res, cs.room, mr, m.Time)
+	if l, ok := p.layerOf(m.Session, cs.res, m.Time, true); ok {
+		if lp := p.layerPayload(cs.res, l); lp != nil {
+			pos.SceneName = l.Name
+			pos.Layer = lp
+		}
+	}
+	p.pushPos(acc, pos)
+	p.sweepStars(m.Session, acc, cs.res, mr.Pos.X, mr.Pos.Y, mr.Pos.Z, m.Time)
+	p.paintSeen(m.Session, acc, cs.res, p.movePath(prev, mr))
 }
 
 // paintSeen 涂一次地(见 docs/data.md 3.8):path 是玩家刚走过的一段(空则只用当前位置),
