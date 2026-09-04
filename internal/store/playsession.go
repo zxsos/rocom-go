@@ -37,7 +37,20 @@ type PlaySummary struct {
 	Daily         []PlayDaily `json:"daily"`
 }
 
-// StartPlaySession 开启一次游玩会话(幂等,**按账号**):该账号已有进行中会话时不重复开。
+// sessionMergeWindow 断线重连的合并窗口。
+//
+// 玩家短暂断线(切网络、客户端重启、手机切后台)后几秒到几分钟就会重连,而
+// settleSessions 在「该账号再无活跃连接」时**立刻**记下线(pipeline.go)——
+// 于是同一次在线被拆成两条会话。用户实测的游玩记录里就是一堆几秒/几十秒的碎片
+// (3 秒、1 分 12 秒、1 分 39 秒、2 分 3 秒…),它们与真正的「下线又上线」
+// 在记录里长得一样,看不出是同一次游玩。
+//
+// 故开新会话时,若该账号最近一条**已结束**会话的下线时刻距此刻不超过本窗口,
+// 就重新打开它(而非新建一行):两次在线合并为一段,login_time 保持首次上线。
+const sessionMergeWindow = 5 * time.Minute
+
+// StartPlaySession 开启一次游玩会话(**按账号**):该账号已有进行中会话时不重复开;
+// 否则先看能否续上刚结束的那条(见 sessionMergeWindow),都不行才新建。
 //
 // 为什么按账号而不是按连接:一个玩家常同时保持**多条 TCP 连接**(实测同一账号有
 // 2~3 条),且重连会换新端口(= 新 conn_id)。按连接记会把一次在线拆成好几条
@@ -46,12 +59,128 @@ type PlaySummary struct {
 // conn_id 仍落库,记的是**开这条会话的那条连接**,仅用于溯源;会话存续期间该连接
 // 断开不代表下线(见 pipeline 的 settleSessions)。
 func (s *Store) StartPlaySession(connID, account string, ts int64) error {
-	_, err := s.db.Exec(`
-INSERT INTO play_sessions(conn_id, account, login_time)
-SELECT ?, ?, ?
-WHERE NOT EXISTS (SELECT 1 FROM play_sessions WHERE account = ? AND logout_time IS NULL)`,
-		connID, account, ts, account)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1) 已有进行中会话 → 幂等(多连接/重连不重复开)
+	var open int
+	if err := tx.QueryRow(
+		`SELECT COUNT(*) FROM play_sessions WHERE account = ? AND logout_time IS NULL`,
+		account).Scan(&open); err != nil {
+		return err
+	}
+	if open > 0 {
+		return tx.Commit()
+	}
+
+	// 2) 断线重连:最近一条已结束会话落在合并窗口内 → 重新打开它。
+	//    `ts - logout_time BETWEEN 0 AND ?` 里的下界 0 挡住「ts 早于上次下线」——
+	//    时钟回拨或乱序回放时会算出负间隔,负间隔永远 ≤ 窗口,不挡就会把一条
+	//    时间倒挂的旧会话重新打开(实测回放多份 pcap 时确实会乱序)。
+	res, err := tx.Exec(`
+UPDATE play_sessions
+SET logout_time = NULL, conn_id = ?
+WHERE id = (
+  SELECT id FROM play_sessions
+  WHERE account = ? AND logout_time IS NOT NULL
+    AND ? - logout_time BETWEEN 0 AND ?
+  ORDER BY logout_time DESC LIMIT 1
+)`, connID, account, ts, int64(sessionMergeWindow/time.Second))
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n > 0 {
+		return tx.Commit()
+	}
+
+	// 3) 确实是一段新的在线 → 新建
+	if _, err := tx.Exec(
+		`INSERT INTO play_sessions(conn_id, account, login_time) VALUES(?, ?, ?)`,
+		connID, account, ts); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// MergeRecentPlaySessions 合并库里**已存在**的碎片会话:同账号相邻两段,若前一段下线
+// 与后一段上线的间隔 ≤ window,就并成一段(保留最早登录、最晚下线)。返回合并掉的条数。
+//
+// 只用于清理本功能上线**之前**积累的历史碎片 —— 新碎片已由 StartPlaySession 在写入
+// 时直接续上,不会再产生。故它只在启动时跑一次。
+//
+// 两条硬约束:
+//   - 只动 **已结束** 的会话(logout_time IS NOT NULL)。进行中的会话正被
+//     StartPlaySession 当作「重开目标」,改它会让在线状态错乱。
+//   - 只合并**严格先后**的两段(r.login >= keep.logout)。时间重叠的会话不合并:
+//     重叠时 `login - logout` 为负、永远 ≤ window,放行会把并行会话也吞掉,
+//     而合并后 duration 按「下线 − 登录」算,吞掉并行段会让时长凭空变长。
+func (s *Store) MergeRecentPlaySessions(window time.Duration) (int, error) {
+	rows, err := s.db.Query(`
+SELECT id, account, login_time, logout_time
+FROM play_sessions
+WHERE logout_time IS NOT NULL
+ORDER BY account, login_time, id`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type seg struct {
+		id            int64
+		account       string
+		login, logout int64
+	}
+	var all []seg
+	for rows.Next() {
+		var g seg
+		if err := rows.Scan(&g.id, &g.account, &g.login, &g.logout); err != nil {
+			return 0, err
+		}
+		all = append(all, g)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	sec := int64(window / time.Second)
+	merged := 0
+	var keep *seg
+	for i := range all {
+		cur := all[i]
+		if keep != nil && cur.account == keep.account &&
+			cur.login >= keep.logout && cur.login-keep.logout <= sec {
+			// 并入 keep:下线时刻取较晚者,duration 按「下线 − 登录」重算。
+			if cur.logout > keep.logout {
+				if _, err := tx.Exec(
+					`UPDATE play_sessions SET logout_time = ?, duration = MAX(0, ? - login_time) WHERE id = ?`,
+					cur.logout, cur.logout, keep.id); err != nil {
+					return 0, err
+				}
+				keep.logout = cur.logout
+			}
+			if _, err := tx.Exec(`DELETE FROM play_sessions WHERE id = ?`, cur.id); err != nil {
+				return 0, err
+			}
+			merged++
+			continue
+		}
+		keep = &all[i] // 新的一段(取地址到切片元素,上面已把较晚下线写回它)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return merged, nil
 }
 
 // EndAccountSessions 结束某账号的全部进行中会话,写入下线时间与时长(时长=下线-登录,秒)。

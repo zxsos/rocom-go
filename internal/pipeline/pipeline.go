@@ -56,12 +56,26 @@ type connState struct {
 	// (见 scene.ParseAreaActs),是「玩家当前在洞穴/几楼」的权威依据。一个 func 可含多个
 	// area(如信仰者村落一层同时进入 541030265/541030499),故按 func 存 area 集合:
 	// 离开其中一个仍在该层,集合空了才算离开。
-	areas      map[uint32]map[uint32]bool
-	layer      *layerState               // 分层地图去抖状态(见 layerDebounce)
-	stars      *starTracker              // 眠枭之星观测态(换场景/传送即重置)
-	wilds      *wildTracker              // 野生宠物图层观测态(换场景即重置,同场景传送只置灰;见 wildpets.go)
-	gathers    *gatherTracker            // 实时采集物观测态(同上,见 gathers.go)
-	pos        scene.Position            // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
+	areas   map[uint32]map[uint32]bool
+	layer   *layerState    // 分层地图去抖状态(见 layerDebounce)
+	stars   *starTracker   // 眠枭之星观测态(换场景/传送即重置)
+	wilds   *wildTracker   // 野生宠物图层观测态(换场景即重置,同场景传送只置灰;见 wildpets.go)
+	gathers *gatherTracker // 实时采集物观测态(同上,见 gathers.go)
+	pos     scene.Position // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
+	// selfUin:自己的 uin,来自进入场景/传送通知的 self_info(scene.ParseSelfUin)。
+	// 访客流(0x02e6)里所有人都混在一起,得先知道它是谁才能认出自己那一条 —— 被牵着走时
+	// 全靠那条流续命(见 position.go 的 onVisitorPos)。
+	selfUin uint64
+	// lastMoveAt:最近一次自己移动包(0x0133)的包内时刻。访客流据此判断「客户端已停发移动包」
+	// 才接管,避免在自己正常操作的间隙抢戏(riderGap)。
+	lastMoveAt time.Time
+	// riderPrevAt:上一次更新位置的时刻,供访客流补位时算本段的位移速度(访客流只有坐标,
+	// 没有 Speed,只能靠前后两包差分)。位置基准直接用 cs.pos —— 两者在每次更新后必然相等,
+	// 再存一份只会多出一个需要同步的冗余字段。
+	riderPrevAt time.Time
+	// riderYaw:上一次由访客流补位算出的朝向(度×10)。站着不动时不该把箭头掰回 0 度,
+	// 故位移过小就沿用上一次的朝向。
+	riderYaw   int32
 	wildSeen   map[uint64]scene.Position // 当前 AOI 里**全部**野生宠实体的位置(涂地用,不只稀有那几只)
 	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
 	home       *homeState                // 家园小窝图层状态(仅在家园场景内非空,见 home.go)

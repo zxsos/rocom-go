@@ -9,7 +9,10 @@ import { usePois } from './usePois'
 import { useGathers } from './useGathers'
 import { useRoutes, RouteLayer } from './useRoutes.jsx'
 import { useWildPets } from './useWildPets'
-import { wildTags } from './wildMatch'
+// 标签文案一律走 wildTagText,不要在这里自己拼 wildTags(...):
+// 两处显示(原生 tooltip 与点击后的悬浮面板)必须同源,分开写就会漂移 ——
+// 曾漏传 rangeRules,导致「图上描着大块头的环、点开却显示普通」。
+import { wildTagText } from './wildMatch'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
@@ -21,7 +24,7 @@ import { GlassChip, rkpetURL } from '../../components/badges'
 export function wildTitle(p, rangeRules = []) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
-  head.push(...wildTags(p, rangeRules))
+  head.push(wildTagText(p, rangeRules))
   const w = p.weightPct != null ? `${Math.round(p.weightPct * 10) / 10}%` : '-'
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
@@ -443,7 +446,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist, rangeRules = [] }) 
           <div key={p.id + '-tip'} className="map-wild-tip"
             style={{ left: p.u * mapPx, top: p.v * mapPx }}>
             <div className="twn">{p.n || '野生宠物'}{p.lv ? ' Lv.' + p.lv : ''}</div>
-            <div className="twt">{wildTags(p.kinds).join(' ') || '普通'}</div>
+            <div className="twt">{wildTagText(p, rangeRules)}</div>
             {/* 炫彩/异色炫彩:悬浮面板里展示完整色卡(角标圆盘太小看不清,点开可细看配色)。
                 后端在 glassType != 空 时才带这两个字段,故此处判断即可;异色(仅 shiny)无炫彩数据不显示。 */}
             {p.glassType > 0 && p.glassValue > 0 && (

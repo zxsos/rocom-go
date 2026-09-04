@@ -23,6 +23,13 @@ const (
 	OpPlayActsNotify = 0x0414 // ZONE_SCENE_PLAY_ACTS_NOTIFY(1044), s2c,区域进/出等动作(见 ParseAreaActs)
 )
 
+// self_info(ActorInfo)在两条 s2c 通知里的字段号。二者结构一致,取 uin 的路径也一致
+// (见 ParseSelfUin),故只差这个字段号。
+const (
+	SelfInfoInEnterSceneRsp = 11 // ZoneEnterSceneRsp(0x0152).self_info
+	SelfInfoInTeleport      = 21 // ZoneSceneTeleportNotify(0x015c).self_info
+)
+
 // Position 是场景世界坐标(UE 单位,1=1 厘米;玩家 z 为脚底高度,角色中心+85)。
 type Position struct {
 	X, Y, Z int32
@@ -390,6 +397,90 @@ func ParseTeleport(body []byte) (Teleport, bool) {
 		}
 	})
 	return t, t.ResID != 0
+}
+
+// ParseSelfUin 从 s2c 进入场景(0x0152)/传送(0x015c)通知里的 self_info 取玩家自己的 uin。
+//
+// 路径 self_info → avatar(12) → base(1) → logic_id(3)。ActorInfo 是个 union:npc(11)
+// 给 NPC、avatar(12) 给玩家,两者**共用同一个 ActorInfo_Base**(3 logic_id / 8 pt /
+// 11 lv / 12 name / 13 gender)。自己只会落在 avatar 分支。
+//
+// 要 uin 是因为:被其他玩家牵着走/双人骑乘时,客户端**不发移动包**(位置由领队带动,自己
+// 这一侧没有输入可报),只有 0x02e6 访客流还在每秒报一次真实坐标——而那条流里所有人都混在
+// 一起,得先知道自己是谁才能认出自己那一条。见 OpOnlineVisitorInfoNotify。
+func ParseSelfUin(body []byte, selfInfoField protowire.Number) uint64 {
+	base := subMsg(subMsg(subMsg(body, selfInfoField), 12), 1)
+	if base == nil {
+		return 0
+	}
+	var uin uint64
+	scanFields(base, func(num protowire.Number, typ protowire.Type, _ []byte, v uint64) {
+		if num == 3 && typ == protowire.VarintType { // logic_id
+			uin = v
+		}
+	})
+	return uin
+}
+
+// OpOnlineVisitorInfoNotify 是 s2c 的「在线访客」位置流(ZONE_SCENE_ONLINE_VISITOR_INFO_NOTIFY,
+// 742),服务器把**当前世界实例里的全部玩家(含自己)**逐条下发,约 1Hz。
+//
+// 它补的是移动包(0x0133)的一片盲区:被牵着走/双人骑乘时客户端不发移动包,而这条流照报,
+// 故可据此把箭头继续往前推。实测(PCAPdroid_01_9月_15_22_36,大世界卡洛西亚大陆 scene_res
+// 10003):自己那份坐标与移动包**同一坐标系、数值连续**,可直接投影上图。
+const OpOnlineVisitorInfoNotify = 0x02e6
+
+// Visitor 是访客流里一个玩家的位置与朝向。VisitorInfo 还有 network(2)/scene_res_id(4)/
+// main_scene_pt(5)/zone_inst_id(6),本功能不需要:pos 已是自己所在场景的坐标(正好对应
+// cs.res),main_scene_pt 只在访客身处子场景时才有,用于「别人在家园里时在大地图上标他」。
+//
+// Dir 来自 Point.dir(旋转,Position 形状:x=Roll y=Pitch z=Yaw),与移动包 to_rot 同口径:
+// 只有 z 有意义,是朝向角×10(度×10)。实测服务器确实下发(如 z:-1523),故**优先用它**
+// 而不是靠前后两包差分——差分只在 dir 缺失(全零)时兜底。
+type Visitor struct {
+	Uin uint32
+	Pos Position
+	Dir Position
+}
+
+// ParseOnlineVisitors 从 s2c 访客流(0x02e6)取全部玩家的位置与朝向。
+// 结构:visitor_info(field 1,重复 VisitorInfo) → 每个 {uin(1), pos(3,Point{pos(1),dir(2)})}。
+func ParseOnlineVisitors(body []byte) []Visitor {
+	var out []Visitor
+	scanFields(body, func(num protowire.Number, typ protowire.Type, val []byte, _ uint64) {
+		if num != 1 || typ != protowire.BytesType {
+			return
+		}
+		if v, ok := parseVisitorInfo(val); ok {
+			out = append(out, v)
+		}
+	})
+	return out
+}
+
+// parseVisitorInfo 解一个 VisitorInfo,取 uin(1)与 pos(3)。解不出 uin 判为误命中。
+func parseVisitorInfo(b []byte) (Visitor, bool) {
+	var v Visitor
+	scanFields(b, func(num protowire.Number, typ protowire.Type, val []byte, u uint64) {
+		switch {
+		case num == 1 && typ == protowire.VarintType:
+			v.Uin = uint32(u)
+		case num == 3 && typ == protowire.BytesType: // pos = Point{pos(1), dir(2)}
+			scanFields(val, func(n2 protowire.Number, t2 protowire.Type, sub []byte, _ uint64) {
+				if n2 != 1 && n2 != 2 {
+					return
+				}
+				if p, ok := parsePosition(sub); ok {
+					if n2 == 1 {
+						v.Pos = p
+					} else {
+						v.Dir = p // dir:旋转(Rotator×10),只有 z=Yaw 有意义
+					}
+				}
+			})
+		}
+	})
+	return v, v.Uin != 0
 }
 
 // retFailed 判断 RetInfo 子消息是否表示失败(field 1 = ret_code,非 0 即失败)。

@@ -46,6 +46,17 @@ export default [
     },
   },
   {
+    // src 下的 *.test.mjs 同属 Node 侧:它们用 `node path/to/x.test.mjs` 直接跑
+    // (见 CONTRIBUTING/AGENTS 的测试说明),顶层 assert / console 都是 Node 全局,
+    // 而上面 src/**/*.{js,jsx} 那套只给了 browser 全局,故这里补一条。
+    files: ['src/**/*.test.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
+    },
+  },
+  {
     // 用 playwright 的验收脚本是**双环境**:顶层跑 Node,而 page.evaluate / addInitScript
     // 的回调体是序列化后放进浏览器执行的 —— 里面用的 window / document / location 是
     // 浏览器的。故两套全局都要给,否则这些浏览器侧代码会被误报 no-undef。
@@ -77,6 +88,9 @@ export default [
       'scripts/verify-account-mobile.mjs',
       'scripts/verify-theme-spread-browser.mjs',
       'scripts/verify-page-boot.mjs', // 页面启动(白屏/黑屏)—— 前端产物缺件的唯一可见证据
+      'scripts/verify-pet-card-size.mjs', // 陈列卡图片不放大/不溢出、四角徽标不重叠不截断
+      'scripts/verify-pet-toggles.mjs', // 筛选面板按键开关(整块命中区、原生语义保留)
+      'scripts/verify-slider.mjs', // 双滑块(钳制/叠放/变焦刻度)—— 回调体里用 document
     ],
     languageOptions: {
       ecmaVersion: 'latest',
