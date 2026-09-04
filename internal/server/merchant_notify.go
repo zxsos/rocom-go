@@ -62,16 +62,22 @@ func (s *Server) merchantClaim(slotStart time.Time) bool {
 	return true
 }
 
-// merchantNotify 槽缓存写好且判定有货后调用:对比本营业日更早轮的商品与本槽**已通知过**的
-// 商品,找出「新增」部分,对关键词命中的订阅者发邮件;每个商品对同一邮箱只提醒一次。
+// merchantNotify 槽缓存写好且判定有货后调用:对本槽**尚未通知过的商品**,对关键词命中的
+// 订阅者发邮件。去重粒度是**每槽每商品**,且**不跨档**。
 //
-// 去重两层:库表 merchant_notified.items 挡跨进程/重启与**同一轮内的多次回源**(发信成功后
+// 为什么不跨档:远行商人一天四档(8/12/16/20),同一批货会隔档重新上架 —— 2026-09-03 实测
+// 16:00 档的 蓝晶碧玺/魔力果/神奇的蛋 与 08:00 档一字不差,而原先「对比本营业日更早轮的
+// 商品名」那条去重会把整档静默吞掉(连一行日志都没有,排查时无从下手)。对每个订阅者来说,
+// 隔档重新上架是一次**新的购买机会**:早上没买到的,下午补货了还想知道。
+// 故去重只认 merchant_notified(按 槽+邮箱+商品名 记),它天然只挡本槽。
+//
+// 去重两层:库表 merchant_notified.items 挡跨进程/重启与**同一槽内的多次回源**(发信成功后
 // 才 Mark,失败留给补扫重试),merchantClaim 挡同进程内并发触发(见该函数注释)。
 //
-// 按商品而非按槽去重的理由:第三方滞后补货,同一轮会回源多次(见 merchantShouldFetch),
-// 每次都可能带来新商品。只按槽去重的话,轮次开始那次若已发过信,后续补上的商品就被永久挡住
+// 按商品而非按槽去重的理由:第三方滞后补货,同一槽会回源多次(见 merchantShouldFetch),
+// 每次都可能带来新商品。只按槽去重的话,槽开始那次若已发过信,后续补上的商品就被永久挡住
 // —— 2026-08-30 就是这样:20:0x 首查只有 4 件全天货,20:56 补上的 3 件专属货再没发出去。
-// 现在第二次通知只会包含「上一次没发过的」那几件。
+// 现在同一槽的第二次通知只会包含「上一次没发过的」那几件。
 //
 // SMTP 未配置(发件邮箱为空)时静默返回,不影响商家数据本身。
 func (s *Server) merchantNotify(slotStart time.Time) {
@@ -108,30 +114,7 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			slotStart.Format("01-02 15:04"), err, truncateBytes([]byte(data), 200))
 		return
 	}
-	// 本营业日更早槽已出现过的商品名(8 点轮无更早槽 → 全部算新增)。
-	seen := map[string]bool{}
-	for _, st := range merchantDaySlots(merchantDayStart(slotStart)) {
-		if !st.Before(slotStart) {
-			break
-		}
-		if e, d, _, ok2 := s.store.GetMerchantSlot(st.Unix()); ok2 && !e {
-			var o struct {
-				Data struct {
-					Items []struct {
-						Name string `json:"name"`
-					} `json:"items"`
-				} `json:"data"`
-			}
-			if json.Unmarshal([]byte(d), &o) == nil {
-				for _, it := range o.Data.Items {
-					if it.Name != "" {
-						seen[it.Name] = true
-					}
-				}
-			}
-		}
-	}
-	// 每个订阅者的「本轮新增」不同 —— 已通知过的商品按邮箱分别去重,故逐个算。
+	// 每个订阅者的「本槽未通知商品」可能不同(已通知清单是按邮箱分别记的),故逐个算。
 	// 先算出全部待办再统一认领发信权,避免「第一个人没新货」就把整槽的发信权占掉。
 	subs, err := s.store.ListMerchantSubs()
 	if err != nil {
@@ -140,35 +123,35 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 	}
 	type pending struct {
 		email string
-		news  []merchantItem
+		fresh []merchantItem
 	}
 	var pend []pending
-	// unnotified 记「所有订阅者里最多的未通知新货数」,用来区分下面两种「pend 为空」:
-	//   - 为 0:这些都通知过了 —— 正常;
-	//   - > 0:有新货却没人收到 —— 反常(多半是订阅关键词配置与预期不符),值得记一笔。
+	// unnotified 记「所有订阅者里最多的未通知商品数」,用来区分下面两种「pend 为空」:
+	//   - 为 0:本槽这些都通知过了 —— 正常;
+	//   - > 0:有货却没人收到 —— 反常(多半是订阅关键词配置与预期不符),值得记一笔。
 	unnotified := 0
 	for _, sub := range subs {
 		notified := s.store.MerchantNotifiedItems(slotStart.Unix(), sub.Email)
-		var news []merchantItem
+		var fresh []merchantItem
 		for _, it := range out.Data.Items {
-			if !seen[it.Name] && !notified[it.Name] {
-				news = append(news, it)
+			if !notified[it.Name] {
+				fresh = append(fresh, it)
 			}
 		}
-		if len(news) > unnotified {
-			unnotified = len(news)
+		if len(fresh) > unnotified {
+			unnotified = len(fresh)
 		}
-		if len(news) == 0 || !merchantSubMatch(sub.Keywords, news) {
-			continue // 没有他没见过的商品,或关键词没命中,不打扰
+		if len(fresh) == 0 || !merchantSubMatch(sub.Keywords, fresh) {
+			continue // 本槽的货都通知过他了,或关键词没命中,不打扰
 		}
-		pend = append(pend, pending{sub.Email, news})
+		pend = append(pend, pending{sub.Email, fresh})
 	}
 	if len(pend) == 0 {
-		// 只在**有新货却没人收到**时记。若只是「都已通知过」则不记 —— merchantResend
+		// 只在**有货却没人收到**时记。若只是「本槽都已通知过」则不记 —— merchantResend
 		// 每 15 分钟把每个有货槽都过一遍,那种情况记下来纯属刷屏,反而把要紧的
 		// 发信耗时日志淹掉。
 		if unnotified > 0 {
-			log.Printf("merchantNotify 跳过 slot=%s: %d 件未通知新货,但无订阅者关键词命中(订阅数=%d)",
+			log.Printf("merchantNotify 跳过 slot=%s: 本槽 %d 件未通知商品,但无订阅者关键词命中(订阅数=%d)",
 				slotStart.Format("01-02 15:04"), unnotified, len(subs))
 		}
 		return
@@ -209,7 +192,7 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 			merchantDayStart(slotStart).Format("2006-01-02"),
 			slotStart.Format("15:04")+" ~ "+slotStart.Add(merchantSlotStep).Format("15:04"),
 			slotStart, time.Unix(fetchedAt, 0),
-			p.news)
+			p.fresh)
 		buildCosts[i] = time.Since(t0)
 		// 退订签名只在 HTML 模板尾部保留一份(见 merchantMailHTMLTpl),正文不再重复。
 		mails[i] = merchantMail{
@@ -230,8 +213,8 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		p := pend[i]
 		if err == nil {
 			sent++
-			names := make([]string, 0, len(p.news))
-			for _, it := range p.news {
+			names := make([]string, 0, len(p.fresh))
+			for _, it := range p.fresh {
 				names = append(names, it.Name)
 			}
 			// 记录的是「本批商品已通知」而非「本槽已通知」:下次重查带着新货再来时,
@@ -251,7 +234,7 @@ func (s *Server) merchantNotify(slotStart time.Time) {
 		// 耗时一律看下面那行汇总(以及 smtp 批量发信那行)。
 		log.Printf("merchantNotify 发信 #%d/%d slot=%s to=%s 构造=%.2fs 商品=%d %s",
 			i+1, len(pend), slotStart.Format("15:04"), p.email,
-			buildCosts[i].Seconds(), len(p.news),
+			buildCosts[i].Seconds(), len(p.fresh),
 			map[bool]string{true: "失败", false: "成功"}[err != nil])
 	}
 	log.Printf("merchantNotify 完成 slot=%s 待发=%d 成功=%d 失败=%d 总耗时=%.2fs",

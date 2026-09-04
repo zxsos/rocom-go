@@ -35,6 +35,10 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 		p.observeHome(m.Session, acc, m.AppBody)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpNpcNextActReq:
 		p.onNpcInteract(m.Session, m.AppBody, m.Time)
+		// 采集物与家园是两套独立的观测态,都得看这条交互 —— 家园那条只认小窝上的蛋
+		// (见 onNpcInteract),认不出采集物,故这里单独再记一次(见 gathers.go 的
+		// noteGatherPick:果树采完服务器不撤实体,靠奖励确认后才撤标记)。
+		p.noteGatherPick(m.Session, m.AppBody, m.Time)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpBattleFinishNotify:
 		p.onBattleFinish(m.Session, acc, m.AppBody, m.Time)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:

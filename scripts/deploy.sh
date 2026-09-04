@@ -70,6 +70,48 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ---- 前端产物完整性校验 ----
+#
+# 存在理由:2026-09-04 线上黑屏。某个 assets chunk 不在工作树里时,
+# `//go:embed all:web` 会**静默跳过**(不报错),而 handleStatic 对找不到的路径一律
+# 走 SPA fallback 返回 index.html —— 于是浏览器拿到 200 + text/html,按 HTML 规范
+# 拒绝执行 module script,React 从未挂载,页面全黑。服务端返回 200、日志一条异常
+# 都没有,只能靠浏览器控制台发现,排查成本极高。
+#
+# 故在**编译前**校验:解析 index.html 引用的每个 assets/*,逐个确认文件存在。
+# 缺一个就中止 —— 带着缺件的产物编出来再部署,比不部署更糟(旧的还能用)。
+# 必须在 go build **之前**跑:embed 发生在编译期,编完再查已经晚了。
+check_frontend_assets() {
+    local out="$1"
+    local html="$out/index.html"
+    [[ -f "$html" ]] || return 0   # 无前端产物(如纯后端部署)不校验
+
+    # 从 index.html 抽出所有 assets/ 引用(src= / href= 两种写法都能匹配)
+    local refs missing=0 n=0
+    refs="$(grep -oE 'assets/[A-Za-z0-9._-]+' "$html" | sort -u || true)"
+    [[ -n "$refs" ]] || return 0
+
+    for r in $refs; do
+        n=$((n + 1))
+        if [[ ! -s "$out/$r" ]]; then
+            echo "错误: 前端产物缺件 —— $out/$r (index.html 引用了它,但文件不存在或为空)" >&2
+            missing=$((missing + 1))
+        fi
+    done
+
+    if [[ "$missing" -gt 0 ]]; then
+        echo "" >&2
+        echo "$missing/$n 个被引用资源缺失。常见原因:vite 的 emptyOutDir 先清空产物目录," >&2
+        echo "上次 npm run build 中途失败/被中断,文件删了没生成回来;" >&2
+        echo "而 go:embed 对缺失文件不报错,故问题会一路静默到线上。" >&2
+        echo "" >&2
+        echo "修复: git checkout -- internal/server/web/  再重新本脚本;" >&2
+        echo "      或在本机 npm run build 提交产物。" >&2
+        return 1
+    fi
+    echo "    前端产物校验通过: index.html 引用的 $n 个资源齐全"
+}
+
 # ---- 必须 root ----
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "错误: 需要 root 权限,请用 sudo 运行。" >&2
@@ -294,6 +336,9 @@ case "$ACTION" in
         else
             echo "==> 前端产物已最新(源码无更新),跳过构建"
         fi
+
+        # 编译前校验产物完整性:embed 在编译期发生,编完再查就晚了(见 check_frontend_assets)
+        check_frontend_assets "$FRONTEND_OUT"
 
         echo "==> 编译 (go build,前端 embed)"
         CGO_ENABLED=1 go build -trimpath -o "$BIN_NAME" ./cmd/rocom-capture

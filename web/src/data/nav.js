@@ -4,7 +4,7 @@ import {
 } from '../components/svg'
 
 // 一级导航;带 children 的分组项渲染为 2 级菜单(顶栏 hover 下拉 / 底部 tab 弹出面板)。
-// 收纳逻辑:功能按「对游戏做了什么」归为三组——我的精灵(收集养成)、世界(探索家园)、商店(洛克贝买卖比拼)。
+// 收纳逻辑:功能按「对游戏做了什么」归为三组——我的精灵(收集养成)、世界(探索家园)、商人(洛克贝买卖比拼)。
 export const NAV = [
   {
     label: '我的精灵', icon: IconBag,
@@ -24,7 +24,7 @@ export const NAV = [
     ],
   },
   {
-    label: '商店', icon: IconCoin,
+    label: '商人', icon: IconCoin,
     children: [
       { to: '/merchant', label: '远行商人', icon: IconSuitcase },
       { to: '/leaderboard', label: '排行榜', icon: IconTrophy },

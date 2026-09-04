@@ -30,9 +30,10 @@ import (
 //   - 触发回源两条路径:merchantLoop 轮询当前槽(覆盖「早上 8 点自动查第一次」与整点后的
 //     密集重试,见 merchantPoll / merchantCatchupEvery),以及玩家打开页面时
 //     handleMerchant 按当前时间补查/重查当前轮;
-//   - 订阅提醒:有货槽写入后对比本营业日更早轮与**本槽已通知过的商品**找出「新增商品」,
-//     对订阅者(邮箱+关键词,空关键词=全部)发 QQ 邮箱邮件;每个商品对每邮箱只提醒一次
-//     (merchant_notified.items 去重,见 store.MerchantNotifiedItems)。SMTP 未配置时静默跳过。
+//   - 订阅提醒:有货槽写入后,对该槽**尚未通知过的商品**,对订阅者(邮箱+关键词,空关键词=全部)
+//     发 QQ 邮箱邮件。去重粒度是**每槽每商品**且**不跨档** —— 同一批货隔档重新上架时要再
+//     提醒一次(2026-09-03 实测 16:00 档货单与 08:00 档完全相同,跨档去重会整档静默),
+//     依据与理由见 merchant_notify.go 的 merchantNotify。SMTP 未配置时静默跳过。
 const (
 	merchantOpenHour = 8                // 每天 8 点开张(8 点前休市)
 	merchantSlotStep = 4 * time.Hour    // 查询槽跨度(8/12/16/20 四轮)
