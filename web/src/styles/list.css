@@ -45,15 +45,260 @@
 .boxmap-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .boxmap-cell.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
-/* 桌面表格(.table-wrap 调试页亦复用;移动端隐藏,调试页用内联 display:block 盖回)
+/* ==================================================================
+   两个视图:陈列(.pet-grid / .pet-card)与表格(table.pets)。
+   由工具栏的 .viewseg 切换,选哪个跟屏幕宽度无关 —— 陈列适合「找那一只」,
+   表格适合「把这一页竖着比」,是两种不同的意图(见 PetList.jsx 的注释)。
+   表格在窄屏也不隐藏了:它自带横向滚动 + 首列吸左,用户既然选了就给他。
+   ================================================================== */
+
+/* 「视图开关 + 共 N 只」打包项:内部永不换行,整体不收缩,
+   免得窄屏下两者被 flex-wrap 拆到两行(见 PetList.jsx 注释)。 */
+.list-tail { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+
+/* ---- 视图开关(工具栏里的二选一胶囊)----
+   选中态用 accent-soft 而非「反色底」:深浅主题下 --bg-1/--bg-2 的相对明暗是反的
+   (暗色主题下 --bg-1 更暗),用背景反色做选中态会在一个主题下变成「凹」、
+   另一个主题下变成「凸」。铺一层主色淡底则两个主题都读作「选中」。 */
+.viewseg { display: inline-flex; gap: 2px; padding: 2px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); }
+.viewseg-b {
+  border: none; background: none; cursor: pointer;
+  padding: 5px 12px; border-radius: 7px; font-size: 13px; color: var(--fg-dim);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.viewseg-b:hover { color: var(--fg); }
+.viewseg-b:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 1px var(--accent); }
+.viewseg-b.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+/* ---- 陈列视图 ----
+   两个尺寸令牌都由 CSS 持有:移动端要连同布局方向一起改(见文件末尾媒体查询)。
+
+   --pet-card-min 200px:原 236 在 1440×900 下只排 4 列,收到 200 能排 5 列。
+   max 必须是 1fr(填满容器),**不能**改成固定值去限宽:实测过
+   `minmax(236px, 340px)`,那时列宽被钉死 340 不再自适应,1500px 容器下 4 列
+   只占 1396px,宽屏右侧大片留白。限宽交给 .pt-img 的 max-*。
+
+   --pet-media-h 104px:图区**固定高度**而非 aspect-ratio。
+   aspect-ratio 在这里有两个坑(都实测过):
+     1. img 的 height:100% 与父的 aspect-ratio 循环依赖,浏览器回退到图片固有
+        比例(Pet256 是正方形),图区被撑成 ≈1:1,声明的 4/3 根本不生效;
+     2. 更糟的是它会让图区高度**跟着卡片宽度走** —— 卡越宽图区越高,
+        单卡被撑到 479px,1440×900 首屏只能看 4 只。
+   固定高度后图区不再受列宽影响,卡片高度可预测。 */
+.pet-grid {
+  display: grid; gap: 10px;
+  --pet-card-min: 200px;
+  --pet-media-h: 104px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--pet-card-min), 1fr));
+}
+.pet-card {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  overflow: hidden; cursor: pointer; user-select: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  /* 长列表滚动性能:视口外卡片跳过布局/绘制,滚动条不跳(原 .card 同款处理)。
+     占位高度须接近实测值(此前写 336 而实测量到 471~482,差了 40%,滚动到底部
+     时滚动条会明显跳动)。紧凑化后实测量约 300,取 300。 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+@media (hover: hover) {
+  .pet-card:hover { border-color: var(--accent); transform: translateY(var(--lift)); box-shadow: var(--shadow-lift); }
+}
+.pet-card:active { transform: scale(.995); }
+.pet-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-sm); }
+
+/* 图区:标本托盘。中心一圈极淡的 --fg 混合色做纵深,让透明底的全身像"浮"起来。
+   用 color-mix(var(--fg), 7%) 而非实色:暗色下 --fg 是浅色 → 中心提亮,
+   浅色下 --fg 是深色 → 中心压暗,两个主题都是"中心比四周更实"的同一观感,
+   而 --hero-tint 那类固定色在一个主题下会变成一块脏斑。
+
+   高度取 --pet-media-h 固定值,不用 aspect-ratio —— 理由见 .pet-grid 处注释
+   (循环依赖 + 图区高度跟着列宽走撑高单卡)。
+
+   用 **flex 而非 grid** 是必须的:grid 的隐式行高按**内容**算,而 img 又写了
+   height:100% —— 两者循环依赖,浏览器先按内容定行高,于是 img 被解析成图片的
+   固有高度 256 而非容器高度,**溢出 104px 的图区**(实测:真实组件因
+   loading="lazy" 侥幸是 103,去掉 lazy 或命中缓存立即加载时就是 256)。
+   这是**时序依赖**的布局,缓存/网络状况一变就露馅,不能靠 lazy 兜着。
+   flex 容器有确定高度,item 的 max-height:100% 直接相对它解析,无循环。
+   overflow:hidden 再兜一层:万一将来尺寸链又出问题,是裁掉而不是顶破卡片。 */
+.pt-media {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: var(--pet-media-h); overflow: hidden;
+  border-bottom: 1px solid var(--line-soft);
+  background:
+    radial-gradient(110% 80% at 50% 14%, color-mix(in srgb, var(--fg) 7%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg-3));
+}
+/* 全身像必须 contain:这些图是带透明背景的整只宠物,cover 会把头尾裁掉。
+
+   盒子尺寸**必须由 CSS 定死**(100% × 100%),不能靠 width/height:auto 让内容撑:
+   试过 auto,结果依赖图片是否已加载 —— loading="lazy" 未加载时内容尺寸为 0,
+   图片塌陷成 16×16(只剩 padding);加载完又变成 103。同一份 CSS 两种结果,
+   随缓存/网络状况漂移,不能接受。
+
+   配合 .pt-media 改用 flex(高度确定,不按内容反推行高),100% 能稳定解析。
+   图片的比例由 object-fit:contain 处理,与加载状态无关。
+
+   min(256px, 100%) 压住两头的上限:
+     - 100% —— 不超过图区(图区固定 104,故显示 ~88);
+     - 256px —— 不超过源尺寸(Pet256 实测 734/737 张是这个尺寸)。放大显示就会糊,
+       有损 webp(gen_images.py 的 QUALITY=90)的边缘振铃会被放大效应一并凸显。
+       图区将来若调高,靠这一档兜住。
+
+   ⚠️ 两个上限必须写进**同一条** min(),不能分两行 —— CSS 同名属性后者胜出,
+   写成 max-width:256px 再 max-width:100% 的话,实际生效的只有 100%,
+   256 那道限制静默失效。
+   padding 算进盒内(box-sizing:border-box,见 base.css 的 *)。 */
+.pt-img {
+  width: 100%; height: 100%; padding: 8px; object-fit: contain; display: block;
+  max-width: min(256px, 100%);
+  max-height: min(256px, 100%);
+}
+.pt-fallback { font-size: 40px; opacity: .5; }
+
+/* ---- 四角徽标(见 PetCard.jsx 的分工说明)----
+   位置贴边 5px、竖排、间距 2px —— 图区高只有 104px(桌面),右上最多 4 项
+   (系别×2 + 形态 + 血脉),紧凑排版才能全部放下且留出图片主体。 */
+/* 左右两栏:各占图区一侧,内部 space-between 把上下两组顶到两端。
+   pointer-events 分层:栏本身 none(不挡图片的点选),栏内角标 auto
+   (炫彩色卡要能点开放大 —— 见 badges.jsx 的 GlassChip)。 */
+.pt-side {
+  position: absolute; top: 5px; bottom: 5px; z-index: var(--z-raised);
+  display: flex; flex-direction: column; justify-content: space-between;
+  /* 固定上限而非百分比:图区宽在两端差异极大(桌面 204~241px、移动端 132px),
+     用百分比要么桌面压图、要么移动端挤爆。取 62px 是两端的最小可行解 ——
+     它刚好容纳最长的一项(形态「夏日的样子」5 字 × 10px + 内边距 ≈60px),
+     且两侧 62 + 62 = 124px < 移动端图区 132px,左右不会撞。 */
+  max-width: 62px;
+  pointer-events: none;
+}
+.pt-side.left { left: 5px; align-items: flex-start; }
+.pt-side.right { right: 5px; align-items: flex-end; }
+
+.pt-corner { display: flex; flex-direction: column; gap: 2px; max-width: 100%; pointer-events: auto; }
+/* 异色/炫彩:横排(见 PetCard.jsx 注释) */
+.pt-corner.row { flex-direction: row; align-items: center; gap: 3px; }
+
+/* 角标里的文字徽标(等级/性格/特长/形态)。
+   半透明背板是**必须**的:它们压在图区渐变上,而宠物图透明背景,
+   没有背板时浅色系宠物(如冰系白身)会把文字吃掉。
+   backdrop-filter 让背板"糊"住背后的图而不是硬盖一层,视觉更轻。 */
+.pt-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0 5px; border-radius: 6px;
+  font-size: 10px; line-height: 15px; font-weight: 600; color: var(--fg);
+  background: color-mix(in srgb, var(--bg-1) 82%, transparent);
+  border: 1px solid var(--line-soft); backdrop-filter: blur(2px);
+}
+/* 等级:唯一带强调色的角标 —— 它是玩家最常读的一项,且要与下面两行
+   (性格/特长)区分开,否则三行小字糊成一片。 */
+.pt-lv { color: var(--accent); font-weight: 700; }
+
+/* 角标内的系别/血脉:沿用它们原有的彩色徽标样式(玩家靠颜色认系别),
+   只压缩到角标尺寸。.type 自带 margin(行内排版用),flex 下与 gap 叠加。 */
+.pt-corner .type { margin: 0; font-size: 10px; padding: 0 5px 0 3px; line-height: 15px; }
+.pt-corner .type-ic { width: 12px; height: 12px; }
+.pt-corner .blood { margin-left: 0; font-size: 10px; padding: 0 5px; border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-1) 82%, transparent);
+  border: 1px solid var(--line-soft); line-height: 15px; }
+.pt-corner .blood-ic { width: 13px; height: 13px; }
+/* 炫彩色卡在角标里按角标高度缩放(原 18px 高在 104px 图区里偏大) */
+.pt-corner .glass-chip { height: 15px; width: 27px; margin-left: 0; }
+.pt-corner .mark-img { width: 15px; height: 15px; margin-left: 0; }
+.pt-corner .mark { font-size: 10px; line-height: 15px; margin-left: 0; }
+
+/* gap 7→4、padding 收紧:实测数据区 283px 里 gap+padding 就占 83.5px(约三成),
+   而它们不承载任何信息。收紧是纯赚 —— 卡片矮 40px 且信息一毫不丢。 */
+.pt-body { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 10px; min-width: 0; }
+/* 名字区:系别已移到图上,名字独占整行(不再有 55% 的宽上限)。 */
+.pt-head { display: flex; align-items: flex-start; gap: 6px; }
+.pt-head-text { flex: 1 1 auto; min-width: 0; }
+.pt-name {
+  font-size: 14px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pt-sub {
+  font-size: 11px; color: var(--fg-dim); margin-top: -4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---- 六维小格(陈列卡)---- */
+.sixgrid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px;
+  padding: 6px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+}
+.sixgrid-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sixgrid-top { display: flex; align-items: center; gap: 2px; min-width: 0; font-size: 12px; line-height: 1; }
+.sixgrid-ic { width: 14px; height: 14px; object-fit: contain; flex: none; }
+.sixgrid-top b { color: var(--gold); font-weight: 700; }
+.sixgrid-talent { font-style: normal; font-size: 10px; font-weight: 700; color: var(--gold); }
+.sixgrid-nat { font-style: normal; font-size: 8px; line-height: 1; }
+.sixgrid-nat.up { color: var(--green); }
+.sixgrid-nat.dn { color: var(--red); }
+/* 定标条:轨道铺满、填充按值/500。轨道必须有底色,否则浅色主题下看不出条的存在。 */
+.sixgrid-track { display: block; height: 3px; border-radius: 2px; background: var(--bg-3); overflow: hidden; }
+.sixgrid-track > i { display: block; height: 100%; border-radius: 2px; background: var(--gold); }
+
+/* ---- 奖牌 + 蛋组(数据区)----
+   性格/特长/血脉/系别/形态都已移到图上,数据区只剩这两项低频信息。
+   原先它们混在单行胶囊里被 nowrap 截断(奖牌显示不全即由此)—— 现在独占
+   一行、各自可省略,不再互相挤掉。两者都可能为空,空容器折叠(免白占 gap)。 */
+.pt-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; min-width: 0; }
+.pt-meta:empty { display: none; }
+.pt-meta-i {
+  display: inline-flex; align-items: center; gap: 3px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 奖牌是全名、不省略(它才 2~4 字);蛋组可能两组连写较长,故让奖牌先占、蛋组收缩。 */
+.pt-meta-i:first-child { flex: none; max-width: 55%; }
+.pt-meta-i:last-child { flex: 1 1 auto; }
+.pt-medal-ic { width: 14px; height: 14px; object-fit: contain; flex: none; }
+
+/* ---- 量测(体重/身高):标签 + 值 + 百分位标尺 + 百分位 ----
+   各占一行而非并排:并排时每半 ~105px 放不下四项,实测溢出并让百分位与标尺
+   重合(见 PetCard.jsx 注释)。全宽下四项从容,标尺拉长后位置更易读。 */
+.measure { display: flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.5; min-width: 0; }
+.measure-lb { flex: none; width: 24px; color: var(--fg-dim); }
+.measure-v { font-weight: 700; color: var(--fg); white-space: nowrap; }
+.measure-v i { font-style: normal; font-weight: 400; font-size: 10px; color: var(--fg-dim); margin-left: 1px; }
+/* 标尺:轨道 + 游标。游标带一圈卡片底色的描边(box-shadow),
+   压在轨道端点上时才不会与轨道端点粘成一坨。 */
+.pctbar { position: relative; flex: 1 1 auto; min-width: 24px; height: 4px; border-radius: 2px; background: var(--bg-3); }
+.pctbar-dot {
+  position: absolute; top: 50%; width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%; background: var(--accent); transform: translateY(-50%);
+  box-shadow: 0 0 0 2px var(--bg-1);
+}
+/* 百分位数字:tabular-nums 已全站开启(见 base.css),固定 44px 让两行的数字右对齐成列。 */
+.measure-pct { flex: none; width: 44px; text-align: right; color: var(--fg-dim); }
+.measure.val-hot-hi .measure-pct, .measure.val-hot-lo .measure-pct { font-weight: 700; }
+
+.pt-foot {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  padding-top: 5px; border-top: 1px solid var(--line-soft);
+}
+.pt-voice { flex: none; color: var(--fg-dim); }
+.pt-voice b { color: var(--fg); }
+.pt-loc {
+  flex: 1 1 auto; min-width: 0; color: var(--fg-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pt-time { flex: none; font-size: 10px; }
+
+/* ---- 表格视图 ----
    列宽自适应内容(table-layout:auto):每列按本列最长内容自动撑开,随每页数据动态重算,
    贴合各列实际最大长度;white-space: nowrap 保证单行不折行,总宽超出容器时由
    .table-wrap 横向滚动。与 fixed 固定列宽相比,切页时列宽会按新内容轻微重排。 */
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); }
 table.pets { width: 100%; border-collapse: collapse; white-space: nowrap; }
-/* 列间距:横向 padding 加大,列与列之间更宽松;宽屏时 width:100% 的富余空间
-   也会按各列内容比例摊给各列,进一步拉宽间距。 */
-table.pets th, table.pets td { padding: 10px 18px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+/* 列间距:原 10px 18px 在 10 列上是 360px 纯内边距,整表被撑到 ~1160px 必然横滚。
+   收到 8px 12px 省下 120px,配合六维换微柱(见 .sixbars)基本能在常见视口放下。 */
+table.pets th, table.pets td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); text-align: left; }
 /* 第 1 列内:名称/副标过长省略号兜底,不折行占位导致视觉错乱。
    .pet-cell 是 flex(头像 + 文字区),文字区必须 min-width:0 + overflow:hidden 才能在
    flex 下正确收缩并触发省略号;否则徽标多的名称行会横向溢出压进相邻的「系别」列。
@@ -65,31 +310,59 @@ table.pets .pet-name, table.pets .pet-sub {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;
 }
 table.pets tr:last-child td { border-bottom: none; }
-table.pets th { color: var(--fg-dim); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
+table.pets th { color: var(--fg-dim); font-weight: 600; user-select: none; position: sticky; top: 0; background: var(--bg-1); }
+
+/* 首列吸左:表格 ~1100px 宽,横滚之后若首列跟着走就不知道在比哪只宠物。
+   border-collapse: collapse 下 sticky 单元格的 border 不跟着粘,故用 box-shadow 画
+   那条分界线(它随单元格一起粘)。
+   thead 的首格要同时吃「吸顶 + 吸左」,层级须高于普通首列,否则会被后者盖住右边框。 */
+table.pets .col-pet { position: sticky; left: 0; z-index: var(--z-base); background: var(--bg-1); box-shadow: 1px 0 0 var(--line); }
+table.pets thead th:first-child { left: 0; z-index: calc(var(--z-base) + 1); box-shadow: 1px 0 0 var(--line); }
+
+/* 排序角标:用伪元素而非往文字后拼 ' ▲' 字符 —— 字符会改变列宽,
+   排序态切换与切页时整列会抖一个字宽。伪元素尺寸固定、只变 opacity/rotate,不占位。
+   未排序列的角标常态隐藏、hover 才淡显:既提示"这列可排序",又不干扰读数。 */
+table.pets th.sortable { cursor: pointer; }
+table.pets th.sortable::after {
+  content: ''; display: inline-block; margin-left: 6px; vertical-align: middle;
+  width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+table.pets th.sortable:hover { color: var(--fg); }
+table.pets th.sortable:hover::after { opacity: .4; }
+table.pets th.sorted { color: var(--accent); }
+table.pets th.sorted::after { opacity: 1; }
+table.pets th.sorted[aria-sort="descending"]::after { transform: rotate(180deg); }
+
 /* 表格行的 hover **只用底色,不用抬升**,两条原因:
    1. transform 作用在 display:table-row 上是未定义行为(规范未要求),
       各浏览器表现不一致,且会让它脱离表格的渲染流程、破坏上面 sticky 的 thead;
    2. 表格是「一整片一起看」的,抬一行出来会打断列与列的对齐关系 ——
       而这里恰恰要逐列对比(六维、身高体重百分位)。
    底色已经够解决「指针在哪一行」了(一行 10 列,横向扫读需要这条引导)。 */
-table.pets tr:hover td { background: var(--bg-2); }
 table.pets tbody tr { cursor: pointer; user-select: none; transition: background .1s ease; }
+table.pets tbody tr:hover td { background: var(--bg-2); }
 table.pets tr.selected td { background: var(--accent-soft); }
-table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+/* 选中行的首列:吸左单元格有独立底色,必须显式跟着换,否则横滚时
+   选中行的首列仍是普通底色,选中态在左边界断掉。 */
+table.pets tbody tr:hover .col-pet { background: var(--bg-2); }
+table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent), 1px 0 0 var(--line); }
+
+/* 六维微柱(表格):6 根竖条,高度按与卡片六维同一把尺子(值/500)定标。
+   色按性格增减分绿/红,与 .six 里 ↑↓ 的配色同源;多数条是金色(无影响),
+   故"形状"仍是一眼可读的。 */
+.sixbars { display: inline-flex; align-items: flex-end; gap: 3px; height: 26px; vertical-align: middle; }
+.sixbars-b { width: 5px; min-height: 2px; border-radius: 2px 2px 0 0; background: var(--gold); opacity: .85; }
+.sixbars-b.up { background: var(--green); }
+.sixbars-b.dn { background: var(--red); }
 
 /* 身高/体重两行显示(StatRange stacked):首行数值、次行百分位;
    次行不写死颜色,继承单元格的极值高亮(val-hot-*),仅缩小 + 降透明度区分主次。 */
 .stat-2l { display: inline-block; line-height: 1.3; vertical-align: top; }
 .stat-2l .stat-pct { display: block; font-size: 12px; font-weight: 400; opacity: 0.65; }
-
-/* 移动卡片(默认隐藏) */
-.cards { display: none; }
-/* 卡片 hover:可点(有下面的 :active 佐证),故走三件套。
-   与桌面表格行的处理不同 —— 见下面 table.pets tbody tr:hover 处的注释。 */
-@media (hover: hover) {
-  .card:hover { border-color: var(--accent); transform: translateY(var(--lift)); box-shadow: var(--shadow-lift); }
-}
-.card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 
 /* 分页 */
 .pager { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
@@ -105,30 +378,189 @@ table.pets tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent);
 .ctx-item:hover { background: var(--bg-3); }
 .ctx-sep { height: 1px; margin: 4px 6px; background: var(--line-soft); }
 
+/* ---- 窄屏:陈列卡转为「图左 + 数据右」的横向条目 ----
+   竖排卡片在窄屏下会高到一屏只放得下一张,而横排把图压成 96px 宽的一条,
+   一屏能看五到六只 —— 找宠物是扫视任务,同屏数量比单张信息量更要紧。 */
 @media (max-width: 760px) {
-  .table-wrap { display: none; }
-  .cards { display: flex; flex-direction: column; gap: 10px; }
-  .card {
-    border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-1); padding: 12px;
-    display: flex; flex-direction: column; gap: 8px; user-select: none;
-    box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
-    /* 长列表滚动性能:视口外卡片跳过布局/绘制(卡片是独立块级,无表格布局风险)。
-       contain-intrinsic-size: auto 让浏览器记住已渲染尺寸,滚动条不跳。 */
-    content-visibility: auto;
-    contain-intrinsic-size: auto 220px;
+  .pet-grid { grid-template-columns: 1fr; gap: 8px; }
+  .pet-card { flex-direction: row; align-items: stretch; contain-intrinsic-size: auto 120px; }
+  /* 横向布局下 --pet-media-h 是高度、不再适用,改按固定宽度撑开:
+     height:100% 让它跟着卡片(由数据区决定高度)走,图始终居中。
+
+     宽度 96 → 132px:四角徽标改两栏后,两侧各需 62px(共 124px),
+     96px 会让左右栏在中间撞上。132px 是「两栏 + 中间图片」的最小可行宽,
+     数据区仍剩 ~250px(390 视口下),六维三列与量测行都放得开。
+     副作用是图片显示边长从 79 → ~118px,更大更清晰(仍远小于源 256px)。 */
+  .pt-media {
+    flex: 0 0 132px; height: auto;
+    border-bottom: none; border-right: 1px solid var(--line-soft);
   }
-  .card:active { transform: scale(.995); }
-  .card-head { display: flex; align-items: center; gap: 10px; }
-  .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 13px; }
-  /* 六维在窄屏铺满等分三列,避免「物攻 235 ↑ +10」挤到两行 */
-  .card .six { grid-template-columns: repeat(3, 1fr); }
-  /* 竖屏卡片窄、六维占两行使单卡过高,竖屏隐藏(横屏更宽则保留);详情页仍可查看 */
-  @media (orientation: portrait) {
-    .card .six { display: none; }
-  }
+  .pt-img { padding: 6px; }
+  .pt-body { flex: 1 1 auto; padding: 8px 10px 10px; gap: 5px; }
+  /* 侧栏贴边收紧:移动端图区窄,5px 边距在 132px 里占比偏大 */
+  .pt-side { top: 3px; bottom: 3px; }
+  .pt-side.left { left: 3px; }
+  .pt-side.right { right: 3px; }
+  /* 只补新增项的触控基线;工具条本身的窄屏收紧规则在 panel.css,
+     重复一份改天就会两边漂移。 */
+  .viewseg-b { min-height: 36px; } /* 与 .btn 的移动端规则同高 */
+  /* 搜索框允许收缩:panel.css 给 .toolbar .input 钉了 max-width:280px,
+     窄屏下它一个就占掉 ~280px,把排序/升序/同步/视图开关全挤到下一行,
+     首行右侧还空着。放开上限让它按余量伸缩,一屏放得下更多控件。
+     min-width:0 是 flex 下收缩的前提(默认 min-width:auto 会撑住不缩)。 */
+  .list-toolbar .input { flex: 1 1 110px; max-width: none; min-width: 0; }
   /* 分页栏单行显示:收紧按钮/间距、缩窄档位下拉,不再换行 */
   .pager { flex-wrap: nowrap; justify-content: center; gap: 6px; margin-top: 14px; }
   .pager .btn { padding: 6px 8px; font-size: 13px; white-space: nowrap; }
   .pager .muted { font-size: 13px; white-space: nowrap; }
   .pager-size { width: 104px; flex: none; font-size: 13px; padding-left: 8px; padding-right: 6px; }
 }
+/* 极窄屏(≤360px):六维三列挤到每格 ~48px,两列更从容 */
+@media (max-width: 360px) {
+  .sixgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 分组块:外观 / 资质 / 体型·声音 / 来源。
+   用 fieldset + legend 而非普通 div:语义上它确实是「一组相关控件」,
+   屏幕阅读器会逐组播报,比一堆平铺的 label 好定位。样式上重置掉 fieldset
+   的默认边框与内缩,只留一条分隔线。 */
+.filter-sec {
+  border: none; border-top: 1px solid var(--line-soft);
+  margin: 0; padding: 12px 0 0;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.list-layout .filters > .filter-reset { padding-bottom: 0; }
+.filter-sec > legend {
+  padding: 0; margin-bottom: -2px;
+  font-size: 10px; font-weight: 700; color: var(--fg-dim);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* ---- 性格罗盘:6×6 方阵筛选(见 pages/pet-list/NatureMatrix.jsx)----
+ *
+ * 两轴用**语义色**定性:左列=增益(绿)、顶行=减益(红)。这不是装饰 ——
+ * 方阵的行/列含义光看图标分不出来,分色后玩家无需读说明就知道
+ * 「横着看是加什么、竖着看是减什么」。取现成的 --green / --red,不另造颜色。
+ *
+ * 尺寸一律 min() 自适应(与 .boxmap-cell 同一套路):侧栏是 clamp 宽度,
+ * 钉死像素会在窄侧栏溢出。 */
+.natmat { gap: 8px; }
+/* 分组标题右侧的「清除 N」:贴着标题而非另起一行,省一行高度 */
+.natmat > label { justify-content: space-between; }
+.natmat-clear {
+  background: none; border: none; padding: 0 2px; cursor: pointer;
+  font-size: 11px; color: var(--accent); letter-spacing: 0; text-transform: none;
+}
+.natmat-clear:hover { text-decoration: underline; }
+
+/* 快捷行:6 个「只要某维↑」。折叠时也能用 —— 这是最高频路径,
+   玩家通常只关心「速度↑」而不需要看全 30 格。 */
+.natmat-quick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.natmat-q {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 5px 0 4px; border-radius: 8px; cursor: pointer;
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.natmat-q-ic { width: 16px; height: 16px; object-fit: contain; }
+/* ↑ 用绿色:与左轴同色,暗示「这一排按的是增益」 */
+.natmat-q-up { font-size: 9px; line-height: 1; color: var(--green); font-weight: 700; }
+.natmat-q:hover { border-color: var(--accent); }
+.natmat-q.on { background: var(--accent); border-color: var(--accent); }
+.natmat-q.on .natmat-q-up { color: #fff; }
+/* 半选:底用 accent 的极淡铺色 + accent 描边。与「全选」(实心)、「未选」(灰底)
+   三者必须一眼可分 —— 半选意味着这一维下还有没勾的格子,点一下才补满。 */
+.natmat-q.part { background: var(--accent-soft); border-color: var(--accent); }
+
+/* 折叠开关 */
+.natmat-toggle {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 2px 0; cursor: pointer;
+  font-size: 11px; color: var(--fg-dim);
+}
+.natmat-toggle:hover { color: var(--accent); }
+.natmat-caret { transition: transform var(--dur-fast) var(--ease-out); }
+.natmat-caret.up { transform: rotate(180deg); }
+
+/* 方阵本体 */
+.natmat-grid {
+  display: grid; grid-template-columns: 26px repeat(6, minmax(0, 1fr)); gap: 3px;
+}
+/* 角落:对角分割的增益/减益图例。放在原点而非画在图外,是因为视线从表头
+   扫到正文必然经过这里 —— 图例放在别处会被略过。 */
+.natmat-corner {
+  position: relative; width: 26px; height: 26px; border-radius: 6px; overflow: hidden;
+  background: var(--bg-3); border: 1px solid var(--line-soft);
+}
+/* 两条三角各占半壁:绿(左下)=增益轴方向,红(右上)=减益轴方向,
+   与左列/顶行的分色一一对应。 */
+.natmat-corner i { position: absolute; }
+.natmat-corner-up {
+  left: 0; bottom: 0; width: 0; height: 0;
+  border-left: 26px solid var(--green); border-top: 26px solid transparent;
+  opacity: .55;
+}
+.natmat-corner-dn {
+  right: 0; top: 0; width: 0; height: 0;
+  border-right: 26px solid var(--red); border-bottom: 26px solid transparent;
+  opacity: .55;
+}
+
+/* 表头(行头/列头):图标 + 轴色描边 */
+.natmat-h {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; height: 26px; padding: 0; cursor: pointer; border-radius: 6px;
+  background: var(--bg-3); border: 1px solid var(--line-soft);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.natmat-h-ic { width: 15px; height: 15px; object-fit: contain; }
+/* 轴向提示条:列头压在**顶边**(减益在上)、行头压在**左边**(增益在左),
+   位置与角落徽标的三角方位一致。用 ::after 而非 border,免得影响盒模型。 */
+.natmat-h-col::after, .natmat-h-row::after {
+  content: ''; position: absolute; background: var(--red);
+}
+.natmat-h-col { position: relative; }
+.natmat-h-col::after { top: -1px; left: 3px; right: 3px; height: 2px; border-radius: 0 0 2px 2px; }
+.natmat-h-row { position: relative; }
+.natmat-h-row::after {
+  left: -1px; top: 3px; bottom: 3px; width: 2px; border-radius: 0 2px 2px 0;
+  background: var(--green);
+}
+.natmat-h:hover { border-color: var(--accent); }
+.natmat-h.on { background: var(--accent); border-color: var(--accent); }
+.natmat-h.part { background: var(--accent-soft); border-color: var(--accent); }
+
+/* 格子 */
+.natmat-cell {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; height: 30px; padding: 0 1px; cursor: pointer;
+  border-radius: 6px; font-size: 11px; line-height: 1; white-space: nowrap; overflow: hidden;
+  background: var(--bg-2); border: 1px solid var(--line-soft); color: var(--fg-dim);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out), transform .08s ease;
+}
+.natmat-cell:hover { border-color: var(--accent); color: var(--fg); }
+.natmat-cell:active { transform: scale(.94); }
+.natmat-cell.on {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+}
+/* 对角线:该组合不存在。画一道斜线而非留白 —— 留白会被读成
+   「有个没加载出来的性格」,而斜线明确表示「此格无意义」。 */
+.natmat-diag {
+  cursor: default; background: transparent; border-style: dashed; border-color: var(--line);
+  background-image: linear-gradient(135deg, transparent 46%, var(--line) 46%, var(--line) 54%, transparent 54%);
+}
+.natmat-diag:hover { border-color: var(--line); }
+
+/* 移动端抽屉更宽(min(86vw,360px)),格子与表头可以放大到舒适触控尺寸 */
+@media (max-width: 760px) {
+  .natmat-grid { grid-template-columns: 32px repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .natmat-corner, .natmat-h { height: 32px; }
+  .natmat-corner { width: 32px; }
+  .natmat-corner-up { border-left-width: 32px; border-top-width: 32px; }
+  .natmat-corner-dn { border-right-width: 32px; border-bottom-width: 32px; }
+  .natmat-cell { height: 38px; font-size: 12px; }
+  .natmat-q { padding: 7px 0 6px; }
+  .natmat-q-ic { width: 18px; height: 18px; }
+}
+CSSEOF

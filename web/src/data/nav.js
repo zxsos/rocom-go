@@ -9,7 +9,7 @@ export const NAV = [
   {
     label: '我的精灵', icon: IconBag,
     children: [
-      { to: '/pets', label: '宠物列表', icon: IconPaw },
+      { to: '/pets', label: '精灵列表', icon: IconPaw },
       { to: '/eggs', label: '精灵蛋', icon: IconEgg },
       { to: '/handbook', label: '炫彩图鉴', icon: IconSparkle },
       { to: '/events', label: '捕获事件', icon: IconBell },

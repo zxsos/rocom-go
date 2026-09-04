@@ -12,9 +12,16 @@ import (
 
 // Filter 是宠物列表的筛选/排序/分页参数。
 type Filter struct {
-	Search        string   // 名称/种类模糊
-	Types         []string // 系别(任一匹配)
-	Nature        string
+	Search string   // 名称/种类模糊
+	Types  []string // 系别(任一匹配)
+	Nature string   // 单个性格(精确等值)
+	// NatureIn 性格多选:命中其中任一即算命中。
+	//
+	// 存在理由:性格是 6×6 方阵(行=+10% 维度、列=-10% 维度,30 个非中性性格填满,
+	// 对角线空),前端做成矩阵后支持三种选法 —— 点格子(精确一个)、点行头(某维度↑
+	// 的 5 个)、点列头(某维度↓ 的 5 个),后两种天然是多选。
+	// 与 Nature 互斥:两者都给时以 NatureIn 为准(前端只会给一个)。
+	NatureIn      []string
 	NatureExclude []string // 性格"其他":排除这些热门性格
 	Gender        string
 	TalentRank    string
@@ -25,20 +32,20 @@ type Filter struct {
 	WeightPctMax int // 小不点:体重百分位上限(weight_pct<=?)
 	VoiceMin     int // 婉转声:嗓音下限(voice>=?)
 	VoiceMax     int // 粗嗓门:嗓音上限(voice<=?)
-	Speciality    string
-	EggGroup      string // 蛋组名(精确匹配组名,含该组即命中)
-	PartnerMark   string
-	Shiny         string // "", "1", "0"
-	Colorful      string // "", "1", "0"
-	Form          string // 地区/季节形态名(精确匹配)
-	Box           string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
-	CatchAfter    int64  // 捕捉时间下限(unix 秒;>0 时筛 catch_time>=该值,由前端按所选区间算)
-	LevelMin      int
-	LevelMax      int
-	Sort          string
-	Order         string
-	Page          int
-	PageSize      int
+	Speciality   string
+	EggGroup     string // 蛋组名(精确匹配组名,含该组即命中)
+	PartnerMark  string
+	Shiny        string // "", "1", "0"
+	Colorful     string // "", "1", "0"
+	Form         string // 地区/季节形态名(精确匹配)
+	Box          string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
+	CatchAfter   int64  // 捕捉时间下限(unix 秒;>0 时筛 catch_time>=该值,由前端按所选区间算)
+	LevelMin     int
+	LevelMax     int
+	Sort         string
+	Order        string
+	Page         int
+	PageSize     int
 }
 
 var sortColumns = map[string]string{
@@ -66,7 +73,24 @@ func buildWhere(f Filter, account string) (string, []any) {
 			args = append(args, val)
 		}
 	}
-	addEq("nature", f.Nature)
+	// 性格:多选优先(前端的矩阵只在点单格时才给 Nature,那时 NatureIn 为空)。
+	// 用 addIn 与 NatureExclude 同一套占位符拼法,保持 SQL 构造只有一种写法。
+	addIn := func(col string, vals []string) {
+		if len(vals) == 0 {
+			return
+		}
+		ph := make([]string, len(vals))
+		for i, v := range vals {
+			ph[i] = "?"
+			args = append(args, v)
+		}
+		where = append(where, col+" IN ("+strings.Join(ph, ",")+")")
+	}
+	if len(f.NatureIn) > 0 {
+		addIn("nature", f.NatureIn)
+	} else {
+		addEq("nature", f.Nature)
+	}
 	if len(f.NatureExclude) > 0 {
 		ph := make([]string, len(f.NatureExclude))
 		for i, n := range f.NatureExclude {
