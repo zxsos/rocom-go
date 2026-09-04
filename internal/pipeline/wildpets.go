@@ -43,8 +43,8 @@ const (
 	wildVoiceLow  = -96
 	// 出 AOI 后「最后所见」的灰点还留多久(超时由 pushWilds 顺手丢弃)。取 4 小时是为了
 	// 让灰点当作「本次上线在这一带见过什么」的备忘:野生宠刷新周期远长于几分钟,隔一阵回来
-	// 多半还在。灰点不会无限堆积——TTL 到了自己过期,自己捉走的当场撤,其余一律保留
-	// (换场景/传送都只置灰,见 resetWilds);真要一次性抹平由用户点「清空」(clearWilds)。
+	// 多半还在。灰点不会无限堆积——TTL 到了自己过期,自己捉走的当场撤,**换场景整份作废**
+	// 是兜住上限的那道闸(否则跑一天会攒下几百个属于别的场景的灰点,见 resetWilds)。
 	wildStaleTTL = 4 * time.Hour
 )
 
@@ -64,8 +64,8 @@ type wildPet struct {
 	left       bool      // 已离开 AOI:标记转为「最后所见」,置灰显示,wildStaleTTL 后丢弃
 }
 
-// wildTracker 是一个连接的野生宠物观测态。换场景/传送**不重置**(只把标记置灰,
-// 见 resetWilds);只有用户主动清空才整份重建(见 clearWilds)。
+// wildTracker 是一个连接在**当前场景会话**内的野生宠物观测态。**换场景即重建**(res 变了,
+// 那些坐标属于另一张图,见 resetWilds);同场景内传送只把标记置灰、不重建。
 //   - pets:稀有类别(异色/炫彩/污染/奖牌四件套)的个体,前端按图层描边、可点资料卡;
 //   - all:其余普通野生宠,仅作「全部野生」图层的小头像点,不描边、不弹卡、不参与通知。
 //
@@ -118,51 +118,40 @@ func (p *Pipeline) wildKinds(a scene.NpcActor) []string {
 	return out
 }
 
-// resetWilds 换场景/传送时把野生宠标记一律转为「最后所见」**置灰,不删**。
+// resetWilds 换场景或传送时结算野生宠标记:同场景内传送只置灰,**真换场景则整份作废**。
 //
 // 关键事实(2026-09-01 实测 PCAPdroid_01_9月_19_12_52.pcap 的 0x015c):
 // 传送后 3 秒内 actor_enter 8 条、**actor_leave 0 条** —— 服务器传送时不为旧实体
-// 补发离开事件(客户端自己清空 AOI)。此刻玩家眼里它们还在图上,是我们自己抹掉的。
+// 补发离开事件(客户端自己清空 AOI)。这一步只能由我们代劳,没有 leave 可等。
 //
-// 标记是「本次上线在这一带见过什么」的备忘:同场景传送后坐标仍属这张底图,走回去
-// 还能遇上,与「走远了出 AOI」是一回事,置灰即可;换到别的场景时这些标记本来就不
-// 画在当前图上(按 ts.res 投影),但它们**不该被删除** —— 是否抹平由用户决定。
+// 两种情形分得很清,依据是**场景 res 变没变**:
+//   - 同场景内传送(`0x015c` 的 `to_scene_res_cfg_id` 与当前 res 相同:大地图传送点、
+//     营地魔力之源之间跳):旧标记的世界坐标仍属这张底图,玩家走回去还能再遇上,只是
+//     此刻不在 AOI 里了 —— 这与「走远了出 AOI」是同一回事,故转成「最后所见」置灰保留。
+//   - 真换场景:那些坐标属于另一张图,投影到新底图上毫无意义。留着只会越攒越多
+//     (灰点 4 小时才过期,跑一天能攒几百个),故整份作废,前端随即清屏。
 //
-// 置灰时**不动 seenAt**:4 小时 TTL 仍从「最后一次确认它在」算起,不因传送/换场景续命,
+// 置灰时**不动 seenAt**:4 小时 TTL 仍从「最后一次确认它在」算起,不因传送续命,
 // 灰点最终自己过期(见 wildStaleTTL 与 pushWilds 的清理)。
 //
 // 只管野生宠物标记。涂地跟踪的实体(connState.wildSeen)由调用方各自处理,本函数不碰
 // —— 两者失效规则不同(涂地是「扫过」的凭据,不随传送恢复)。
 func (p *Pipeline) resetWilds(conn, acc string, res int32, now time.Time) {
 	cs := p.conn(conn)
-	if cs.wilds == nil { // 首次进场景:还没有观测态,建一个空的
+	if ts := cs.wilds; ts != nil && ts.res == res {
+		// 同场景内传送:只置灰。稀有(pets)与普通(all)两个通道都要置灰,
+		// 免得出现「稀有还留着、普通没了」的不一致。
+		for _, w := range ts.pets {
+			w.left = true
+		}
+		for _, w := range ts.all {
+			w.left = true
+		}
+	} else { // 真换了场景(或首次进场景):上个场景的实体与坐标一律作废
 		cs.wilds = newWildTracker(res)
-	} else {
-		// 换场景:观测态(含灰点)保留,但**当前场景要跟到新 res** —— 新场景看到的宠
-		// 记在新 res 名下,投影才对得上(pushWilds 按 ts.res 投影)。
-		cs.wilds.res = res
 	}
-	// 稀有(pets)与普通(all)两个通道都置灰,免得出现「稀有还留着、普通没了」的不一致。
-	for _, w := range cs.wilds.pets {
-		w.left = true
-	}
-	for _, w := range cs.wilds.all {
-		w.left = true
-	}
-	// 换场景/传送必须**立即**广播(标记要当场转为置灰态,不能等合并窗口),
+	// 换场景/传送必须**立即**广播(标记要当场转为置灰态或清屏,不能等合并窗口),
 	// 顺带把待发的变更一并消费掉 —— 否则紧接着还会再补发一次,白多一份全量。
-	cs.wildsDirtyAt = time.Time{}
-	p.pushWilds(conn, acc, now)
-}
-
-// clearWilds 主动清空野生宠标记(用户点「清空」时用):整份作废,灰点也一并清掉。
-//
-// **这是唯一会真正删除标记的路径** —— resetWilds 只置灰,故系统不会自动抹掉任何
-// 见过的野生宠,清不清完全由用户决定。清空后不会被服务器补回:标记只随 AOI 实体
-// 下发(actor_enter)重建,不像见闻录那样每次登录重发(对比 pipeline.syncTrialEncounters)。
-func (p *Pipeline) clearWilds(conn, acc string, res int32, now time.Time) {
-	cs := p.conn(conn)
-	cs.wilds = newWildTracker(res)
 	cs.wildsDirtyAt = time.Time{}
 	p.pushWilds(conn, acc, now)
 }
@@ -363,8 +352,8 @@ func (p *Pipeline) flushAllDirtyWilds() {
 // pushWilds 缓存并广播当前场景的野生宠物标记(顺带清理过期的「最后所见」)。
 //
 // 调用方只有两处:markWildsDirty 攒够窗口后的补发(常规路径),以及换场景/传送时的
-// resetWilds —— 后者必须**立即**广播(玩家已经到了新场景,旧标记要当场清掉,不能
-// 等窗口)。延迟一律走 markWildsDirty,别在这里节流。
+// resetWilds —— 后者必须**立即**广播(玩家已经到了新场景,旧标记要么当场清掉、要么
+// 转为灰点,不能等窗口)。延迟一律走 markWildsDirty,别在这里节流。
 //
 // 为什么不逐条广播:实体进出 AOI 在跑动时是**突发**而非低频 —— 实测一份 604 秒的
 // pcap 里 0x0414 有 11282 条,其中 2878 条带实体进出(约 4.8 次/秒);而同一只宠

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { IconCheck, IconChevronDown } from '../../components/svg'
 
 // ZonePanel 区域收集度:列出本场景各分区的「已收集/总数」,按缺口从大到小排序,
 // 点一行把地图移到该区中心。数据全部来自 GET /api/pois 的 zones[](服务器口径,
@@ -56,7 +57,8 @@ export default function ZonePanel({ stats, onFocus, disabled }) {
           <b>{stats.got}</b><i>/{stats.tot}</i>
           <em>{pct.toFixed(pct < 10 ? 1 : 0)}%</em>
         </span>
-        <span className="muted">▾</span>
+        {/* 旋转靠 .map-medal-toggle .muted(见 map.css),故箭头必须带 muted 类 */}
+        <IconChevronDown size={13} className="muted" />
       </button>
 
       {open && (
@@ -69,7 +71,7 @@ export default function ZonePanel({ stats, onFocus, disabled }) {
           <div className="map-zone-filter">
             <button className={'map-collect-btn' + (onlyLeft ? ' on' : '')}
               onClick={() => setOnlyLeft((v) => !v)} aria-pressed={onlyLeft}
-              title="只看还没集满的分区" aria-label="只看未集满">✓</button>
+              title="只看还没集满的分区" aria-label="只看未集满"><IconCheck size={13} /></button>
             <span className="map-layer-name">只看未集满</span>
             <span className="muted">
               {rows.filter((z) => z.miss === 0).length} / {rows.length} 区已集满
@@ -77,35 +79,39 @@ export default function ZonePanel({ stats, onFocus, disabled }) {
           </div>
 
           {/* 明细:缺口大的在前。点行定位;不能定位时(无底图/该区无点位)整行禁用,
-              但不影响看数——进度本身就是有用的信息。 */}
-          {shown.map((z) => {
-            const p = z.tot > 0 ? (z.got * 100) / z.tot : 0
-            const done = z.miss === 0
-            const canFocus = !disabled && z.n > 0 && z.u != null
-            return (
-              <div className={'map-zone-row' + (done ? ' done' : '')} key={z.camp}>
-                <button className="map-zone-btn" disabled={!canFocus}
-                  onClick={() => canFocus && onFocus(z)}
-                  title={canFocus
-                    ? `把地图移到${z.name}(${z.n} 个点位的中心)`
-                    : z.n > 0 ? '该场景没有底图,无法定位' : `${z.name}:本场景无点位`}>
-                  <span className="map-zone-name">{z.name}</span>
-                  <span className="map-zone-num">
-                    <b>{z.got}</b><i>/{z.tot}</i>
-                  </span>
-                  <span className="map-zone-miss muted">{done ? '已集满' : `缺 ${z.miss}`}</span>
-                  <span className="map-zone-bar map-zone-bar-sm">
-                    <span className="map-zone-bar-fill" style={{ width: `${p}%` }} />
-                  </span>
-                </button>
-              </div>
-            )
-          })}
-          {shown.length === 0 && (
-            <span className="muted" style={{ fontSize: 13, padding: '4px 2px' }}>
-              全部分区都已集满 🎉
-            </span>
-          )}
+              但不影响看数——进度本身就是有用的信息。
+              整段限高内滚(见 .map-zone-list):一个场景能有 40 多个分区,全铺开会把
+              下面的野生宠物/涂色/路线推出两屏之外,而这块默认就是展开的。 */}
+          <div className="map-zone-list">
+            {shown.map((z) => {
+              const p = z.tot > 0 ? (z.got * 100) / z.tot : 0
+              const done = z.miss === 0
+              const canFocus = !disabled && z.n > 0 && z.u != null
+              return (
+                <div className={'map-zone-row' + (done ? ' done' : '')} key={z.camp}>
+                  <button className="map-zone-btn" disabled={!canFocus}
+                    onClick={() => canFocus && onFocus(z)}
+                    title={canFocus
+                      ? `把地图移到${z.name}(${z.n} 个点位的中心)`
+                      : z.n > 0 ? '该场景没有底图,无法定位' : `${z.name}:本场景无点位`}>
+                    <span className="map-zone-name">{z.name}</span>
+                    <span className="map-zone-num">
+                      <b>{z.got}</b><i>/{z.tot}</i>
+                    </span>
+                    <span className="map-zone-miss muted">{done ? '已集满' : `缺 ${z.miss}`}</span>
+                    <span className="map-zone-bar map-zone-bar-sm">
+                      <span className="map-zone-bar-fill" style={{ width: `${p}%` }} />
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
+            {shown.length === 0 && (
+              <span className="muted" style={{ fontSize: 13, padding: '4px 2px' }}>
+                全部分区都已集满
+              </span>
+            )}
+          </div>
         </>
       )}
     </div>

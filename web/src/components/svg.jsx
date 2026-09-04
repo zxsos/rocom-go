@@ -179,3 +179,28 @@ export const IconCheck = (p) => (
     <path d="M20 6L9 17l-5-5" />
   </S>
 )
+
+// 滑杆(设置面板标题:图层/筛选这一类开关集合的统称)
+export const IconSliders = (p) => (
+  <S {...p}>
+    <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h9M17 18h3" />
+    <circle cx="15" cy="6" r="2" />
+    <circle cx="9" cy="12" r="2" />
+    <circle cx="15" cy="18" r="2" />
+  </S>
+)
+
+// 回转重置(圆弧 + 箭头,顺时针):涂色重置、跟走进度重置
+export const IconRefresh = (p) => (
+  <S {...p}>
+    <path d="M20.5 12a8.5 8.5 0 1 1-2.8-6.3" />
+    <path d="M20.5 4v5.5H15" />
+  </S>
+)
+
+// 展开箭头(向下):折叠按钮的 ▾,旋转由各自的 CSS 负责
+export const IconChevronDown = (p) => (
+  <S {...p}>
+    <path d="M6 9.5l6 6 6-6" />
+  </S>
+)

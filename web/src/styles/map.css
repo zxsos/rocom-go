@@ -11,28 +11,73 @@
    必须用 .map-filters(而非 .filters)限定:宠物列表等普通页面桌面仍是常驻左列,仅移动端进抽屉
    (见 panel.css 的 media query)。视觉样式同 panel.css 的移动端抽屉,另加桌面已有的毛玻璃与渐变标题。 */
 .map-filters {
+  /* 组标题的吸顶位置 = 标题栏高度。两者必须绑成同一个变量:
+     不等的话,组标题要么压住标题栏,要么刚打开就「跳」一下
+     (sticky 阈值与其自然位置不等,一滚动就瞬间位移)。 */
+  --map-bar-h: 46px;
   position: fixed; top: 0; left: 0; bottom: 0; width: min(86vw, 360px);
   max-height: none; margin: 0; z-index: var(--z-drawer); border-radius: 0;
   border: none; border-right: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(6px) saturate(1.2);
   overflow-y: auto; padding: 0 14px 14px;
+  /* 组间距改由组标题的 padding-top 提供(见下),故这里必须归零:
+     用 gap 的话,标题吸顶时上方那条间隙是「空隙」,滚动的内容会从缝里穿过去。 */
+  row-gap: 0;
   transform: translateX(-100%); transition: transform .32s cubic-bezier(.32, .72, 0, 1);
 }
 .map-filters:not(.collapsed) { transform: none; }
-/* 抽屉滑出时内容逐组淡入上浮(stagger),与整体位移叠加出层次;收起时随抽屉滑走,不播动画 */
+/* 抽屉滑出时内容逐组淡入上浮(stagger),与整体位移叠加出层次;收起时随抽屉滑走,不播动画。
+   用 nth-child 而非 nth-of-type:后者数的是同类型(div)兄弟,条件渲染的组(跑图路线
+   只在部分场景有)一缺席,后面几组的序号就整体错位、延迟全乱。 */
 @keyframes map-filters-in {
   from { opacity: 0; transform: translateX(-16px); }
   to { opacity: 1; transform: none; }
 }
-.map-filters:not(.collapsed) .filter-group { animation: map-filters-in .34s ease-out both; }
-.map-filters:not(.collapsed) .filter-group:nth-of-type(2) { animation-delay: .05s; }
-.map-filters:not(.collapsed) .filter-group:nth-of-type(3) { animation-delay: .1s; }
-/* 标题栏吸顶(渐变底边);长面板滚动时始终可见 */
+.map-filters:not(.collapsed) > div { animation: map-filters-in .34s ease-out both; }
+.map-filters:not(.collapsed) > div:nth-child(2) { animation-delay: .04s; }
+.map-filters:not(.collapsed) > div:nth-child(3) { animation-delay: .08s; }
+.map-filters:not(.collapsed) > div:nth-child(4) { animation-delay: .12s; }
+.map-filters:not(.collapsed) > div:nth-child(5) { animation-delay: .16s; }
+.map-filters:not(.collapsed) > div:nth-child(6) { animation-delay: .2s; }
+/* 组标题吸顶:侧栏展开后能滚很长(40 多个分区 + 20 条路线),滚到中间时上面几组的
+   名字早没了,分不清当前这段是「收集进度」还是「野生宠物」。
+   sticky 的粘附范围天然是父元素 .filter-group 的盒子,故滚出本组后标题自动被
+   下一组的顶掉,不必 JS 参与。
+   组间距做进标题的 padding-top(而不是外层 gap):吸顶时那 14px 也在标题的不透明
+   背景里,滚动内容不会从缝里穿过去。用负 margin 去吃掉外层 gap 也能达到同样效果,
+   但负 margin 会改变元素在包含块内的静态位置,而 sticky 的位移要按包含块钳制 ——
+   各浏览器对「静态位置已在包含块之外」的处理不一致,不值得赌。 */
+.map-filters .filter-group > label {
+  position: sticky; top: var(--map-bar-h); z-index: var(--z-base);
+  margin: 0; padding: 14px 0 6px;
+  background: var(--bg-1);
+  font-size: 12px; font-weight: 600;
+}
+/* 组内的二级小标题(「地图图标」组里的「此刻可采」):比组标题更轻,用一条渐隐细线
+   把同组内两小块分开。刻意不另起一组 —— 分成两组会被当成两个无关功能,而它们
+   只是同一批采集物的两种画法(候选点 vs 此刻真刷着的),摆在一组里才对比得出来。 */
+.map-sub-label {
+  display: flex; align-items: center; gap: 8px;
+  margin: 5px 0 0; font-size: 11px; letter-spacing: .04em;
+  color: var(--fg-dim); text-transform: uppercase;
+}
+.map-sub-label::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+/* 抽屉是定高 flex 列(top:0;bottom:0)而内容往往远超一屏,故**所有直接子项都要
+   flex: none**:flex-shrink 默认 1,会把它们压向内容高度 —— 标题栏就是这样从 46px
+   被压到 33px(图标按钮的高度)的,于是组标题吸顶的 46px 与标题栏底边之间露出
+   13px 的缝,滚动内容从缝里穿过去。组的 min-height:auto 能兜住大部分情况,
+   但兜不住「有个高度是设定值、内容比它矮」的那一个,故显式关掉收缩。 */
+.map-filters > * { flex: none; }
+/* 标题栏吸顶(渐变底边);长面板滚动时始终可见。
+   高度钉在 --map-bar-h 上(不用 padding 撑):组标题要吸在它正下方,高度必须是个确定值。 */
 .map-filters .filters-bar {
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: var(--z-base); background: var(--bg-1);
-  padding: 12px 0 10px; margin-bottom: 4px;
+  height: var(--map-bar-h); padding: 0; margin-bottom: 0;
   border-bottom: 1px solid transparent;
   background-image: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent);
   background-size: 100% 1px; background-position: bottom; background-repeat: no-repeat;
@@ -43,7 +88,10 @@
   background: linear-gradient(90deg, var(--accent), #8b5cf6);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.map-filters .filters-title-ic { font-size: 16px; -webkit-text-fill-color: initial; filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
+/* 标题用渐变文字(color: transparent + background-clip),而图标是 stroke=currentColor
+   的 SVG,会跟着一起透明 —— 故这里把颜色显式补回来(原来靠 -webkit-text-fill-color
+   让 emoji 保住原色,换 SVG 后那招不适用了)。 */
+.map-filters .filters-title-ic { color: var(--accent); filter: drop-shadow(0 0 4px rgba(76, 141, 255, .4)); }
 /* 抽屉遮罩:盖住地图,点它关抽屉。独立兄弟节点(非 .map-filters 后代),单独类不与宠物列表共用。 */
 .map-filters-backdrop {
   display: block; position: fixed; inset: 0; z-index: var(--z-scrim); background: rgba(0, 0, 0, .45);
@@ -426,12 +474,8 @@
 }
 .map-wild-btn:not(.on) .map-wild-swatch { opacity: .45; }
 /* 稀有宠提醒按钮的铃铛:与图层色点同一行高对齐;关闭态随按钮灰掉。 */
-.map-notify-ic { font-size: 15px; line-height: 1; flex: none; }
+.map-notify-ic { display: block; flex: none; }
 
-/* 「清空野生宠标记」按钮:塞在分组标题(label)里,靠 margin-left:auto 推到行右端。
-   .map-collect-btn 默认 width:32px,在标题行里偏大,收紧到 24px 与下方图层行对齐。
-   它是唯一会真正删除标记的入口(换场景/传送只置灰),故用 🗑 而非 ↺ 以示区别。 */
-.map-wild-clear { width: 24px; height: 24px; font-size: 12px; margin-left: auto; }
 .map-notify-btn:not(.on) .map-notify-ic { opacity: .45; }
 /* 「仅双牌时提醒」子开关:缩进表示从属提醒开关;禁用(提醒关时)变灰不可点。 */
 .map-notify-dual-row { padding-left: 20px; }
@@ -457,7 +501,8 @@
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--fg-dim); font-variant-numeric: tabular-nums;
 }
-.map-route-count i { font-style: normal; color: var(--fg); }
+/* inline-flex:里面装的是 SVG 箭头(i 本身只是给它一个可旋转的壳) */
+.map-route-count i { font-style: normal; color: var(--fg); display: inline-flex; }
 /* 路线组头:折叠按钮 + 右侧一键全开/全关 */
 .map-routes-head { display: flex; align-items: center; gap: 6px; }
 .map-routes-head .map-medal-toggle { flex: 1; min-width: 0; }
@@ -511,9 +556,10 @@
 .map-medal-dual .map-layer-name { color: var(--fg); }
 .map-medal-dual .map-collect-btn { width: 24px; }
 .map-medal-dual-ic {
-  flex: none; width: 14px; text-align: center;
-  font-size: 13px; line-height: 1; color: var(--c-medal);
-  text-shadow: 0 0 6px rgba(var(--c-medal-rgb), .55);
+  flex: none; width: 14px; height: 14px; display: block;
+  color: var(--c-medal);
+  /* SVG 不吃 text-shadow,改用 drop-shadow 做同样的辉光 */
+  filter: drop-shadow(0 0 5px rgba(var(--c-medal-rgb), .55));
 }
 /* 双牌子滑块行:缩进 + 更小字号,金橙淡底延续双牌组的视觉归属。与上面 4 条单牌滑块
    视觉区分(单牌用默认底色 + accent 轨道),让用户一眼看出"这是双牌专用阈值"。 */
@@ -783,6 +829,20 @@
 }
 .map-zone-filter .map-layer-name { flex: 0 0 auto; }
 .map-zone-filter .muted { margin-left: auto; font-size: 12px; }
+
+/* 长列表限高内滚(分区明细 / 路线列表)。
+   分区默认展开且动辄 40 多行,路线有 20 条 —— 全铺开会把下面的野生宠物/涂色/路线
+   推出两屏之外,侧栏高度也就变得不可预期。限到 40vh 后无论数据多少,整条侧栏
+   都差不长,配合组标题吸顶,滚到哪儿都知道自己在哪一组。
+   刻意**不加** overscroll-behavior: contain —— 那是给模态框/下拉这类「滚到头就该停」
+   的浮层用的;这里一旦加上,手指在列表上滑到底后滚动不再传递给外层抽屉,
+   用户会以为侧栏卡住了。默认的滚动链(continue)才是这里想要的:列表滚到底 → 抽屉接着滚。 */
+.map-zone-list, .map-route-list {
+  display: flex; flex-direction: column;
+  max-height: 40vh; overflow-y: auto;
+}
+.map-zone-list { gap: 4px; padding-right: 2px; }
+.map-route-list { gap: 2px; }
 
 /* 明细行:名字 / 进度数字 / 缺口 / 迷你进度条 */
 .map-zone-row { display: flex; }

@@ -60,11 +60,6 @@ type Server struct {
 	eggSrc   string
 	eggSrcMu sync.Mutex
 
-	// 「清空野生宠标记」的回调,由消费管线注册(见 SetWildsClearer)。
-	// 野生宠观测态在 pipeline 侧,server 靠这个钩子反向调用它。
-	wildsMu      sync.Mutex
-	wildsClearer func(account string)
-
 	// 远行商人订阅提醒的进程内认领:槽开始时间戳 → 上一次认领时刻(见 merchant_notify.go)。
 	// 用途:同一槽被并发触发时只放行一个调用去发信,避免订阅者收到两份一模一样的邮件。
 	merchantClaimMu sync.Mutex
@@ -205,7 +200,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/pois", s.handlePois)
 	s.mux.HandleFunc("GET /api/gathers", s.handleGathers)
 	s.mux.HandleFunc("GET /api/wildpets", s.handleWildPets)
-	s.mux.HandleFunc("DELETE /api/wildpets", s.handleWildPetsClear)
+	// 曾有 DELETE /api/wildpets(清空野生宠标记),已删除:换场景本就整份作废
+	// (见 pipeline.resetWilds),同场景内的灰点又有 4 小时 TTL 兜着 —— 手动清空只剩
+	// 「不想看这些灰点了」这一种用处,不值为它留一个删数据的入口。
 	s.mux.HandleFunc("GET /api/paint", s.handlePaint)
 	s.mux.HandleFunc("DELETE /api/paint", s.handlePaintReset)
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
