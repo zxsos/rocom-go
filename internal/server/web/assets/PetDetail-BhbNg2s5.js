@@ -1,1 +1,0 @@
-import{j as s,P as e}from"./index-DgRQmdHo.js";import{g as o,h as r}from"./vendor-react-DFpSqo2U.js";function m(){const{gid:t}=o(),a=r();return s.jsx(e,{gid:t,onClose:()=>a(-1)})}export{m as default};

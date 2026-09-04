@@ -59,7 +59,7 @@ type connState struct {
 	areas      map[uint32]map[uint32]bool
 	layer      *layerState               // 分层地图去抖状态(见 layerDebounce)
 	stars      *starTracker              // 眠枭之星观测态(换场景/传送即重置)
-	wilds      *wildTracker              // 野生宠物图层观测态(同上,见 wildpets.go)
+	wilds      *wildTracker              // 野生宠物图层观测态(换场景即重置,同场景传送只置灰;见 wildpets.go)
 	gathers    *gatherTracker            // 实时采集物观测态(同上,见 gathers.go)
 	pos        scene.Position            // 最近一次移动包/传送落点的玩家世界坐标(涂地要从这儿画到宠物那儿)
 	wildSeen   map[uint64]scene.Position // 当前 AOI 里**全部**野生宠实体的位置(涂地用,不只稀有那几只)
@@ -139,23 +139,7 @@ func New(st *store.Store, db *gamedata.DB, srv *server.Server) *Pipeline {
 			}
 		}
 	}
-	// 把「用户点清空」这条反向调用注入 server:野生宠观测态在管线侧(见 Server.SetWildsClearer)。
-	srv.SetWildsClearer(p.clearWildsForAccount)
 	return p
-}
-
-// clearWildsForAccount 清空某账号的野生宠标记(server 的 DELETE /api/wildpets 走这里)。
-//
-// 账号可能同时有多条连接(多设备/多游戏服),故逐条清;连接状态各自持有观测态,
-// 清空后等下一个 actor_enter 自然重建 —— 不会像见闻录那样被服务器补回。
-func (p *Pipeline) clearWildsForAccount(acc string) {
-	now := time.Now()
-	for conn, a := range p.connAccount {
-		if a != acc {
-			continue
-		}
-		p.clearWilds(conn, acc, p.conn(conn).res, now)
-	}
 }
 
 // conn 返回(必要时创建)某连接的状态。

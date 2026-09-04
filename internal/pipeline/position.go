@@ -64,7 +64,7 @@ func (p *Pipeline) onEnterScene(m capture.Message, acc string) {
 		// 星星观测态按场景重置:上个场景的实体不算数。周边实体快照(0x014a)随后才到。
 		cs.stars = newStarTracker(res)
 		cs.wildSeen = nil                         // 涂地跟踪的实体同样按场景清零(见 paintSeen)
-		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(并推空列表,前端立刻清屏)
+		p.resetWilds(m.Session, acc, res, m.Time) // 野生宠物标记同理(换场景整份作废,推空列表清屏)
 		// 采集物是「此刻有」的实时态,整份作废而非置灰(留着就是一屏指向别处的假标记,
 		// 见 resetGathers)。
 		p.resetGathers(m.Session, acc, res, m.Time)
@@ -85,10 +85,13 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	p.st.SaveSessionScene(m.Session, tp.ResID, tp.Room)
 	p.leaveHome(m.Session, acc, tp.ResID) // 传送走了就撤掉小窝图层(进家园时由快照重建)
 	p.resetAreas(m.Session)
-	cs.wildSeen = nil                              // 同上:涂地跟踪的实体也作废
-	cs.pos = tp.Pos                                // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
-	p.resetWilds(m.Session, acc, tp.ResID, m.Time) // 传送落地后 AOI 全换,旧标记一律作废
-	p.resetGathers(m.Session, acc, tp.ResID, m.Time) // 同上:传送不为旧实体补发 leave,采集物整份作废
+	cs.wildSeen = nil // 同上:涂地跟踪的实体也作废
+	cs.pos = tp.Pos   // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
+	// 传送落地后 AOI 全换:跨场景的旧标记作废,同场景内(大地图传送点之间)的只置灰留着。
+	p.resetWilds(m.Session, acc, tp.ResID, m.Time)
+	// 采集物与野生宠不同:它是「此刻有」的实时态,同场景传送也整份作废
+	// (留着就是一屏指向别处的假标记,见 resetGathers)。
+	p.resetGathers(m.Session, acc, tp.ResID, m.Time)
 	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)

@@ -137,14 +137,6 @@ export const getPois = (res) => getJSON('/api/pois?res=' + res, { kinds: [], poi
 // 之后由 SSE wildpets 增量覆盖;从未收到过任何 AOI 通知时返回 null。
 export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)
 
-// clearWildPets 主动清空野生宠标记(连同已置灰的「最后所见」)。
-// 这是唯一会真正删除标记的入口:换场景/传送都只置灰(见 internal/pipeline/wildpets.go
-// 的 resetWilds),系统不会自动抹掉任何见过的野生宠。数据只随 AOI 实体下发重建,
-// 不会被服务器补回,故清空是有效的。
-export async function clearWildPets() {
-  await fetch('/api/wildpets?' + buildQuery(), { method: 'DELETE' })
-}
-
 // getGathers 返回当前账号**此刻视野内**的采集物(花/草/菌/矿/果树):
 //   {sceneResId, gathers:[{id,r,n,icon,u,v,x,y,z}]}
 //

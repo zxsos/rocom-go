@@ -108,9 +108,9 @@ func (p *Pipeline) observeGathers(conn, acc string, body []byte, now time.Time, 
 
 // resetGathers 换场景/传送时整份作废(并推空列表,前端立刻清屏)。
 //
-// 与 resetWilds 只置灰不同:采集物是「此刻有」的实时态,换场景后旧实体必然已不在
-// 视野里,留着就是一屏**指向别处**的假标记 —— 比没有更糟。传送同理(实测传送时
-// 服务器不为旧实体补发 leave,见 resetWilds 的注释)。
+// 与 resetWilds 不同:采集物是「此刻有」的实时态,**同场景内传送也整份作废**(野生宠那样
+// 置灰留着会让人白跑一趟 —— 采完会按刷新规则再刷,「那儿还有」是假的)。换场景同理。
+// 实测传送时服务器不为旧实体补发 leave,故这一步只能由我们代劳(见 resetWilds 的注释)。
 func (p *Pipeline) resetGathers(conn, acc string, res int32, now time.Time) {
 	cs := p.conns[conn]
 	if cs == nil {
