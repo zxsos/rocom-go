@@ -62,10 +62,19 @@ const PetGallery = (await server.ssrLoadModule('/src/pages/pet-list/PetGallery.j
 const st = (v, t = 0, n = 0) => ({ value: v, talentLv: t, nature: n })
 // fixture 用**极端数据**(长形态名 + 双系别 + 血脉 + 异色炫彩 + 双蛋组 + 长奖牌):
 // 四角徽标是叠在图片上的浮层,只有内容撑到最满才会暴露越界/重叠/截断 ——
-// 用「小火花」这种短数据测,布局永远是绿的,而真实数据里长形态名(「夏日的样子」)
-// 与异色炫彩一起出现时就会崩(用户报的「显示不全」正是被短数据掩盖的)。
+// 用「小火花」这种短数据测,布局永远是绿的,而真实数据里的长形态名会崩。
+//
+// ⚠️ 形态名取 8 字「穿星星睡衣的样子」,是**实测出来的玩家侧上限**(见下)。
+// 这里原先写的是 5 字「夏日的样子」,而它恰好卡在旧的 .pt-side 62px 上限内
+// (5 字 × 10px + 内边距 = 60px),于是**旧布局下这条断言也是绿的** ——
+// 用户报的「显示不全」就这样被自己的验收脚本放过去了。
+// 实测 names.json 的 petbase.f 共 84 个形态名:5 字 29 / 6 字 17 / 7 字 19 / 8 字 2。
+// 10px 字号下 7 字要 82px、8 字要 92px,都超出 62px —— 四分之一的形态名会截断。
+// (另有 13/14 字两个是 NPC 专属「草系徽章-BOSS专属精灵」等,玩家宠物取不到,
+//  且放到多长都不可能一行装下,交由 title 兜底,不作为布局验收的上限。)
+// 已做变异测试:把形态名挪回右栏(.pt-side 内),8 字会立刻截断报红。
 const pet = {
-  gid: 1, confId: 10, baseConfId: 10, species: '火花兽', book: 31, form: '夏日的样子', stage: 2,
+  gid: 1, confId: 10, baseConfId: 10, species: '火花兽', book: 31, form: '穿星星睡衣的样子', stage: 2,
   name: '我的小火火花兽', level: 100, natureId: 1, nature: '顽皮', gender: '♂',
   types: ['火', '龙'], typeIcons: [], bloodId: 3, blood: '烈焰', bloodIcon: '',
   eggGroups: [{ id: 6, name: '陆上' }, { id: 9, name: '天空' }],

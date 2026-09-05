@@ -14,19 +14,22 @@
 .list-layout > section { min-width: 0; }
 .filters {
   position: sticky; top: 64px; background: var(--bg-1); border: 1px solid var(--line);
-  border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow: auto;
+  border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 11px; max-height: calc(100vh - 90px); overflow: auto;
   box-shadow: var(--shadow-sm);
 }
+/* 分组改成卡片后,组与组之间不需要 14px —— 卡片自带的边框已划出边界,
+   间距只需「不贴在一起」即可(11px)。原先 14px 是在给那条弱分隔线留白,
+   现在留白的作用由边框接手了。 */
+.filters > .filter-sec + .filter-sec { margin-top: 0; }
 .filter-group { display: flex; flex-direction: column; gap: 7px; }
-/* 分组标题:左侧装饰竖条 + 字间距,更轻盈更分组化 */
+/* 组内小标签(系别 / 变异 / 性别 / 天分 …):块内找项用,权重**低于**组标题。
+   原先带一条 3px 渐变竖条 + uppercase,视觉比重比 .filter-sec 的组标题还大 ——
+   主次颠倒了:扫视时先定位到块(组标题),再在块内找项(本标签)。
+   去掉竖条与 uppercase 后,层次回到「组名 > 项名」,且中文没有大小写概念,
+   uppercase 对它本就无意义(只把字距拉散了)。 */
 .filter-group > label {
-  font-size: 11px; color: var(--fg-dim); letter-spacing: .04em; text-transform: uppercase;
+  font-size: 11px; color: var(--fg-dim); letter-spacing: .02em;
   display: flex; align-items: center; gap: 6px;
-}
-.filter-group > label::before {
-  content: ''; width: 3px; height: 12px; border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent), transparent);
-  flex: none;
 }
 /* 筛选抽屉的标题栏/底部条/遮罩:仅移动端显示,桌面隐藏 */
 .filters-bar, .filters-foot, .filters-backdrop { display: none; }
@@ -109,8 +112,13 @@
     padding: 10px 0 2px; margin-top: 4px; border-top: 1px solid var(--line);
   }
   .filters-foot .btn { flex: 1; }
-  /* 底部条已有重置,隐藏面板内那颗独立「重置筛选」 */
-  .filter-reset { display: none; }
+  /* 抽屉里状态条**不吸顶**:顶部已有 .filters-bar(含关闭入口)吸顶,两条 sticky
+     叠在同一位置会互相盖住。抽屉底部条另有「查看 N 只」,计数信息不缺,
+     故这里退回常规流式,只把负 margin 按抽屉的 padding(左右 14)对齐。 */
+  .filter-status {
+    position: static; margin: 0 -14px; padding: 10px 14px;
+    border-top: 1px solid var(--line-soft);
+  }
   .filters-backdrop {
     display: block; position: fixed; inset: 0; z-index: var(--z-scrim); background: rgba(0, 0, 0, .45);
     opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility .2s ease;

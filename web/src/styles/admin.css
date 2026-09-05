@@ -295,7 +295,7 @@
 .admin-config-group {
   margin: 12px 0; padding: 10px 12px;
   background: var(--bg-2, transparent);
-  border: 1px solid var(--line); border-radius: var(--radius, 6px);
+  border: 1px solid var(--line); border-radius: var(--radius);
 }
 .admin-config-group h4 {
   margin: 0 0 8px; font-size: 13px; color: var(--accent, #4a9eff);
@@ -322,7 +322,7 @@
 .admin-trial {
   margin: 12px 0; padding: 10px 12px;
   background: var(--bg-2, transparent);
-  border: 1px dashed var(--accent, #4a9eff); border-radius: var(--radius, 6px);
+  border: 1px dashed var(--accent, #4a9eff); border-radius: var(--radius);
 }
 .admin-trial .admin-hint { margin: 0 0 8px; }
 .admin-trial .admin-config-actions { margin-top: 8px; }
