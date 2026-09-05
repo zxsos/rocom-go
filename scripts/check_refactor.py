@@ -202,6 +202,12 @@ INTENTIONALLY_CHANGED = {
     # 它按 槽+邮箱+商品名 记,天然只挡本槽。同一批货隔档重新上架时不再被静默吞掉。
     # 待发清单由 news 改名 fresh(它不再是「相对更早轮的新增」,而是「本槽未通知过的」)。
     "merchantNotify": "阶段2:发信调用点改为 s.smtp.send*;fix:去重粒度由整槽改为每商品(补货要能补发);fix:去掉跨档 seen 去重(隔档补货要能再提醒)",
+
+    # 管理面板配置化(2026-09-05):凭据改走加锁访问器
+    # eggAPIKey 原本是裸字段,现可被面板在运行期修改,而读取方横跨 HTTP 请求与
+    # merchantLoop 两个 goroutine —— 裸读是数据竞争。故 7 处读取点改走
+    # eggAPIKeyGet()/eggAPIKeySetOn()。只是把 `s.eggAPIKey != ""` 换成等价格式,无行为变化。
+    "handleAdminEggStats": "配置面板:eggAPIKey 裸读改走 eggAPIKeySetOn()(加锁访问器,防运行期改配置的数据竞争)",
     "merchantResend": "阶段2:发信调用点改为 s.smtp.send*",
     # fix:第三方滞后补货。改为只回源当前轮(更早的轮永不回源,拿回来的是当前货单=伪造历史),
     # 并按 merchantShouldFetch 判定(取代原先「有缓存就跳过」)。

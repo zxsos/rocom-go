@@ -90,7 +90,10 @@ func (m *smtpSender) dial() (smtpSession, error) {
 		log.Printf("smtp 读服务问候失败 拨号已耗=%.2fs: %v", tDial.Seconds(), err)
 		return nil, fmt.Errorf("读服务问候: %w", err)
 	}
-	if err := c.Auth(smtp.PlainAuth("", m.user, m.pass, merchantSmtpHost)); err != nil {
+	// 取凭据快照而非持锁发信:mu 只护字段,这里在调用方的 batchMu 下,
+	// 走到这儿时并不持有 mu(见 smtpSender.batchMu 注释)。
+	user, pass := m.credentials()
+	if err := c.Auth(smtp.PlainAuth("", user, pass, merchantSmtpHost)); err != nil {
 		c.Close()
 		log.Printf("smtp 认证失败 拨号=%.2fs 认证=%.2fs: %v(授权码过期或被限流?)",
 			tDial.Seconds(), time.Since(t0).Seconds(), err)
@@ -107,7 +110,7 @@ func (s *realSession) send(m *smtpSender, msg smtpMail) (int, error) {
 	if err := s.conn.SetDeadline(time.Now().Add(smtpMailTimeout)); err != nil {
 		return 0, fmt.Errorf("设 deadline: %w", err)
 	}
-	if err := s.c.Mail(m.user); err != nil {
+	if err := s.c.Mail(m.senderAddr()); err != nil {
 		return 0, fmt.Errorf("MAIL FROM: %w", err)
 	}
 	if err := s.c.Rcpt(msg.to); err != nil {
@@ -156,8 +159,9 @@ func (s *realSession) discard() { s.c.Close() }
 // 重连再发剩下的 —— 一个人撞上 550 不能连累其他人收不到。连接级错误(拨号/问候/
 // 认证)绕不过去,余下各封返回同一个错误,交给上层按「失败不 Mark」去重试。
 func (m *smtpSender) sendBatch(msgs []smtpMail) []error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// 整批串行(理由见 batchMu 注释)。注意**不是** mu:那条要留给管理面板改配置用。
+	m.batchMu.Lock()
+	defer m.batchMu.Unlock()
 	errs := make([]error, len(msgs))
 	if len(msgs) == 0 {
 		return errs

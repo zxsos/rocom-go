@@ -29,8 +29,11 @@ const merchantMailHTMLTpl = `<!DOCTYPE html>
 </body></html>`
 
 // from 生成带中文显示名的 From 头。
+//
+// 读 user 要加锁:发信路径只持有 batchMu,而管理面板可在运行期改这个字段
+// (见 smtpSender.setCredentials)。
 func (m *smtpSender) from() string {
-	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + m.user + ">"
+	return mime.QEncoding.Encode("utf-8", merchantMailFromName) + " <" + m.senderAddr() + ">"
 }
 
 // merchantMailBody 把纯文本正文转成模板包裹的 HTML(保留换行与前导空格,列表行转 •)。

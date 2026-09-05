@@ -435,9 +435,17 @@ func (sn *snapshotStore) forget(acc string) {
 // 是固定开销,每人重来一遍纯属浪费。刻意**不并发**:QQ 邮箱对并发连接敏感,
 // 容易判为异常触发限流;复用连接则既省了那部分开销,又不增加并发连接数。
 type smtpSender struct {
+	// mu 只保护下面这几个字段,临界区**必须短** —— 管理面板改配置时要抢它。
 	mu   sync.Mutex
 	user string // 发件 QQ 邮箱;空=订阅提醒不可用
 	pass string // SMTP 授权码
+
+	// batchMu 把整批发信串成一路:一批人共用一个 SMTP 会话,故同一时刻只该有一条连接
+	// (QQ 邮箱对并发连接敏感,见下)。它跨网络 I/O 持有,**不能**用来保护 user/pass ——
+	// 否则面板改一次配置要等到整批发完(可能几分钟)才返回。
+	//
+	// 早先只有一把 mu,两件事混在一起:既护字段又串行发信。加运行期改配置后必须拆开。
+	batchMu sync.Mutex
 
 	// 测试注入:非 nil 时 sendBatch 改走它而不真连 QQ SMTP(见 merchant_notify_test.go)。
 	sendFn func(to, subject, html string) error
@@ -451,4 +459,43 @@ func newSMTPSender(user, pass string) *smtpSender {
 }
 
 // configured 返回 SMTP 是否已配置。
-func (m *smtpSender) configured() bool { return m.user != "" && m.pass != "" }
+//
+// 加读取锁:凭据现在能被管理面板在运行时改(见 setCredentials),而 configured()
+// 同时被 HTTP 请求与订阅触发的 goroutine 调用 —— 不加锁就是数据竞争,
+// 表现为「面板刚改完,页面上 configured 还是旧值」这类偶发错乱。
+func (m *smtpSender) configured() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user != "" && m.pass != ""
+}
+
+// setCredentials 更新发件邮箱与授权码(管理面板改配置后立即生效)。
+//
+// 凭据只在 sendBatch 建会话时读取,故这里换掉值即可,不需要断连重连 ——
+// 下一次发信自然用新凭据。返回是否真的变了,供调用方决定是否记日志/清状态。
+func (m *smtpSender) setCredentials(user, pass string) (changed bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.user == user && m.pass == pass {
+		return false
+	}
+	m.user, m.pass = user, pass
+	return true
+}
+
+// credentials 返回当前凭据(管理面板回显、dial 时取快照用)。
+func (m *smtpSender) credentials() (user, pass string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user, m.pass
+}
+
+// senderAddr 返回发件地址(MAIL FROM / From 头)。
+//
+// 发信路径只持有 batchMu 而不持有 mu(见 batchMu 注释),故这里必须单独加锁读 ——
+// 否则与管理面板的写入构成数据竞争。
+func (m *smtpSender) senderAddr() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user
+}

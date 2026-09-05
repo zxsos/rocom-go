@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"log"
-	"net/http"
 	"net/netip"
 	"strings"
 	"time"
@@ -47,7 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("打开数据库失败: %v", err)
 	}
-	srv := server.New(st, server.NewHub(), db, *eggAPIKey, *smtpUser, *smtpPass)
+	// 代理交给 Manager 管理生命周期:面板改代理配置时能只重启它,不必重启整个进程
+	// (重启会打断正在解密的游戏连接)。原 serveSocks5 的校验与拆分逻辑已并入
+	// socks5.Config.Validate / Manager.Start。
+	socks5Mgr := socks5.NewManager()
+	srv := server.New(st, server.NewHub(), db, *eggAPIKey, *smtpUser, *smtpPass, socks5Mgr)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 	for s := range strings.SplitSeq(*ignoreIPs, ",") {
@@ -61,14 +64,40 @@ func main() {
 		eng.AddSkipIP(ip)
 	}
 
+	// Web 服务交给 server 的监听器托管(而非这里直接 ListenAndServe):
+	// 管理面板要在运行期改监听地址,必须能「先起新的、成功后再停旧的」——
+	// 那要求有人持有并管理监听器,见 internal/server/web_listen.go。
+	// 证书只在这里准备一次,换地址时复用同一份(它是 -tls 的产物,与监听地址无关)。
+	var tlsCfg *tls.Config
+	if *useTLS {
+		cert, err := loadOrCreateCert(*certPath, *keyPath)
+		if err != nil {
+			log.Fatalf("准备 TLS 证书失败: %v", err)
+		}
+		tlsCfg = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+	web := server.NewWebServer(srv.Handler(), tlsCfg)
+	srv.SetWebServer(web)
+
 	pl := pipeline.New(st, db, srv)
 	go pl.Run(eng)
-	go serveWeb(*addr, srv.Handler(), *useTLS, *certPath, *keyPath)
+	if err := web.Listen(*addr); err != nil {
+		log.Fatalf("Web 服务失败: %v", err)
+	}
 	if *socks5Addr != "" {
 		if *skipSelf && *iface != "" {
 			log.Printf("提示: -socks5-addr 已启用但未设 -skip-self-ip=false,代理进程以本机 IP 出站的游戏流量会被丢弃")
 		}
-		go serveSocks5(*socks5Addr, *socks5Allow, *socks5Block, *socks5Max, *socks5User, *socks5Pass)
+		if err := socks5Mgr.Start(socks5.Config{
+			Addr:     *socks5Addr,
+			Allow:    *socks5Allow,
+			Block:    *socks5Block,
+			MaxConns: *socks5Max,
+			User:     *socks5User,
+			Pass:     *socks5Pass,
+		}); err != nil {
+			log.Fatalf("SOCKS5 服务启动失败: %v", err)
+		}
 	}
 
 	switch {
@@ -109,57 +138,6 @@ func main() {
 	}
 }
 
-// serveWeb 启动 Web 服务(-tls 时用自签证书起 HTTPS,证书不存在则生成,见 tls.go)。
-func serveWeb(addr string, h http.Handler, useTLS bool, certPath, keyPath string) {
-	if useTLS {
-		cert, err := loadOrCreateCert(certPath, keyPath)
-		if err != nil {
-			log.Fatalf("准备 TLS 证书失败: %v", err)
-		}
-		hs := &http.Server{
-			Addr:      addr,
-			Handler:   h,
-			TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}},
-		}
-		log.Printf("Web 界面: https://localhost%s (自签证书,浏览器首次访问需手动信任)", addr)
-		if err := hs.ListenAndServeTLS("", ""); err != nil {
-			log.Fatalf("HTTPS 服务失败: %v", err)
-		}
-		return
-	}
-	log.Printf("Web 界面: http://localhost%s", addr)
-	// ReadHeaderTimeout: 防慢速 header 攻击(Slowloris),不影响正常请求。
-	// IdleTimeout: 空闲连接最大存活时间,清理断开未检测的残留连接,避免 goroutine 堆积。
-	// 注意:不设 WriteTimeout/ReadTimeout —— SSE 长连接(/api/stream)需要无写超时,
-	// 设了会中断流式推送。ReadHeaderTimeout 只影响 header 读取阶段,不影响 body/SSE。
-	hs := &http.Server{
-		Addr:              addr,
-		Handler:           h,
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
-	if err := hs.ListenAndServe(); err != nil {
-		log.Fatalf("HTTP 服务失败: %v", err)
-	}
-}
-
-// serveSocks5 启动内置 SOCKS5 代理(仅 TCP CONNECT),供手机把游戏流量代理到本机,
-// 整网卡抓包即可看到代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false,见 main)。
-func serveSocks5(addr, allow, block string, maxConns int, user, pass string) {
-	prefs, err := socks5.ParseAllow(allow)
-	if err != nil {
-		log.Fatalf("解析 -socks5-allow 失败: %v", err)
-	}
-	if user != "" && pass == "" {
-		log.Fatal("-socks5-user 已设置但 -socks5-pass 为空")
-	}
-	blocked := []string{}
-	for part := range strings.SplitSeq(block, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			blocked = append(blocked, part)
-		}
-	}
-	if err := socks5.ListenAndServe(addr, prefs, blocked, maxConns, user, pass); err != nil {
-		log.Fatalf("SOCKS5 服务失败: %v", err)
-	}
-}
+// 内置 SOCKS5 代理(仅 TCP CONNECT)供手机把游戏流量代理到本机,整网卡抓包即可看到
+// 代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false)。
+// 启停与参数变更走 socks5.Manager(见 main 里的 socks5Mgr),管理面板可在运行期改。

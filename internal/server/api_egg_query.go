@@ -56,6 +56,27 @@ func (s *Server) eggSource() string {
 	return s.eggSrc
 }
 
+// eggAPIKeyGet 返回当前生效的第三方图鉴令牌;空=未配置。
+//
+// 加锁而非直接读字段:管理面板可在运行期改它(见 eggAPIKeySet),而读取方横跨
+// HTTP 请求与 merchantLoop 两个 goroutine —— 裸读是数据竞争。
+func (s *Server) eggAPIKeyGet() string {
+	s.eggAPIKeyMu.Lock()
+	defer s.eggAPIKeyMu.Unlock()
+	return s.eggAPIKey
+}
+
+// eggAPIKeySet 更新令牌(管理面板改配置后立即生效,不必重启)。
+func (s *Server) eggAPIKeySet(key string) {
+	s.eggAPIKeyMu.Lock()
+	defer s.eggAPIKeyMu.Unlock()
+	s.eggAPIKey = key
+}
+
+// eggAPIKeySetOn 返回令牌是否已配置。面板回显只给这个布尔,
+// 令牌原文从不下发前端(见 server.New 的注释)。
+func (s *Server) eggAPIKeySetOn() bool { return s.eggAPIKeyGet() != "" }
+
 // eggSetSource 切换数据源:落库 → 更新内存镜像。
 //
 // 与远行商人不同,这里**不需要清缓存**:两个源都是「每次请求实时算」
@@ -191,13 +212,13 @@ func (s *Server) handleEggQueryXianyu(w http.ResponseWriter, r *http.Request, he
 		s.store.LogEggQuery(s.acct(r), ok, int(time.Since(start).Milliseconds()), matches, height, weight)
 	}()
 
-	if s.eggAPIKey == "" {
+	if s.eggAPIKeyGet() == "" {
 		http.Error(w, "服务端未配置查询令牌(启动时加 -egg-api-key);可到管理面板把数据源切回本地源",
 			http.StatusServiceUnavailable)
 		return
 	}
 	params := url.Values{}
-	params.Add("key", s.eggAPIKey)
+	params.Add("key", s.eggAPIKeyGet())
 	params.Add("format", "json")
 	if height != "" {
 		params.Add("height", height)

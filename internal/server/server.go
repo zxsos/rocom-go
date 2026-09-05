@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/gamedata"
+	"github.com/whoisnian/rocom-capture/internal/socks5"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
@@ -47,7 +48,12 @@ type Server struct {
 	adminMu    sync.Mutex
 	adminToken string // 管理员会话令牌;服务重启后失效需重新登录
 
-	eggAPIKey string // 第三方图鉴 API 令牌(-egg-api-key),查随机蛋可能物种用;空=不启用
+	// eggAPIKey:第三方图鉴 API 令牌(-egg-api-key),查随机蛋可能物种用;空=不启用。
+	// 现在可被管理面板在运行期修改,而读取方有 HTTP 请求与 merchantLoop 两个 goroutine,
+	// 故经 eggAPIKey()/setEggAPIKey() 访问 —— 直接读写字段会构成数据竞争。
+	// 对外只暴露「是否已设置」(keySet),令牌原文不下发前端(见 New 的注释)。
+	eggAPIKey   string
+	eggAPIKeyMu sync.Mutex
 
 	merchantMu sync.Mutex // 远行商人回源互斥:并发请求/定时任务同时缺缓存时,只放行一次回源(见 merchant.go)
 
@@ -75,7 +81,19 @@ type Server struct {
 	// 远行商人订阅邮件提醒:发件 QQ 邮箱与 SMTP 授权码(-merchant-smtp-user/-merchant-smtp-pass),
 	// 空=订阅提醒不可用(前端提示,商家数据仍正常)。一批订阅者共用一个 SMTP 会话串行发信,
 	// 既省掉重复的握手与认证,又不增加并发连接(QQ 邮箱对并发连接敏感,见 state.go)。
+	// 凭据可被管理面板在运行期改(见 smtpSender.setCredentials)。
 	smtp *smtpSender
+
+	// 运行期配置(管理面板可改,见 api_admin_config.go)。
+	// envPath 是配置**唯一**的落盘位置(systemd 的 EnvironmentFile,由 deploy.sh 生成);
+	// 内存里的值只是「不必重启的加速」—— 故任何改动都必须先落盘再改内存,
+	// 两者顺序反了就会「重启后配置丢失」。
+	envPath string
+	// socks5Mgr 管理内置代理的启停。改代理配置不必重启进程,也就不打断抓包。
+	socks5Mgr *socks5.Manager
+	// web 托管 Web 服务的监听,使监听地址也能在运行期改(试运行→确认,见 web_listen.go)。
+	// main 启动时注入;为空时改地址的端点返回 503(单元测试与只用到 Handler 的场景)。
+	web *webServer
 
 	injectMu sync.Mutex
 	injects  map[string][]*injectEntry // 账号 -> 已注入精灵(管理员投放,有生命周期,见 admin_inject.go)
@@ -98,7 +116,8 @@ type iconMeta struct {
 // New 创建 HTTP 服务。eggAPIKey 是查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌,
 // 只在服务端持有;空字符串 = 孵蛋页不提供查询(前端会提示未配置)。
 // smtpUser/smtpPass 是远行商人订阅邮件提醒的发件 QQ 邮箱与授权码,空 = 订阅提醒不可用。
-func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPass string) *Server {
+// New 创建 HTTP 服务。socks5Mgr 为 nil 时自建一个(测试与纯 Web 场景)。
+func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPass string, socks5Mgr *socks5.Manager) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals(), eggAPIKey: eggAPIKey}
 	s.snap = newSnapshotStore()
 	s.medalIDs = map[string][]uint32{}
@@ -106,6 +125,12 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 	s.online = newOnlineTracker()
 	s.accounts = newAcctResolver(s.online, st)
 	s.smtp = newSMTPSender(smtpUser, smtpPass)
+	s.envPath = configEnvPath()
+	if socks5Mgr != nil {
+		s.socks5Mgr = socks5Mgr
+	} else {
+		s.socks5Mgr = socks5.NewManager()
+	}
 	// 远行商人数据源:库里没配置(老库/首次)或值非法时回退默认源。
 	// 读取失败按「未配置」处理(表是后加的,老库没有这一行属正常),同样回退。
 	s.merchantSrc = merchantSrcDefault
@@ -146,6 +171,10 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 
 // Hub 返回广播中心。
 func (s *Server) Hub() *Hub { return s.hub }
+
+// SetWebServer 注入 Web 监听托管,使管理面板能在运行期改监听地址。
+// main 在开始监听之前调用(见 cmd/rocom-capture/main.go)。
+func (s *Server) SetWebServer(w *webServer) { s.web = w }
 
 // OpcodeName 返回 opcode 的可读名称。
 func (s *Server) OpcodeName(op uint16) string {
@@ -229,6 +258,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
 	s.mux.HandleFunc("GET /api/admin/egg-source", s.handleAdminEggSource)
 	s.mux.HandleFunc("POST /api/admin/egg-source", s.handleAdminEggSource)
+	s.mux.HandleFunc("GET /api/admin/config", s.handleAdminConfig)
+	s.mux.HandleFunc("POST /api/admin/config", s.handleAdminConfig)
+	// Web 监听地址(改它要试运行 + 确认,见 api_web_addr.go)
+	s.mux.HandleFunc("POST /api/admin/web-addr", s.handleAdminWebAddr)
+	s.mux.HandleFunc("POST /api/admin/web-addr/confirm", s.handleAdminWebAddrConfirm)
+	s.mux.HandleFunc("POST /api/admin/web-addr/revert", s.handleAdminWebAddrRevert)
 	s.mux.HandleFunc("GET /api/stream", s.handleStream)
 	s.mux.HandleFunc("POST /api/debug/parse", s.handleDebugParse)
 	// 宠物图片(embed 的 webp,路径如 /img/HeadIcon/3001.webp);长缓存,内容随版本变更。
