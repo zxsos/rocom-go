@@ -8,7 +8,9 @@ import { Portrait } from './avatar'
 import { toast } from './toast'
 import { useDialog } from '../hooks/useDialog'
 import { StatRadar, StatRange } from './stats'
-import { locTag, fmtTime, voiceHot, pctHot } from '../utils/format'
+import { fmtTime, voiceHot, pctHot } from '../utils/format'
+import { IconMedal } from './svg'
+import LocTag from './LocTag'
 
 // PetDetailModal 宠物详情弹窗:覆盖在当前页面之上,不打断底层正在操作的列表/事件页。
 // 点击卡片外区域、按 Esc、点返回均触发 onClose。
@@ -128,7 +130,7 @@ export function PetDetailModal({ gid, onClose }) {
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
             <Item k="体重" v={<span className={pctHot(pet.weightPct)}><StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" /></span>} />
             <Item k="声音" v={<span className={voiceHot(pet.voice)}>{pet.voice}</span>} />
-            <Item k="位置" v={locTag(pet)} />
+            <Item k="位置" v={<LocTag pet={pet} className="" />} />
             <Item k="捕捉时间" v={fmtTime(pet.catchTime)} title={fmtTime(pet.catchTime)} />
           </div>
 
@@ -157,7 +159,7 @@ export function PetDetailModal({ gid, onClose }) {
               <div className="medals">
                 {ownedMedals.map((m) => (
                   <div key={m.id} className="medal medal-tip" data-tip={m.name + (m.desc ? '：' + m.desc : '')}>
-                    {m.icon ? <InlineIcon src={m.icon} className="medal-ic" alt={m.name} /> : '🏅'}
+                    {m.icon ? <InlineIcon src={m.icon} className="medal-ic" alt={m.name} /> : <IconMedal size={20} className="medal-ic" />}
                   </div>
                 ))}
               </div>

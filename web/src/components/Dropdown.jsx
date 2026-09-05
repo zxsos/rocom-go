@@ -13,7 +13,7 @@ export default function Dropdown({ value, options, onChange, placeholder = 'å…¨é
   const curIdx = items.findIndex((o) => String(o.value) === String(value))
   const cur = items[curIdx]
 
-  const { open, setOpen, hi, setHi, rootRef, ulRef, onKeyDown, pickAt } = useDropdown({
+  const { open, setOpen, up, hi, setHi, rootRef, ulRef, onKeyDown, pickAt } = useDropdown({
     count: items.length,
     selectedIndex: curIdx,
     disabled,
@@ -22,7 +22,7 @@ export default function Dropdown({ value, options, onChange, placeholder = 'å…¨é
 
   return (
     <div
-      className={'dropdown' + (open ? ' open' : '') + (small ? ' small' : '') + (className ? ' ' + className : '')}
+      className={'dropdown' + (open ? ' open' : '') + (up ? ' up' : '') + (small ? ' small' : '') + (className ? ' ' + className : '')}
       ref={rootRef} onKeyDown={onKeyDown} title={title}
     >
       <button

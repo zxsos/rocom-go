@@ -6,6 +6,7 @@ import { ImgAvatar, imgURL } from '../../components/icons'
 import { confirmDialog } from '../../components/confirm'
 import { fmtTime } from '../../utils/format'
 import { Marks } from '../../components/badges'
+import { IconCoin } from '../../components/svg'
 import ElementWheel from './ElementWheel'
 
 // 草系徽章试炼页:实时同步游戏内的一局。
@@ -283,7 +284,7 @@ function RunView({ run, active }) {
               {run.floorLabel}
             </span>
           )}
-          <span className="trial-chip trial-coin" title="试炼金币">🪙 {run.coin}</span>
+          <span className="trial-chip trial-coin" title="试炼金币"><IconCoin size={13} />{run.coin}</span>
           {run.boss && <span className="trial-chip trial-boss">BOSS</span>}
         </div>
         <div className="trial-bar" title={`${doneNodes}/${totalNodes}`}>
@@ -390,7 +391,7 @@ function RunView({ run, active }) {
                 <div className="trial-card-t">{shopKind(s.type)}</div>
                 <div className="trial-card-id">{s.id}</div>
                 <div className="trial-card-meta">
-                  <span>🪙 {s.price}</span>
+                  <span><IconCoin size={12} />{s.price}</span>
                   {s.bought && <span className="muted">已购</span>}
                 </div>
               </div>
@@ -706,7 +707,7 @@ function OptionCard({ o }) {
         <div className="trial-opt-meta">
           {o.level > 0 && <span>Lv {o.level}</span>}
           <span className="trial-opt-cost" title="在这只精灵的抽取池里重抽一个">
-            换奖励 🪙 {o.rewardCost || 0}
+            换奖励 <IconCoin size={12} />{o.rewardCost || 0}
           </span>
         </div>
 
@@ -727,7 +728,7 @@ function OptionCard({ o }) {
       </div>
 
       <div className="trial-opt-swap" title="换掉整只精灵,抽取池随之换成新精灵的一套">
-        换事件 🪙 {o.eventCost || 0}
+        换事件 <IconCoin size={12} />{o.eventCost || 0}
         {/* 槽位行:优先给可读名 —— 事件映射到精灵就显示精灵名(豆丁鱼),特殊事件
             (商人/魔力之源等)显示后端下发的 eventName;两者都没有才退回裸事件 id。
             原始 event_conf_id 保留在 title 里,方便对照抓包。 */}

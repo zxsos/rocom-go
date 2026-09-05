@@ -622,3 +622,30 @@ html.theme-spread::view-transition-new(root) {
      裁掉半屏的快照(animation: none 时新快照整张立即可见,即瞬时切换)。 */
   html.theme-spread::view-transition-new(root) { animation: none; }
 }
+
+/* ---- 图标与文字混排的统一对齐(图标 SVG 化后的收尾)----
+ *
+ * 原先这些位置的图标是 emoji,浏览器按**字形**排版,基线天然与汉字对齐。
+ * 换成 SVG 后它是 replaced element,默认 vertical-align: baseline ——
+ * 而 SVG 没有文本基线,会坐在基线上、底部与文字底部错开一截,看起来
+ * 是「图标浮起来了」。每个用到的类各写一份对齐又会散落到七八个 css 里,
+ * 故统一在这里按「图标是 .xxx > svg 的第一个子元素」这个结构收口。
+ *
+ * 只管**水平居中对齐**,不碰颜色:颜色由各处按语义给(如金币取 --c-wealth)。
+ *
+ * 覆盖的容器:金额/倒计时/标题/按钮等一切「图标 + 短文案」的行内组合。
+ * gap 取 5px:比文字间距略紧,让图标与它修饰的词连成一组读。
+ */
+.merchant-coins, .merchant-countdown, .merchant-sub-title, .merchant-sub-fold-mail,
+.merchant-rank-btn, .hb-title, .trial-chip, .trial-opt-cost, .btn-dbg-copy {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+/* 金币图标统一取财富金:它是「洛克贝」这个语义的载体,在哪儿都该是金色的
+   (与排行榜 --c-wealth 同源,见 base.css 的语义色注释)。 */
+.merchant-coins > svg, .trial-chip > svg, .trial-opt-cost > svg, .rank-coins > svg {
+  color: var(--c-wealth); flex: none;
+}
+/* 页面标题里的图标:与 h2 同色但稍淡一档,不与标题文字抢注意力 */
+.hb-title > svg { color: var(--c-flower); flex: none; }
+/* 商品图缺图兜底:整块居中,图标比原 emoji 略小以免显得空 */
+.merchant-item-fb { display: grid; place-items: center; color: var(--fg-dim); opacity: .7; }

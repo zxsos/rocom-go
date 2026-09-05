@@ -4,6 +4,7 @@ import { AccountContext, AccountNameContext, IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { GlassChip } from '../../components/badges'
 import { Skeleton } from '../../components/Skeleton'
+import { IconSparkle } from '../../components/svg'
 import { toast } from '../../components/toast'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../../data/glassConf'
@@ -173,7 +174,7 @@ export default function HandbookGlasses() {
   return (
     <div className="hb-page">
       <div className="hb-head">
-        <h2 className="hb-title">✨ 炫彩图鉴</h2>
+        <h2 className="hb-title"><IconSparkle size={19} />炫彩图鉴</h2>
         <span className="hb-note">数据来自登录包快照(每次登录更新),非实时</span>
         {stats && stats.species > 0 && (
           <button className="btn hb-share-btn" onClick={exportShare} disabled={exporting}>

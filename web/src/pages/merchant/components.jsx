@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { count, groupBySlot, imgSrc, kindText, msTime, parseSlots, unwrap } from './format'
+import { IconLuggage } from '../../components/svg'
 
 // 远行商人的纯展示组件:轮次步骤条、单个轮次、商品卡片。都不持有业务状态,
 // 只依赖传入的数据(商品图加载失败是唯一的局部状态)。
@@ -102,7 +103,7 @@ export function MerchantItem({ it, slot }) {
           <img className="merchant-item-img" src={src} alt="" loading="lazy" draggable={false}
             onError={() => setImgBad(true)} />
         ) : (
-          <span className="merchant-item-fb">🧳</span>
+          <span className="merchant-item-fb"><IconLuggage size={26} /></span>
         )}
       </div>
       <div className="merchant-item-body">
