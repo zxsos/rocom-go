@@ -191,8 +191,10 @@
 @keyframes map-ctrl-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
 .map-btn {
   width: 38px; height: 38px; border-radius: 10px;
+  /* 底保留 --bar-bg 磨砂(浮在地图上需要透出底图),但边框与字走中性灰,
+     与 .on 的蓝是色相级差别 —— 见 base.css 的 --sw-off-* 注释。 */
   background: var(--bar-bg); backdrop-filter: blur(6px);
-  border: 1px solid var(--line); color: var(--fg);
+  border: 1px solid var(--sw-off-line); color: var(--sw-off-fg);
   font-size: 18px; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: transform .18s ease, border-color .18s ease, color .18s ease, background-color .18s ease, box-shadow .18s ease;
@@ -204,7 +206,7 @@
    包进 @media(hover:hover):触摸设备 :hover 会粘住,详见 panel.css 的注释。 */
 @media (hover: hover) {
   .map-btn:hover {
-    border-color: var(--fg-dim); color: var(--fg);
+    border-color: var(--sw-off-line-hi); color: var(--sw-off-fg-hi);
     background: var(--bar-hover);
     transform: translateY(-1px);
     /* 阴影也去掉蓝色 —— 它原是 rgba(76,141,255,.25) 的一圈蓝光,
