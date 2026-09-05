@@ -50,18 +50,20 @@ func (s *Server) handleEggs(w http.ResponseWriter, r *http.Request) {
 	// 孵化倍率**整个响应一份**而非逐蛋:倍率是全局的,不逐蛋(实测三颗不同 maxSecs
 	// 的蛋同秒各 +10s,统一 5.00)。
 	//
-	// hatchRate 是**外推用的**倍率 = 活动倍率(固定时间表,见 pet.HatchActivityRate)。
-	// 它不靠测量:加速日是每周五 04:00~周一 04:00 的固定活动,服务器在窗口内照此推进,
-	// **玩家离线时也一样** —— 故按时间表算,离线外推天然准确,不必攒样本、不存在冷启动。
+	// hatchRate 已含「此刻是否在移动」(见 pet.HatchRate),前端拿它直接外推即可。
+	// 之所以能实时,是因为它由两部分拼出,各自都拿得到:
+	//   - 活动倍率:加速日时间表,按时刻算(离线也准,不存在冷启动);
+	//   - 移动增益:玩家此刻在不在动,由移动包 0x0133 观测(翻转会经 SSE 推送)。
 	//
-	// hatchMoving 单列:玩家移动/挂风场会在活动倍率之上再加,但那是**在线行为加成**,
-	// 随速度与移动方式而变(实测静止 5.00、移动 16.9~25.8),样本不足以定出一个可信的
-	// 数。故它**不进** hatchRate(拿它外推会虚报「可破壳」),只作定性提示:此刻确实
-	// 在动,进度会比标注的更快。
+	// 语义要说清:这个倍率对应「**若保持当前状态**」。玩家跑动时 ETA 短、停下就变长,
+	// 故前端必须把状态标出来(「移动中」/「静止」),否则数字来回跳会让人困惑。
+	acc := s.acct(r)
+	moving := s.isHatchMoving(acc)
 	writeJSON(w, map[string]any{
-		"eggs":        eggs,
-		"hatchRate":   pet.HatchActivityRate(time.Now().Unix()),
-		"hatchMoving": s.isHatchMoving(s.acct(r)),
+		"eggs":          eggs,
+		"hatchRate":     pet.HatchRate(time.Now().Unix(), moving),
+		"hatchMoving":   moving,
+		"hatchMovingAt": s.hatchMovingAt(acc).Unix(),
 	})
 }
 
@@ -71,6 +73,10 @@ const hatchMoveTTL = 10 * time.Second
 
 // SetHatchMoving 记录某账号最近一次观测到「玩家在移动」的时刻;at 为零值表示明确停止。
 // 由抓包管线在每次移动包(0x0133)时调用,HTTP 读取方据此判定时效。
+//
+// **状态翻转时广播 SSE**(事件名 hatch):不推的话,孵蛋页只在自己重拉时才更新
+// 移动状态 —— 玩家跑起来了页面却还按静止算,「实时」就无从谈起。
+// 只在翻转时推:移动包峰值约 8 条/秒,逐包广播既无意义也浪费。
 func (s *Server) SetHatchMoving(account string, at time.Time) {
 	if account == "" {
 		return
@@ -79,8 +85,33 @@ func (s *Server) SetHatchMoving(account string, at time.Time) {
 	if s.hatchMoving == nil {
 		s.hatchMoving = map[string]time.Time{}
 	}
+	prev := !s.hatchMoving[account].IsZero() &&
+		time.Since(s.hatchMoving[account]) <= hatchMoveTTL
 	s.hatchMoving[account] = at
+	now := !at.IsZero() && time.Since(at) <= hatchMoveTTL
+	changed := prev != now
 	s.hatchMovingMu.Unlock()
+
+	if changed {
+		// 只带状态与时刻,倍率由前端按当前的「加速日时间表 + 是否在动」自己算:
+		// 倍率会随加速日窗口起止而变,推一个算好的值过去,翻过 04:00 那一刻就成了
+		// 过期数字。前端复算的口径见 web/src/pages/eggs/hatch.js 的 hatchRateNow。
+		s.hub.Broadcast("hatch", account, map[string]any{
+			"moving": now,
+			"at":     at.Unix(), // 零值(明确停止)时为 0
+		})
+	}
+}
+
+// hatchMovingAt 返回最近一次观测到「在移动」的时刻;从未移动过则返回零值。
+//
+// 单独暴露给前端是因为移动状态**有时效**:玩家站住后,客户端未必补发 stop_move 包,
+// 后端只能靠 TTL 自然过期 —— 而过期那一刻没有事件可推(没人发包)。前端据此每秒
+// 自己判断,才能及时翻回「静止」,不必等下一次请求。
+func (s *Server) hatchMovingAt(account string) time.Time {
+	s.hatchMovingMu.Lock()
+	defer s.hatchMovingMu.Unlock()
+	return s.hatchMoving[account]
 }
 
 // isHatchMoving 报告某账号此刻是否算「在移动」:最近一次移动观测还在 TTL 内。

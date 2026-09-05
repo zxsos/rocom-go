@@ -28,6 +28,57 @@
 // 除了「加速」没见过别的方向,倍率 <1 只可能是数据出错。
 const RATE_MIN = 1
 
+// ---- 实时倍率:加速日时间表 × 此刻是否在动 ----
+//
+// 前端自己算而不是用后端给的数,是因为倍率会随**时间推移**自己变(比如挂着页面
+// 跨过周一 04:00,加速日结束)。用后端某次请求返回的值,那一刻之后就是过期数字。
+// 口径与后端 pet.HatchRate 完全一致,两边改一处都要同步改另一处。
+
+// ACTIVITY_RATE 是加速日期间的活动倍率(其余时间 1),来自活动文案
+// 「背包孵化精灵速度提升至500%」。见 docs/data.md 3.6。
+const ACTIVITY_RATE = 5
+
+// MOVE_GAIN 是在移动时乘上的增益。实测(加速日)静止 5.00、移动中位约 21,
+// 故增益 ≈ 21/5 ≈ 4.2。
+//
+// ⚠️ 非加速日 + 移动是**推算**(1 × 4.2 = 4.2),六份 pcap 全抓在加速日窗口内,
+// 没有对照样本区分「乘法」与「加法」模型 —— 详见 docs/data.md 3.6。
+const MOVE_GAIN = 4.2
+
+// MOVE_TTL 是「多久没动就算停下了」(秒)。与后端 hatchMoveTTL 同值:移动包最疏
+// 是 2.5-3s 一次心跳,要明显大于它;玩家站住后客户端未必补发 stop 包,故前端得
+// 自己按时刻过期,否则会一直挂着「移动中」。
+const MOVE_TTL = 10
+
+// CST_OFFSET 是北京时间的时区偏移(秒)。加速日窗口按北京时间判定,与浏览器所在
+// 时区无关 —— 直接用本地时间算会整体偏移,正好跨过 04:00 边界。
+const CST_OFFSET = 8 * 3600
+
+// activityRate 返回 ts(unix 秒)时刻的活动倍率:加速日窗口内 5,否则 1。
+// 窗口 = 北京时间**周五 04:00 ~ 周一 04:00**(周一 04:00 整点结束)。
+export function activityRate(ts) {
+  const t = new Date((ts + CST_OFFSET) * 1000) // 转到北京时间再看星期与时分
+  const sec = t.getUTCHours() * 3600 + t.getUTCMinutes() * 60 + t.getUTCSeconds()
+  const day = t.getUTCDay() // 0=周日 … 5=周五
+  const START = 4 * 3600
+  switch (day) {
+    case 5: return sec >= START ? ACTIVITY_RATE : 1               // 周五 04:00 起
+    case 6: case 0: return ACTIVITY_RATE                          // 整个周末
+    case 1: return sec < START ? ACTIVITY_RATE : 1                // 到周一 04:00 止
+    default: return 1
+  }
+}
+
+// hatchRateNow 返回 now(毫秒)时刻、给定移动状态下的总倍率。
+// movingAt 是最近一次观测到在移动的时刻(unix 秒,0=明确停止);超过 MOVE_TTL
+// 即视为静止 —— 这样玩家站住后即使没收到推送,也会在一秒内自动翻回慢的那档。
+export function hatchRateNow(now, movingAt) {
+  const ts = Math.floor(now / 1000)
+  const moving = movingAt > 0 && ts - movingAt <= MOVE_TTL
+  const r = activityRate(ts)
+  return { rate: moving ? r * MOVE_GAIN : r, moving, activity: r }
+}
+
 // clampRate 把倍率收进合理区间(仅作防御,正常路径下后端给的就是 1 或 5)。
 export function clampRate(r) {
   // 先处理 NaN(它不参与任何大小比较,单独挡掉);±Infinity 走下面的大小比较

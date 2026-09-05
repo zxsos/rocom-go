@@ -221,6 +221,8 @@ func TestContractEggsAndGlasses(t *testing.T) {
 // docs/api/fields.json 一类的机器消费方直接解析。
 func scrubHatch(s string) string {
 	s = regexp.MustCompile(`"hatchRate": [\d.]+`).ReplaceAllString(s, `"hatchRate": 0`)
+	// 负号也要匹配:从未移动过时是 time.Time 零值,Unix() 是个很大的负数
+	s = regexp.MustCompile(`"hatchMovingAt": -?\d+`).ReplaceAllString(s, `"hatchMovingAt": 0`)
 	return regexp.MustCompile(`"hatchMoving": (true|false)`).ReplaceAllString(s, `"hatchMoving": false`)
 }
 

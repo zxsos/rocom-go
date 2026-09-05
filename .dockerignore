@@ -1,0 +1,51 @@
+# 构建上下文瘦身:下面这些都不参与镜像构建,省去几 MB~几 GB 的无谓传输。
+#
+# ⚠️ **别忽略 embed 的产物**:internal/server/web(前端)与 internal/gamedata/data
+# (名称库/图片)是编译期 embed 进二进制的,缺了它们 go build 会失败或运行时空白。
+# 故这里只忽略「源」与「无关产物」,不碰那两个目录。
+
+# 版本控制与 IDE
+.git
+.gitignore
+.github
+.idea
+.vscode
+.codebuddy
+
+# pcap 归档(抓包样本,单个几 MB,与本镜像无关)
+_private-inbox-DO-NOT-TOUCH/
+pcap/
+*.pcap
+*.pcap0
+*.pcap1
+*.pcapng
+
+# 前端依赖(产物 internal/server/web 已提交并 embed,容器内不需要 npm build)
+web/node_modules/
+web/dist/
+
+# 本地数据库与运行时产物
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+
+# 自签证书(运行时生成,不该进镜像)
+*.pem
+
+# Python 虚拟环境(生成脚本用,镜像构建不需要)
+.venv/
+
+# 开发期二进制
+pcapdump
+dist/
+rocom-capture
+rocom-cert.pem
+rocom-key.pem
+
+# 文档与脚本:镜像里不需要,但保留 docs/ 便于容器内查看?—— 不需要,
+# 前端帮助入口已把关键说明写在页面里。这里忽略以缩小上下文。
+# docs/
+# scripts/
+# README.md

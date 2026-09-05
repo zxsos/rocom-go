@@ -1,6 +1,7 @@
 package pet
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -75,6 +76,36 @@ func TestHatchActivityRateIgnoresHostZone(t *testing.T) {
 		if got := HatchActivityRate(tue); got != 1 {
 			t.Errorf("时区 %s 下周二 12:00 应为 1,实得 %v", zone, got)
 		}
+	}
+}
+
+// TestHatchRateWithMoving 守「总倍率 = 活动倍率 × 移动增益」。
+//
+// 前端按同一口径自己算(见 hatch.js 的 hatchRateNow),两边必须一致 —— 故这里把
+// 期望值写死成数字,任一侧改了算法都会对不上。
+func TestHatchRateWithMoving(t *testing.T) {
+	at := func(y int, mo time.Month, d, h int) int64 {
+		return time.Date(y, mo, d, h, 0, 0, 0, cstZone).Unix()
+	}
+	// 加速日窗口内(周六):静止 5、移动 5×4.2=21
+	if got := HatchRate(at(2026, 9, 5, 12), false); got != 5 {
+		t.Errorf("加速日静止应为 5,实得 %v", got)
+	}
+	if got := HatchRate(at(2026, 9, 5, 12), true); math.Abs(got-21) > 0.01 {
+		t.Errorf("加速日移动应为 21(5 × 4.2),实得 %v", got)
+	}
+	// 非加速日(周二):静止 1、移动 1×4.2=4.2
+	// ⚠️ 后者是**推算值**(六份 pcap 全抓在加速日,没有对照样本),若实测不符,
+	// 改 hatchMoveGain 时同步改这里与前端常数。
+	if got := HatchRate(at(2026, 9, 8, 12), false); got != 1 {
+		t.Errorf("非加速日静止应为 1,实得 %v", got)
+	}
+	if got := HatchRate(at(2026, 9, 8, 12), true); math.Abs(got-4.2) > 0.01 {
+		t.Errorf("非加速日移动应为 4.2(1 × 4.2),实得 %v", got)
+	}
+	// 异常时刻不该崩,也不该被算成某周的某天
+	if got := HatchRate(0, true); got <= 0 {
+		t.Errorf("ts=0 时应退回安全的正倍率,实得 %v", got)
 	}
 }
 

@@ -31,6 +31,12 @@
 #   ROCOM_SMTP_USER / ROCOM_SMTP_PASS   远行商人订阅邮件的发件邮箱与授权码
 #   ROCOM_EGG_API_KEY   第三方图鉴 API 令牌(查随机蛋可能物种)
 #   ROCOM_EXTRA       其他要透传的参数(如 -ignore-ip)
+#   ROCOM_PCAP        离线回放的 pcap 路径(与 ROCOM_IFACE 二选一)
+#   ROCOM_DB / ROCOM_CERT / ROCOM_KEY   数据库与 TLS 证书路径
+#                     (容器里有默认值 /data/...,一般不写;systemd 部署由 run.sh 固定)
+#
+# 上面这些键 **Docker 部署同样认**(docker-entrypoint.sh 负责组装),故两种部署
+# 方式的配置文件可互换 —— 新增键时两边都要改,只改一边会让「同一份配置换环境就失效」。
 #
 # 除抓包网卡/端口/监听地址这类**启动即固定**的项(改了须 systemctl restart),
 # 邮箱、令牌、SOCKS5 那几项都可以在 Web 管理面板(设置)里改,改完立即生效。

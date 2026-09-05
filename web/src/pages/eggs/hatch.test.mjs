@@ -7,7 +7,7 @@
 //
 // 这里守住的是外推本身的三条:无采样不外推、进度不倒退、孵化秒与真实秒不混。
 import assert from 'node:assert/strict'
-import { hatchProgress, remainRealSecs, clampRate } from './hatch.js'
+import { hatchProgress, remainRealSecs, clampRate, hatchRateNow, activityRate } from './hatch.js'
 
 const NOW = 1788000000 * 1000 // 固定"当前时刻",避免依赖真实时钟
 
@@ -99,6 +99,65 @@ assert.ok(hatchProgress(skew, NOW, 5).secs >= 600, '时钟回拨不该把进度�
   // 倍率缺省(未传 / undefined)按 1 处理,而不是 undefined 参与运算变成 NaN
   assert.equal(hatchProgress(sampled, NOW, undefined).rate, 1, '倍率缺省应按 1 倍')
   assert.equal(hatchProgress(sampled, NOW, 0).rate, 1, '倍率为 0 应按 1 倍')
+}
+
+// —— 实时倍率:加速日时间表 × 此刻是否在动 ——
+//
+// 前端自己按当前时刻算(而非用后端返回的值),因为倍率会随时间自己变:挂着页面
+// 跨过周一 04:00 加速日就结束了,过期数字不会自己更新。故这里逐边界钉死,且必须
+// 与后端 pet.HatchActivityRate 一致(两边改一处要同步改另一处)。
+{
+  // utc 把「北京时间 Y-M-D H:M」转成 unix 秒(测试不依赖运行环境的时区)
+  const cst = (y, mo, d, h, mi = 0, s = 0) =>
+    Date.UTC(y, mo - 1, d, h - 8, mi, s) / 1000
+
+  const cases = [
+    ['周四 03:59:59', cst(2026, 9, 3, 3, 59, 59), 1],
+    ['周四 23:00', cst(2026, 9, 3, 23, 0, 0), 1],
+    ['周五 03:59:59', cst(2026, 9, 4, 3, 59, 59), 1],
+    ['周五 04:00:00', cst(2026, 9, 4, 4, 0, 0), 5],   // 窗口起始边界
+    ['周五 12:00', cst(2026, 9, 4, 12, 0, 0), 5],
+    ['周六 13:26', cst(2026, 9, 5, 13, 26, 0), 5],     // 实测 pcap 时刻
+    ['周日 23:59:59', cst(2026, 9, 6, 23, 59, 59), 5],
+    ['周一 00:00', cst(2026, 9, 7, 0, 0, 0), 5],
+    ['周一 03:59:59', cst(2026, 9, 7, 3, 59, 59), 5],  // 窗口结束边界
+    ['周一 04:00:00', cst(2026, 9, 7, 4, 0, 0), 1],
+    ['周二 12:00', cst(2026, 9, 8, 12, 0, 0), 1],
+  ]
+  for (const [name, ts, want] of cases) {
+    assert.equal(activityRate(ts), want, `${name} 活动倍率应为 ${want}`)
+  }
+
+  // 与浏览器时区无关:上面用的是 UTC 时刻,换算里已固定按北京时间判,
+  // 故无论测试跑在哪个时区结果都一样。
+  assert.equal(activityRate(cst(2026, 9, 5, 12)), 5, '周六 12:00 应为 5(不随环境时区变)')
+  assert.equal(activityRate(cst(2026, 9, 8, 12)), 1, '周二 12:00 应为 1')
+
+  // 实时切换:同一时刻,移动与否差一个 MOVE_GAIN
+  const sat = cst(2026, 9, 5, 12, 0, 0)
+  const still = hatchRateNow(sat * 1000, 0)
+  assert.equal(still.moving, false)
+  assert.equal(still.rate, 5, '静止时 = 活动倍率')
+
+  const moving = hatchRateNow(sat * 1000, sat) // 此刻刚观测到在动
+  assert.equal(moving.moving, true)
+  assert.ok(Math.abs(moving.rate - 21) < 0.5,
+    `加速日 + 移动应约 21(5 × 4.2),实际 ${moving.rate}`)
+
+  // 移动状态会**自动过期**:玩家站住后没收到推送,也该在一秒内翻回静止。
+  // 否则页面会一直挂着「移动中」并按快倍率外推 —— 那是虚报。
+  const stale = hatchRateNow((sat + 11) * 1000, sat)
+  assert.equal(stale.moving, false, '超过 TTL 应自动翻回静止(不等推送)')
+  assert.equal(stale.rate, 5, '过期后倍率应回到活动倍率')
+  const fresh = hatchRateNow((sat + 9) * 1000, sat)
+  assert.equal(fresh.moving, true, 'TTL 内仍算在移动')
+
+  // 非加速日 + 移动:推算 1 × 4.2 ≈ 4.2(尚未实测,见 MOVE_GAIN 注释)
+  const tue = cst(2026, 9, 8, 12, 0, 0)
+  const tueMv = hatchRateNow(tue * 1000, tue)
+  assert.ok(Math.abs(tueMv.rate - 4.2) < 0.1,
+    `非加速日 + 移动应约 4.2,实际 ${tueMv.rate}`)
+  assert.equal(hatchRateNow(tue * 1000, 0).rate, 1, '非加速日静止应为 1')
 }
 
 console.log('hatch.test.mjs: 全部通过')

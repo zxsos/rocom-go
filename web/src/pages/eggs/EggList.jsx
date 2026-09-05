@@ -6,7 +6,7 @@ import { PetDetailModal } from '../../components/PetDetailModal'
 import { fmtTime, pad2, pctHot, voiceHot } from '../../utils/format'
 import { useInterval } from '../../hooks/useAsyncData'
 import { Marks } from '../../components/badges'
-import { hatchProgress, remainRealSecs } from './hatch'
+import { hatchProgress, remainRealSecs, hatchRateNow } from './hatch'
 import { toast } from '../../components/toast'
 
 // 精灵蛋页面:两段垂直 —— 孵蛋器(在孵且进度未满的蛋)、仓库(其余蛋)。不分标签页——在孵的蛋
@@ -57,10 +57,11 @@ function etaTitle(egg, p, moving) {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   const dur = h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`
-  const base = `按 ×${rateText(p.rate)} 倍率估算,约剩 ${dur}`
-  // 玩家此刻在移动:进度会比这个数更快,但快多少随速度与移动方式而变(实测静止 5.00
-  // 对移动 16.9~25.8),没有可信的定值,故只作定性提示、不折算进上面的 d(虚报更糟)。
-  return base + (moving ? ' · 移动中,实际更快' : '')
+  // ⚠️ 这个数是「**若保持当前状态**」的估计 —— 倍率实时跟着玩家动没动走,
+  // 故跑起来会变短、站住会变长。必须说清前提,否则数字来回跳会让人以为算错了。
+  return moving
+    ? `按 ×${rateText(p.rate)} 倍率(移动中)估算,约剩 ${dur};停下会变慢`
+    : `按 ×${rateText(p.rate)} 倍率(静止)估算,约剩 ${dur};跑动会更快`
 }
 
 // rateText 把倍率格式化成给人看的样子:整数不带小数(5 倍就是「5」),否则留一位。
@@ -69,16 +70,20 @@ const rateText = (r) => (Number.isInteger(r) ? String(r) : r.toFixed(1))
 // Boost 孵化加速徽章。倍率是**全局**的(实测三颗不同 maxSecs 的蛋同秒各 +10s,
 // 见 docs/data.md 3.6),故整个孵蛋器标一处即可,不必逐蛋重复。
 //
-// 倍率是加速日时间表算出来的定值(离线也准),故 rate 必然是 1 或 5 —— 不存在
-// 「估不出来」的中间态,<=1 时(非加速日)直接不画。
-function Boost({ rate, moving }) {
+// 倍率按「加速日时间表 × 此刻是否在动」实时算,故会自己变 —— <=1 时(非加速日
+// 且静止)不画,移动中则把状态一并标出来,免得数字跳动看着像出错。
+function Boost({ rate, moving, activity }) {
   if (!(rate > 1)) return null
+  const inWindow = activity > 1
   return (
     <span className="incu-boost" title={
-      `孵蛋加速日:每过 1 真实秒推进 ${rateText(rate)} 个孵化秒` +
-      '(北京时间周五 04:00 ~ 周一 04:00,服务器离线期间同样按此推进)' +
-      (moving ? ' · 你正在移动,进度还会更快' : '')}>
-      加速中 ×{rateText(rate)}
+      `每过 1 真实秒推进 ${rateText(rate)} 个孵化秒` +
+      (inWindow
+        ? '(孵蛋加速日:北京时间周五 04:00 ~ 周一 04:00,离线期间同样按此推进)'
+        : '(非加速日)') +
+      (moving ? ' · 你正在移动,进度更快;停下会变慢' : ' · 跑动会更快')}>
+      {inWindow ? '加速中' : '孵化中'} ×{rateText(rate)}
+      {moving && <span className="incu-boost-mv"> · 移动中</span>}
     </span>
   )
 }
@@ -136,11 +141,18 @@ export default function EggList() {
   })
   const [detailGid, setDetailGid] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  // 最近一次观测到「在移动」的时刻。用 ref 而非 state:它每次请求都会回来,
+  // 但不需要触发渲染 —— 真正驱动重渲染的是每秒都在走的 now(见 hatchRateNow)。
+  const lastMovingAt = useRef(0)
 
   const load = useCallback(() => getEggs({ search, sort, order })
     .then((d) => {
       d = d || { eggs: [] }
       if (!search) writeHatchCache(hatchKey(account), d.eggs.filter((e) => e.hatching))
+      // 记住上次见到的 hatchMovingAt:翻页/搜索重拉时 SSE 未必到,别把移动状态弄丢。
+      // 倍率本身由 hatchRateNow 按当前时刻重算,故存旧值不会让倍率过期。
+      d.hatchMovingAt = d.hatchMovingAt || lastMovingAt.current
+      lastMovingAt.current = d.hatchMovingAt
       setData(d)
     }).catch(() => {}), [account, search, sort, order])
 
@@ -149,6 +161,16 @@ export default function EggList() {
   // onOpen 断线重连时也要补拉:SSE 断开期间的推送全丢了,不补就一直显示旧数据
   // (登录那次广播尤其可能正好落在断线窗口里 —— 见 pipeline/eggs.go 登录分支)。
   useEffect(() => subscribe('eggs', load, { onOpen: load }), [load])
+
+  // 玩家开始/停止移动时后端推 hatch,就地改状态 —— 这是「实时」的关键。
+  //
+  // 不重拉整个列表:移动状态只影响进度怎么外推,蛋的数据一个字没变;而且玩家
+  // 跑跑停停很频繁,每次都重拉纯属浪费。
+  useEffect(() => subscribe('hatch', (d) => {
+    lastMovingAt.current = d.at
+    setData((prev) => ({ ...prev, hatchMovingAt: d.at }))
+  }), [])
+
   // 孵化进度随时间涨:秒级刷新即可。
   useInterval(() => setNow(Date.now()), 1000)
 
@@ -166,23 +188,24 @@ export default function EggList() {
   const incubating = data.eggs.filter((e) => e.hatching)
   const bag = data.eggs.filter((e) => !e.hatching)
 
-  // 孵化倍率直接取后端那份:它按**加速日时间表**(北京时间周五 04:00 ~ 周一 04:00)
-  // 算出,离线也准,不存在「还没校准」的冷启动。
+  // 孵化倍率**前端实时算**(hatchRateNow),不直接用后端响应里那个数 —— 因为倍率
+  // 会随时间自己变:挂着页面跨过周一 04:00 加速日就结束了,而过期的数字不会自己
+  // 更新。口径与后端 pet.HatchRate 一致(两边改一处要同步改另一处)。
   //
-  // 早先这里做的是「对相邻两次进度下发做差分、取跨蛋中位数」,那套已废弃 —— 它把
-  // 活动倍率(固定时间表)与在线加成(移动/风场)混成一个数去测,于是移动时段的
-  // 加速会污染样本、离线那段又完全算不了。详见 hatch.js 文件头与 docs/data.md 3.6。
-  const rate = data.hatchRate || 1
-  // moving 是后端按移动包(0x0133)判的「玩家此刻在移动」。它**不进**倍率与 ETA ——
-  // 移动加成随速度与移动方式而变(静止 5.00 vs 移动 16.9~25.8),没有可信定值,
-  // 折算进去会虚报「可破壳」。只作定性提示。
-  const moving = !!data.hatchMoving
+  // 两部分各自都拿得到,故能实时:
+  //   - 活动倍率:加速日时间表,按当前时刻算(离线也准,不存在冷启动);
+  //   - 移动增益:此刻在不在动,由移动包观测、翻转经 SSE 推送,且按时刻自动过期。
+  //
+  // 早先的「对相邻两次进度下发做差分、取跨蛋中位数」已废弃 —— 它把活动倍率(固定
+  // 时间表)与在线加成混成一个数去测,移动时段会污染样本、离线那段又算不了。
+  // 详见 hatch.js 文件头与 docs/data.md 3.6。
+  const { rate, moving, activity } = hatchRateNow(now, data.hatchMovingAt || 0)
   const slots = HATCH_SLOTS
 
   return (
     <div className="eggs-page">
       <div className="eggs-cols">
-        <IncuTitle n={incubating.length} slots={slots} rate={rate} moving={moving} />
+        <IncuTitle n={incubating.length} slots={slots} rate={rate} moving={moving} activity={activity} />
         {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
         <aside className="eggs-incu">
           {Array.from({ length: slots }, (_, i) => incubating[i]).map((e, i) => (
@@ -233,7 +256,7 @@ export default function EggList() {
 
 // IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
 // 点击弹出半透明气泡,说明在孵口径(后端权威快照)与进度是本地外推的估算。点气泡外关闭。
-function IncuTitle({ n, slots, rate, moving }) {
+function IncuTitle({ n, slots, rate, moving, activity }) {
   const ref = useRef(null)
   const [tip, setTip] = useState(false)
   useEffect(() => {
@@ -245,11 +268,11 @@ function IncuTitle({ n, slots, rate, moving }) {
   return (
     <div className="eggs-col-t">
       孵蛋器 <span className="muted">{n}/{slots}</span>
-      <Boost rate={rate} moving={moving} />
+      <Boost rate={rate} moving={moving} activity={activity} />
       <span ref={ref} className="incu-tip">
         <img className="incu-tip-ic" src="/ps.svg" alt="?" title="在孵按权威快照判定,进度是本地外推的估算"
           onClick={() => setTip((t) => !t)} draggable={false} />
-        {tip && <span className="incu-tip-bubble">在孵按后端登录 / 开孵蛋器时的权威快照判定;进度条是本地外推的估算</span>}
+        {tip && <span className="incu-tip-bubble">孵化日加速中</span>}
       </span>
     </div>
   )
@@ -361,6 +384,11 @@ function EggCard({ egg, now, rate, moving, onPet }) {
         <div className="egg-hatch">
           <div className="egg-bar"><div className="egg-bar-fill" style={{ width: p.pct + '%' }} /></div>
           <span className={p.pct >= 100 ? 'val-hot-hi' : undefined}>{p.pct >= 100 ? '可破壳' : p.pct + '%'}</span>
+          {/* 移动中的轻标记:倍率实时翻倍,ETA 会明显变短。标一下才不至于看着像
+              数字出错。移动状态由后端按移动包判,翻转经 SSE 推来。 */}
+          {p.pct < 100 && moving && (
+            <span className="egg-mv" title="你正在移动,孵化更快;停下后这里会变慢">移动中</span>
+          )}
           {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p, moving)}>预计 {etaText(egg, p, now)}</span>}
         </div>
       )}

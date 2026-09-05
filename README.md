@@ -187,3 +187,98 @@ sudo ./scripts/deploy.sh --uninstall
 不受影响。重启后自动从 `sessions` 表预热会话密钥、连接归属、场景定位(有效期 24h),对仍存活的
 游戏连接从中段继续解密,历史统计原样保留。仅当库 schema 变化(新版加了字段/表)时才需删库重建——
 `CREATE TABLE IF NOT EXISTS` 是幂等的,schema 没变就直接打开旧库即可。
+
+### Docker 部署
+
+不想在宿主机装 Go / 配 systemd 时,可用容器跑。`Dockerfile` 是多阶段构建:builder
+装 gcc 与内核头编出二进制,运行镜像只留 alpine + 证书(**约 106 MB**)。
+
+```bash
+# 构建
+docker build -t rocom-capture .
+
+# 实时抓包(把 eth0 换成实际网卡)
+docker run -d --name rocom --restart unless-stopped \
+  --cap-add=NET_ADMIN --cap-add=NET_RAW \
+  --network host \
+  -v rocom-data:/data \
+  rocom-capture -iface eth0 -addr :4939 -db /data/rocom.db
+
+# 离线回放(纯解析,不需要 capability)
+docker run -d --name rocom-replay -p 4939:4939 \
+  -v /path/to/pcap:/pcap:ro -v rocom-data:/data \
+  rocom-capture -pcap /pcap/xxx.pcap -addr :4939 -db /data/rocom.db
+
+docker logs -f rocom     # 看日志
+```
+
+也可以用 `docker-compose.yml`(已写好 capability、host 网络与数据卷):
+
+```bash
+# 先把 compose 里 command 的 eth0 改成实际网卡
+docker compose up -d
+```
+
+预构建镜像(可免登录直接拉取,含 amd64/x86_64):
+
+```bash
+docker pull docker.cnb.cool/test00123/roco:latest
+```
+
+需要其它架构(ARM 等)时从源码本地构建:`docker build -t rocom-capture .`
+
+几个要点:
+
+- **抓包权限**:`--cap-add=NET_ADMIN --cap-add=NET_RAW` 是最小集,别用
+  `--privileged`。若加了仍报 `operation not permitted`,多半是**嵌套容器**
+  (容器内跑 docker):capability 不能超过 bounding set,此时只能 privileged
+  或直接在宿主机部署。判断:`grep CapBnd /proc/self/status`。
+- **网络用 host**:桥接模式下容器看不见宿主机物理网卡,`-iface eth0` 会报
+  网卡不存在。host 模式的代价是端口直接占宿主机,`-p` 不生效(端口由 `-addr` 定)。
+- **数据持久化**:数据库在卷的 `/data/rocom.db`,重建容器 / 更新镜像都不丢历史;
+  开 `-tls` 时自签证书也生成在这里,信任一次后复用。
+- **cgo 不能关**:抓包用 `gopacket/afpacket`,必须 `CGO_ENABLED=1`;builder 阶段
+  除 gcc 外还要 `linux-headers`(提供 `linux/if_packet.h`),少装会编译失败。
+
+#### 配置文件与管理面板
+
+容器启动时从配置文件读参数,**与 systemd 部署用同一套键**(列表见
+`scripts/deploy.sh` 头部注释),故两种部署方式的配置可互换。默认路径
+`/data/rocom.env`(挂卷,重建容器不丢;不是 systemd 版的 `/etc/rocom.env`),
+可用 `-e ROCOM_ENV_FILE=/某路径` 改。
+
+优先级:**命令行显式给的 > 配置文件 > 内置默认值**。命令行始终能压过配置,
+否则一旦往配置里写过值,命令行参数就再也覆盖不了。
+
+首次启动会自动创建该文件(带注释模板),管理面板(`#/admin`)随即**可写** ——
+不建文件的话面板会显示「配置文件不可写」而降级只读,改了也存不下。
+
+于是启动命令可以极简,参数写进文件即可:
+
+```bash
+# 写配置(只需一次;之后都在面板改)
+docker run --rm -v rocom-data:/data alpine sh -c 'cat > /data/rocom.env <<EOF
+ROCOM_IFACE=eth0
+ROCOM_ADDR=:4939
+ROCOM_TLS=1
+ROCOM_SOCKS5_ADDR=:1080
+ROCOM_SOCKS5_ALLOW=<手机公网IP>
+ROCOM_SOCKS5_USER=rocom
+ROCOM_SOCKS5_PASS=<密码>
+EOF
+chmod 600 /data/rocom.env'
+
+# 启动:命令行什么都不用给
+docker run -d --name rocom --restart unless-stopped \
+  --cap-add=NET_ADMIN --cap-add=NET_RAW --network host \
+  -v rocom-data:/data \
+  rocom-capture
+```
+
+之后在面板里改 socks5、邮箱、图鉴令牌会**立即生效**并落盘;抓包网卡、端口、
+HTTPS 属启动项,改完 `docker restart rocom` 即可 —— 不再是「改了存不下」。
+
+> 已实测:构建、离线回放(743 只宠物解析)、Web API、数据落卷均正常;
+> 配置闭环(面板改配置 → 落盘 → 重启容器后生效)已端到端验证。
+> 实时抓包**收包**未在 CI 环境验证(该环境为嵌套容器且无 `CAP_NET_RAW`),
+> 二进制中 afpacket 正常编译、可启动到创建 socket 那一步。

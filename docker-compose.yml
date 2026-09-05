@@ -1,0 +1,72 @@
+# rocom-capture 编排示例。
+#
+# 用法:
+#   docker compose up -d          # 构建并启动
+#   docker compose logs -f        # 看日志
+#   docker compose down           # 停止(数据卷保留)
+#
+# 首次启动前**务必**把 command 里的 eth0 改成实际网卡(手机流量的必经之路),
+# 查网卡名:ip link
+
+services:
+  rocom:
+    build: .
+    image: rocom-capture:latest
+    container_name: rocom
+    restart: unless-stopped
+
+    # —— 抓包权限:两项 capability 是最小集 ——
+    #   NET_RAW   AF_PACKET 原始套接字,收包必需
+    #   NET_ADMIN 网卡操作(afpacket 建环、取网卡 IP 做单臂去重)
+    # 不要用 privileged:true —— 那等于把宿主机全部权限交出去。
+    #
+    # ⚠️ 若加了仍报 "抓包失败(需 root): operation not permitted",**先查环境**:
+    #   嵌套容器(DinD / 容器内跑 docker)拿不到外层没有的 capability ——
+    #   capability 不能超过 bounding set,故 --cap-add 无效,此时只能
+    #   privileged 或直接在宿主机跑。判断方法(在容器内执行):
+    #     grep CapBnd /proc/self/status   # 含 0x2000 位才有 NET_RAW
+    #     python3 -c "import socket;socket.socket(socket.AF_PACKET,socket.SOCK_RAW)"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    # —— 网络:抓包场景用 host ——
+    # 桥接模式下容器有独立网络命名空间,**看不见宿主机的物理网卡**,
+    # 于是 -iface eth0 会报「网卡不存在」。host 模式共享宿主机网络栈,
+    # 容器里 ip link 与宿主机一致,抓包才成立。
+    # 代价:容器端口直接占用宿主机端口,故下面 ports 在 host 模式下不生效,
+    #       Web 端口由 command 里的 -addr 决定。
+    network_mode: host
+
+    volumes:
+      # 数据库(宠物/事件/涂地/会话密钥)与自签证书都落 /data,
+      # 重建容器、更新镜像都不会丢历史。
+      - rocom-data:/data
+      # 离线回放:把 pcap 目录挂进去,再把 command 换成
+      #   -pcap /pcap/xxx.pcap
+      # - ./pcap:/pcap:ro
+
+    environment:
+      # 只影响日志与页面里时间显示的可读性;加速日窗口按 FixedZone(+8) 判定,
+      # 不依赖容器时区(见 Dockerfile 里 tzdata 的说明)
+      TZ: Asia/Shanghai
+
+    # 启动参数与二进制完全一致,可整段替换。几个常用项:
+    #   -iface <网卡>      实时抓包(必填其一)
+    #   -pcap <文件>       离线回放(必填其一)
+    #   -db /data/rocom.db 放挂载卷里,更新镜像不丢数据
+    #   -tls               启用 HTTPS(手机经局域网访问时「屏幕常亮」需要 secure context);
+    #                      自签证书自动生成在 /data 下,信任一次后重建容器仍复用
+    #   -socks5-addr :1080 内置代理,供手机把游戏流量代理到本机(云部署)
+    #                      此时还需 -skip-self-ip=false,否则本机 IP 出站的流量被去重丢弃
+    #   -socks5-allow <IP> 客户端白名单。带公网 IP 时**必填**:无认证代理几分钟内
+    #                      会被全网扫描器找上,耗尽 fd 把同进程的 Web 服务拖垮
+    command:
+      [
+        "-iface", "eth0",
+        "-addr", ":4939",
+        "-db", "/data/rocom.db",
+      ]
+
+volumes:
+  rocom-data:
