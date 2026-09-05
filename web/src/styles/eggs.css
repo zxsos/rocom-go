@@ -26,6 +26,19 @@
   white-space: nowrap; cursor: help; font-variant-numeric: tabular-nums;
 }
 
+/* 徽章里的「· 移动中」后缀:淡一档,与主文案区分 —— 它是会随时消失的动态状态,
+   不该和「加速中 ×5」这个相对稳定的读数抢注意力 */
+.incu-boost-mv { opacity: .75; font-weight: 600; }
+
+/* 进度条旁的实时状态:倍率会跟着玩家动没动跳 4 倍,数字随之变化。给个轻标记
+   说明「此刻在动」,否则 ETA 突然变短会让人以为算错了 */
+.egg-mv {
+  font-size: 11px; padding: 0 5px; border-radius: 999px;
+  color: var(--gold); border: 1px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 14%, transparent);
+  white-space: nowrap; cursor: help;
+}
+
 /* 孵蛋器标题旁的提示图标:比数字(13px)小;深色主题下黑色 svg 反白显示 */
 .incu-tip { position: relative; display: inline-flex; }
 .incu-tip-ic {

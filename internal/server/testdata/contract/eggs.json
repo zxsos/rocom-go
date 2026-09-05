@@ -19,5 +19,6 @@
     }
   ],
   "hatchMoving": false,
+  "hatchMovingAt": 0,
   "hatchRate": 0
 }
