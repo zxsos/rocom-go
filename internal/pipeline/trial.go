@@ -369,7 +369,10 @@ func newRun(c *trial.Challenge, t time.Time) *trialRun {
 		trialConfID: c.TrialConfID, slotID: c.SlotID, chapterID: c.ChapterID,
 		nodeIndex: c.NodeIndex, coin: c.Coin, chapters: c.Chapters,
 		effects: c.Effects, pet: c.Pet, selection: c.Selection,
-		active: true, startedAt: t,
+		// 天生特性必须在建局时一起带上 —— #33 只在全量快照里出现,而快照一局
+		// 只有 4 次且换章会重建 run,漏了它整章都只剩裸 id(见 trial_feature_test.go)。
+		initialFeatures: c.InitialFeatures,
+		active:          true, startedAt: t,
 	}
 }
 
@@ -395,8 +398,9 @@ func (r *trialRun) merge(c *trial.Challenge) {
 	if c.Pet != nil {
 		r.pet = c.Pet
 	}
-	// 天生特性整局不变,只在建局/恢复时取一次(#33 是局级字段,
-	// apply 类的增量回包里没有它,故不在这里更新,免得被空值覆盖)。
+	// 天生特性整局不变(#33 是局级字段,apply 类的增量回包里没有它),
+	// 故只在快照真的带了它时才更新 —— 免得被空值覆盖掉建局时取到的那份
+	// (newRun 取的也是同一份,见上)。
 	if len(c.InitialFeatures) > 0 {
 		r.initialFeatures = c.InitialFeatures
 	}
