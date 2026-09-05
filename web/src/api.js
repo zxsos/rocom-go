@@ -482,6 +482,44 @@ export const adminEggSource = () => adminFetch('/api/admin/egg-source').then(asy
 // 故切换立即生效,也不用清任何东西。
 export const adminEggSourceSet = (source) => postJSON('/api/admin/egg-source', { source })
 
+// adminConfig 运行期配置:{writable, path, smtpUser, smtpPassSet, eggKeySet, socks5:{...}}。
+//
+// **敏感项只给「是否已设置」**(smtpPassSet / eggKeySet / socks5.passSet),令牌与授权码
+// 原文从不下发 —— 它们能用来发信、能刷第三方图鉴配额,一旦经 API 下来就会出现在
+// 浏览器响应、前端内存与可能的截图里。保存时留空即「不修改」,前端据此渲染占位文案。
+export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) => {
+  if (!r.ok) throw await adminError(r, '拉取配置失败')
+  return r.json()
+})
+
+// adminConfigSave 保存配置。入参里所有敏感字段留空表示「不修改」。
+//
+// 写入的两条语义(后端保证,前端据此提示):
+//   - 先落盘 /etc/rocom.env 再改内存 —— 故「重启后配置还在」是天然成立的
+//   - 代理(socks5)是热重启的,不影响抓包;邮箱与令牌纯热更
+export const adminConfigSave = (payload) => postJSON('/api/admin/config', payload)
+
+// —— Web 监听地址(改它要试运行 + 确认,见 internal/server/api_web_addr.go)——
+//
+// 它不能像其它配置那样「保存即生效」:改的是管理员正用来改它的那条连接的另一端,
+// 一旦新地址连不上(端口被占、没映射、IP 填成 127.0.0.1)面板当场失联。
+// 故后端要求先试运行、由管理员在新地址上打开过面板后再确认:
+//
+//   adminWebAddrTrial    → {addr, realAddr, port, deadline, handoff}
+//   adminWebAddrConfirm  → {ok, addr, realAddr[, token]}:先落盘再停旧监听
+//   adminWebAddrRevert   → {ok}:关掉新监听,配置不动
+//
+// deadline 是自动回滚时刻(Unix 秒):到点无人确认,新监听自己收掉。
+// port 是**实际**端口号,前端据此拼跳转 URL(端口填 0 时由内核分配,与填的不一样)。
+//
+// handoff 是一次性交接码。换端口即换源,localStorage 里的令牌不跟过去,故新地址
+// 凭这个码完成确认(它同时是「新地址可达」的证据),并在响应里领回一个令牌接上会话。
+// adminWebAddrConfirm 的入参为空表示「仍在旧地址上确认」(须已登录);
+// 传入 handoff 则表示「从新地址确认」(无需令牌),此时响应带 token。
+export const adminWebAddrTrial = (addr) => postJSON('/api/admin/web-addr', { addr })
+export const adminWebAddrConfirm = (handoff) => postJSON('/api/admin/web-addr/confirm', { handoff: handoff || '' })
+export const adminWebAddrRevert = () => postJSON('/api/admin/web-addr/revert', {})
+
 // adminTestMail 发送测试邮件验证 SMTP 配置(错误信息透传后端 SMTP 具体报错)。
 // subject/body 可自定义,为空则后端用默认标题/内容。
 export const adminTestMail = (email, subject, body) =>

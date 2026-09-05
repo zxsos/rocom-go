@@ -144,6 +144,20 @@
 | `POST /api/admin/merchant-source` | admin | 切换数据源（body: `source`）；会清空已缓存货单并按新源重抓当前轮 |
 | `GET /api/admin/egg-source` | admin | 查蛋数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
 | `POST /api/admin/egg-source` | admin | 切换查蛋数据源（body: `source`，`local`\|`xianyu`）；立即生效，不清缓存 |
+| `GET /api/admin/config` | admin | 当前运行配置脱敏回显：`{path, writable, smtpUser, smtpPassSet, eggKeySet, socks5, web}` |
+| `POST /api/admin/config` | admin | 修改运行配置（body 只带要改的项；敏感项留空 = 不修改）。**不含** Web 监听地址 |
+| `POST /api/admin/web-addr` | admin | Web 监听地址**试运行**（body: `addr`）：新地址开始监听，新旧并存、不落盘。返回 `{addr, realAddr, port, deadline, handoff}` |
+| `POST /api/admin/web-addr/confirm` | admin 或 handoff | **确认**试运行：先写入 `ROCOM_ADDR` 再停旧监听。带 `handoff` 时免令牌（见下） |
+| `POST /api/admin/web-addr/revert` | admin | 放弃试运行：关掉新监听，配置不动 |
+
+> Web 监听地址为何要「试运行 → 确认」：它正是管理员用来改它的那条连接的另一端，
+> 保存即生效会让「端口被占 / 容器没映射 / 填了 127.0.0.1」都变成当场失联。故配置文件
+> 只在**确认**时写，试运行 90 秒无人确认即自动回滚（见 `internal/server/api_web_addr.go`）。
+>
+> `handoff` 是试运行返回的一次性交接码（`POST /api/admin/web-addr/confirm` 的 body 字段）。
+> 换端口即换源，`X-Admin-Token` 存在前端 localStorage、按源隔离带不过去，故管理员点的
+> 跳转链接里带着它：新源凭此码确认（同时充当「新地址可达」的证据），并在响应里领回
+> `token` 接上会话。用完即废，随试运行一起过期。
 
 > `GET /api/admin/placeholder` 曾为占位接口，前端已删除唯一调用者，
 > 后端连带删除（见 `docs/refactor-contract.md`）。

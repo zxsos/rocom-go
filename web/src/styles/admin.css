@@ -34,6 +34,25 @@
 }
 .admin-head h2 { margin: 0; } /* 字号走全局 --text-h2(20px,3.2 统一) */
 
+/* —— 分页(信息查询 / 普通设置 / 高级设置)—— */
+/* 与页面里的胶囊按钮同一套视觉(见 trial.css 的 .trial-tab),只多一条下边框:
+   它横跨整行,加线之后才看得出「下面这块都属于当前分页」。 */
+.admin-tabs {
+  grid-column: 1 / -1; width: 100%; display: flex; gap: 6px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line); padding-bottom: 10px;
+}
+.admin-tab {
+  font: inherit; font-size: 13px; line-height: 2; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg-1); color: var(--fg-dim); cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.admin-tab:hover { color: var(--fg); border-color: var(--accent); }
+.admin-tab.on {
+  color: var(--accent); border-color: var(--accent);
+  background: var(--accent-soft); font-weight: 600;
+}
+
 /* —— 黑白名单 —— */
 .admin-card h3 { margin: 0; font-size: 15px; }
 /* 含表格/图表的大卡片跨整行,其余卡片由网格自动并排 */
@@ -263,4 +282,47 @@
   .admin-inject-scene { flex-basis: 100%; }
   /* 成员条形图:名字列收窄,腾空间给进度条 */
   .admin-bar-name { width: 68px; }
+  /* 分页三个胶囊在窄屏按内容宽会挤成两行,不如均分一行 */
+  .admin-tabs { gap: 8px; }
+  .admin-tab { flex: 1; padding: 0 8px; text-align: center; }
+  /* 配置行(监听 IP / 端口等)标签固定 96px 会挤掉输入框,改成上下两行 */
+  .admin-field { flex-wrap: wrap; }
+  .admin-field > span { width: auto; }
 }
+
+/* —— 运行配置(ConfigCards:发件邮箱 / 令牌与代理)—— */
+/* 三组配置各有各的生效代价,分组是为了让人一眼看出「改这个会不会断东西」。 */
+.admin-config-group {
+  margin: 12px 0; padding: 10px 12px;
+  background: var(--bg-2, transparent);
+  border: 1px solid var(--line); border-radius: var(--radius, 6px);
+}
+.admin-config-group h4 {
+  margin: 0 0 8px; font-size: 13px; color: var(--accent, #4a9eff);
+}
+.admin-field {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0;
+}
+.admin-field > span {
+  flex: none; width: 96px; font-size: 13px; color: var(--fg-dim, var(--muted));
+}
+.admin-field > input {
+  flex: 1; min-width: 0;
+  padding: 5px 8px; font-size: 13px;
+  background: var(--bg, transparent);
+  color: var(--fg, inherit);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.admin-field > input:focus { outline: none; border-color: var(--accent, #4a9eff); }
+.admin-config-actions { display: flex; gap: 8px; margin-top: 12px; }
+/* 保存成功的提示:与 .admin-hint 同排版,只换色(原先是各处内联 style 写死) */
+.admin-ok { color: var(--green); font-size: 13px; margin: 0; }
+/* 试运行提示块:与 .admin-config-group 同形,但用**虚线主色边框** —— 它强调的正是
+   「配置还没落盘」:实线框在视觉上等于「已保存」,虚线才是「暂态、随时会撤」。 */
+.admin-trial {
+  margin: 12px 0; padding: 10px 12px;
+  background: var(--bg-2, transparent);
+  border: 1px dashed var(--accent, #4a9eff); border-radius: var(--radius, 6px);
+}
+.admin-trial .admin-hint { margin: 0 0 8px; }
+.admin-trial .admin-config-actions { margin-top: 8px; }

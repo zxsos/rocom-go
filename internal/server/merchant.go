@@ -316,7 +316,7 @@ func (s *Server) merchantResend(now time.Time) {
 func (s *Server) merchantEnsure(now time.Time, force ...bool) {
 	// 只有咸鱼源需要令牌:好游快爆源抓公开页面,未配 -egg-api-key 时仍应正常定时
 	// 补查 —— 否则「换源」就换不来任何数据,而这恰恰是换源最主要的用途。
-	if merchantNeedKey(s.merchantSource()) && s.eggAPIKey == "" {
+	if merchantNeedKey(s.merchantSource()) && s.eggAPIKeyGet() == "" {
 		return
 	}
 	if merchantDayStatus(now) == "idle" {
@@ -640,7 +640,7 @@ func (s *Server) merchantTryInc(slotStart time.Time) int {
 // 此刻真实货单),false = 拿它可能陈旧的快照。取值策略见 merchantShouldForceRefresh。
 func (s *Server) fetchXianyu(slotStart time.Time, refresh bool) (string, bool, merchantTiming) {
 	params := url.Values{}
-	params.Add("key", s.eggAPIKey)
+	params.Add("key", s.eggAPIKeyGet())
 	params.Add("format", "json")
 	params.Add("refresh", strconv.FormatBool(refresh))
 
@@ -666,7 +666,7 @@ func truncateBytes(b []byte, n int) string {
 func (s *Server) handleMerchant(w http.ResponseWriter, r *http.Request) {
 	// 只有咸鱼源需要令牌:好游快爆源抓的是公开页面,没令牌也能查 —— 缺令牌时
 	// 提示里给出这条路,免得管理员以为服务坏了只能去申请第三方令牌。
-	if merchantNeedKey(s.merchantSource()) && s.eggAPIKey == "" {
+	if merchantNeedKey(s.merchantSource()) && s.eggAPIKeyGet() == "" {
 		http.Error(w, "服务端未配置查询令牌(启动时加 -egg-api-key,或在管理面板切换到无需令牌的好游快爆源)",
 			http.StatusServiceUnavailable)
 		return

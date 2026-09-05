@@ -115,7 +115,7 @@ func TestEggQueryDefaultsToLocal(t *testing.T) {
 func TestEggQueryLocalNeedsNoKey(t *testing.T) {
 	s := newTestServer(t)
 	stubMerchantFetch(t)
-	s.eggAPIKey = "test-key"
+	s.eggAPIKeySet("test-key")
 	rr, out := eggQuery(t, s, "height=0.20&weight=11.443&maxSecs=57600")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("本地查询失败: %d %s", rr.Code, rr.Body.String())
@@ -133,7 +133,7 @@ func TestEggQueryLocalNeedsNoKey(t *testing.T) {
 func TestEggQuerySrcParamIgnored(t *testing.T) {
 	s := newTestServer(t)
 	stubMerchantFetch(t)
-	s.eggAPIKey = "test-key"
+	s.eggAPIKeySet("test-key")
 	for _, q := range []string{
 		"height=0.20&weight=11.443&maxSecs=57600&src=xianyu",
 		"height=0.20&weight=11.443&maxSecs=57600&src=api",
@@ -192,7 +192,7 @@ func TestEggQueryBothSourcesShareShape(t *testing.T) {
 
 	s := newTestServer(t)
 	stubMerchantFetch(t)
-	s.eggAPIKey = "test-key"
+	s.eggAPIKeySet("test-key")
 	// 两个源的响应要分别取:先用当前(本地)源查一次,再切到咸鱼源查一次。
 	_, localOut := eggQuery(t, s, "height=0.20&weight=11.443&maxSecs=57600")
 	if err := s.eggSetSource(eggSrcXianyu); err != nil {

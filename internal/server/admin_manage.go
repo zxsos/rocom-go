@@ -70,7 +70,7 @@ func (s *Server) handleAdminEggStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	st.KeySet = s.eggAPIKey != ""
+	st.KeySet = s.eggAPIKeySetOn()
 	writeJSON(w, st)
 }
 
@@ -146,7 +146,7 @@ func (s *Server) handleAdminMerchantSource(w http.ResponseWriter, r *http.Reques
 		}
 		writeJSON(w, map[string]any{
 			"source":  s.merchantSource(),
-			"keySet":  s.eggAPIKey != "",
+			"keySet":  s.eggAPIKeySetOn(),
 			"sources": sources,
 		})
 	case http.MethodPost:
@@ -200,7 +200,7 @@ func (s *Server) handleAdminEggSource(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, map[string]any{
 			"source":  s.eggSource(),
-			"keySet":  s.eggAPIKey != "",
+			"keySet":  s.eggAPIKeySetOn(),
 			"sources": sources,
 		})
 	case http.MethodPost:

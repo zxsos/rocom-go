@@ -37,7 +37,7 @@ func newTestServer(t *testing.T) *Server {
 	// checkpointLoop 无从停止,不关连接池的话 t.TempDir() 清理时会 “directory not empty”
 	// —— 用例随机失败,且与被测逻辑无关。见 store.Close 的说明。
 	t.Cleanup(func() { _ = st.Close() })
-	return New(st, NewHub(), db, "", "", "") // 测试不涉及查蛋/邮件,三个令牌留空
+	return New(st, NewHub(), db, "", "", "", nil) // 测试不涉及查蛋/邮件,三个令牌留空
 }
 
 // grid 经 HTTP 接口取某张覆盖位图(顺带验一遍 base64 编码),返回位图与边长(格)。

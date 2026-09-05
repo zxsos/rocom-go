@@ -178,6 +178,11 @@ sudo ./scripts/deploy.sh --archive rocom-capture.tar
 sudo ./scripts/deploy.sh --uninstall
 ```
 
+`/etc/rocom.env` 里的多数项可在管理面板(`#/admin`,隐式入口)直接改,改动立即生效并写回该文件;
+只有抓包网卡、游戏端口、HTTPS 属启动项,改它们仍需 `systemctl restart rocom`。
+**Web 监听地址**也可以在线改,但它正是你用来改它的那条连接的另一端,故不直接生效:先在新端口
+试运行,从新地址打开过面板后才落盘;90 秒内不确认会自动回滚(详见 [docs/api/](docs/api/README.md))。
+
 更新流程只替换 `/opt/rocom/rocom-capture` 并 `systemctl restart`,数据库 `/var/lib/rocom/rocom.db`
 不受影响。重启后自动从 `sessions` 表预热会话密钥、连接归属、场景定位(有效期 24h),对仍存活的
 游戏连接从中段继续解密,历史统计原样保留。仅当库 schema 变化(新版加了字段/表)时才需删库重建——

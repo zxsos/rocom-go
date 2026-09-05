@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -30,56 +31,124 @@ const (
 	repConnRefused = 0x05
 )
 
-// ListenAndServe 在 addr 上监听并处理 SOCKS5 连接,阻塞直至监听器关闭。
+// Params 是代理的**运行期可变**参数。与监听地址分开:地址变了必须重新 bind,
+// 而这几项可以在不碰监听器的前提下换掉(见 Server.SetParams)。
+type Params struct {
+	Allow    []netip.Prefix // 客户端白名单;空=不限制
+	Block    []string       // 屏蔽的目标域名
+	MaxConns int            // 并发上限;0=不限制
+	User     string         // 认证用户名;空=无认证
+	Pass     string         // 认证密码
+}
+
+// Server 是一个在跑的 SOCKS5 代理,可随时关停,也可在运行期换参数。
+//
+// 参数与监听器**分开持有**,理由很实际:管理面板改密码/白名单时监听地址往往没变,
+// 而 TCP 不允许两个 socket 同时 bind 同一个地址 —— 若换参数也要重新起监听,
+// 同端口改密码就会撞上 "address already in use" 而失败。分开之后,
+// 改参数只是换内存里的值,零中断;只有真改地址才需要重开监听。
+type Server struct {
+	ln net.Listener
+
+	mu       sync.Mutex
+	params   Params
+	inflight int32 // 当前在处理的连接数(atomic,配合 maxConns 用)
+}
+
+// New 在 addr 上监听并建立参数,返回已就绪的代理(尚未开始接受连接)。
+// user 非空而 pass 为空时报错(与 ListenAndServe 一致的校验)。
+func New(addr string, p Params) (*Server, error) {
+	if p.User != "" && p.Pass == "" {
+		return nil, errors.New("socks5: 已设置用户名但密码为空")
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	return &Server{ln: ln, params: p}, nil
+}
+
+// SetParams 换掉运行期参数,**立即对新连接生效**,不中断监听、不影响已建立的连接。
+// 这是改密码/白名单/并发上限的通路(改地址走 Manager 重启监听)。
+func (s *Server) SetParams(p Params) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.params = p
+}
+
+// paramsOf 取一份参数快照:判定与处理都用同一份,避免一次连接中途参数被换掉
+// 导致「按旧白名单放行、按新密码认证」这类半新半旧的组合。
+func (s *Server) paramsOf() Params {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.params
+}
+
+// Serve 接受并处理连接,阻塞直至 Close 或监听器出错。
+func (s *Server) Serve() error {
+	addr := s.ln.Addr().String()
+	p := s.paramsOf()
+	if p.User == "" {
+		log.Printf("socks5 代理已启动: %s (无认证)", addr)
+	} else {
+		log.Printf("socks5 代理已启动: %s (用户名/密码认证,用户=%s)", addr, p.User)
+	}
+	if len(p.Allow) > 0 {
+		log.Printf("socks5 客户端白名单: %v", p.Allow)
+	}
+	if p.MaxConns > 0 {
+		log.Printf("socks5 并发连接上限: %d", p.MaxConns)
+	}
+	for {
+		conn, err := s.ln.Accept()
+		if err != nil {
+			// 关停时 Accept 必然返回 error,那是正常退出路径而非故障;
+			// 由 Close 的调用方负责记录日志,这里静默返回。
+			return err
+		}
+		p := s.paramsOf()
+		if !allowed(conn.RemoteAddr(), p.Allow) {
+			conn.Close()
+			log.Printf("socks5: 拒绝未授权客户端 %s", conn.RemoteAddr())
+			continue
+		}
+		// 并发上限用计数而非 channel 信号量:上限可在运行期改,
+		// 而 channel 的容量改不了(重建会让已在跑的连接在错误的 channel 上归还令牌)。
+		if p.MaxConns > 0 && int(atomic.AddInt32(&s.inflight, 1)) > p.MaxConns {
+			atomic.AddInt32(&s.inflight, -1)
+			conn.Close()
+			log.Printf("socks5: 并发连接数已达上限(%d),拒绝 %s", p.MaxConns, conn.RemoteAddr())
+			continue
+		}
+		go func(c net.Conn) {
+			if p.MaxConns > 0 {
+				defer atomic.AddInt32(&s.inflight, -1)
+			}
+			handle(c, p.User, p.Pass, p.Block)
+		}(conn)
+	}
+}
+
+// Close 关停监听器。已在处理的连接**不受影响**(它们会在自己结束时退出),
+// 只是不再接受新连接 —— 优雅退出要等每个连接自己走完,而手机上的游戏长连接
+// 可能几分钟都不换,故不做等待:管理面板改配置要的是立刻生效。
+func (s *Server) Close() error { return s.ln.Close() }
+
+// Addr 返回实际监听地址(端口填 0 时由内核分配,此处给出真实端口)。
+func (s *Server) Addr() net.Addr { return s.ln.Addr() }
+
+// ListenAndServe 监听并处理 SOCKS5 连接,阻塞直至出错(等价于 New + Serve)。
 // allow 非空时仅允许匹配的客户端 IP 接入(支持 IP 或 CIDR),用于挡住公网扫描器;
 // block 非空时屏蔽匹配的目标域名(精确或子域),在拨号前直接拒绝——手机系统的
 // 连通性探测(google.com/example.com 等)不属于游戏流量,拦下可避免反复拨号失败刷日志;
 // maxConns > 0 时限制同时处理的连接数,超限直接拒绝,防止连接风暴拖垮同进程的 Web 服务;
 // user 非空时启用 RFC 1929 用户名/密码认证,pass 为对应密码。
 func ListenAndServe(addr string, allow []netip.Prefix, block []string, maxConns int, user, pass string) error {
-	ln, err := net.Listen("tcp", addr)
+	s, err := New(addr, Params{Allow: allow, Block: block, MaxConns: maxConns, User: user, Pass: pass})
 	if err != nil {
 		return err
 	}
-	if user == "" {
-		log.Printf("socks5 代理已启动: %s (无认证)", addr)
-	} else {
-		log.Printf("socks5 代理已启动: %s (用户名/密码认证,用户=%s)", addr, user)
-	}
-	if len(allow) > 0 {
-		log.Printf("socks5 客户端白名单: %v", allow)
-	}
-	var sem chan struct{}
-	if maxConns > 0 {
-		sem = make(chan struct{}, maxConns)
-		log.Printf("socks5 并发连接上限: %d", maxConns)
-	}
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			return err
-		}
-		if !allowed(conn.RemoteAddr(), allow) {
-			conn.Close()
-			log.Printf("socks5: 拒绝未授权客户端 %s", conn.RemoteAddr())
-			continue
-		}
-		if sem != nil {
-			select {
-			case sem <- struct{}{}:
-			default:
-				conn.Close()
-				log.Printf("socks5: 并发连接数已达上限(%d),拒绝 %s", maxConns, conn.RemoteAddr())
-				continue
-			}
-		}
-		go func(c net.Conn) {
-			if sem != nil {
-				defer func() { <-sem }()
-			}
-			handle(c, user, pass, block)
-		}(conn)
-	}
+	return s.Serve()
 }
 
 // ParseAllow 解析逗号分隔的客户端 IP 白名单,支持 IP 或 CIDR 网段。
@@ -184,7 +253,7 @@ type dnsCache struct {
 	m        map[string][]netip.Addr
 	t        map[string]time.Time
 	refresh  map[string]struct{} // 正在后台刷新的 host(去重,避免惊群)
-	inflight map[string]*dnsCall  // 正在同步解析的 host(singleflight 去重)
+	inflight map[string]*dnsCall // 正在同步解析的 host(singleflight 去重)
 }
 
 var dns = &dnsCache{

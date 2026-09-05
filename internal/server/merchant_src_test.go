@@ -23,7 +23,7 @@ func newTestServerFrom(t *testing.T, st *store.Store) *Server {
 	if err != nil {
 		t.Fatalf("加载名称库: %v", err)
 	}
-	return New(st, NewHub(), db, "", "", "") // 测试不涉及查蛋/邮件,三个令牌留空
+	return New(st, NewHub(), db, "", "", "", nil) // 测试不涉及查蛋/邮件,三个令牌留空
 }
 
 // 本文件锁住「数据源可切换」这条链路,尤其是三件只在这条链路上成立的事:

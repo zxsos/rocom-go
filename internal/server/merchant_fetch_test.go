@@ -305,7 +305,7 @@ func TestMerchantCurrentSlot(t *testing.T) {
 // 同时也钉住其余必填参数:key 与 format=json 缺一不可。
 func TestMerchantFetchSendsRefresh(t *testing.T) {
 	s := newTestServer(t)
-	s.eggAPIKey = "test-key"                // merchantFetch 的必填查询参数;真 token 不在测试里出现
+	s.eggAPIKeySet("test-key")              // merchantFetch 的必填查询参数;真 token 不在测试里出现
 	slot := merchantDaySlots(testDay(0))[5] // 避开别处占用的槽
 	const goods = `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`
 
@@ -358,7 +358,7 @@ func TestMerchantFetchSendsRefresh(t *testing.T) {
 // 故必须在这里钉死。
 func TestMerchantEnsureForcesRefresh(t *testing.T) {
 	s := newTestServer(t)
-	s.eggAPIKey = "test-key"
+	s.eggAPIKeySet("test-key")
 	// 用昨天的一个进行中槽(避开别处占用的):把 now 设在槽开始后 30 分钟
 	slot := merchantDaySlots(testDay(-1))[1]
 	now := slot.Add(30 * time.Minute)
