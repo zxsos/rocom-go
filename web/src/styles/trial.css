@@ -73,7 +73,10 @@
 /* —— 第 7 层 NPC 候选阵容 —— */
 .trial-opps { display: flex; flex-direction: column; gap: 8px; }
 .trial-opp {
-  border: 1px solid var(--line); border-radius: var(--radius, 8px);
+  /* 原写 var(--radius, 8px) —— 而 --radius 是 10px,fallback 从未生效,
+     实际一直渲染成 10px。fallback 暴露的意图是 8px,改用 --radius-md 对上。
+     ⚠️ 这是本次唯一有视觉变化的改动(圆角 10px → 8px)。 */
+  border: 1px solid var(--line); border-radius: var(--radius-md);
   padding: 8px 10px; background: var(--bg-2);
 }
 .trial-opp-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
@@ -126,7 +129,7 @@
   display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 .trial-skill {
-  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--line); border-radius: var(--radius-md);
   background: var(--bg-1); padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
 }
 .trial-skill.on { border-color: var(--accent); background: var(--accent-soft); }

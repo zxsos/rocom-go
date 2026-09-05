@@ -62,6 +62,26 @@ export const FILTER_KEY = 'petListFilter'
 export const DEFAULT_FILTER = { page: 1, pageSize: 20, sort: 'boxpos', order: 'asc' }
 export const sanitizeFilter = (v, fallback) => (v && typeof v === 'object' ? v : fallback)
 
+// —— 已选条件计数(侧栏顶部状态条与分组标题上的角标)——
+//
+// 侧栏内容比视口长,滚到下面时高亮的 chip 会滑出视野,计数是「还有几条在生效」
+// 的兜底。只数**真正收窄结果**的项 —— 排序/分页/视图开关不计,它们不改变
+// 「有哪些」,只改变「怎么排 / 一页几只 / 长什么样」。
+//
+// 返回 {外观, 资质, 体型声音, 来源, total},分组与侧栏的四个 fieldset 一一对应。
+// 独立成纯函数而非内联在组件里,是为了能给它写断言(见 verify-filter-count.mjs);
+// 与同文件的 sanitizeView 同一考虑。
+const b = (v) => (v ? 1 : 0)
+export function countPicked(f) {
+  f = f || {}
+  const look = (f.types || []).length + b(f.shiny) + b(f.colorful) + b(f.gender)
+  // 性格:单选 nature 与多选 natureIn 是同一条件的两种存法,算一条。
+  const gift = b(f.nature || f.natureIn) + b(f.talentRank) + b(f.speciality)
+  const body = b(f.medal) + b(f.medalBig) + b(f.medalSmall) + b(f.medalHigh) + b(f.medalLow)
+  const from = b(f.box) + b(f.catchRange) + b(f.eggGroup)
+  return { look, gift, body, from, total: look + gift + body + from }
+}
+
 // dropBoxFilter 清掉持久化筛选里与账号绑定的盒子条件(切换账号时调,其它条件跨账号仍有意义)。
 export function dropBoxFilter() {
   try {

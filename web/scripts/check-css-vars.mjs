@@ -87,12 +87,43 @@ for (const f of files) {
   }
 }
 
+// —— JSX 内联注入的 CSS 变量 ——
+//
+// React 的 style={{ '--c': color }} 会把变量挂到元素的 style 上,其作用域是
+// **那个元素及其后代**。CSS 里 var(--c) 完全合法,但脚本若只扫 .css 就会把它
+// 报成「未定义」。
+//
+// 自动扫 src/ 下的 .jsx 而非手工维护白名单:白名单会漂移 —— 新增一个注入点而
+// 忘了登记,脚本就退化成噪音(报假错),人一旦开始忽略红灯,真错也就漏了。
+// 自动扫描则永远与代码同步。
+//
+// 真实案例:trial.css 的 .sigil-* 用 var(--c) / var(--d),由
+// pages/trial/ElementWheel.jsx 的 style={{ '--c': d.color, '--d': ... }} 注入。
+const injected = new Map() // var -> Set(file)
+const SRC = join(DIR, '..')
+const walk = (dir) => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) { if (e.name !== 'styles' && e.name !== 'node_modules') walk(p) } else if (e.name.endsWith('.jsx') || e.name.endsWith('.js')) {
+      const txt = readFileSync(p, 'utf8')
+      // 匹配 '--x': 与 '--x': 两种字面量键写法(单引号/双引号/无引号不适用)
+      for (const m of txt.matchAll(/['"](--[\w-]+)['"]\s*:/g)) {
+        injected.set(m[1], (injected.get(m[1]) || new Set()).add(p.slice(SRC.length + 1)))
+      }
+    }
+  }
+}
+walk(SRC)
+if (injected.size) {
+  console.log('ℹ️  JSX 内联注入的变量(视为已定义):',
+    [...injected.keys()].sort().map((v) => `${v}(${[...injected.get(v)].join(',')})`).join(' '))
+}
+
 let bad = 0
 
-// 1) 暗色(默认)主题:可用 = :root 定义的 ∪ 局部变量
-const darkMissing = [...used.keys()].filter(
-  (v) => !rootVars.has(v) && !localVars.has(v),
-)
+// 1) 暗色(默认)主题:可用 = :root 定义的 ∪ 局部变量 ∪ JSX 内联注入
+const known = (v) => rootVars.has(v) || localVars.has(v) || injected.has(v)
+const darkMissing = [...used.keys()].filter((v) => !known(v))
 if (darkMissing.length) {
   bad++
   console.log('❌ 暗色主题(默认 :root)下未定义的变量 —— 会静默失效:')
@@ -109,7 +140,7 @@ if (darkMissing.length) {
 
 // 2) 亮色主题:可用 = :root ∪ light ∪ 局部。这项理论上不会缺,列出是为了显式确认。
 const lightMissing = [...used.keys()].filter(
-  (v) => !rootVars.has(v) && !lightVars.has(v) && !localVars.has(v),
+  (v) => !rootVars.has(v) && !lightVars.has(v) && !localVars.has(v) && !injected.has(v),
 )
 if (lightMissing.length) {
   bad++
@@ -120,7 +151,7 @@ if (lightMissing.length) {
 
 // 3) 与主题无关却被写进 light 块:这是本次事故的形态,单独预警。
 //    判定:light 块定义了、但 :root 没定义 → 暗色主题下必然失效(除非是局部变量)
-const themeLeak = [...lightVars].filter((v) => !rootVars.has(v) && !localVars.has(v))
+const themeLeak = [...lightVars].filter((v) => !rootVars.has(v) && !localVars.has(v) && !injected.has(v))
 if (themeLeak.length) {
   bad++
   console.log('❌ light 块定义但 :root 未定义(暗色主题会失效):', themeLeak.sort().join(', '))

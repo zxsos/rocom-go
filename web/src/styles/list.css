@@ -160,24 +160,56 @@
 }
 .pt-fallback { font-size: 40px; opacity: .5; }
 
-/* ---- 四角徽标(见 PetCard.jsx 的分工说明)----
-   位置贴边 5px、竖排、间距 2px —— 图区高只有 104px(桌面),右上最多 4 项
-   (系别×2 + 形态 + 血脉),紧凑排版才能全部放下且留出图片主体。 */
+/* ---- 顶部横幅 + 四角徽标(见 PetCard.jsx 的分工说明)----
+   位置贴边 5px、竖排、间距 2px —— 图区高只有 104px(桌面),右上最多 3 项
+   (系别×2 + 血脉),紧凑排版才能全部放下且留出图片主体。 */
+
+/* 顶部横幅:搭档标记 + 形态名,横跨图区顶部一行。
+   形态名原先挤在右栏与系别/血脉竖排,被 .pt-side 的 62px 上限截断 ——
+   实测形态名 5 字 29 个 / 6 字 17 个 / 7 字 19 个 / 8 字 2 个,10px 字号下
+   7 字要 82px、8 字要 92px,而 62px 只放得下 5 字(「夏天的样子」刚好卡满),
+   四分之一的形态名必然显示不全。
+   横幅横跨整个图区(桌面卡宽 ≥200px → ~190px、移动端 132px → ~126px),
+   8 字也能一行放下;更长的只有 NPC 专属那两个(13/14 字),才退到省略号,
+   全文仍留在 title 里。
+
+   pointer-events 同 .pt-side:横幅本身 none(不挡图片点选),子项 auto
+   (搭档标记有 title、炫彩色卡要能点开放大)。 */
+.pt-banner {
+  position: absolute; top: 5px; left: 5px; right: 5px; z-index: var(--z-raised);
+  display: flex; align-items: center; gap: 3px;
+  min-width: 0; pointer-events: none;
+}
+.pt-banner > * { pointer-events: auto; }
+/* 搭档标记在横幅里回到常规流:它原本是 absolute + top/left 负值(压在头像左上角
+   略微溢出,见 pet.css)。在图区里那两个负值会把它推出图区,被 .pt-media 的
+   overflow:hidden 裁掉一角 —— 改 relative 后由 flex 排在横幅左端,负值一并清零。
+   用 relative 而非 static:内部两层 img 是 absolute,需要一个定位参照。 */
+.pt-banner .pet-mark { position: relative; top: 0; left: 0; }
+/* min-width:0 是 flex 下收缩的前提(默认 min-width:auto 会撑住不缩),
+   否则长形态名会撑破横幅、把右边的东西顶出图区。省略号由 .pt-chip 提供。 */
+.pt-form { min-width: 0; }
+
 /* 左右两栏:各占图区一侧,内部 space-between 把上下两组顶到两端。
    pointer-events 分层:栏本身 none(不挡图片的点选),栏内角标 auto
    (炫彩色卡要能点开放大 —— 见 badges.jsx 的 GlassChip)。 */
 .pt-side {
-  position: absolute; top: 5px; bottom: 5px; z-index: var(--z-raised);
+  position: absolute; top: 25px; bottom: 5px; z-index: var(--z-raised);
   display: flex; flex-direction: column; justify-content: space-between;
   /* 固定上限而非百分比:图区宽在两端差异极大(桌面 204~241px、移动端 132px),
      用百分比要么桌面压图、要么移动端挤爆。取 62px 是两端的最小可行解 ——
-     它刚好容纳最长的一项(形态「夏日的样子」5 字 × 10px + 内边距 ≈60px),
-     且两侧 62 + 62 = 124px < 移动端图区 132px,左右不会撞。 */
+     它由最宽的一项定标:血脉名最长 3 字(「黑魔法」),图标 13 + 字 30 +
+     内边距 10 + 边框 2 ≈ 55px;且两侧 62 + 62 = 124px < 移动端图区 132px,
+     左右不会撞。形态名原先也走这里(5 字 60px 刚好卡满),7~8 字放不下,
+     已移到上面的 .pt-banner。 */
   max-width: 62px;
   pointer-events: none;
 }
 .pt-side.left { left: 5px; align-items: flex-start; }
 .pt-side.right { right: 5px; align-items: flex-end; }
+/* 左栏顶部已让给横幅,只剩底部一组(等级/性格/特长)。space-between 在只剩一项时
+   会把它顶到栏顶 —— 改 flex-end 贴底,位置与改动前一致(底部组本来就在底)。 */
+.pt-side.left { justify-content: flex-end; }
 
 .pt-corner { display: flex; flex-direction: column; gap: 2px; max-width: 100%; pointer-events: auto; }
 /* 异色/炫彩:横排(见 PetCard.jsx 注释) */
@@ -397,10 +429,13 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
   }
   .pt-img { padding: 6px; }
   .pt-body { flex: 1 1 auto; padding: 8px 10px 10px; gap: 5px; }
-  /* 侧栏贴边收紧:移动端图区窄,5px 边距在 132px 里占比偏大 */
-  .pt-side { top: 3px; bottom: 3px; }
+  /* 侧栏贴边收紧:移动端图区窄,5px 边距在 132px 里占比偏大。
+     top 23px = 横幅 top 3 + chip 高 15 + 间隙 5,让出顶部横幅那一行。 */
+  .pt-side { top: 23px; bottom: 3px; }
   .pt-side.left { left: 3px; }
   .pt-side.right { right: 3px; }
+  /* 横幅同样收紧贴边,把 126px 的宽度尽量留给形态名 */
+  .pt-banner { top: 3px; left: 3px; right: 3px; }
   /* 只补新增项的触控基线;工具条本身的窄屏收紧规则在 panel.css,
      重复一份改天就会两边漂移。 */
   .viewseg-b { min-height: 36px; } /* 与 .btn 的移动端规则同高 */
@@ -420,21 +455,85 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
   .sixgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* ---- 顶部状态条:共 N 只 / 已选 K 项 / 重置 ----
+   sticky 吸在侧栏顶:侧栏内容比视口长(4 个分组 + 性格方阵),滚到下面时
+   「还剩多少只」是最该留着的一条 —— 它是筛选的目的,不是过程。
+   原先「重置筛选」是 BoxMap 下面一颗孤立按钮,而它与「共 N 只」本是一体两面
+   (清空条件 ↔ 回到全量),分开放在视觉上把因果关系切断了。 */
+.filter-status {
+  position: sticky; top: 0; z-index: var(--z-base);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  /* 负 margin 抵掉 .filters 的 padding,让吸顶条铺满侧栏宽度、背后不透内容;
+     再补等量 padding 回来,内容与其余分组仍对齐。 */
+  margin: -14px -14px 0; padding: 10px 14px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line-soft);
+}
+.fs-count { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--fg-dim); }
+.fs-count > b { font-family: var(--font-num); font-size: 20px; font-weight: 700; color: var(--fg); }
+/* 已选计数:主色胶囊。它是「还有几条在生效」的兜底 —— 侧栏滚动后高亮的 chip
+   会滑出视野,而这一条始终吸在顶部。 */
+.fs-n {
+  font-style: normal; font-size: 11px; font-weight: 600;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+}
+/* 重置:无筛选时置灰 —— 没有可清的东西却给主色,是在骗人。
+   > svg 缩小到与文字同高(见 svg.jsx 的 S 组件,默认 16px 在这里偏大)。 */
+.fs-reset {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--fg-dim); font-size: 12px;
+  font-family: inherit; cursor: pointer; user-select: none;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.fs-reset > svg { width: 13px; height: 13px; }
+.fs-reset:disabled { opacity: .4; cursor: default; }
+/* 有筛选时才变成可点的主色态 */
+.fs-reset.on { color: var(--fg); border-color: var(--line); }
+.fs-reset.on:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.fs-reset:not(:disabled):active { transform: scale(.97); }
+
 /* 分组块:外观 / 资质 / 体型·声音 / 来源。
    用 fieldset + legend 而非普通 div:语义上它确实是「一组相关控件」,
-   屏幕阅读器会逐组播报,比一堆平铺的 label 好定位。样式上重置掉 fieldset
-   的默认边框与内缩,只留一条分隔线。 */
+   屏幕阅读器会逐组播报,比一堆平铺的 label 好定位。
+
+   改为**卡片**:原先只靠一条 --line-soft 分隔(它与 --bg-1 几乎同色,实测
+   几乎看不见),四组糊成一片、扫视时找不到块边界。给 --bg-2 微底 + 细边框
+   + 圆角后,四块从侧栏底色里浮出来,一眼能定位到「我要找的那组」。
+   不用更强的阴影:侧栏本身已是卡片,再来投影会变成卡片套卡片的浑浊感。 */
 .filter-sec {
-  border: none; border-top: 1px solid var(--line-soft);
-  margin: 0; padding: 12px 0 0;
+  border: 1px solid var(--line-soft); border-radius: var(--radius);
+  margin: 0; padding: 10px 12px 12px;
+  background: var(--bg-2);
   display: flex; flex-direction: column; gap: 12px;
 }
-.list-layout .filters > .filter-reset { padding-bottom: 0; }
+/* 标题行:序号 + 组名 + 已选计数,一条 flex 基线对齐。
+   原先是 10px 纯灰 uppercase,与下面的小标签(11px + 蓝色竖条)相比反而更弱 ——
+   主次颠倒了:组名是「先定位到块」的锚点,该比「块内找项」的标签更重。 */
 .filter-sec > legend {
-  padding: 0; margin-bottom: -2px;
-  font-size: 10px; font-weight: 700; color: var(--fg-dim);
-  letter-spacing: .1em; text-transform: uppercase;
+  padding: 0; width: 100%;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--fg);
+  letter-spacing: .04em;
 }
+/* 序号:等宽数字 + 主色,是这一组在「外观→资质→体型→来源」流程里的位置。
+   用 --font-num(项目自带的数字子集)而非系统等宽 —— 与页面其余数字同族。 */
+.fl-idx {
+  font-family: var(--font-num); font-size: 10px; font-weight: 700;
+  color: var(--accent); letter-spacing: .06em;
+}
+/* 组内的已选计数:与顶部 .fs-n 同款但更小、中性色 ——
+   顶部那条是全局的「还剩几条」,这里只是「这组设了没」,不该抢主色的语义。 */
+.fl-n {
+  font-style: normal; font-size: 10px; font-weight: 700; line-height: 1;
+  min-width: 15px; padding: 2px 5px; border-radius: 999px; text-align: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+/* 辅助说明(如奖牌特征下的口径注解):比 .muted 再淡一档、缩进对齐开关组。
+   它是「用之前看一眼」的注解,不该与开关争视觉权重。 */
+.filter-hint { font-size: 11px; line-height: 1.5; color: var(--fg-dim); opacity: .75; }
 
 /* ---- 性格罗盘:6×6 方阵筛选(见 pages/pet-list/NatureMatrix.jsx)----
  *

@@ -38,26 +38,36 @@ export default function PetCard({ p, selected, itemProps }) {
           )
           : <span className="pt-fallback">{p.shiny ? '✨' : '🐾'}</span>}
 
-        {/* —— 四角徽标:把「属性」压到图上,数据区只留数值 ——
-            原先它们挤在数据区一行胶囊里(nowrap + 截断),形态(「夏日的样子」)
-            与奖牌常被切掉。移到图上是游戏宠物卡的通行做法:图片四周本来就
-            是透明区,四角压标不挡主体,且属性与形象同处一眼扫完。
+        {/* —— 徽标压到图上,数据区只留数值 ——
+            原先它们挤在数据区一行胶囊里(nowrap + 截断),形态与奖牌常被切掉。
+            移到图上是游戏宠物卡的通行做法:图片四周本来就是透明区,
+            压标不挡主体,且属性与形象同处一眼扫完。
 
-            四角分工按「语义相近的挨在一起」:
-              左上 搭档标记 —— 玩家自己打的标,独占一角免得和稀有度混
-              右上 系别(≤2)/形态/血脉 —— 都是「它是什么」
-              左下 等级/性格/特长 —— 都是「它有多强」
-              右下 异色·炫彩 —— 稀有度,与左上的搭档对角呼应
+            分工按「语义相近的挨在一起」,形态名是唯一的例外 —— 它太长,
+            竖排在角上必然被截断(详见 .pt-banner 处的注释):
+              顶部横幅 搭档标记 + 形态名 —— 「它是什么样」,横排占满图区宽度
+              右上     系别(≤2)/血脉 —— 都是「它是什么」
+              左下     等级/性格/特长 —— 都是「它有多强」
+              右下     异色·炫彩 —— 稀有度,与横幅里的搭档对角呼应
 
-            **一律竖排**:图区高 104(桌面)/204(移动)、宽 204~241(桌面)/
+            角标**一律竖排**:图区高 104(桌面)/204(移动)、宽 204~241(桌面)/
             96(移动),横排放三个必然溢出;竖排只占 ~40px 宽,且移动端靠
             高 204px 也放得下,两端可用同一套结构。 */}
-        {/* 左右两栏而非四个独立角:右栏(系别/形态/血脉 + 异色炫彩)与左栏
-            (搭档 + 等级/性格/特长)各自 space-between 上下顶开。四个独立
-            absolute 角在 104px 图区里会垂直撞上(实测右上 70px + 右下 32px
-            + 边距 > 104),两栏布局则**结构上不可能重叠**。 */}
+        {/* 顶部横幅:搭档标记 + 形态名,横跨图区顶部一行(见 list.css .pt-banner)。
+            形态名原先挤在右栏与系别/血脉竖排,被 .pt-side 的 62px 上限截断 ——
+            实测形态名 5 字 29 个 / 6 字 17 个 / 7 字 19 个 / 8 字 2 个,10px 字号下
+            7 字要 82px、8 字要 92px,而 62px 只放得下 5 字(「夏天的样子」刚好卡满),
+            四分之一的形态名必然显示不全。横幅横跨整个图区,8 字也能一行放下。 */}
+        <div className="pt-banner">
+          <PetMark p={p} />
+          {p.form && <span className="pt-chip pt-form" title={'形态：' + p.form}>{p.form}</span>}
+        </div>
+
+        {/* 左右两栏而非四个独立角:右栏(系别/血脉 + 异色炫彩)与左下的等级/性格/特长
+            各自在 104px 图区内竖排。四个独立 absolute 角会垂直撞上(实测右上 70px +
+            右下 32px + 边距 > 104),两栏布局则**结构上不可能重叠**。
+            左栏顶部已让给横幅,只剩底部一组(见 list.css .pt-side.left 的 flex-end)。 */}
         <div className="pt-side left">
-          <div className="pt-corner tl"><PetMark p={p} /></div>
           <div className="pt-corner bl">
             <span className="pt-chip pt-lv">Lv.{p.level}</span>
             {p.nature && <span className="pt-chip" title="性格">{p.nature}</span>}
@@ -68,9 +78,6 @@ export default function PetCard({ p, selected, itemProps }) {
         <div className="pt-side right">
           <div className="pt-corner tr">
             <Types types={p.types} icons={p.typeIcons} />
-            {/* 形态名可能很长(「夏日的样子」),故给上限 + 省略号兜底;
-                title 保留全文,悬停可读(原先在数据区被硬截断且无从查看)。 */}
-            {p.form && <span className="pt-chip" title={'形态：' + p.form}>{p.form}</span>}
             {p.blood && <Blood p={p} />}
           </div>
           {/* 异色/炫彩横排:竖排会把 3 个标记拉成 32px 高,在 104px 图区里

@@ -3,9 +3,12 @@ import { IconsContext } from '../../context'
 import { ALL_TYPES, ALL_EGG_GROUPS } from '../../constants'
 import { InlineIcon } from '../../components/icons'
 import { Gender } from '../../components/badges'
-import { CATCH_RANGES } from './filters'
+import { IconRefresh } from '../../components/svg'
+import { CATCH_RANGES, countPicked } from './filters'
 import NatureMatrix from './NatureMatrix'
 import Dropdown from '../../components/Dropdown'
+
+
 
 // FilterPanel 筛选侧栏:桌面常驻左列,移动端为侧滑抽屉(collapsed 控制开合)。
 // children 为顶部的位置示意图(BoxMap)插槽;筛选状态由父级持有,经 set 增量更新。
@@ -16,6 +19,9 @@ import Dropdown from '../../components/Dropdown'
 // 分块后可以先定位到块、再在块内找,且块与块之间有明确的语义边界。
 export default function FilterPanel({ filter, options, total, collapsed, onClose, set, toggleType, reset, children }) {
   const icons = useContext(IconsContext)
+  // 已选条件计数:分组级 + 全局(见 filters.js 的 countPicked)。
+  const { look: nLook, gift: nGift, body: nBody, from: nFrom, total: picked } = countPicked(filter)
+
   return (
     <>
       {/* 移动端筛选抽屉的背景遮罩:点击关闭 */}
@@ -27,12 +33,30 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
           <button className="icon-btn" onClick={onClose} aria-label="关闭筛选">✕</button>
         </div>
         {children}
-        <div className="filter-group filter-reset">
-          <button className="btn" onClick={reset}>重置筛选</button>
+
+        {/* 顶部状态条(sticky):「共 N 只」+ 已选计数 + 重置合到一处。
+            原先「重置筛选」是 BoxMap 下面一颗孤零零的按钮,而它真正的语义是
+            「清掉我现在设的条件」—— 与「还剩多少只」是一件事的两面,该挨着。
+            计数为 0 时重置置灰:没有可清的东西,给它主色是在骗人。 */}
+        <div className="filter-status">
+          <span className="fs-count">
+            <b>{total}</b> 只
+            {picked > 0 && <i className="fs-n">已选 {picked} 项</i>}
+          </span>
+          <button
+            className={'fs-reset' + (picked > 0 ? ' on' : '')}
+            onClick={reset} disabled={picked === 0}
+            title={picked > 0 ? '清空全部筛选条件' : '当前没有筛选条件'}
+          >
+            <IconRefresh />重置
+          </button>
         </div>
 
         <fieldset className="filter-sec">
-          <legend>外观</legend>
+          <legend>
+            <span className="fl-idx">01</span>外观
+            {nLook > 0 && <i className="fl-n">{nLook}</i>}
+          </legend>
           <div className="filter-group">
             <label>系别</label>
             <div className="chips">
@@ -67,7 +91,10 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         </fieldset>
 
         <fieldset className="filter-sec">
-          <legend>资质</legend>
+          <legend>
+            <span className="fl-idx">02</span>资质
+            {nGift > 0 && <i className="fl-n">{nGift}</i>}
+          </legend>
           {/* 性格改走 6×6 方阵:原先的「热门 8 项 + 其他」丢掉了 22 个性格的区分度,
               且「其他」是排除式条件,与其它筛选叠加时语义很绕。方阵一次给全 30 个,
               并支持「只要某维↑ / 只要某维↓」这类按维度的选法。 */}
@@ -82,7 +109,10 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         </fieldset>
 
         <fieldset className="filter-sec">
-          <legend>体型 · 声音</legend>
+          <legend>
+            <span className="fl-idx">03</span>体型 · 声音
+            {nBody > 0 && <i className="fl-n">{nBody}</i>}
+          </legend>
           <Select label="奖牌" opts={options.medal} value={filter.medal} onChange={(v) => set({ medal: v })} />
           <div className="filter-group">
             <label>奖牌特征</label>
@@ -92,12 +122,17 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
               <Toggle checked={filter.medalHigh === '1'} onChange={(v) => set({ medalHigh: v ? '1' : '' })}>婉转声</Toggle>
               <Toggle checked={filter.medalLow === '1'} onChange={(v) => set({ medalLow: v ? '1' : '' })}>粗嗓门</Toggle>
             </div>
-            <div className="muted small">按体重百分位/嗓音判定，与地图奖牌筛选同口径；可多选，多选=同时满足（如大块头+婉转声）</div>
+            {/* 辅助说明:从 .muted 正文降到 .filter-hint(更小、更淡、有左边距),
+                它是「用之前看一眼」的注解,不该和开关抢注意力。 */}
+            <div className="filter-hint">按体重百分位/嗓音判定，与地图奖牌筛选同口径；可多选，多选=同时满足（如大块头+婉转声）</div>
           </div>
         </fieldset>
 
         <fieldset className="filter-sec">
-          <legend>来源</legend>
+          <legend>
+            <span className="fl-idx">04</span>来源
+            {nFrom > 0 && <i className="fl-n">{nFrom}</i>}
+          </legend>
           <Select label="宠物盒" opts={options.box} value={filter.box} onChange={(v) => set({ box: v })} />
           <div className="filter-group">
             <label>捕捉时间</label>

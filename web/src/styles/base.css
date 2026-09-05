@@ -26,6 +26,14 @@
      想整体收敛(比如移动端不抬)改一处即可。 */
   --lift: -1px;
   --shadow-lift: 0 4px 12px -4px rgb(0 0 0 / .45);
+  /* 圆角标度:sm < md < base < lg。
+     原先只有 base(10px)与 lg(14px),缺中间两档 —— 于是各处只能写
+     var(--radius-sm, 6px) / var(--radius-md, 8px),把 6px/8px 硬编码散落到
+     detail.css / trial.css / admin.css 等处。改圆角时这些散落值不会被带到,
+     是典型的「看着是变量、实则是常量」。补齐后 fallback 可以一并去掉。
+     取值:6 / 8 / 10 / 14,按 2px 递进(最末 4px 是给大卡片的)。 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
   --radius: 10px;
   --radius-lg: 14px;
   /* 磨砂顶栏/底栏背景:暗色下深、亮色下浅(见 [data-theme="light"] 覆写)。
