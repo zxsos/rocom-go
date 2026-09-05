@@ -5,6 +5,7 @@ import { fmtTime } from '../../utils/format'
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
 import { ImgAvatar } from '../../components/icons'
 import { GlassChip, MarkIcon } from '../../components/badges'
+import { IconStar } from '../../components/svg'
 import Dropdown from '../../components/Dropdown'
 
 // 花种页面:渲染 s2c 0x0375 下发的 flower_npcs(花灵)活动 BOSS 分组。
@@ -200,7 +201,12 @@ function fmtLeft(endTs, nowMs) {
 
 function FlowerCard({ f, now }) {
   const icons = useContext(IconsContext)
-  const stars = (f.star || 0) > 0 ? '★'.repeat(f.star) : ''
+  // 星级是**数量**(1~5 颗),故用实心星:描边星在 12px 下数不清几颗,
+  // 而「几颗星」这个语义本身就靠实心块来读。原先是 '★'.repeat(n),
+  // 那是字形,不响应 currentColor 且各家系统字重不同。
+  const stars = (f.star || 0) > 0
+    ? Array.from({ length: f.star }, (_, i) => <IconStar key={i} size={11} filled />)
+    : null
   const left = fmtLeft(f.endTs, now)
   // 详情字段:点过地图花种后由 0x0338 合并进来;未点过全空(普通花种绑定/奖牌恒为空)。
   const hasDetail = f.detail || f.lv > 0 || f.glass || f.bindName || f.medalName

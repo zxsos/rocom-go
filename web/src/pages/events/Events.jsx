@@ -11,7 +11,7 @@ import { PetDetailModal } from '../../components/PetDetailModal'
 import { TweenNumber } from '../../components/TweenNumber'
 import { fmtTime, voiceHot, pctHot } from '../../utils/format'
 import LocTag from '../../components/LocTag'
-import { IconTrash } from '../../components/svg'
+import { IconTrash, IconChevronDown, IconChevronUp, IconStar } from '../../components/svg'
 import { chime, rareChime } from '../../utils/audio'
 import { sanitizeRules, isHighlight, matchedRules, NOTABLE_BLOODS, SUB_KINDS } from './highlight'
 import RulePanel from './RulePanel'
@@ -167,9 +167,9 @@ export default function Events() {
           <div className="spacer" />
           {/* 三个操作统一为单图标,含义见各自 title */}
           <button className={'btn btn-icon' + (statsOpen ? ' primary' : '')} onClick={() => setStatsOpen((v) => !v)}
-            title={statsOpen ? '收起统计图表' : '展开统计图表'}>{statsOpen ? '▴' : '▾'}</button>
+            title={statsOpen ? '收起统计图表' : '展开统计图表'}>{statsOpen ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />}</button>
           <button className={'btn btn-icon' + (onlyHl ? ' primary' : '')} onClick={() => setOnlyHl((v) => !v)}
-            title="仅展示命中高亮规则的事件">{onlyHl ? '★' : '☆'}</button>
+            title="仅展示命中高亮规则的事件"><IconStar size={14} filled={onlyHl} /></button>
           {wakeLockSupported
             ? <button className={'btn btn-icon' + (keepAwake ? ' primary' : '')} onClick={() => setKeepAwake((v) => !v)}
                 title="阻止屏幕熄灭,方便盯着高亮提醒">☀</button>

@@ -197,11 +197,25 @@
   display: flex; align-items: center; justify-content: center;
   transition: transform .18s ease, border-color .18s ease, color .18s ease, background-color .18s ease, box-shadow .18s ease;
 }
-.map-btn:hover {
-  border-color: var(--accent); color: var(--accent);
-  background: rgba(76, 141, 255, .14);
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(76, 141, 255, .25);
+/* hover 改中性:原先这条与 .map-btn.on **完全相同**(同为 accent 边/字 +
+   0.14 淡蓝底),于是「取消后鼠标还停着」时外观与开着 100% 一致,
+   是本次「看不出是否关闭」最严重的一处。
+   主色只留给选中态,hover 改用中性提亮 + --bar-hover(与顶栏按钮同口径)。
+   包进 @media(hover:hover):触摸设备 :hover 会粘住,详见 panel.css 的注释。 */
+@media (hover: hover) {
+  .map-btn:hover {
+    border-color: var(--fg-dim); color: var(--fg);
+    background: var(--bar-hover);
+    transform: translateY(-1px);
+    /* 阴影也去掉蓝色 —— 它原是 rgba(76,141,255,.25) 的一圈蓝光,
+       悬停在已关闭的按钮上就是一圈蓝晕,同样会被读成"还开着"。 */
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .3);
+  }
+  /* 选中 + 悬停:保住主色(与 .toggle.on:hover 同口径) */
+  .map-btn.on:hover {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(var(--c-accent-rgb), .22);
+  }
 }
 .map-btn:active { transform: translateY(0) scale(.94); }
 .map-btn.on { color: var(--accent); border-color: var(--accent); background: rgba(76, 141, 255, .14); }

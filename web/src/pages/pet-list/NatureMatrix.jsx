@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { StatIcon } from '../../components/icons'
+import { IconChevronDown } from '../../components/svg'
 
 // ---- 性格罗盘:6×6 方阵筛选 ----
 //
@@ -117,7 +118,7 @@ export default function NatureMatrix({ matrix, nature, natureIn, onChange }) {
       {/* 折叠开关:默认收起,避免筛选面板被 264px 高的方阵撑到无法扫视 */}
       <button type="button" className="natmat-toggle" onClick={() => setOpen((v) => !v)}>
         {expanded ? '收起方阵' : '展开方阵'}
-        <span className={'natmat-caret' + (expanded ? ' up' : '')}>▾</span>
+        <span className={'natmat-caret' + (expanded ? ' up' : '')}><IconChevronDown size={12} /></span>
       </button>
 
       {expanded && (

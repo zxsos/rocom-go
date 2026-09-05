@@ -45,7 +45,14 @@
   background: transparent; border: 1px solid var(--line); border-radius: 6px;
   cursor: pointer; transition: all .12s var(--ease-out);
 }
-.rrule-mini:hover { border-color: var(--accent); color: var(--accent); }
+/* hover 改中性:原写 --accent,与 .rrule-mini.on 撞色(只差一层 0.14 的底色),
+   取消勾选后鼠标悬停时看不出已关。主色留给选中态专属,理据见 panel.css 的
+   .toggle:hover 注释。同样包进 @media(hover:hover) 防触摸设备粘滞。 */
+@media (hover: hover) {
+  .rrule-mini:hover { border-color: var(--fg-dim); color: var(--fg); }
+  /* 选中 + 悬停:保住主色(与 .toggle.on:hover 同口径) */
+  .rrule-mini.on:hover { border-color: var(--accent); color: var(--accent); }
+}
 .rrule-mini.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .rrule-mini.danger:hover { border-color: var(--red); color: var(--red); background: rgba(248, 81, 73, .1); }
 

@@ -113,7 +113,10 @@
   display: flex; align-items: baseline; gap: 6px; font-size: 13px; white-space: nowrap;
   overflow: hidden;
 }
-.flower-star { color: var(--gold); letter-spacing: 1px; }
+/* 星级(1~5 颗实心星,见 Flowers.jsx)。
+   图标化后靠 gap 而非 letter-spacing 控制间距 —— 后者是给**字形**用的,
+   SVG 是 replaced element,字距对它无效。 */
+.flower-star { color: var(--gold); display: inline-flex; align-items: center; gap: 1px; }
 .flower-blood { display: inline-flex; align-items: center; gap: 3px; color: var(--fg-dim); }
 .flower-blood-ic { width: 14px; height: 14px; object-fit: contain; }
 

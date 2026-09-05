@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect, useMe
 import { subscribe, getPosition } from '../../api'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
+import { IconMenu } from '../../components/svg'
 import { useAsyncRun } from '../../hooks/useAsyncData'
 import { ZOOM_FALLBACK, defaultZoom, SMOOTH_TAU as SMOOTH_TAU_FALLBACK, TAU_CUTOFF, snap, posAt, makeAnchor } from './motion'
 import { usePanZoom } from './usePanZoom'
@@ -289,7 +290,7 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
   const ctrl = (
     <div className="map-ctrl">
       <button className={'map-btn map-layers-toggle' + (layersActive ? ' on' : '')} title="图层栏"
-        onClick={onToggleLayers}>☰</button>
+        onClick={onToggleLayers}><IconMenu size={16} /></button>
       <button className="map-btn" title="放大" disabled={!zoomReady}
         onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
       <button className="map-btn" title="缩小" disabled={!zoomReady}

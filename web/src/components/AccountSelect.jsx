@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { useDropdown } from '../hooks/useDropdown'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { IconChevronDown } from './svg'
 import { uidOf } from '../data/nav'
 import RankTitle from './RankTitle'
 import AccountAvatar from './AccountAvatar'
@@ -110,7 +111,7 @@ export default function AccountSelect({ accounts, current, onChange, onManagePin
         {/* 手机端无账号时的兜底:上面几项在 current 为空时都不渲染,
             不补这一句整条就是个空按钮(只有一个箭头),看不出点它做什么。 */}
         {mobile && !current && <span className="account-trigger-name">选择账号…</span>}
-        <span className="account-caret">▾</span>
+        <span className="account-caret"><IconChevronDown size={13} /></span>
       </button>
 
       {mobile ? (

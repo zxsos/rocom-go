@@ -59,7 +59,6 @@
   transition: border-color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.toggle:hover { border-color: var(--accent); color: var(--fg); }
 .toggle:active { transform: scale(.97); }
 /* input 铺满并透明:点按键任意位置都能切换,且保留原生语义与键盘可达 */
 .toggle > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -72,6 +71,32 @@
    不影响「选中了没」的显示(那由 React 加的 .on 负责)。 */
 .toggle:has(> input:focus-visible) {
   outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+
+/* —— hover 只做**中性**提亮,不碰主色 ——
+ *
+ * 主色(--accent)是「选中」的专属语义,见上面的 .toggle.on。
+ * 两者曾都写 --accent:取消勾选后鼠标还停在按键上,边框依旧是蓝的,
+ * 与开着只差一层 0.14 alpha 的底色 —— 扫视时根本分不清开还是关。
+ * 用户实测反馈正是这句:「取消后还有蓝色光圈在,不容易看出是否关闭」。
+ *
+ * 改用中性通道后,「蓝」只表示选中:
+ *   关 + 不悬停  深底 + 灰边 + 灰字
+ *   关 + 悬停    底微提 + 中性边 + 亮字      ← 无蓝
+ *   开(任何时候) 淡蓝底 + 蓝边 + 蓝字 + 加粗  ← 只有这里有蓝
+ *
+ * 包进 @media (hover: hover):触摸设备上 :hover 会**粘住**(点完一直保持
+ * 到点别处),带主色的 hover 在手机上就会让「刚取消」的按键一直显示蓝边 ——
+ * 这正是本问题的移动端版本。与 .pet-card:hover 同口径。 */
+@media (hover: hover) {
+  .toggle:hover { border-color: var(--fg-dim); color: var(--fg); background: var(--bg-3); }
+  /* 选中 + 悬停:保住主色语义,只把底再压深一档表示"可点"。
+     必须显式写 —— 它与 .toggle:hover 特异性相同,只靠源码顺序太脆,
+     一旦有人调整规则顺序,「开着悬停」就会静默变成中性灰。 */
+  .toggle.on:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(var(--c-accent-rgb), .22);
+  }
 }
 /* 性别符号在按键里:加大加粗与列表里一致(见 pet.css 的 .gender) */
 .toggle .gender { font-size: 1.15em; font-weight: 800; }

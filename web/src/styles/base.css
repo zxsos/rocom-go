@@ -649,3 +649,8 @@ html.theme-spread::view-transition-new(root) {
 .hb-title > svg { color: var(--c-flower); flex: none; }
 /* 商品图缺图兜底:整块居中,图标比原 emoji 略小以免显得空 */
 .merchant-item-fb { display: grid; place-items: center; color: var(--fg-dim); opacity: .7; }
+
+/* chip 内的「移除」小叉(见 Debug.jsx / RulePanel.jsx 的已选项标签)。
+   原先是 ✕ 字形,靠字距与文字挤在一起;换成 SVG 后需要显式压到 11px 并
+   垂直居中,否则会比旁边的文字大一圈、且坐在基线上显得偏下。 */
+.chip-x { width: 11px; height: 11px; vertical-align: -1px; margin-left: 2px; opacity: .75; }

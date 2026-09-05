@@ -14,7 +14,9 @@
 .dropdown-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 触发按钮上的弱化副文本(如花种槽位数量) */
 .dropdown-count { flex: none; font-size: 12px; color: var(--fg-dim); }
-.dropdown-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
+/* 图标化后 font-size 对它无效(SVG 不吃字号),改由 inline-flex + align 居中;
+   旋转仍作用在本容器上,展开时翻转 180° 的效果不变。 */
+.dropdown-caret { flex: none; color: var(--fg-dim); display: inline-flex; align-items: center; transition: transform .2s ease; }
 .dropdown.open .dropdown-caret { transform: rotate(180deg); }
 
 /* 浮层:绝对定位贴在 trigger 下方,与 trigger 同宽,最大高度滚动 */

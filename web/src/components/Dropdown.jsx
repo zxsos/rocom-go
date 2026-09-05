@@ -1,5 +1,6 @@
 import React from 'react'
 import { useDropdown } from '../hooks/useDropdown'
+import { IconChevronDown } from './svg'
 
 // Dropdown 通用自绘下拉,替代原生 <select>:原生浮层是系统样式,与站点深色主题割裂。
 // 键鼠/触屏均可操作:点击展开/选条;键盘 ↑↓ 切换、Enter/空格选择、Esc 关闭、Tab 收起,
@@ -35,7 +36,7 @@ export default function Dropdown({ value, options, onChange, placeholder = '全�
       >
         <span className="dropdown-value">{cur ? cur.label : placeholder}</span>
         {cur && cur.count !== undefined && <span className="dropdown-count">{cur.count}</span>}
-        <span className="dropdown-caret">▾</span>
+        <span className="dropdown-caret"><IconChevronDown size={13} /></span>
       </button>
       {open && (
         <ul className="dropdown-menu" ref={ulRef} role="listbox">
