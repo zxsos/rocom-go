@@ -11,6 +11,7 @@ package pet
 
 import (
 	"math"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -31,6 +32,68 @@ const (
 // EggItemType 是精灵蛋在 BAG_ITEM_CONF/BagItem 里的 type 值。
 const EggItemType = 8
 
+// ---- 孵化倍率:活动部分(时间表)----
+//
+// 倍率由两部分构成,**性质不同、来源不同,必须分开算**:
+//
+//	总倍率 = 活动倍率(本节的固定时间表) + 在线行为加成(移动 / 挂风场 / 孵化宝典)
+//
+// 活动倍率:每周「孵蛋加速日」,**北京时间周五 04:00 ~ 周一 04:00**,期间后台按 500%
+// 推进(即 5 倍),其余时间 1 倍。这是**固定时间表**,与时区无关地直接按时刻算出来即可,
+// 不需要也不应该靠采样反推 —— 玩家离线期间服务器照此推进,离线外推因此天然准确。
+//
+// 在线行为加成:玩家跑动、挂风场、用孵化宝典会在活动倍率之上**再**加,只在他在线时
+// 发生,由后端按移动包等实时观测(见 pipeline/position.go 的 onMove 与孵化倍率下发)。
+//
+// ⚠️ 不要把两者混成一个数去「测」:2026-09-05 那份 pcap 里静止时差分精确 5.00、
+// 移动时是 16.9~25.8 —— 那不是噪声,是玩家真的在跑。若把移动样本也并进中位数,
+// 得到的数既不是静止倍率也不是移动倍率,离线外推必然错。
+
+// hatchActivityRate 是加速日期间的活动倍率(其余时间为 1)。
+// 500% 来自活动文案「背包孵化精灵速度提升至500%」;早期几期是 100%(即 2 倍),
+// 若游戏改动只需改这里 —— 但**窗口时间表**才是要跟着维护的东西(见 docs/data.md 3.6)。
+const hatchActivityRate = 5.0
+
+// hatchWindowStart / End 是加速日窗口的起止时刻(一天内的秒数):04:00 ~ 04:00。
+const (
+	hatchWindowStart = 4 * 3600
+	hatchWindowEnd   = 4 * 3600
+)
+
+// cstZone 是游戏服务器用的时区(北京时间 UTC+8)。活动窗口按它判定,与抓包主机所在
+// 时区无关 —— 后者可能是 UTC,若按本地时区算会整体偏 8 小时,正好跨过 04:00 边界。
+var cstZone = time.FixedZone("CST", 8*60*60)
+
+// HatchActivityRate 返回 ts(unix 秒)时刻的活动倍率:加速日窗口内 5 倍,否则 1 倍。
+//
+// 窗口 = 北京时间**周五 04:00 ~ 周一 04:00**(周一 04:00 整点结束,即 03:59:59 仍在窗口内)。
+// 判据与 `ACTIVITY_CONF` 里 `activity_type==18` 那几期吻合:2026-08-14(周五)04:00:00
+// ~ 2026-08-17(周一)03:59:59。
+//
+// 时间表**硬编码**而非解包读取:活动 id 每期都变(1800001 → 1800022 → 1800025),
+// 且解包目录并非总是可得;而窗口是稳定的周期规律,两期实测(pcap 都在周六、都测出
+// 5 倍)与用户确认一致。将来若官方改窗口,改本函数的三个常量即可。
+func HatchActivityRate(ts int64) float64 {
+	if ts <= 0 {
+		return 1
+	}
+	t := time.Unix(ts, 0).In(cstZone)
+	sec := t.Hour()*3600 + t.Minute()*60 + t.Second()
+	switch t.Weekday() {
+	case time.Friday:
+		if sec >= hatchWindowStart {
+			return hatchActivityRate // 周五 04:00 起
+		}
+	case time.Saturday, time.Sunday:
+		return hatchActivityRate // 整个周末
+	case time.Monday:
+		if sec < hatchWindowEnd {
+			return hatchActivityRate // 到周一 04:00 为止
+		}
+	}
+	return 1
+}
+
 // Egg 是一颗背包里的精灵蛋(BagItem + egg_data)。
 type Egg struct {
 	Gid        uint32 // 背包物品 gid:蛋的唯一 id(孵化状态里的 egg_gid 即此)
@@ -42,7 +105,7 @@ type Egg struct {
 	Weight      int32  // ÷1000 千克
 	HatchedSec  int32  // 已孵秒数(服务器在 HatchUpdate 时刻算出)
 	MaxSec      int32  // 孵满所需秒数(随机蛋只能靠它,见 3.6)
-	HatchUpdate int32  // last_hatch_update_sec:HatchedSec 的计算时刻
+	HatchUpdate int32  // last_hatch_update_sec:HatchedSec 的计算时刻(落库时被改写,见 ToEggView)
 	StartHatch  int32  // start_hatch_time:放进孵蛋器的时刻;0=不在孵蛋器里
 	Src         int32  // EggAcquireWayType:6=牧场(家园小窝),5=好友赐福,0=其他
 	RandomConf  uint32 // random_egg_conf:随机蛋的外观配置(非 0 即随机蛋)
@@ -328,10 +391,14 @@ type EggView struct {
 	Random     bool   `json:"random,omitempty"`  // 神奇的蛋(物种未知)
 	ObtainedAt int64  `json:"obtainedAt"`        // 获得时间(unix 秒)
 
+	// 跨语言约束(改动前先看 docs/data.md 3.6「差分」一节):
+	// HatchUpdate 不是协议里的 last_hatch_update_sec,而是**抓包主机的观测时刻** ——
+	// store 落库时改写过。前端拿相邻两次采样做差分估孵化倍率,两个时刻必须同源,
+	// 故钟只能有一个。进度为 0 时它也是 0(不留旧时刻,免得外推退化成单点法)。
 	Hatching    bool  `json:"hatching"`              // 在孵蛋器里
 	HatchedSecs int32 `json:"hatchedSecs,omitempty"` // 已孵秒数(HatchUpdate 时刻的快照)
 	MaxSecs     int32 `json:"maxSecs,omitempty"`     // 孵满所需秒数
-	HatchUpdate int64 `json:"hatchUpdate,omitempty"` // 上面那个数的计算时刻(前端据此外推)
+	HatchUpdate int64 `json:"hatchUpdate,omitempty"` // 上面那个数的采样时刻(前端据此外推)
 	StartHatch  int64 `json:"startHatch,omitempty"`  // 放进孵蛋器的时刻
 
 	Parents *EggParents `json:"parents,omitempty"`
@@ -343,6 +410,12 @@ var eggSrcNames = map[int32]string{
 }
 
 // ToEggView 把一颗解析出的蛋结合名称库转成展示模型(不含双亲,双亲由 pipeline 另行推断)。
+//
+// ⚠️ Egg.HatchUpdate 是**服务器**算出 HatchedSec 的时刻,前端拿到的却不是它:
+// store 落库时会把它改写成**抓包主机的观测时刻**(见 store/egg.go 的 UpsertEggs)。
+// 原因是前端估孵化倍率靠「相邻两次采样做差分」Δv/Δt(详见 docs/data.md 3.6),
+// 两次采样的 t 一旦不同源,钟差就直接落进分母 —— 网关与游戏服务器差 60 秒时,
+// 5 倍速会被算成 0.7 再被钳到下限 1。这里保留协议原值只为解析层自洽。
 func ToEggView(e Egg, db *gamedata.DB) *EggView {
 	v := &EggView{
 		Gid: e.Gid, ItemID: e.ItemID, ConfID: e.ConfID,

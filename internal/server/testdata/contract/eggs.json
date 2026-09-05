@@ -17,5 +17,7 @@
       "typeOrder": 100000,
       "weightKg": 1.2
     }
-  ]
+  ],
+  "hatchMoving": false,
+  "hatchRate": 0
 }

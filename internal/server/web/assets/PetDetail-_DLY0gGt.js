@@ -1,0 +1,1 @@
+import{j as s,P as e}from"./index-Cpzr1YMK.js";import{g as o,h as r}from"./vendor-react-BYjT61Vf.js";function m(){const{gid:t}=o(),a=r();return s.jsx(e,{gid:t,onClose:()=>a(-1)})}export{m as default};

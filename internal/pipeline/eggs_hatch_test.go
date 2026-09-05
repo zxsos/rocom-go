@@ -173,6 +173,53 @@ func TestPutEggIntoIncubatorShowsIt(t *testing.T) {
 	}
 }
 
+// TestPutEggKeepsStartHatch 守「刚放入的蛋要带着入孵时刻下发」。
+//
+// 前端给刚放进去的蛋画进度条,靠的是从**入孵时刻**外推:此刻进度是确定的 0,而后端
+// 对「进度为 0」的蛋会把 HatchUpdate 一起清零(见 store/egg.go 的 UpsertEggs),
+// 于是 startHatch 成了唯一可用的起点。它若丢了,这颗蛋就没有进度条也没有预计时间,
+// 玩家得手动重开一次孵蛋器才看得到。
+//
+// 取出(0x0300)时不该残留 —— 那颗蛋 hatching 已是 false,前端不会用它的 startHatch。
+func TestPutEggKeepsStartHatch(t *testing.T) {
+	p, _ := newTestPipeline(t)
+
+	p.handle(msg(gcp.S2C, pet.OpLoginRsp, loginWithHatchBody(1, "测试", nil)))
+	p.handle(msg(gcp.S2C, pet.OpGetBagItemInfoByPageRsp, bagEggPageBody(1, 1, []uint32{4001})))
+
+	// 在背包里点「孵化」
+	p.handle(msg(gcp.S2C, pet.OpUseBagItemRsp, eggActionBody(4001)))
+
+	e := eggViewOf(t, p, 4001)
+	if !e.Hatching {
+		t.Fatalf("前置条件:入孵后 4001 应在孵")
+	}
+	if e.StartHatch == 0 {
+		t.Error("入孵后 startHatch 应有值 —— 进度为 0 时它是前端外推的唯一起点," +
+			"丢了这颗蛋就没有进度条(要手动重开一次孵蛋器才出现)")
+	}
+	// 进度为 0 时采样时刻照例清零(留着旧时刻会让外推退化成被否掉的单点法)
+	if e.HatchUpdate != 0 {
+		t.Errorf("进度为 0 时 HatchUpdate 应为 0,实得 %d", e.HatchUpdate)
+	}
+}
+
+// eggViewOf 读回某颗蛋的完整展示模型(不止 hatching)。
+func eggViewOf(t *testing.T, p *Pipeline, gid uint32) *pet.EggView {
+	t.Helper()
+	eggs, err := p.st.For(testAcc).ListEggs(store.EggFilter{})
+	if err != nil {
+		t.Fatalf("读蛋: %v", err)
+	}
+	for _, e := range eggs {
+		if e.Gid == gid {
+			return e
+		}
+	}
+	t.Fatalf("库里没有 gid %d", gid)
+	return nil
+}
+
 // TestHatchStatusNotClobberByStaleLoginList 权威列表到货后不能被登录那一刻的旧快照冲掉。
 //
 // hatchGids 是登录时记下的孵蛋器占用列表,本意是给「登录包先到、蛋后入库」的时序兜底。
