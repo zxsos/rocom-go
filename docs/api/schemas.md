@@ -546,9 +546,26 @@
              "icon": "egg/5001.webp", "heightM": 0.3, "weightKg": 1.2,
              "obtainedAt": 1700000000, "src": 1, "srcName": "牧场",
              "hatching": true, "hatchedSecs": 600, "maxSecs": 3600,
-             "hatchUpdate": 1700000000, "random": false, "typeOrder": 0 }] }
+             "hatchUpdate": 1700000000, "random": false, "typeOrder": 0 }],
+  "hatchRate": 5 }
 ```
 `hatchUpdate` 是上面三个数的计算时刻，前端据此外推孵化进度。
+
+`hatchRate` 是孵化倍率（每过 1 真实秒推进多少孵化秒），整个响应一份而非逐蛋——
+倍率是全局的，不逐蛋（实测三颗不同 `maxSecs` 的蛋同秒各 +10s，统一 5.00）。
+
+它**按加速日时间表直接算出**，不是估的：每周**北京时间周五 04:00 ~ 周一 04:00**
+窗口内为 `5`，其余时间 `1`（见 `pet.HatchActivityRate`）。服务器在窗口内照此推进，
+**玩家离线期间也一样**，故按时间表算离线外推天然准确——不需要攒样本，也不存在
+「刚打开页面还没校准」的冷启动。
+
+`hatchMoving` 报告玩家此刻是否在移动（后端按移动包 0x0133 判）。移动/挂风场会在
+活动倍率之上**再**加孵化进度，但它随速度与移动方式而变（实测静止 5.00、移动
+16.9~25.8），没有可信定值，故**不进** `hatchRate`、也不用于外推——只作定性提示
+「移动中，实际更快」。拿它外推会虚报「可破壳」。
+
+> ⚠️ 离线回放时 `hatchMoving` **恒为 false**（历史包内时刻与 `time.Now()` 差几小时，
+> 必然超时；语义上也确实无从得知玩家现在在不在动）。详见 `docs/data.md` 3.6。
 
 ### `GET /api/handbook-glasses` ✅
 ```json

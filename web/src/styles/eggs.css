@@ -11,6 +11,21 @@
 .eggs-incu .egg-card, .eggs-incu .egg-slot-empty { flex: 1 1 300px; min-width: 260px; }
 .eggs-bag { min-width: 0; }
 
+/* 孵化加速徽章:「加速中 ×5」。
+   用金色(--gold)而非主色:加速只在「孵蛋加速日」这类活动期间才有,是**值得注意
+   的异常态**而非常态,颜色要与仓库标题那种静信息拉开;同时与全站的极值高亮
+   (.val-hot-hi)同色系,语义一致 —— 都是「这个数不一般」。
+   淡金底 + 金边 + 金字,而不是实心底:实心的 .pill-gold 是给「了不起的天分」那种
+   确定性标签用的,这里只是估算值,视觉上不该那么重。 */
+.incu-boost {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  color: var(--gold); border: 1px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 14%, transparent);
+  white-space: nowrap; cursor: help; font-variant-numeric: tabular-nums;
+}
+
 /* 孵蛋器标题旁的提示图标:比数字(13px)小;深色主题下黑色 svg 反白显示 */
 .incu-tip { position: relative; display: inline-flex; }
 .incu-tip-ic {

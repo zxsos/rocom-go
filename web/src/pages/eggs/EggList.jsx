@@ -6,7 +6,7 @@ import { PetDetailModal } from '../../components/PetDetailModal'
 import { fmtTime, pad2, pctHot, voiceHot } from '../../utils/format'
 import { useInterval } from '../../hooks/useAsyncData'
 import { Marks } from '../../components/badges'
-import { hatchProgress } from './hatch'
+import { hatchProgress, remainRealSecs } from './hatch'
 import { toast } from '../../components/toast'
 
 // 精灵蛋页面:两段垂直 —— 孵蛋器(在孵且进度未满的蛋)、仓库(其余蛋)。不分标签页——在孵的蛋
@@ -35,22 +35,52 @@ const HATCH_SLOTS = 3
 // 这里只规整结尾的重复(中间的「的蛋」是名字本身,不动)。
 const tidyEggName = (name) => (name || '').replace(/的蛋的蛋$/, '的蛋')
 
-// 预计完成时间:按当前估算孵化倍率(见 hatch.js)外推剩余秒数,换算成时间点。
-// 同一天只显时分(手机双列卡片宽度紧张),跨天补「月-日 时:分」;title 里给剩余时长,
-// 并注明是估算(倍率本身是估的)。
+// 预计完成时间:按孵化倍率(后端按加速日时间表给,见 hatch.js)外推剩余时间,换算成时间点。
+//
+// ⚠️ 剩的是**孵化秒**,不是真实秒 —— 必须过 remainRealSecs 除以倍率。
+// 直接拿 maxSecs − p.secs 当秒数,平时(1 倍)恰好对得上,一旦撞上孵蛋加速
+// (5 倍)就会把完成时刻报成 5 倍远:真实还剩 24 分钟的说成 2 小时后。
+// 同一天只显时分(手机双列卡片宽度紧张),跨天补「月-日 时:分」;title 里给剩余时长。
+//
+// 倍率不是估的:加速日是每周五 04:00~周一 04:00 的固定活动,服务器照此推进(离线
+// 也一样),后端按时刻直接算 —— 故这里可以明说「按 ×N 倍率」,不用像早先那样挂
+// 「倍率尚未测出」(那是靠差分估倍率时的说法,已废弃)。
 function etaText(egg, p, now) {
-  const remainSecs = Math.max(0, egg.maxSecs - p.secs)
-  const eta = new Date(now + remainSecs * 1000)
+  const eta = new Date(now + remainRealSecs(egg, p) * 1000)
   const hm = `${pad2(eta.getHours())}:${pad2(eta.getMinutes())}`
   return new Date(now).toDateString() === eta.toDateString()
     ? hm
     : `${eta.getMonth() + 1}-${eta.getDate()} ${hm}`
 }
-function etaTitle(egg, p) {
-  const s = Math.max(0, egg.maxSecs - p.secs)
+function etaTitle(egg, p, moving) {
+  const s = remainRealSecs(egg, p)
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
-  return `按当前孵化倍率估算,约剩 ${h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`}`
+  const dur = h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`
+  const base = `按 ×${rateText(p.rate)} 倍率估算,约剩 ${dur}`
+  // 玩家此刻在移动:进度会比这个数更快,但快多少随速度与移动方式而变(实测静止 5.00
+  // 对移动 16.9~25.8),没有可信的定值,故只作定性提示、不折算进上面的 d(虚报更糟)。
+  return base + (moving ? ' · 移动中,实际更快' : '')
+}
+
+// rateText 把倍率格式化成给人看的样子:整数不带小数(5 倍就是「5」),否则留一位。
+const rateText = (r) => (Number.isInteger(r) ? String(r) : r.toFixed(1))
+
+// Boost 孵化加速徽章。倍率是**全局**的(实测三颗不同 maxSecs 的蛋同秒各 +10s,
+// 见 docs/data.md 3.6),故整个孵蛋器标一处即可,不必逐蛋重复。
+//
+// 倍率是加速日时间表算出来的定值(离线也准),故 rate 必然是 1 或 5 —— 不存在
+// 「估不出来」的中间态,<=1 时(非加速日)直接不画。
+function Boost({ rate, moving }) {
+  if (!(rate > 1)) return null
+  return (
+    <span className="incu-boost" title={
+      `孵蛋加速日:每过 1 真实秒推进 ${rateText(rate)} 个孵化秒` +
+      '(北京时间周五 04:00 ~ 周一 04:00,服务器离线期间同样按此推进)' +
+      (moving ? ' · 你正在移动,进度还会更快' : '')}>
+      加速中 ×{rateText(rate)}
+    </span>
+  )
 }
 
 // 随机蛋「猜猜孵出谁」查询缓存:同一组身高/体重结果相同,按 `height|weight` 为 key 存
@@ -135,16 +165,28 @@ export default function EggList() {
   // 「这颗蛋该不该出现」就是把估算误差放大成数据丢失。它只该影响进度条怎么画。
   const incubating = data.eggs.filter((e) => e.hatching)
   const bag = data.eggs.filter((e) => !e.hatching)
+
+  // 孵化倍率直接取后端那份:它按**加速日时间表**(北京时间周五 04:00 ~ 周一 04:00)
+  // 算出,离线也准,不存在「还没校准」的冷启动。
+  //
+  // 早先这里做的是「对相邻两次进度下发做差分、取跨蛋中位数」,那套已废弃 —— 它把
+  // 活动倍率(固定时间表)与在线加成(移动/风场)混成一个数去测,于是移动时段的
+  // 加速会污染样本、离线那段又完全算不了。详见 hatch.js 文件头与 docs/data.md 3.6。
+  const rate = data.hatchRate || 1
+  // moving 是后端按移动包(0x0133)判的「玩家此刻在移动」。它**不进**倍率与 ETA ——
+  // 移动加成随速度与移动方式而变(静止 5.00 vs 移动 16.9~25.8),没有可信定值,
+  // 折算进去会虚报「可破壳」。只作定性提示。
+  const moving = !!data.hatchMoving
   const slots = HATCH_SLOTS
 
   return (
     <div className="eggs-page">
       <div className="eggs-cols">
-        <IncuTitle n={incubating.length} slots={slots} />
+        <IncuTitle n={incubating.length} slots={slots} rate={rate} moving={moving} />
         {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
         <aside className="eggs-incu">
           {Array.from({ length: slots }, (_, i) => incubating[i]).map((e, i) => (
-            e ? <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />
+            e ? <EggCard key={e.gid} egg={e} now={now} rate={rate} moving={moving} onPet={setDetailGid} />
               : <div key={'s' + i} className="egg-slot-empty">空格子</div>
           ))}
           {/* 全空时给一句解释:光秃秃 3 个空格子,用户分不清是「真没在孵」还是
@@ -179,7 +221,7 @@ export default function EggList() {
             ? <div className="empty">仓库里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
             : (
               <div className="egg-grid">
-                {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} onPet={setDetailGid} />)}
+                {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} rate={rate} moving={moving} onPet={setDetailGid} />)}
               </div>
             )}
         </section>
@@ -191,7 +233,7 @@ export default function EggList() {
 
 // IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
 // 点击弹出半透明气泡,说明在孵口径(后端权威快照)与进度是本地外推的估算。点气泡外关闭。
-function IncuTitle({ n, slots }) {
+function IncuTitle({ n, slots, rate, moving }) {
   const ref = useRef(null)
   const [tip, setTip] = useState(false)
   useEffect(() => {
@@ -203,6 +245,7 @@ function IncuTitle({ n, slots }) {
   return (
     <div className="eggs-col-t">
       孵蛋器 <span className="muted">{n}/{slots}</span>
+      <Boost rate={rate} moving={moving} />
       <span ref={ref} className="incu-tip">
         <img className="incu-tip-ic" src="/ps.svg" alt="?" title="在孵按权威快照判定,进度是本地外推的估算"
           onClick={() => setTip((t) => !t)} draggable={false} />
@@ -217,8 +260,8 @@ function IncuTitle({ n, slots }) {
 //   重量 / 声音 / 高度 / 时间
 //   (在孵才有的进度条)
 //   双亲两行(非家园蛋留占位)
-function EggCard({ egg, now, onPet }) {
-  const p = hatchProgress(egg, now)
+function EggCard({ egg, now, rate, moving, onPet }) {
+  const p = hatchProgress(egg, now, rate)
   const src = egg.srcName ? `来源:${egg.srcName}` : ''
   const name = tidyEggName(egg.name)
   // 随机蛋(神奇的蛋)的「猜猜孵出谁」。
@@ -318,7 +361,7 @@ function EggCard({ egg, now, onPet }) {
         <div className="egg-hatch">
           <div className="egg-bar"><div className="egg-bar-fill" style={{ width: p.pct + '%' }} /></div>
           <span className={p.pct >= 100 ? 'val-hot-hi' : undefined}>{p.pct >= 100 ? '可破壳' : p.pct + '%'}</span>
-          {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p)}>预计 {etaText(egg, p, now)}</span>}
+          {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p, moving)}>预计 {etaText(egg, p, now)}</span>}
         </div>
       )}
 

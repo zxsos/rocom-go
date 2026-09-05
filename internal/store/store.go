@@ -378,6 +378,20 @@ CREATE TABLE IF NOT EXISTS egg_source (
   updated_at INTEGER
 );
 
+-- 孵化倍率(按账号):最近若干次「相邻采样差分」的样本,取中位数即当前倍率估计。
+-- 为什么在后端算而不是前端:前端要差分就得手里有**两次**采样,而它通常只有一次 ——
+-- 玩家打开页面时后端库里只躺着最后一次快照(进度只在开孵蛋器 0x0312 / 开背包 0x1344
+-- 时下发,没有被动推送),于是永远算不出倍率、退回 1 倍,加速日(实测 5 倍)把预计
+-- 完成时间报成 5 倍远。后端回放或实时抓包时**全程看得见**每一次下发,差分随手可得。
+-- 存样本数组而非单个值,是为了取中位数抗跳变:实测 22 个差分里有 19 个精确 5.0,
+-- 却混着 16.9 / 25.8 / 130.0 三个异常(服务器批量补齐),中位数能把它们滤掉。
+-- 详见 docs/data.md 3.6 与 web/src/pages/eggs/hatch.js。
+CREATE TABLE IF NOT EXISTS hatch_rate (
+  account TEXT PRIMARY KEY,
+  samples TEXT NOT NULL,
+  updated_at INTEGER
+);
+
 -- 查蛋 API(第三方图鉴,见 api_egg_query.go)使用统计:每次发起第三方请求记一行,
 -- 管理面板据此看今日消耗/成功率/谁在查。量小(一天几十次),不做清理。
 CREATE TABLE IF NOT EXISTS egg_queries (

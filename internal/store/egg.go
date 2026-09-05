@@ -18,6 +18,10 @@ import (
 // 的入孵时刻都不可信,故 UpsertEggs 只把新行初始为 0、更新时不碰该列;放入(0x0164)、
 // 取出(0x0300)回包一律只当普通变化入库,标记在玩家下次打开孵蛋器(0x0312)时全量收敛。
 // 读取时以列为准覆盖 data 里的推断值(见 ListEggs)。
+//
+// **data 里的 HatchUpdate 一律是「抓包主机的观测时刻」,不是服务器下发的
+// last_hatch_update_sec**(理由见 UpsertEggs 内的注释)。前端拿相邻两次采样做差分
+// 估倍率,两个时刻不同源就没有差分可言 —— 这里是那个约定的唯一落地点。
 
 // UpsertEggs 批量写入/更新蛋(不动 parents 与 first_seen)。
 // now 取**消息时刻**而非 time.Now():离线回放的包时间是几小时前的,与挂钟混用会让
@@ -38,6 +42,24 @@ func (sc *Scoped) UpsertEggs(eggs []*pet.EggView, now int64, knownHatch map[uint
 		// 但 data 是整块 JSON,留着不一致的推断值会在别处(如导出)露出来
 		if knownHatch != nil {
 			e.Hatching = knownHatch[e.Gid]
+		}
+		// HatchUpdate 改记作**抓包主机的观测时刻** now,不采信服务器下发的
+		// last_hatch_update_sec(那是服务器的钟)。
+		//
+		// 前端估倍率靠相邻两次采样的差分 Δv/Δt(见 web/src/pages/eggs/hatch.js),
+		// 两个 t 一旦不同源,钟差就直接落进分母:网关时钟若与游戏服务器差 60 秒,
+		// 相隔 10 秒的两次采样会被算成 70 秒 → 5 倍速算出 0.7,再被钳到下限 1。
+		// 而 0x0312 顶层那份 hatched_secs[] 根本不带时刻,本来也只能配 now ——
+		// 不统一成它,就永远存在「这次是这个钟、下次是那个钟」的组合。
+		// now 是唯一处处可得的钟,统一到它上面差分才成立。
+		//
+		// 只在确有进度时盖:不在孵蛋器里的蛋 hatched_secs 恒为 0,若也给盖上 now,
+		// 前端外推就会退化成被实测否掉的单点法(玩家跑动过后会虚报成 8~9 倍)。
+		// 留 0,前端按「进度未知」处理。
+		if e.HatchedSecs > 0 {
+			e.HatchUpdate = now
+		} else {
+			e.HatchUpdate = 0
 		}
 		data, err := json.Marshal(e)
 		if err != nil {
@@ -66,6 +88,9 @@ func (sc *Scoped) UpsertEggs(eggs []*pet.EggView, now int64, knownHatch map[uint
 	if knownHatch != nil {
 		hatchClause = ", hatching=excluded.hatching"
 	}
+	// 一批下发的几颗蛋共享同一次服务器结算(实测三颗蛋同秒各 +10s),若这次是批量
+	// 补齐的跳变,几颗会一起跳 —— 逐个记进去等于把同一次跳变放大成好几票,故先取
+	// 中位数,整批只贡献一个样本。记失败不影响主流程:倍率只是外推的输入,估不出来
 	return execBatch(sc.db, `
 INSERT INTO eggs(account, gid, item_id, conf_id, name, species,
                  height, weight, height_pct, weight_pct, src, hatching, obtained_at,
@@ -136,8 +161,9 @@ func (sc *Scoped) PruneMissingEggs(keep map[uint32]bool, before int64) error {
 //   - gids 里没有、但列标着在孵的蛋 → 清列与进度(取出/破壳残留的收敛点)
 //   - gids 里的蛋 → 确保列为在孵;skip 里的蛋刚由 ret_info.changes 精确刷新过
 //     (含 last_hatch_update_sec),不再动它们的进度
-//   - secs 与 gids 长度一致时才顺带刷新进度(HatchUpdate 取消息时刻近似;proto3 会省掉
-//     hatched_secs=0 的项,数组对不上时只对账标记)
+//   - secs 与 gids 长度一致时才顺带刷新进度;配的时刻同样取消息时刻(与 UpsertEggs
+//     同一个钟,否则前端的差分就跨钟了);proto3 会省掉 hatched_secs=0 的项,
+//     数组对不上时只对账标记
 //
 // 返回是否有行被改动。
 func (sc *Scoped) ReconcileHatching(gids []uint32, secs []int32, skip map[uint32]bool, now int64) (bool, error) {
@@ -181,6 +207,11 @@ func (sc *Scoped) ReconcileHatching(gids []uint32, secs []int32, skip map[uint32
 			}
 			if sec, ok := secBy[gid]; ok {
 				v.HatchedSecs, v.HatchUpdate = sec, now
+				if sec == 0 {
+					// 进度为 0 时连时刻一起清零(与 UpsertEggs 同一条规矩):留着旧时刻
+					// 配 0 进度,前端会拿 elapsed 去外推,退化成被实测否掉的单点法。
+					v.HatchUpdate = 0
+				}
 			}
 		} else if hatching == 1 {
 			hatching = 0

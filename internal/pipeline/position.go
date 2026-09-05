@@ -167,6 +167,7 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	// 移动包在发 = 自己在操作,访客流该让位(见 riderGap / onVisitorPos)。
 	cs.lastMoveAt = m.Time
 	cs.riderPrevAt = m.Time
+	p.observeHatchMove(acc, mr, m.Time)
 	pos := p.buildPos(acc, res, cs.room, mr, m.Time)
 	// 分层地图:玩家当前所在区域(服务器区域进/出事件维护)命中某层的 area_func_id 即在该层,
 	// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
@@ -182,6 +183,42 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	// 涂地:贴身安全带沿这一段路涂,再把「玩家 ↔ 此刻视野里每只野生宠」的走廊涂上
 	// (见 docs/data.md 3.8)。人一动,同样几只宠的走廊也会扫过新的一片,故每包都涂一次。
 	p.paintSeen(m.Session, acc, res, p.movePath(prev, mr))
+}
+
+// ---- 孵化倍率的在线部分:玩家是否在移动 ----
+//
+// 移动(跑动/飞行)会在活动倍率之上**再**加孵化进度,实测:同一份 pcap 里静止时差分
+// 精确 5.00(即活动倍率),移动时是 16.9~25.8。这是**在线行为**,协议不会告诉你
+// 「现在有几倍」,但它的**前提条件**是能直接观测的:玩家有没有在动。
+//
+// 状态只作**定性**提示(「移动中,进度更快」),ETA 仍按活动倍率算 —— 移动加成随
+// 速度/移动方式(地面跑 vs 飞行)而变,现有样本(2 段)不足以定出一个可信的数,
+// 拿它算 ETA 会虚报。等有了分工况的实测再量化。
+//
+// 这正好与活动倍率互补:活动倍率是**时间表**(离线也准,照它外推),移动加成只在
+// 在线时发生、且随时在变,故只在当下这一刻提示,不进外推。
+
+// hatchMoveTTL 是「多久没收到移动包就算停下了」的时长(读取侧的同值常量见
+// server/api_eggs.go)。移动包最疏是 2.5-3s 一次心跳,故要明显大于 3s;取 10s:
+// 既不会在心跳间隙误判成停下,玩家真停下(客户端会发 stop_move,即使那包丢了也会
+// 在 10s 内自然收敛)、或切后台/断线(不再有移动包)也能及时翻回静止。
+const hatchMoveTTL = 10 * time.Second
+
+// observeHatchMove 收一次移动包,把「最近一次观测到在移动的时刻」推给 server。
+//
+// 推的是**时刻**而非布尔:超时判定留给读取方按当前时间算,这样切后台/断线(移动包
+// 直接停发、不会有 stop 包)也能在 TTL 后自然翻回静止 —— 若推布尔,那次翻转就永远
+// 送不出去,页面会一直挂着「移动中」。
+//
+// 与 SetLastPosition 同款:管线单向告知 server,免得 server 反向依赖 pipeline。
+// 移动包峰值约 8 条/秒,但这里只写一个时间戳,开销可忽略。
+func (p *Pipeline) observeHatchMove(acc string, mr scene.MoveReq, t time.Time) {
+	// 停下:客户端会显式上报 stop_move;速度为零同样算停(站着/站上坐骑不动)。
+	if mr.StopMove || (mr.Speed.X == 0 && mr.Speed.Y == 0 && mr.Speed.Z == 0) {
+		p.srv.SetHatchMoving(acc, time.Time{}) // 零值 = 明确停止,不等 TTL
+		return
+	}
+	p.srv.SetHatchMoving(acc, t)
 }
 
 // riderGap 是判定「客户端已停发移动包」的静默时长。移动包最疏是 2.5-3s 一次心跳(推住摇杆

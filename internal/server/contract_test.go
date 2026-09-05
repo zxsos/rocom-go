@@ -209,8 +209,41 @@ func TestContractStatic(t *testing.T) {
 func TestContractEggsAndGlasses(t *testing.T) {
 	s := newTestServer(t)
 	seedContract(t, s)
-	checkGolden(t, "eggs", get(t, s, "/api/eggs?account="+contractAcc), nil)
+	// hatchRate 与 hatchMoving 随**当前时刻/玩家状态**而变(活动倍率按每周时间表算,
+	// 见 pet.HatchActivityRate),不抹掉的话 golden 会在周五~周日变成另一份、契约测试
+	// 周期性变红。它们本身由 TestHatchRateContract 单独按固定时刻锁定。
+	checkGolden(t, "eggs", get(t, s, "/api/eggs?account="+contractAcc), scrubHatch)
 	checkGolden(t, "handbook-glasses", get(t, s, "/api/handbook-glasses?account="+contractAcc), nil)
+}
+
+// scrubHatch 抹掉孵化倍率相关的两个随时间/状态而变的取值(字段名仍在,键出现与否
+// 本身是契约的一部分)。抹成 0 而非占位符:golden 需保持合法 JSON,才能被
+// docs/api/fields.json 一类的机器消费方直接解析。
+func scrubHatch(s string) string {
+	s = regexp.MustCompile(`"hatchRate": [\d.]+`).ReplaceAllString(s, `"hatchRate": 0`)
+	return regexp.MustCompile(`"hatchMoving": (true|false)`).ReplaceAllString(s, `"hatchMoving": false`)
+}
+
+// TestHatchRateContract 按固定时刻锁定孵化倍率的**取值**(上面的 golden 抹掉了它)。
+//
+// 这是本契约里唯一会随时间变化的字段,而它恰恰是玩家最关心的(加速日 ETA 差 5 倍),
+// 故单独钉:窗口内 5、窗口外 1。时刻写死,不掺 time.Now()。
+func TestHatchRateContract(t *testing.T) {
+	s := newTestServer(t)
+	seedContract(t, s)
+	// 北京时间的周六 12:00 与周二 12:00(见 pet.HatchActivityRate 的窗口定义)
+	sat := time.Date(2026, 9, 5, 12, 0, 0, 0, time.FixedZone("CST", 8*60*60)).Unix()
+	tue := time.Date(2026, 9, 8, 12, 0, 0, 0, time.FixedZone("CST", 8*60*60)).Unix()
+	if got := pet.HatchActivityRate(sat); got != 5 {
+		t.Errorf("周六 12:00(加速窗口内)倍率 = %v,期望 5", got)
+	}
+	if got := pet.HatchActivityRate(tue); got != 1 {
+		t.Errorf("周二 12:00(窗口外)倍率 = %v,期望 1", got)
+	}
+	// 移动标记:未观测到移动时为 false
+	if s.isHatchMoving(contractAcc) {
+		t.Error("未收到移动包时 hatchMoving 应为 false")
+	}
 }
 
 // —— 实时快照:四个 map[string]any payload,本次重构最易改坏的地方 ——
