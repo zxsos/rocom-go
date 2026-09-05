@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { getMerchantSub, setMerchantSub, delMerchantSub } from '../../api'
 import { AccountContext } from '../../context'
 import { maskEmail } from '../../utils/format'
+import { IconBell, IconMail } from '../../components/svg'
 import { SUB_PRESETS, normKws } from './format'
 
 // SubCard 新货邮件提醒订阅:填任意邮箱(可选关键词,空=全部),每轮新货上架后后端发邮件。
@@ -81,7 +82,7 @@ export default function SubCard() {
   return (
     <div className="merchant-sub">
       <div className="merchant-sub-head">
-        <span className="merchant-sub-title">🔔 新货邮件提醒</span>
+        <span className="merchant-sub-title"><IconBell size={14} />新货邮件提醒</span>
         {cfg && cfg.configured && cfg.subscribed && <span className="merchant-sub-badge">已订阅</span>}
         {cfg && !cfg.configured && <span className="merchant-sub-warn">服务端未配置发信邮箱,不可用</span>}
         {cfg && cfg.configured && cfg.subscribed && (
@@ -92,7 +93,7 @@ export default function SubCard() {
       </div>
       {collapsed && cfg && cfg.subscribed ? (
         <div className="merchant-sub-fold">
-          <span className="merchant-sub-fold-mail" title={email}>📮 {maskEmail(email)}</span>
+          <span className="merchant-sub-fold-mail" title={email}><IconMail size={13} />{maskEmail(email)}</span>
           <span className="merchant-sub-fold-kw">{kws.trim() ? '关键词:' + kws.trim() : '提醒全部新货'}</span>
         </div>
       ) : (

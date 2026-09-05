@@ -2,7 +2,8 @@ import React from 'react'
 import { imgURL, useImgFallback, useImgReady, InlineIcon } from '../../components/icons'
 import { Types, Marks, Gender, Blood, PetMark } from '../../components/badges'
 import { SixGrid, Measure } from './metrics'
-import { locTag, voiceHot, fmtShortTime } from '../../utils/format'
+import { voiceHot, fmtShortTime } from '../../utils/format'
+import LocTag from '../../components/LocTag'
 
 // PetCard 陈列视图里的一张宠物卡。与旧版移动卡片(PetCards.jsx)的区别不是"换个皮":
 //
@@ -127,7 +128,7 @@ export default function PetCard({ p, selected, itemProps }) {
 
         <div className="pt-foot">
           <span className="pt-voice">声 <b className={voiceHot(p.voice)}>{p.voice}</b></span>
-          <span className="pt-loc" title={locTag(p)}>{locTag(p)}</span>
+          <LocTag pet={p} />
           <span className="pt-time muted">{fmtShortTime(p.catchTime)}</span>
         </div>
       </div>

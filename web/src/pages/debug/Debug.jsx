@@ -5,6 +5,7 @@ import { useStoredJSON } from '../../hooks/useStoredState'
 import { fmtClock } from '../../utils/format'
 import { copyText } from '../../utils/clipboard'
 import { Highlight } from '../../components/Highlight'
+import { IconCopy, IconCheck } from '../../components/svg'
 
 // 默认忽略高频且无分析价值的场景 NPC 位置同步(每秒多条,会淹没事件流)。
 // localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
@@ -184,9 +185,9 @@ export default function Debug() {
                           <span className="muted">{open.hex.length / 2}B</span>
                           <span style={{ flex: 1 }} />
                           <button className="btn-dbg-copy" disabled={open.loading} title="复制解析结果"
-                            onClick={() => doCopy('text', open.text)}>{copied === 'text' ? '已复制 ✓' : '📋 复制解析'}</button>
+                            onClick={() => doCopy('text', open.text)}>{copied === 'text' ? <><IconCheck size={13} />已复制</> : <><IconCopy size={13} />复制解析</>}</button>
                           <button className="btn-dbg-copy" disabled={open.loading} title="复制原始 hex"
-                            onClick={() => doCopy('hex', open.hex)}>{copied === 'hex' ? '已复制 ✓' : '📋 复制 hex'}</button>
+                            onClick={() => doCopy('hex', open.hex)}>{copied === 'hex' ? <><IconCheck size={13} />已复制</> : <><IconCopy size={13} />复制 hex</>}</button>
                         </div>
                         {open.loading ? <div className="muted">解析中…</div>
                           : <pre className="dbg-tree"><Highlight text={open.text} query={filter} /></pre>}

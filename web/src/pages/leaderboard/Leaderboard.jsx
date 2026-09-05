@@ -4,12 +4,15 @@ import { getLeaderboard, setAccountRank } from '../../api'
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData'
 import { TweenNumber } from '../../components/TweenNumber'
 import { SkeletonRows } from '../../components/Skeleton'
+import { IconCoin, IconCrown, IconTrophy, IconMedal, IconTrendUp, IconTrendDown } from '../../components/svg'
 
-// 称号展示配置:大富翁👑 / 赚钱王💹 / 败家子💸(每晚 00:05 结算,当天佩戴一天)
+// 称号展示配置(每晚 00:05 结算,当天佩戴一天)。
+// icon 存**组件**而非 emoji:emoji 不响应 currentColor,主题切换时不跟着变色,
+// 且三家系统字形不同。图标色由 .rank-title 的 CSS 按 cls 给。
 const TITLES = [
-  { key: '大富翁', icon: '👑', cls: 'rich', desc: '昨日结束时洛克贝最多' },
-  { key: '赚钱王', icon: '💹', cls: 'earner', desc: '昨日净赚最多' },
-  { key: '败家子', icon: '💸', cls: 'spender', desc: '昨日净亏最多' },
+  { key: '大富翁', icon: IconCrown, cls: 'rich', desc: '昨日结束时洛克贝最多' },
+  { key: '赚钱王', icon: IconTrendUp, cls: 'earner', desc: '昨日净赚最多' },
+  { key: '败家子', icon: IconTrendDown, cls: 'spender', desc: '昨日净亏最多' },
 ]
 
 const fmt = (n) => (n == null ? '—' : n.toLocaleString('zh-CN'))
@@ -21,7 +24,10 @@ const isMe = (a, account) => a.account === account
 
 // 排行榜行:前三名奖牌,当前账号高亮;称号徽标(若有)
 function RankRow({ entry, rank, account, mode }) {
-  const medal = rank <= 3 ? <span className="rank-medal">{[null, '🥇', '🥈', '🥉'][rank]}</span> : <span className="rank-no">{rank}</span>
+  // 前三名用奖牌图标,名次色由 .rank-medal 按名次给(金银铜),图标本身走 currentColor
+  const medal = rank <= 3
+    ? <span className={`rank-medal r${rank}`}><IconMedal size={15} /></span>
+    : <span className="rank-no">{rank}</span>
   const mine = isMe(entry, account)
   return (
     <div className={`rank-row${mine ? ' is-me' : ''}${entry.hasCoins ? '' : ' is-unknown'}`}>
@@ -34,7 +40,7 @@ function RankRow({ entry, rank, account, mode }) {
       {mode === 'forbes' ? (
         <span className="rank-num">
           {entry.hasCoins
-            ? <span className="rank-coins">🪙 <TweenNumber value={entry.coins} format={fmt} /></span>
+            ? <span className="rank-coins"><IconCoin size={14} /><TweenNumber value={entry.coins} format={fmt} /></span>
             : <span className="rank-unknown">待同步</span>}
         </span>
       ) : (
@@ -90,7 +96,7 @@ export default function Leaderboard() {
   return (
     <div className="panel rank-page">
       <div className="panel-head rank-head">
-        <h2>🏆 排行榜</h2>
+        <h2 className="rank-h2"><IconTrophy size={19} />排行榜</h2>
         <div className="rank-head-right">
           <span className="rank-settle-note">每晚 00:05 结算 · 称号佩戴一天</span>
           <button className="btn small ghost" disabled={loading} onClick={refresh}>刷新</button>
@@ -103,7 +109,7 @@ export default function Leaderboard() {
           const w = titles.find((x) => x.title === t.key)
           return (
             <div key={t.key} className={`rank-title-card ${t.cls}${w ? '' : ' pending'}`}>
-              <span className="rank-title-icon">{t.icon}</span>
+              <span className="rank-title-icon">{React.createElement(t.icon, { size: 20 })}</span>
               <div className="rank-title-body">
                 <div className="rank-title-key">{t.key}</div>
                 <div className="rank-title-who">

@@ -91,6 +91,7 @@ export default [
       'scripts/verify-pet-card-size.mjs', // 陈列卡图片不放大/不溢出、四角徽标不重叠不截断
       'scripts/verify-pet-toggles.mjs', // 筛选面板按键开关(整块命中区、原生语义保留)
       'scripts/verify-slider.mjs', // 双滑块(钳制/叠放/变焦刻度)—— 回调体里用 document
+      'scripts/verify-pager-dropdown.mjs', // 移动端分页档位下拉不被底栏遮挡(翻转)
     ],
     languageOptions: {
       ecmaVersion: 'latest',

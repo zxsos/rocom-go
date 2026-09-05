@@ -20,14 +20,27 @@ export function teamLabel(team) {
   return `${team.teamIdx + 1}-${team.pos + 1}`
 }
 
+// locKind 返回宠物位置的类型:'box' | 'world' | 'pending'。
+// 位置图标由调用方据此渲染 SVG —— 原先这里直接返回带 emoji 的字符串
+// (📦/🌍/⏳),而 emoji 不响应 currentColor:主题切换时周围文字与图标
+// 都变了色,只有它纹丝不动。图标与文案拆开后,各处可自己决定怎么画。
+export function locKind(pet) {
+  if (pet?.box) return 'box'
+  if (pet?.team) return 'world'
+  return 'pending'
+}
+
 // locTag 返回宠物位置的【简化文案】(单一权威格式):
-// 盒子 📦盒号-盒名 排-格 / 大世界 🌍大世界 队-位 / 尚未落位 ⏳位置待同步。
+// 盒子 盒号-盒名 排-格 / 大世界 队-位 / 尚未落位 位置待同步。
 // 盒位/队位均缺失多为刚捕捉、登录快照之后新增的宠物:游戏「打开盒子」不重传布局,
 // 位置要等下次登录 / 挪格 / 整理才会经流量落库,故标「位置待同步」而非留空。
+//
+// ⚠️ 只返回**文案**,不含图标 —— 图标请用 locKind + 对应的 SVG 组件。
+// 纯文本场合(如 title 属性、复制到剪贴板)直接用它即可。
 export function locTag(pet) {
-  if (pet?.box) return `📦${boxLabel(pet.box)}`
-  if (pet?.team) return `🌍大世界 ${teamLabel(pet.team)}`
-  return '⏳位置待同步'
+  if (pet?.box) return boxLabel(pet.box)
+  if (pet?.team) return `大世界 ${teamLabel(pet.team)}`
+  return '位置待同步'
 }
 
 // pad2 补零到两位(时间字段的通用补位,各页自用一份的都收到这里)。

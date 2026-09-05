@@ -16,7 +16,12 @@
 .rank-title-card.rich   { border-color: rgba(var(--c-wealth-rgb), .5);  background: linear-gradient(135deg, rgba(var(--c-wealth-rgb), .14), var(--bg-1) 55%); }
 .rank-title-card.earner { border-color: rgba(var(--c-earn-rgb), .45);  background: linear-gradient(135deg, rgba(var(--c-earn-rgb), .12), var(--bg-1) 55%); }
 .rank-title-card.spender{ border-color: rgba(var(--c-spend-rgb), .45);  background: linear-gradient(135deg, rgba(var(--c-spend-rgb), .12), var(--bg-1) 55%); }
-.rank-title-icon { font-size: 26px; line-height: 1; }
+/* 称号卡的大图标:原先是 26px 的 emoji,换成 SVG 后由组件给 size=20。
+   用 flex 居中而非 line-height:图标与文字的基线本就不对齐,靠 flex 才稳。 */
+.rank-title-icon { display: flex; align-items: center; justify-content: center; line-height: 0; }
+.rank-title-card.rich .rank-title-icon { color: var(--c-wealth); }
+.rank-title-card.earner .rank-title-icon { color: var(--c-earn); }
+.rank-title-card.spender .rank-title-icon { color: var(--c-spend); }
 .rank-title-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rank-title-key { font-weight: 800; font-size: 15px; }
 .rank-title-card.rich .rank-title-key { color: var(--c-wealth); }
@@ -61,7 +66,13 @@
 .rank-row.is-me { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent), var(--shadow-sm); }
 .rank-row.is-unknown { opacity: .65; }
 .rank-pos { flex: none; width: 44px; text-align: center; }
-.rank-medal { font-size: 20px; }
+/* 前三名奖牌:图标走 currentColor,金银铜由名次给色 ——
+   原先是 🥇🥈🥉 三个 emoji,颜色写死在各家系统的字形里,改不了也统一不了。
+   SVG 化后名次色与 .rank-title 那套语义色同源,且能随主题微调。 */
+.rank-medal { display: inline-flex; align-items: center; justify-content: center; }
+.rank-medal.r1 { color: #ffc93c; } /* 金:比 --c-medal 更亮,前三名要跳出来 */
+.rank-medal.r2 { color: #c8ccd4; } /* 银 */
+.rank-medal.r3 { color: #cd8b52; } /* 铜 */
 .rank-no { font-weight: 700; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
 .rank-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
 .rank-uname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -84,7 +95,10 @@
 /* 字重由 800 降到 700:子集里只有 700 一个字重,写 800 浏览器会做**合成加粗**
    (把轮廓描粗一圈),比真 700 更糊也更胖。字号保持 15px 不动 —— 换字体后字面
    大小会变,但那属于观感微调,不该在这里凭猜测改。 */
-.rank-coins { font-weight: 700; font-size: 15px; color: var(--gold, #e0a83c); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.rank-coins { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 15px; color: var(--gold, #e0a83c); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+/* 标题行的奖杯图标:与 h2 文字居中对齐,并给一点右间距 */
+.rank-h2 { display: flex; align-items: center; gap: 8px; }
+.rank-h2 > svg { color: var(--c-wealth); flex: none; }
 .rank-profit { font-weight: 700; font-size: 15px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .rank-profit.pos { color: var(--c-earn); }
 .rank-profit.neg { color: var(--c-spend); }

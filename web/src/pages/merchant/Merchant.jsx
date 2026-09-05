@@ -4,6 +4,7 @@ import { AccountContext } from '../../context'
 import RankTitle from '../../components/RankTitle'
 import { confirmDialog } from '../../components/confirm'
 import { Skeleton, SkeletonRows } from '../../components/Skeleton'
+import { IconCoin, IconTrophy, IconHourglass } from '../../components/svg'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { STATUS, count, unwrap } from './format'
 import { RoundSteps, MerchantTurn } from './components'
@@ -109,23 +110,23 @@ export default function Merchant() {
           </div>
           <div className="merchant-hero-side">
             {coins !== null ? (
-              <span className="merchant-coins" title={`${account || '当前'} 洛克贝(每次登录游戏时同步)`}>🪙 {coins.toLocaleString()}</span>
+              <span className="merchant-coins" title={`${account || '当前'} 洛克贝(每次登录游戏时同步)`}><IconCoin size={15} />{coins.toLocaleString()}</span>
             ) : (
-              <span className="merchant-coins merchant-coins-unk" title={`${account || '当前'} 洛克贝尚未同步,请重新登录游戏后刷新`}>🪙 待同步</span>
+              <span className="merchant-coins merchant-coins-unk" title={`${account || '当前'} 洛克贝尚未同步,请重新登录游戏后刷新`}><IconCoin size={15} />待同步</span>
             )}
             <RankTitle title={title} />
             {curAcc && (
               <button type="button" className={`merchant-rank-btn${join ? ' joined' : ''}`}
                 onClick={toggleRank} disabled={busyRank}
                 title={join ? '已参加排行榜,点击退出' : '未参加排行榜,点击参加(默认参加)'}>
-                {join ? '🏆 已参加' : '🏆 参加'}
+                {join ? <><IconTrophy size={14} />已参加</> : <><IconTrophy size={14} />参加</>}
               </button>
             )}
             {rankErr && <span className="merchant-rank-err">{rankErr}</span>}
             <span className={`merchant-status merchant-status-${st.cls}`}>{st.text}</span>
             <span className="merchant-day">{dayText}</span>
             {m && m.round && m.round.countdown && (
-              <span className="merchant-countdown" title="距本轮结束">⏳ {m.round.countdown}</span>
+              <span className="merchant-countdown" title="距本轮结束"><IconHourglass size={13} />{m.round.countdown}</span>
             )}
           </div>
         </div>

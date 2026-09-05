@@ -25,6 +25,13 @@
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
+/* 向上翻转(下方空间不足,由 useDropdown 的 up 决定,见该 hook 的注释)。
+   阴影方向也跟着翻:光从上方来是项目的统一设定(见 .tabgroup-pop 的 0 -8px),
+   朝上展开的菜单若仍投向下的影子,看起来会像是「陷进去」而不是「浮起来」。 */
+.dropdown.up > .dropdown-menu {
+  top: auto; bottom: calc(100% + 4px);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, .35);
+}
 .dropdown-item {
   display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
   cursor: pointer; user-select: none;

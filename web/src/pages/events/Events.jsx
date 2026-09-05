@@ -9,7 +9,9 @@ import { Avatar } from '../../components/avatar'
 import { Marks, Blood, Gender } from '../../components/badges'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { TweenNumber } from '../../components/TweenNumber'
-import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
+import { fmtTime, voiceHot, pctHot } from '../../utils/format'
+import LocTag from '../../components/LocTag'
+import { IconTrash } from '../../components/svg'
 import { chime, rareChime } from '../../utils/audio'
 import { sanitizeRules, isHighlight, matchedRules, NOTABLE_BLOODS, SUB_KINDS } from './highlight'
 import RulePanel from './RulePanel'
@@ -174,7 +176,7 @@ export default function Events() {
             : <button className="btn btn-icon" disabled title="当前非 HTTPS/localhost 环境,浏览器不提供屏幕常亮">☀</button>}
           <button className={'btn btn-icon' + (soundOn ? ' primary' : '')} onClick={() => setSoundOn((v) => !v)}
             title="规则命中提示音,新捕获命中高亮规则时响铃(异色/炫彩响升级音)">{soundOn ? '🔊' : '🔈'}</button>
-          <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史">🗑</button>
+          <button className="btn btn-icon" disabled={events.length === 0} onClick={clearAll} title="清空事件历史"><IconTrash size={15} /></button>
         </div>
         {/* 来源筛选:获得方式由 catch_way 推断(捕捉/孵蛋/赠送获得/获得)。
             此前列表里完全看不出来源,只能点开详情 —— 混在一起时想单看「这波孵了几只」
@@ -319,7 +321,7 @@ function EventItem({ ev, seq, hl, hits = [], onOpen }) {
           {p?.speciality && p.speciality !== '无' ? ` · ${p.speciality}` : ''}
           {' · W '}<span className={pctHot(p?.weightPct)}>{p?.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'}</span>
           {' · V '}<span className={voiceHot(p?.voice)}>{p?.voice ?? '-'}</span>
-          {' · '}{locTag(p)}
+          {' · '}<LocTag pet={p} className="" />
         </div>
       </div>
     </div>

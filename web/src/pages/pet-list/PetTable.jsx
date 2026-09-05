@@ -3,7 +3,8 @@ import { Avatar } from '../../components/avatar'
 import { Types, Marks, Gender, Form, Blood, EggGroups } from '../../components/badges'
 import { StatRange } from '../../components/stats'
 import { SixBars } from './metrics'
-import { locTag, fmtTime, voiceHot, pctHot } from '../../utils/format'
+import { fmtTime, voiceHot, pctHot } from '../../utils/format'
+import LocTag from '../../components/LocTag'
 
 // PetTable 紧凑表格(陈列视图之外的第二视图,由 PetList 的视图开关切换)。
 // itemProps(p) 由父级注入行交互(单击选中/双击详情/右键长按菜单)。
@@ -64,7 +65,7 @@ export default function PetTable({ pets, selected, sort, order, onSort, itemProp
                     <div className="pet-name">
                       {p.name || p.species}<Gender g={p.gender} /><Marks p={p} /><Blood p={p} iconOnly /><Form form={p.form} /><EggGroups groups={p.eggGroups} />
                     </div>
-                    <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · #${p.book}` : ''} · {locTag(p)}</div>
+                    <div className="pet-sub">{p.species} · Lv.{p.level}{p.book ? ` · #${p.book}` : ''} · <LocTag pet={p} className="" /></div>
                   </div>
                 </div>
               </td>
