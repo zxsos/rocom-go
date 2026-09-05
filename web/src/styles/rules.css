@@ -41,15 +41,17 @@
 .rrule-mini {
   flex: none; width: 20px; height: 20px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; line-height: 1; color: var(--fg-dim);
-  background: transparent; border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12px; line-height: 1;
+  /* 关闭态:中性灰(见 base.css 的 --sw-off-* 注释),与 .on 的蓝拉开色相距离 */
+  color: var(--sw-off-fg);
+  background: var(--sw-off-bg); border: 1px solid var(--sw-off-line); border-radius: 6px;
   cursor: pointer; transition: all .12s var(--ease-out);
 }
 /* hover 改中性:原写 --accent,与 .rrule-mini.on 撞色(只差一层 0.14 的底色),
    取消勾选后鼠标悬停时看不出已关。主色留给选中态专属,理据见 panel.css 的
    .toggle:hover 注释。同样包进 @media(hover:hover) 防触摸设备粘滞。 */
 @media (hover: hover) {
-  .rrule-mini:hover { border-color: var(--fg-dim); color: var(--fg); }
+  .rrule-mini:hover { border-color: var(--sw-off-line-hi); color: var(--sw-off-fg-hi); background: var(--sw-off-bg-hi); }
   /* 选中 + 悬停:保住主色(与 .toggle.on:hover 同口径) */
   .rrule-mini.on:hover { border-color: var(--accent); color: var(--accent); }
 }

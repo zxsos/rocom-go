@@ -50,11 +50,13 @@
    这些开关常有多个同时选中(如奖牌特征可 4 个全开),实心会把面板糊成
    一片主色、抢走系别与性格方阵的注意力;淡底在多选时仍清晰可辨且不喧宾夺主。
    这与 .viewseg-b.on(视图开关选中)完全同色,即项目里「开关型选中」的统一语言。 */
+/* 关闭态用 --sw-off-* 中性灰(见 base.css 该组变量的注释):
+   与 .on 的蓝是**色相级**的差别,不只是深浅 —— 扫视时不用比对就能分。 */
 .toggle {
   position: relative; display: inline-flex; align-items: center;
   min-height: 32px; padding: 0 12px;
-  border-radius: 999px; border: 1px solid var(--line);
-  background: var(--bg-2); color: var(--fg-dim);
+  border-radius: 999px; border: 1px solid var(--sw-off-line);
+  background: var(--sw-off-bg); color: var(--sw-off-fg);
   font-size: 13px; cursor: pointer; user-select: none;
   transition: border-color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
@@ -89,7 +91,10 @@
  * 到点别处),带主色的 hover 在手机上就会让「刚取消」的按键一直显示蓝边 ——
  * 这正是本问题的移动端版本。与 .pet-card:hover 同口径。 */
 @media (hover: hover) {
-  .toggle:hover { border-color: var(--fg-dim); color: var(--fg); background: var(--bg-3); }
+  .toggle:hover {
+    border-color: var(--sw-off-line-hi); color: var(--sw-off-fg-hi);
+    background: var(--sw-off-bg-hi);
+  }
   /* 选中 + 悬停:保住主色语义,只把底再压深一档表示"可点"。
      必须显式写 —— 它与 .toggle:hover 特异性相同,只靠源码顺序太脆,
      一旦有人调整规则顺序,「开着悬停」就会静默变成中性灰。 */

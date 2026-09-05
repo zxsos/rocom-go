@@ -128,16 +128,35 @@ for (const [name, sel] of CASES) {
     if (!m) return false
     return Math.abs(+m[1] - ar) < 12 && Math.abs(+m[2] - ag) < 12 && Math.abs(+m[3] - ab) < 12
   }
-  // 关闭态:边框与字色都不得是主色(阴影里的蓝晕同样会让人误读)
+  // 彩度 = RGB 极差。关闭态必须是**灰**(≈0),而不是"任何不是主色的颜色"。
+  //
+  // 只判"不含主色"太松 —— 浅蓝、青灰都能过,而那正是「一点也不明显」的来源:
+  // 旧代码用带蓝调的 --line(#2a3240,极差 22)/ --fg-dim(#9aa7b4,极差 26),
+  // 严格说也不是主色,却仍偏蓝,与 .on 的蓝边拉不开距离。
+  //
+  // 只判边框与字:map-btn 的底是半透明磨砂,混色后不具可比性。
+  const chroma = (c) => {
+    const m = c.match(/(\d+),\s*(\d+),\s*(\d+)/)
+    if (!m) return 0
+    const [r, g, b] = [+m[1], +m[2], +m[3]]
+    return Math.max(r, g, b) - Math.min(r, g, b)
+  }
+  const offChroma = Math.max(chroma(r.border), chroma(r.color))
+  // 阈值 18 —— 实测卡在新旧之间:
+  //   新 --sw-off-* 最大 17(亮色 --sw-off-fg #8b939c)
+  //   旧 --line/--fg-dim/--bg-2 最小 20(#1c2230)  主色则高达 179
+  const GRAY = 18
   const bluish = !r.on && (isAccent(r.border) || isAccent(r.color) || /76,\s*141,\s*255/.test(r.shadow))
-  if (bluish) bad++
+  const notGray = !r.on && offChroma > GRAY
+  if (bluish || notGray) bad++
   console.log(
     `${name.padEnd(11)} on=${String(r.on).padEnd(5)} hover=${r.hovered ? 'Y' : 'N'}  `
-    + `border=${r.border.padEnd(20)} color=${r.color.padEnd(20)} ${bluish ? '✗ 关闭态仍带主色' : '✓'}`,
+    + `border=${r.border.padEnd(20)} color=${r.color.padEnd(20)} 彩度=${String(offChroma).padStart(3)}  `
+    + `${bluish ? '✗ 关闭态仍带主色' : notGray ? `✗ 关闭态不够灰(彩度 ${offChroma} > ${GRAY})` : '✓'}`,
   )
 }
 
 await browser.close()
 rmSync(TMP, { recursive: true, force: true })
-console.log(bad ? `\n✗ ${bad} 个开关在关闭态显示主色` : '\n✓ 关闭态均无主色 —— 蓝只表示选中')
+console.log(bad ? `\n✗ ${bad} 个开关的关闭态不够"熄灭"(带主色或不够灰)` : '\n✓ 关闭态均为中性灰 —— 蓝只表示选中')
 process.exit(bad ? 1 : 0)
