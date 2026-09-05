@@ -578,7 +578,7 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
   font-size: 11px; color: var(--fg-dim);
 }
 .natmat-toggle:hover { color: var(--accent); }
-.natmat-caret { transition: transform var(--dur-fast) var(--ease-out); }
+.natmat-caret { display: inline-flex; align-items: center; transition: transform var(--dur-fast) var(--ease-out); }
 .natmat-caret.up { transform: rotate(180deg); }
 
 /* 方阵本体 */

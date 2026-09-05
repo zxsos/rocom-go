@@ -3,6 +3,7 @@ import {
   RANGE_DIMS, DIM_BY_K, RULE_PALETTE, RULE_PRESETS, RULE_SCHEMES,
   DEFAULT_RANGE_RULES, newRuleId, rangeRuleLabel, clampRange, rangeScale, sliderTop,
 } from '../utils/rules'
+import { IconCheck } from './svg'
 
 // RangeRules 体重/声音区间规则的编辑器(事件页与大地图共用同一份规则,见 hooks/useRangeRules)。
 //
@@ -151,7 +152,7 @@ export default function RangeRules({ rules = [], setRules, counts }) {
                 onClick={() => patch(rule.id, { on: !rule.on })}
                 title={rule.on ? '停用这条规则(保留配置)' : '启用这条规则'}
                 aria-label={rule.on ? '停用' : '启用'} aria-pressed={rule.on}
-              >{rule.on ? '✓' : ''}</button>
+              >{rule.on ? <IconCheck size={12} /> : ''}</button>
               <button
                 className="rrule-mini danger" onClick={() => remove(rule.id)}
                 title="删除这条规则" aria-label="删除"

@@ -92,6 +92,7 @@ export default [
       'scripts/verify-pet-toggles.mjs', // 筛选面板按键开关(整块命中区、原生语义保留)
       'scripts/verify-slider.mjs', // 双滑块(钳制/叠放/变焦刻度)—— 回调体里用 document
       'scripts/verify-pager-dropdown.mjs', // 移动端分页档位下拉不被底栏遮挡(翻转)
+      'scripts/verify-toggle-off-state.mjs', // 开关关闭态不得带主色(hover 不得与选中撞色)
     ],
     languageOptions: {
       ecmaVersion: 'latest',

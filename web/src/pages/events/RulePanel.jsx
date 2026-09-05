@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { getNameOptions } from '../../api'
 import { HOT_NATURE_NAMES } from '../../constants'
 import { FIELDS, GENDER_OPTS } from './highlight'
+import { IconClose } from '../../components/svg'
+
 import RangeRules from '../../components/RangeRules'
 
 // RulePanel 高亮规则侧栏:桌面常驻左栏,移动端为抽屉(collapsed 控制开合)。
@@ -50,7 +52,7 @@ export default function RulePanel({
             <button className={'btn small' + (mode === 'and' ? ' primary' : '')} onClick={() => setMode('and')}>AND</button>
             <button className={'btn small' + (mode === 'or' ? ' primary' : '')} onClick={() => setMode('or')}>OR</button>
           </div>
-          <button className="icon-btn rules-close" onClick={onClose} aria-label="关闭规则">✕</button>
+          <button className="icon-btn rules-close" onClick={onClose} aria-label="关闭规则"><IconClose size={16} /></button>
         </div>
         <div className="rule-logic">
           <span className="muted small" title="AND:各维度都要命中(同维度内任一条目即可)。OR:任一条目命中即可。体重/声音按区间判定,与大地图共用同一套规则。异色/炫彩始终高亮。">
@@ -80,7 +82,7 @@ export default function RulePanel({
                   {speciesRules.length > 0 && (
                     <div className="chips">
                       {speciesRules.map((r) => (
-                        <span key={r.value} className="chip on" onClick={() => toggleRule('species', r.value)}>{r.value} ✕</span>
+                        <span key={r.value} className="chip on" onClick={() => toggleRule('species', r.value)}>{r.value} <IconClose size={11} className="chip-x" /></span>
                       ))}
                     </div>
                   )}

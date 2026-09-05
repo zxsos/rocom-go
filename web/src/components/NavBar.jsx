@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { NAV } from '../data/nav'
 import { useOutsideClick } from '../hooks/useDropdown'
+import { IconChevronDown } from './svg'
 
 // 双击当前激活的导航项:平滑滚动回页面顶部(非激活项照常跳转,不滚动)。
 // 只是个工厂函数(不调任何 hook),故不用 use 前缀。
@@ -68,7 +69,7 @@ export function TopNav() {
             <button type="button" className="navgroup-btn" title={n.label} aria-haspopup="true">
               <span className="nav-icon"><n.icon size={18} /></span>
               <span className="nav-label">{n.label}</span>
-              <span className="navgroup-arrow">▾</span>
+              <span className="navgroup-arrow"><IconChevronDown size={11} /></span>
             </button>
             <div className="navgroup-pop">
               {n.children.map((c) => (

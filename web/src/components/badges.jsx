@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { IconsContext } from '../context'
 import { imgURL, useImgFallback, InlineIcon } from './icons'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
+import { IconClose } from './svg'
 
 // 宠物名称行内的各种小徽标(性别/异色炫彩/血脉/形态/蛋组/系别/搭档标记)。
 
@@ -110,7 +111,7 @@ function GlassZoom({ p, type, value, onClose }) {
     >
       <div className="glass-zoom">
         {body}
-        <button className="icon-btn glass-zoom-close" onClick={(e) => { stop(e); onClose() }} title="关闭" aria-label="关闭">✕</button>
+        <button className="icon-btn glass-zoom-close" onClick={(e) => { stop(e); onClose() }} title="关闭" aria-label="关闭"><IconClose size={16} /></button>
         {/* rkpet 链接放在**放大预览里**而不是色卡本身上:色卡那一下点击是本地放大
             (本工具原有交互),叠一个跳转会打架;收进预览里两级分离,也不会误触外链。
             只是个普通 <a>,不点不会有任何外部请求(本项目是局域网工具,断网照常用)。 */}

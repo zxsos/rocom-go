@@ -3,7 +3,7 @@ import { IconsContext } from '../../context'
 import { ALL_TYPES, ALL_EGG_GROUPS } from '../../constants'
 import { InlineIcon } from '../../components/icons'
 import { Gender } from '../../components/badges'
-import { IconRefresh } from '../../components/svg'
+import { IconClose, IconRefresh } from '../../components/svg'
 import { CATCH_RANGES, countPicked } from './filters'
 import NatureMatrix from './NatureMatrix'
 import Dropdown from '../../components/Dropdown'
@@ -30,7 +30,7 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
         {/* 抽屉标题栏(仅移动端显示):关闭入口与打开处的「筛选」按钮同侧 */}
         <div className="filters-bar">
           <span className="filters-title">筛选</span>
-          <button className="icon-btn" onClick={onClose} aria-label="关闭筛选">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="关闭筛选"><IconClose size={16} /></button>
         </div>
         {children}
 

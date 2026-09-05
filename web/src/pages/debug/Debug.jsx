@@ -5,7 +5,7 @@ import { useStoredJSON } from '../../hooks/useStoredState'
 import { fmtClock } from '../../utils/format'
 import { copyText } from '../../utils/clipboard'
 import { Highlight } from '../../components/Highlight'
-import { IconCopy, IconCheck } from '../../components/svg'
+import { IconCopy, IconCheck, IconClose } from '../../components/svg'
 
 // 默认忽略高频且无分析价值的场景 NPC 位置同步(每秒多条,会淹没事件流)。
 // localStorage 无该键时用默认值;用户清空后存 [] 且不再回落默认。
@@ -153,7 +153,7 @@ export default function Debug() {
         <div className="ignore-bar">
           <span className="muted">已忽略:</span>
           {ignored.map((n) => (
-            <span key={n} className="chip on" title="点击取消忽略" onClick={() => removeIgnore(n)}>{n} ✕</span>
+            <span key={n} className="chip on" title="点击取消忽略" onClick={() => removeIgnore(n)}>{n} <IconClose size={11} className="chip-x" /></span>
           ))}
         </div>
       )}

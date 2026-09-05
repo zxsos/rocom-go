@@ -38,7 +38,7 @@
   transition: background .15s ease, color .15s ease;
 }
 .navgroup:hover .navgroup-btn, .navgroup.active .navgroup-btn { background: var(--bg-3); color: var(--fg); }
-.navgroup-arrow { font-size: 9px; opacity: .7; }
+.navgroup-arrow { display: inline-flex; align-items: center; opacity: .7; }
 /* 二级菜单(顶栏分组 hover / 键盘聚焦展开)。z-index 用 --z-popover 而非 --z-drawer:
    它困在 .topbar 的层叠上下文(--z-shell)内,写多大对外都表现为 --z-shell,
    用 --z-drawer 会误导人以为它能高过顶栏。只需保证它在栏内压过其它栏内元素即可。
@@ -207,7 +207,8 @@
 /* UID 与昵称并列、同排显示(手机端由媒体查询整条去掉,不再换行到第二行 ——
    换行会把顶栏撑高一截,滚动时各页高度不一致,反而不如把这点宽度让给昵称)。 */
 .acct-uid { flex: none; font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
-.account-caret { flex: none; color: var(--fg-dim); font-size: 12px; transition: transform .2s ease; }
+/* 图标化后 font-size 对 SVG 无效,改 inline-flex 居中;旋转仍作用于本容器 */
+.account-caret { flex: none; color: var(--fg-dim); display: inline-flex; align-items: center; transition: transform .2s ease; }
 .account-trigger.open .account-caret { transform: rotate(180deg); }
 
 /* ---- 账号行(桌面浮层与手机 sheet 共用,唯一的行渲染源) ----
