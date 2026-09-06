@@ -4,94 +4,75 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
-// TestHatchRateReflectsMoving 守「API 返回的倍率随移动状态实时变化」。
+// eggRate 取 /api/eggs 返回的孵化倍率。
+func eggRate(t *testing.T, s *Server, acc string) float64 {
+	t.Helper()
+	w := httptest.NewRecorder()
+	s.mux.ServeHTTP(w, httptest.NewRequest("GET", "/api/eggs?account="+acc, nil))
+	if w.Code != 200 {
+		t.Fatalf("HTTP %d: %s", w.Code, w.Body.String())
+	}
+	var j struct {
+		HatchRate float64 `json:"hatchRate"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &j); err != nil {
+		t.Fatalf("解响应: %v (%s)", err, w.Body.String())
+	}
+	return j.HatchRate
+}
+
+// TestHatchRateIgnoresMoving 守「倍率**不**随移动状态变化」。
 //
-// 这是「实时显示孵化时间」的核心保障:玩家跑起来,接口就该给出更快的倍率;
-// 站住或超时,就该回到静止那档。回放覆盖不到(历史包时刻与 time.Now() 差几小时,
-// 必然判定为静止),故在这里用可控的时刻钉住。
-func TestHatchRateReflectsMoving(t *testing.T) {
+// 这是 2026-09-06 的结论,别再改回去。早先版本会在移动时乘一个固定增益 4.2,
+// 那等于把「在线加成」这个**没有定值**的量当成有定值去外推:实测移动档倍率
+// 16.90~27.32(中位 21.96、标准差 3.38),单一增益覆盖不了;且 ETA 会随玩家
+// 跑跑停停每几秒跳一次(六份 pcap 合计 212 次,最密的一份平均 3.5 秒一次)。
+// 现在倍率只由活动倍率(1x/5x)与玩家实测决定,移动状态不参与。
+func TestHatchRateIgnoresMoving(t *testing.T) {
 	s := newTestServer(t)
 	seedContract(t, s)
 	const acc = contractAcc
 
-	rate := func() float64 {
-		w := httptest.NewRecorder()
-		s.mux.ServeHTTP(w, httptest.NewRequest("GET", "/api/eggs?account="+acc, nil))
-		var j struct{ HatchRate float64 `json:"hatchRate"` }
-		if err := json.Unmarshal(w.Body.Bytes(), &j); err != nil {
-			t.Fatalf("解响应: %v (%s)", err, w.Body.String())
-		}
-		return j.HatchRate
-	}
-	base := rate()
+	base := eggRate(t, s, acc)
 	if base <= 0 {
 		t.Fatalf("前置:倍率应为正,实得 %v", base)
 	}
-
-	// 玩家开始移动 → 倍率应变大
-	s.SetHatchMoving(acc, time.Now())
-	mv := rate()
-	if !(mv > base) {
-		t.Errorf("移动后倍率应大于静止(%v),实得 %v —— 实时没生效", base, mv)
-	}
-
-	// 明确停止(零值) → 立刻回到静止倍率
-	s.SetHatchMoving(acc, time.Time{})
-	if got := rate(); got != base {
-		t.Errorf("停止后应回到静止倍率 %v,实得 %v", base, got)
-	}
-
-	// 超时:不再有移动包(切后台/站住不补发),TTL 后自动翻回
-	s.SetHatchMoving(acc, time.Now().Add(-hatchMoveTTL-time.Second))
-	if got := rate(); got != base {
-		t.Errorf("超过 TTL 应自动翻回静止倍率 %v,实得 %v", base, got)
+	// 管线里已不再有移动观测(见本次改动),倍率不该受任何移动状态影响。
+	// 这里钉住「同一账号连续两次请求倍率一致」—— 它只该随加速日时间表变。
+	if again := eggRate(t, s, acc); again != base {
+		t.Errorf("倍率不该自发变化,两次请求 %v 与 %v", base, again)
 	}
 }
 
-// TestHatchMovingFlip 守「玩家是否在移动」的状态翻转(孵化倍率的在线加成依据)。
+// TestHatchRateUsesMeasured 守「玩家实测的倍率优先于活动倍率」。
 //
-// 回放覆盖不到这条逻辑(历史数据的包内时刻与 time.Now() 差几小时,必然超时 ——
-// 见 isHatchMoving 的注释),故在这里用可控的时刻钉住三种情形。
-func TestHatchMovingFlip(t *testing.T) {
+// 这是「测速」功能的核心契约:玩家点开始 → 开两次孵蛋器 → 后端取差分,之后
+// 接口就该返回**实测值**而非活动倍率。实测值可以大于(移动时)也可以小于
+// 活动倍率,都必须如实返回 —— 它是测出来的,不是估出来的。
+func TestHatchRateUsesMeasured(t *testing.T) {
 	s := newTestServer(t)
-	const acc = "UID:test-moving"
+	seedContract(t, s)
+	const acc = contractAcc
 
-	// 从没收到过移动包 → 不在移动
-	if s.isHatchMoving(acc) {
-		t.Error("未收到移动包时应为 false")
-	}
+	before := eggRate(t, s, acc)
 
-	// 收到一个在移动的包 → 在移动
-	s.SetHatchMoving(acc, time.Now())
-	if !s.isHatchMoving(acc) {
-		t.Error("刚收到移动包时应为 true")
+	// 模拟一次完整测速:第一次采样 → 等够间隔 → 第二次采样
+	sc := s.store.For(acc)
+	if err := sc.ArmHatchSpeed(1000); err != nil {
+		t.Fatalf("ArmHatchSpeed: %v", err)
 	}
-
-	// 客户端上报 stop_move(记零值) → 立即翻回,不等 TTL
-	s.SetHatchMoving(acc, time.Time{})
-	if s.isHatchMoving(acc) {
-		t.Error("收到 stop_move(零值)后应立即为 false")
+	if got := eggRate(t, s, acc); got != before {
+		t.Errorf("刚开始测速(还没采样)时就该仍是活动倍率 %v,实得 %v", before, got)
 	}
-
-	// 切后台/断线:不会再有 stop 包,只剩 TTL 兜底
-	s.SetHatchMoving(acc, time.Now().Add(-hatchMoveTTL+time.Second))
-	if !s.isHatchMoving(acc) {
-		t.Error("TTL 内仍应算在移动")
+	sc.RecordHatchSample(1000, map[uint32]int32{1: 0, 2: 0, 3: 0})
+	if got := eggRate(t, s, acc); got != before {
+		t.Errorf("只采了一次样时仍该是活动倍率 %v,实得 %v", before, got)
 	}
-	s.SetHatchMoving(acc, time.Now().Add(-hatchMoveTTL-time.Second))
-	if s.isHatchMoving(acc) {
-		t.Error("超过 TTL 应翻回 false(切后台/断线时不会有 stop 包)")
-	}
-}
-
-// TestHatchMovingEmptyAccount 守空账号不该被记录(防御:未归属的消息不该污染状态)。
-func TestHatchMovingEmptyAccount(t *testing.T) {
-	s := newTestServer(t)
-	s.SetHatchMoving("", time.Now())
-	if s.isHatchMoving("") {
-		t.Error("空账号不该被记成在移动")
+	// 间隔 30s、每颗蛋各推进 630 孵化秒 → 21 倍(加速日 5 倍叠加移动加成,典型值)
+	sc.RecordHatchSample(1030, map[uint32]int32{1: 630, 2: 630, 3: 630})
+	if got := eggRate(t, s, acc); got != 21 {
+		t.Errorf("测速完成后应返回实测倍率 21,实得 %v", got)
 	}
 }

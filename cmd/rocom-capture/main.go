@@ -106,6 +106,11 @@ func main() {
 		if err := eng.RunOffline(*pcapPath); err != nil {
 			log.Fatalf("回放失败: %v", err)
 		}
+		// 等管线消费完 Out 缓冲里的剩余消息再统计:RunOffline 的 close(Out) 只表示
+		// 「不再有新消息」,已缓冲的(最多 4096 条)还在被 handle 消费,不等待的话
+		// 下面这行会拿到偏小的数字(实测打印「共宠物 0 只」而实际 730 只)。
+		// 涂地同理 —— 它也是管线写的,故等完再补刷盘。
+		<-pl.Done()
 		// 涂地是攒批落盘的(见 server/paint.go),而回放几秒就跑完一整份 pcap、一次都攒不到,
 		// 故这里补一次落盘,否则回放出来的覆盖图重启就没了。
 		srv.FlushPaint()

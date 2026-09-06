@@ -44,6 +44,12 @@ type Pipeline struct {
 	// 需要「当前时刻」的地方(如回放结束时补发野生宠)必须用它而不是 time.Now():
 	// 否则野生宠的 TTL 判定(now - seenAt)会算出几小时,把整份列表全当过期删掉。
 	lastMsgAt time.Time
+
+	// done 在 Run 返回时关闭,供调用方等待管线处理完 Out 缓冲里的全部消息。
+	// 离线回放必须等它:RunOffline 的 close(Out) 只表示「不再有新消息」,
+	// 已缓冲的(最多 4096 条)仍在被消费,不等待就统计会拿到偏小的数字
+	// (实测打印「共宠物 0 只」而实际 730 只)。
+	done chan struct{}
 }
 
 // connState 是单条 GCP 连接的实时地图状态。场景 res 与区域只在切场景/跨触发体时下发、
@@ -128,6 +134,7 @@ func New(st *store.Store, db *gamedata.DB, srv *server.Server) *Pipeline {
 		connAccount: map[string]string{},
 		conns:       map[string]*connState{},
 		accts:       map[string]*acctState{},
+		done:        make(chan struct{}),
 	}
 	if saved, err := st.LoadSessionAccounts(); err == nil {
 		p.connAccount = saved
@@ -187,6 +194,7 @@ const sweepInterval = 30 * time.Second
 // Run 消费 eng.Out 与连接断开通知,直到消息通道关闭(离线回放结束时)。期间定期兜底扫描
 // 游玩会话。所有状态只在当前 goroutine 内读写,故无并发问题。
 func (p *Pipeline) Run(eng *capture.Engine) {
+	defer close(p.done)
 	// 启动时先结算一次:上次进程若非正常退出(崩溃/强杀),库里会残留 logout_time 为 NULL
 	// 的悬挂会话,管理后台就会一直显示那些玩家「在线中」。此刻内存连接表是空的,
 	// 故这一趟会把它们全部记为已下线 —— 不必等 30s 后的第一轮 sweep。
@@ -204,9 +212,7 @@ func (p *Pipeline) Run(eng *capture.Engine) {
 				p.flushAllDirtyWilds()
 				p.flushAllDirtyGathers()
 				// 把剩余连接断开通知处理完(正常退出,不留悬挂会话)。
-				for cid := range eng.CloseCh {
-					p.onConnClose(cid)
-				}
+				p.drainCloses(eng.CloseCh)
 				return
 			}
 			p.handle(m)
@@ -214,6 +220,27 @@ func (p *Pipeline) Run(eng *capture.Engine) {
 			p.onConnClose(cid)
 		case <-sweep.C:
 			p.sweepOnce(time.Now())
+		}
+	}
+}
+
+// Done 返回一个在 Run 返回后关闭的 channel,供调用方等待管线消费完 Out 缓冲里的消息。
+// 离线回放的结束统计必须等它,否则会拿到偏小的宠物数(见 done 字段的注释)。
+// 实时抓包下 Out 不关闭,Run 不返回,故那里不要等它。
+func (p *Pipeline) Done() <-chan struct{} { return p.done }
+
+// drainCloses 非阻塞排空连接断开通知。
+//
+// 不能写成 for range ch —— CloseCh 从不关闭(见 capture.Engine 的字段注释),
+// 那样会永久阻塞,使 Run 永不返回,回放结束的统计也就永远等不到。
+// 排空即足够:断开通知由 capture 在 process 期间同步发出,走到这里时已全部抵达。
+func (p *Pipeline) drainCloses(ch <-chan string) {
+	for {
+		select {
+		case cid := <-ch:
+			p.onConnClose(cid)
+		default:
+			return
 		}
 	}
 }
@@ -255,6 +282,11 @@ func (p *Pipeline) settleSessions(now time.Time) {
 	// (内存连接表已清空),下一轮 sweep 即回收,无需等到 24h。
 	if err := p.st.EndStalePlaySessions(active, now.Unix()); err != nil {
 		log.Printf("EndStalePlaySessions 失败: %v", err)
+	}
+	// 同一批账号的孵化测速结果一并清掉:倍率依赖玩家此刻的状态(在不在动、有没有
+	// 挂风场),下线后再上线状态已变,旧结果留着会让新会话按上一轮的倍率外推(虚报)。
+	if err := p.st.ClearStaleHatchSpeed(active); err != nil {
+		log.Printf("ClearStaleHatchSpeed 失败: %v", err)
 	}
 }
 

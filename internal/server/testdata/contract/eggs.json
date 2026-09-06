@@ -1,4 +1,5 @@
 {
+  "activityRate": 5,
   "eggs": [
     {
       "gid": 9001,
@@ -18,7 +19,8 @@
       "weightKg": 1.2
     }
   ],
-  "hatchMoving": false,
-  "hatchMovingAt": 0,
-  "hatchRate": 0
+  "hatchRate": 0,
+  "hatchSpeed": {
+    "state": "idle"
+  }
 }

@@ -21,6 +21,7 @@
     "endpoint": "GET /api/eggs",
     "sample": "internal/server/testdata/contract/eggs.json",
     "shape": {
+      "activityRate": "int",
       "eggs": [
         {
           "gid": "int",
@@ -40,9 +41,10 @@
           "weightKg": "float"
         }
       ],
-      "hatchMoving": "bool",
-      "hatchMovingAt": "int",
-      "hatchRate": "int"
+      "hatchRate": "int",
+      "hatchSpeed": {
+        "state": "str"
+      }
     }
   },
   "events": {

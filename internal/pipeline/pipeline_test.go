@@ -321,6 +321,48 @@ func TestRegisterLoginAvatar(t *testing.T) {
 	}
 }
 
+// TestRunReturnsAfterOutClosed 验证 Out 关闭后 Run 会返回,并排空残留的断开通知。
+//
+// 这是「回放结束统计」的前提:main 在 RunOffline 关闭 Out 后立刻调 PetTotal(),
+// 若 Run 不返回就无法等它处理完 —— 那时缓冲里的消息还没入库,统计会偏小
+// (实测打印「共宠物 0 只」而实际 730 只)。
+// 曾因用 for range 遍历从不关闭的 CloseCh 而永久阻塞在这里。
+func TestRunReturnsAfterOutClosed(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	eng := capture.NewEngine(8195)
+
+	// CloseCh 里留一条未消费的断开通知:实现若用 for range 遍历会永久阻塞在这里
+	eng.CloseCh <- testSess
+	close(eng.Out)
+
+	done := make(chan struct{})
+	go func() { p.Run(eng); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run 在 Out 关闭后未返回(可能又卡在遍历 CloseCh)")
+	}
+}
+
+// TestDrainCloses 验证收尾时的断开通知排空:不阻塞、且真的调用了 onConnClose。
+func TestDrainCloses(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	cs := p.conn(testSess)
+	cs.sessionOpen = true
+
+	ch := make(chan string, 4)
+	ch <- testSess
+	ch <- "other-sess"
+	p.drainCloses(ch)
+
+	if len(ch) != 0 {
+		t.Errorf("drainCloses 未排空: 还剩 %d 条", len(ch))
+	}
+	if cs.sessionOpen {
+		t.Error("drainCloses 未处理断开通知(会留下悬挂的游玩会话)")
+	}
+}
+
 func abs(f float64) float64 {
 	if f < 0 {
 		return -f

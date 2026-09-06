@@ -72,14 +72,6 @@ type Server struct {
 	merchantClaimMu sync.Mutex
 	merchantClaimed map[int64]time.Time
 
-	// hatchMoving:账号 → 最近一次观测到「玩家在移动」的时刻(见 pipeline/position.go
-	// 的 observeHatchMove)。孵化倍率的**在线加成**只在移动时发生,而协议不会直接给
-	// 倍率,故记这个前提。零值 = 明确停止(客户端上报 stop_move 或速度归零)。
-	// 存时刻而非布尔:超时判定留给读取方按当前时间算,切后台/断线(移动包停发、
-	// 不会有 stop 包)也能自然翻回静止。读取方有 HTTP 请求,故加锁。
-	hatchMoving   map[string]time.Time
-	hatchMovingMu sync.Mutex
-
 	// 远行商人本轮的回源尝试次数:槽开始时间戳 → 已尝试几次(见 merchant.go)。
 	// 用途:日志里给出「第几次才拿到货单」—— 整点后第三方滞后切换时,没有序号就
 	// 分不出「第 4 次才拿到」与「一次命中」,而那正是判断第三方是否异常的依据。
@@ -253,6 +245,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/eggs/query", s.handleEggQuery)
+	// 孵化倍率实测:玩家点「开始测速」→ 游戏内开两次孵蛋器 → 后端取差分
+	s.mux.HandleFunc("POST /api/hatch/speed", s.handleHatchSpeed)
 	s.mux.HandleFunc("GET /api/handbook-glasses", s.handleHandbookGlasses)
 	s.mux.HandleFunc("GET /api/merchant", s.handleMerchant)
 	s.mux.HandleFunc("GET /api/merchant/sub", s.handleMerchantSub)

@@ -203,6 +203,25 @@ export async function deleteFlowerSlot(key) {
 //           obtainedAt,hatching,parents,…}]}
 export const getEggs = (params) => getJSON('/api/eggs?' + buildQuery(params), { eggs: [] })
 
+// setHatchSpeed 开始/取消孵化倍率实测。on=true 重置并等第一次采样,false 取消。
+// 返回测速状态 {state:"idle"|"armed"|"first"|"done", rate, t1, measuredAt}。
+//
+// 测法:玩家点开始 → 去游戏内打开**两次**孵蛋器(每次触发一次进度下发) → 后端取
+// 差分。进度没有被动推送,只能靠玩家自己触发,故必须他先点一下才知道要配对哪两次。
+export async function setHatchSpeed(on) {
+  const r = await fetch('/api/hatch/speed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ on: !!on }),
+  })
+  if (!r.ok) {
+    let msg = '操作失败(' + r.status + ')'
+    try { const t = (await r.text()).trim(); if (t) msg = t } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
 // queryEggMatch 查随机蛋(神奇的蛋)可能孵出的物种。
 //
 // **用哪个数据源由服务端配置决定,前端传不了** —— 数据源是对全服生效的运维选项,

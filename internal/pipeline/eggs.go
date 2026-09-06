@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"log"
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/capture"
@@ -161,9 +162,38 @@ func (p *Pipeline) applyHatchStatus(m capture.Message, sc *store.Scoped, acc str
 	if len(eggs) > 0 {
 		// 0x0312 自带权威列表且随后就要全量对账,这里不必再按登录列表覆盖
 		p.upsertEggs(sc, acc, eggs, m.Time, nil)
+		p.observeHatchSample(sc, acc, eggs, m.Time)
 	}
 	gids, secs := pet.ParseHatchStatus(m.AppBody)
 	p.applyHatchSlots(m.Session, sc, acc, gids, secs, skip, m.Time)
+}
+
+// observeHatchSample 把这次下发的进度交给测速状态机(玩家正在测速时才会有动作)。
+//
+// 只取**在孵**的蛋(hatchedSecs>0):不在孵的蛋进度恒为 0,混进来会让差分的分母
+// 对不上(第二次采样时那颗蛋可能已被放进孵蛋器,凭空多出一大截增量)。
+//
+// 时刻用 m.Time(抓包主机时钟)而非服务器下发的 last_hatch_update_sec —— 与
+// store.UpsertEggs 落库的 HatchUpdate 同一个钟,差分才成立(理由见那里的注释)。
+func (p *Pipeline) observeHatchSample(sc *store.Scoped, acc string, eggs []pet.Egg, t time.Time) {
+	secs := make(map[uint32]int32, len(eggs))
+	for _, e := range eggs {
+		if e.HatchedSec > 0 {
+			secs[e.Gid] = e.HatchedSec
+		}
+	}
+	if len(secs) == 0 {
+		return
+	}
+	changed, err := sc.RecordHatchSample(t.Unix(), secs)
+	if err != nil {
+		log.Printf("记录孵化采样失败: %v", err)
+		return
+	}
+	if changed {
+		// 让页面立刻看到新状态(等第一次/第二次/已完成),不必等下次重拉
+		p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
+	}
 }
 
 // applyHatchSlots 用权威的孵蛋器占用列表订正在孵标记,有改动就通知前端。

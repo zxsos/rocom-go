@@ -25,6 +25,70 @@ afpacket/pcap → TCP 重组 → GCP 分帧 → 0x1002 取密钥 → 0x4013 AES-
 - [服务架构](docs/architecture.md) — 数据流、模块、HTTP 接口、前端、部署
 - [参考资料](docs/reference.md) — 相关工具与开源项目
 
+## 环境准备(首次搭建)
+
+全新机器上一次装齐:Go(含 cgo 依赖)、Node、Chromium。**已装过可跳过,直接看「构建」。**
+以下命令在**仓库根目录**执行,Go 版本自动与 `go.mod` 对齐。
+
+> 另需 `uv` 的只有「更新游戏数据」那几条生成脚本(见「构建」第 1 步);
+> 不更新游戏数据时用不到,装法见 https://docs.astral.sh/uv。
+
+### Debian / Ubuntu
+
+```bash
+# 1. Go —— 版本与 go.mod 对齐,别用发行版仓库里的旧版
+GOVER=$(grep -m1 '^go ' go.mod | awk '{print $2}')
+GOARCH=$(uname -m | sed -e s/x86_64/amd64/ -e s/aarch64/arm64/)
+curl -fsSLO "https://dl.google.com/go/go${GOVER}.linux-${GOARCH}.tar.gz"
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf "go${GOVER}.linux-${GOARCH}.tar.gz"
+
+# 写入 PATH(用 zsh 就把 ~/.bashrc 换成 ~/.zshrc)
+echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
+export PATH=$PATH:/usr/local/go/bin
+
+# 2. cgo 依赖 —— 抓包必经,漏了会编出不能抓包的二进制(见下方"cgo 是硬要求")
+sudo apt-get install -y build-essential   # gcc + linux/if_packet.h(经 libc6-dev → linux-libc-dev)
+go env -w CGO_ENABLED=1                   # 固化到 ~/.config/go/env,换机器要重设
+
+# 3. Node —— 前端构建用,建议 20+(已有可跳过)
+node -v && npm -v
+
+# 4. 前端依赖 + Chromium(仅 `npm run verify:browser` 需要,不跑浏览器验收可省)
+cd web
+npm install
+npx playwright install chromium             # 浏览器二进制
+sudo npx playwright install-deps chromium    # 补系统库(libnss3 等);脚本已内置 --no-sandbox,root 下可直接跑
+cd ..
+```
+
+### 其它系统对照
+
+| 步骤 | Arch | macOS |
+| --- | --- | --- |
+| Go | `sudo pacman -S go` | `brew install go`(或同上用官方包) |
+| cgo 依赖 | `sudo pacman -S base-devel linux-headers` | Xcode CLT:`xcode-select --install` |
+| Node | `sudo pacman -S nodejs npm` | `brew install node` |
+| Chromium 系统库 | 通常已齐 | 不需要(Homebrew 版自带依赖) |
+
+### 自检
+
+```bash
+go version      # 期望与 go.mod 一致,如 go1.26.4
+
+# 关键:afpacket 必须真的编进去。CGO 关掉时它被静默忽略,而 go build 报的却是
+# 看似无关的 "undefined: pageSize",极易误判成依赖版本问题。
+go list -f '{{.IgnoredGoFiles}}' github.com/google/gopacket/afpacket \
+  | grep -q afpacket.go && echo "❌ cgo 未启用" || echo "✅ afpacket 已编入"
+
+go build ./...  # 无输出即通过
+```
+
+> **cgo 是硬要求,不能关。** 实时抓包用 `gopacket/afpacket`(mmap 的 AF_PACKET 原始套接字),
+> 它靠 `import "C"` 实现。环境无 gcc 时 Go 会把 `CGO_ENABLED` 自动降为 0,
+> `afpacket.go` / `header.go` 被静默移入 `IgnoredGoFiles` —— 于是 `pageSize` 未定义。
+> 别照抄「Go 项目通用 Dockerfile」里的 `CGO_ENABLED=0`:那样编出的二进制能启动、
+> 能开 Web,但一抓包就失败。容器构建见 `Dockerfile` 头部注释。
+
 ## 构建
 
 ```bash
