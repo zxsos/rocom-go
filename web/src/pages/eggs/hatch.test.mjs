@@ -5,9 +5,13 @@
 // 「对相邻两次进度下发做差分、取跨蛋中位数」已废弃,它把活动倍率(固定时间表)与
 // 在线加成(移动/风场)混成一个数去测,结果样本被移动时段污染、离线那还算不了。
 //
+// 倍率有两个来源,由 effectiveRate 择一:**玩家实测 > 活动倍率**。实测值来自后端
+// (要两次进度采样才差得出分,前端手里通常只有一次快照),未经测速时回落到活动
+// 倍率(1x/5x)—— 那是保守下限,绝不虚报。
+//
 // 这里守住的是外推本身的三条:无采样不外推、进度不倒退、孵化秒与真实秒不混。
 import assert from 'node:assert/strict'
-import { hatchProgress, remainRealSecs, clampRate, hatchRateNow, activityRate } from './hatch.js'
+import { hatchProgress, remainRealSecs, clampRate, effectiveRate, activityRate } from './hatch.js'
 
 const NOW = 1788000000 * 1000 // 固定"当前时刻",避免依赖真实时钟
 
@@ -133,31 +137,41 @@ assert.ok(hatchProgress(skew, NOW, 5).secs >= 600, '时钟回拨不该把进度�
   assert.equal(activityRate(cst(2026, 9, 5, 12)), 5, '周六 12:00 应为 5(不随环境时区变)')
   assert.equal(activityRate(cst(2026, 9, 8, 12)), 1, '周二 12:00 应为 1')
 
-  // 实时切换:同一时刻,移动与否差一个 MOVE_GAIN
+
+// —— 有效倍率:实测值优先于活动倍率 ——
+//
+// 2026-09-06 回退了「按移动状态乘固定增益」的做法(那会让 ETA 每几秒在 5 与 21
+// 之间跳,且在半数样本上虚报)。现在只有两个来源,实测值优先。
   const sat = cst(2026, 9, 5, 12, 0, 0)
-  const still = hatchRateNow(sat * 1000, 0)
-  assert.equal(still.moving, false)
-  assert.equal(still.rate, 5, '静止时 = 活动倍率')
-
-  const moving = hatchRateNow(sat * 1000, sat) // 此刻刚观测到在动
-  assert.equal(moving.moving, true)
-  assert.ok(Math.abs(moving.rate - 21) < 0.5,
-    `加速日 + 移动应约 21(5 × 4.2),实际 ${moving.rate}`)
-
-  // 移动状态会**自动过期**:玩家站住后没收到推送,也该在一秒内翻回静止。
-  // 否则页面会一直挂着「移动中」并按快倍率外推 —— 那是虚报。
-  const stale = hatchRateNow((sat + 11) * 1000, sat)
-  assert.equal(stale.moving, false, '超过 TTL 应自动翻回静止(不等推送)')
-  assert.equal(stale.rate, 5, '过期后倍率应回到活动倍率')
-  const fresh = hatchRateNow((sat + 9) * 1000, sat)
-  assert.equal(fresh.moving, true, 'TTL 内仍算在移动')
-
-  // 非加速日 + 移动:推算 1 × 4.2 ≈ 4.2(尚未实测,见 MOVE_GAIN 注释)
   const tue = cst(2026, 9, 8, 12, 0, 0)
-  const tueMv = hatchRateNow(tue * 1000, tue)
-  assert.ok(Math.abs(tueMv.rate - 4.2) < 0.1,
-    `非加速日 + 移动应约 4.2,实际 ${tueMv.rate}`)
-  assert.equal(hatchRateNow(tue * 1000, 0).rate, 1, '非加速日静止应为 1')
+
+  // 未测速 → 活动倍率,且**不含**任何移动推算
+  assert.equal(effectiveRate(sat * 1000, { state: 'idle' }, 5).rate, 5)
+  assert.equal(effectiveRate(tue * 1000, { state: 'idle' }, 1).rate, 1, '非加速日应为 1')
+  // 没给 speed(旧后端/字段缺失)也不能崩,退回活动倍率
+  assert.equal(effectiveRate(sat * 1000, undefined, 5).rate, 5)
+
+  // 测速中(还没结果)→ 仍用活动倍率,不能因为点了按钮就把倍率改了
+  for (const st of ['armed', 'first']) {
+    assert.equal(effectiveRate(sat * 1000, { state: st }, 5).rate, 5,
+      `${st} 状态下倍率应仍是活动倍率`)
+  }
+
+  // 测速完成 → 用实测值(它含此刻全部加成,可以大于活动倍率)
+  const done = { state: 'done', rate: 21.3, t1: sat, measuredAt: sat + 30 }
+  const got = effectiveRate(sat * 1000, done, 5)
+  assert.equal(got.rate, 21.3, '完成态应取实测倍率')
+  assert.equal(got.measured, true, '要标出这是实测值')
+  assert.equal(got.activity, 5, '活动倍率仍要一并返回(徽章用)')
+
+  // ⚠️ 关键:实测值**不打折、不钳到活动倍率** —— 玩家测出多少就是多少,
+  //    这是它与旧「移动增益推算」的根本区别(旧的是估,这个是测)。
+  assert.equal(effectiveRate(sat * 1000, { state: 'done', rate: 4.2 }, 5).rate, 4.2,
+    '实测值小于活动倍率时也要如实采用,不得被覆盖')
+
+  // rate 为 0 的完成态是脏数据(不该出现),退回活动倍率而不是拿 0 去外推
+  assert.equal(effectiveRate(sat * 1000, { state: 'done', rate: 0 }, 5).rate, 5,
+    '实测值为 0 应退回活动倍率')
 }
 
 console.log('hatch.test.mjs: 全部通过')

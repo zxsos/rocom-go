@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react'
-import { getEggs, subscribe, queryEggMatch } from '../../api'
+import { getEggs, subscribe, queryEggMatch, setHatchSpeed } from '../../api'
 import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { fmtTime, pad2, pctHot, voiceHot } from '../../utils/format'
 import { useInterval } from '../../hooks/useAsyncData'
 import { Marks } from '../../components/badges'
-import { hatchProgress, remainRealSecs, hatchRateNow } from './hatch'
+import { hatchProgress, remainRealSecs, effectiveRate, activityRate, MIN_SAMPLE_GAP } from './hatch'
 import { toast } from '../../components/toast'
 
 // 精灵蛋页面:两段垂直 —— 孵蛋器(在孵且进度未满的蛋)、仓库(其余蛋)。不分标签页——在孵的蛋
@@ -35,16 +35,12 @@ const HATCH_SLOTS = 3
 // 这里只规整结尾的重复(中间的「的蛋」是名字本身,不动)。
 const tidyEggName = (name) => (name || '').replace(/的蛋的蛋$/, '的蛋')
 
-// 预计完成时间:按孵化倍率(后端按加速日时间表给,见 hatch.js)外推剩余时间,换算成时间点。
+// 预计完成时间:按当前有效倍率外推剩余时间,换算成时间点。
 //
 // ⚠️ 剩的是**孵化秒**,不是真实秒 —— 必须过 remainRealSecs 除以倍率。
 // 直接拿 maxSecs − p.secs 当秒数,平时(1 倍)恰好对得上,一旦撞上孵蛋加速
 // (5 倍)就会把完成时刻报成 5 倍远:真实还剩 24 分钟的说成 2 小时后。
 // 同一天只显时分(手机双列卡片宽度紧张),跨天补「月-日 时:分」;title 里给剩余时长。
-//
-// 倍率不是估的:加速日是每周五 04:00~周一 04:00 的固定活动,服务器照此推进(离线
-// 也一样),后端按时刻直接算 —— 故这里可以明说「按 ×N 倍率」,不用像早先那样挂
-// 「倍率尚未测出」(那是靠差分估倍率时的说法,已废弃)。
 function etaText(egg, p, now) {
   const eta = new Date(now + remainRealSecs(egg, p) * 1000)
   const hm = `${pad2(eta.getHours())}:${pad2(eta.getMinutes())}`
@@ -52,16 +48,17 @@ function etaText(egg, p, now) {
     ? hm
     : `${eta.getMonth() + 1}-${eta.getDate()} ${hm}`
 }
-function etaTitle(egg, p, moving) {
+function etaTitle(egg, p, measured) {
   const s = remainRealSecs(egg, p)
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   const dur = h > 0 ? `${h} 小时 ${m} 分` : `${m} 分钟`
-  // ⚠️ 这个数是「**若保持当前状态**」的估计 —— 倍率实时跟着玩家动没动走,
-  // 故跑起来会变短、站住会变长。必须说清前提,否则数字来回跳会让人以为算错了。
-  return moving
-    ? `按 ×${rateText(p.rate)} 倍率(移动中)估算,约剩 ${dur};停下会变慢`
-    : `按 ×${rateText(p.rate)} 倍率(静止)估算,约剩 ${dur};跑动会更快`
+  // 用实测倍率时,前提是「玩家保持测速时的状态」—— 他若从跑动改成站着,实际会变慢。
+  // 用活动倍率时则是保守下限(不含移动/风场加成),实际只会更快。两者都得说清,
+  // 否则数字与体感对不上会让人以为算错了。
+  return measured
+    ? `按实测倍率 ×${rateText(p.rate)} 估算,约剩 ${dur};若改变状态(如停下)会变慢`
+    : `按活动倍率 ×${rateText(p.rate)} 估算,约剩 ${dur};跑动/挂风场会更快`
 }
 
 // rateText 把倍率格式化成给人看的样子:整数不带小数(5 倍就是「5」),否则留一位。
@@ -70,21 +67,26 @@ const rateText = (r) => (Number.isInteger(r) ? String(r) : r.toFixed(1))
 // Boost 孵化加速徽章。倍率是**全局**的(实测三颗不同 maxSecs 的蛋同秒各 +10s,
 // 见 docs/data.md 3.6),故整个孵蛋器标一处即可,不必逐蛋重复。
 //
-// 倍率按「加速日时间表 × 此刻是否在动」实时算,故会自己变 —— <=1 时(非加速日
-// 且静止)不画,移动中则把状态一并标出来,免得数字跳动看着像出错。
-function Boost({ rate, moving, activity }) {
+// 倍率来源二选一,徽章要标明是哪一种:
+//   - 实测值(玩家点过「开始测速」):标「实测」,它是开两次孵蛋器差分出来的真值,
+//     包含此刻全部加成 —— 只要玩家不改变状态,它就一直准;
+//   - 活动倍率(默认):只有 1x/5x,按加速日时间表算。它是**保守下限**,故提示
+//     「跑动会更快」—— 宁可慢,不虚报可破壳(见 hatch.js 文件头)。
+//
+// <=1 时(非加速日且未测速)不画。
+function Boost({ rate, measured, activity }) {
   if (!(rate > 1)) return null
   const inWindow = activity > 1
   return (
     <span className="incu-boost" title={
-      `每过 1 真实秒推进 ${rateText(rate)} 个孵化秒` +
-      (inWindow
-        ? '(孵蛋加速日:北京时间周五 04:00 ~ 周一 04:00,离线期间同样按此推进)'
-        : '(非加速日)') +
-      (moving ? ' · 你正在移动,进度更快;停下会变慢' : ' · 跑动会更快')}>
-      {inWindow ? '加速中' : '孵化中'} ×{rateText(rate)}
-      {moving && <span className="incu-boost-mv"> · 移动中</span>}
-    </span>
+      measured
+        ? `实测倍率 ×${rateText(rate)}:你开两次孵蛋器测出来的真实速度,含此刻全部加成。
+只要不改变状态(继续跑 / 继续站着、不换场景),它就一直准;玩家下线后清除`
+        : `每过 1 真实秒推进 ${rateText(rate)} 个孵化秒` +
+          (inWindow
+            ? '(孵蛋加速日:北京时间周五 04:00 ~ 周一 04:00,离线期间同样按此推进)'
+            : '(非加速日)') +
+          ' · 跑动/挂风场还会更快,想要更准的 ETA 就点「测速」'}>{measured ? '实测' : inWindow ? '加速中' : '孵化中'} ×{rateText(rate)}</span>
   )
 }
 
@@ -141,18 +143,12 @@ export default function EggList() {
   })
   const [detailGid, setDetailGid] = useState(null)
   const [now, setNow] = useState(() => Date.now())
-  // 最近一次观测到「在移动」的时刻。用 ref 而非 state:它每次请求都会回来,
-  // 但不需要触发渲染 —— 真正驱动重渲染的是每秒都在走的 now(见 hatchRateNow)。
-  const lastMovingAt = useRef(0)
+  const [busy, setBusy] = useState(false) // 测速按钮正在提交,防连点
 
   const load = useCallback(() => getEggs({ search, sort, order })
     .then((d) => {
       d = d || { eggs: [] }
       if (!search) writeHatchCache(hatchKey(account), d.eggs.filter((e) => e.hatching))
-      // 记住上次见到的 hatchMovingAt:翻页/搜索重拉时 SSE 未必到,别把移动状态弄丢。
-      // 倍率本身由 hatchRateNow 按当前时刻重算,故存旧值不会让倍率过期。
-      d.hatchMovingAt = d.hatchMovingAt || lastMovingAt.current
-      lastMovingAt.current = d.hatchMovingAt
       setData(d)
     }).catch(() => {}), [account, search, sort, order])
 
@@ -162,16 +158,7 @@ export default function EggList() {
   // (登录那次广播尤其可能正好落在断线窗口里 —— 见 pipeline/eggs.go 登录分支)。
   useEffect(() => subscribe('eggs', load, { onOpen: load }), [load])
 
-  // 玩家开始/停止移动时后端推 hatch,就地改状态 —— 这是「实时」的关键。
-  //
-  // 不重拉整个列表:移动状态只影响进度怎么外推,蛋的数据一个字没变;而且玩家
-  // 跑跑停停很频繁,每次都重拉纯属浪费。
-  useEffect(() => subscribe('hatch', (d) => {
-    lastMovingAt.current = d.at
-    setData((prev) => ({ ...prev, hatchMovingAt: d.at }))
-  }), [])
-
-  // 孵化进度随时间涨:秒级刷新即可。
+  // 孵化进度随时间涨:秒级刷新即可。测速等待进度(已开几次、间隔够不够)也靠它走。
   useInterval(() => setNow(Date.now()), 1000)
 
   // 两段分类:**只看 hatching 标记**,不看进度。
@@ -188,28 +175,40 @@ export default function EggList() {
   const incubating = data.eggs.filter((e) => e.hatching)
   const bag = data.eggs.filter((e) => !e.hatching)
 
-  // 孵化倍率**前端实时算**(hatchRateNow),不直接用后端响应里那个数 —— 因为倍率
-  // 会随时间自己变:挂着页面跨过周一 04:00 加速日就结束了,而过期的数字不会自己
-  // 更新。口径与后端 pet.HatchRate 一致(两边改一处要同步改另一处)。
+  // 活动倍率**前端实时算**,不直接用后端响应里那个数 —— 因为倍率会随时间自己变:
+  // 挂着页面跨过周一 04:00 加速日就结束了,而过期的数字不会自己更新。
+  // 口径与后端 pet.HatchActivityRate 一致(两边改一处要同步改另一处)。
   //
-  // 两部分各自都拿得到,故能实时:
-  //   - 活动倍率:加速日时间表,按当前时刻算(离线也准,不存在冷启动);
-  //   - 移动增益:此刻在不在动,由移动包观测、翻转经 SSE 推送,且按时刻自动过期。
-  //
-  // 早先的「对相邻两次进度下发做差分、取跨蛋中位数」已废弃 —— 它把活动倍率(固定
-  // 时间表)与在线加成混成一个数去测,移动时段会污染样本、离线那段又算不了。
-  // 详见 hatch.js 文件头与 docs/data.md 3.6。
-  const { rate, moving, activity } = hatchRateNow(now, data.hatchMovingAt || 0)
+  // 实测倍率则是后端给的(要两次采样才差得出分,前端手里通常只有一次快照),
+  // 有效倍率 = 实测值(若有)否则活动倍率,见 effectiveRate。
+  const activity = activityRate(Math.floor(now / 1000))
+  const { rate, measured } = effectiveRate(now, data.hatchSpeed, activity)
+  const speed = data.hatchSpeed || { state: 'idle' }
+  // 开始 / 取消测速。后端会广播 eggs,上面的订阅会重拉;这里就地也更新一次,
+  // 免得等一轮往返按钮才变样。
+  const toggleSpeed = async (on) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const st = await setHatchSpeed(on)
+      setData((prev) => ({ ...prev, hatchSpeed: st }))
+    } catch (e) {
+      toast(e.message || '操作失败')
+    } finally {
+      setBusy(false)
+    }
+  }
   const slots = HATCH_SLOTS
 
   return (
     <div className="eggs-page">
       <div className="eggs-cols">
-        <IncuTitle n={incubating.length} slots={slots} rate={rate} moving={moving} activity={activity} />
+        <IncuTitle n={incubating.length} slots={slots} rate={rate} measured={measured} activity={activity} />
+        <SpeedTest speed={speed} now={now} busy={busy} onToggle={toggleSpeed} />
         {/* 空格子只在宽屏画出来,手机上由 CSS 收起(见 eggs.css) */}
         <aside className="eggs-incu">
           {Array.from({ length: slots }, (_, i) => incubating[i]).map((e, i) => (
-            e ? <EggCard key={e.gid} egg={e} now={now} rate={rate} moving={moving} onPet={setDetailGid} />
+            e ? <EggCard key={e.gid} egg={e} now={now} rate={rate} measured={measured} onPet={setDetailGid} />
               : <div key={'s' + i} className="egg-slot-empty">空格子</div>
           ))}
           {/* 全空时给一句解释:光秃秃 3 个空格子,用户分不清是「真没在孵」还是
@@ -244,7 +243,7 @@ export default function EggList() {
             ? <div className="empty">仓库里没有精灵蛋(需后端抓到背包全量:游戏内打开一次背包即可)</div>
             : (
               <div className="egg-grid">
-                {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} rate={rate} moving={moving} onPet={setDetailGid} />)}
+                {bag.map((e) => <EggCard key={e.gid} egg={e} now={now} rate={rate} measured={measured} onPet={setDetailGid} />)}
               </div>
             )}
         </section>
@@ -256,7 +255,7 @@ export default function EggList() {
 
 // IncuTitle 孵蛋器标题:「孵蛋器 n/3」+ 提示图标。图标比数字小;
 // 点击弹出半透明气泡,说明在孵口径(后端权威快照)与进度是本地外推的估算。点气泡外关闭。
-function IncuTitle({ n, slots, rate, moving, activity }) {
+function IncuTitle({ n, slots, rate, measured, activity }) {
   const ref = useRef(null)
   const [tip, setTip] = useState(false)
   useEffect(() => {
@@ -268,7 +267,7 @@ function IncuTitle({ n, slots, rate, moving, activity }) {
   return (
     <div className="eggs-col-t">
       孵蛋器 <span className="muted">{n}/{slots}</span>
-      <Boost rate={rate} moving={moving} activity={activity} />
+      <Boost rate={rate} measured={measured} activity={activity} />
       <span ref={ref} className="incu-tip">
         <img className="incu-tip-ic" src="/ps.svg" alt="?" title="在孵按权威快照判定,进度是本地外推的估算"
           onClick={() => setTip((t) => !t)} draggable={false} />
@@ -278,12 +277,62 @@ function IncuTitle({ n, slots, rate, moving, activity }) {
   )
 }
 
+// SpeedTest 孵化测速的按钮与状态引导。
+//
+// 测法由玩家配合完成:**点「开始测速」→ 去游戏里打开两次孵蛋器面板**(每次开面板
+// 服务器才下发一次进度,后端取两次的差分成倍率)。故这里主要是把「现在该做什么」
+// 说清楚 —— 玩家不知道要开两次、也不知道要隔多久,光给个按钮他只会愣住。
+//
+// 为什么要隔 ≥MIN_SAMPLE_GAP 秒:服务器约按 5 秒步长结算进度,间隔太短的差分是假值
+// (实测 1s 区间算出 5.00 或 67.50)。隔得越久越准,故够间隔后提示「可以开第二次了」,
+// 但也不阻止他早点开 —— 早开了后端会重置起点,再开一次就是,不会算出错误结果。
+function SpeedTest({ speed, now, busy, onToggle }) {
+  const ts = Math.floor(now / 1000)
+  const waited = speed.t1 ? ts - speed.t1 : 0
+  const enough = waited >= MIN_SAMPLE_GAP
+
+  let tip, done = false
+  switch (speed.state) {
+    case 'armed':
+      tip = <>已就绪 — 请到游戏内<b>打开一次孵蛋器</b>(1/2)</>
+      break
+    case 'first':
+      tip = enough
+        ? <>间隔已够 — 请再<b>打开一次孵蛋器</b>(2/2)</>
+        : <>已记录第 1 次 — 请隔 {MIN_SAMPLE_GAP - waited} 秒后再开一次孵蛋器(2/2)</>
+      break
+    case 'done':
+      done = true
+      tip = <>实测倍率 <b>×{rateText(speed.rate)}</b> — 只要不改变状态就一直准</>
+      break
+    default:
+      tip = <>默认按活动倍率估算(保守)。想看准确 ETA 就测一次</>
+  }
+  return (
+    <div className="eggs-speed">
+      <span className={'eggs-speed-tip' + (done ? ' on' : '')}>{tip}</span>
+      <button
+        className={'btn eggs-speed-btn' + (done ? '' : ' on')}
+        disabled={busy}
+        onClick={() => onToggle(speed.state === 'idle' || speed.state === 'done')}
+        title={speed.state === 'done'
+          ? '重新测一次(会清掉当前结果)'
+          : speed.state === 'idle'
+            ? '开始测速:随后到游戏内打开两次孵蛋器面板'
+            : '取消测速'}
+      >
+        {speed.state === 'done' ? '重新测速' : speed.state === 'idle' ? '测速' : '取消'}
+      </button>
+    </div>
+  )
+}
+
 // EggCard 一颗蛋。布局固定(缺什么都留位置,免得同一行的卡片高低不齐):
 //   [蛋图] 名称 / 奖牌标签        [品类角标][孵出物种头像]
 //   重量 / 声音 / 高度 / 时间
 //   (在孵才有的进度条)
 //   双亲两行(非家园蛋留占位)
-function EggCard({ egg, now, rate, moving, onPet }) {
+function EggCard({ egg, now, rate, measured, onPet }) {
   const p = hatchProgress(egg, now, rate)
   const src = egg.srcName ? `来源:${egg.srcName}` : ''
   const name = tidyEggName(egg.name)
@@ -384,12 +433,7 @@ function EggCard({ egg, now, rate, moving, onPet }) {
         <div className="egg-hatch">
           <div className="egg-bar"><div className="egg-bar-fill" style={{ width: p.pct + '%' }} /></div>
           <span className={p.pct >= 100 ? 'val-hot-hi' : undefined}>{p.pct >= 100 ? '可破壳' : p.pct + '%'}</span>
-          {/* 移动中的轻标记:倍率实时翻倍,ETA 会明显变短。标一下才不至于看着像
-              数字出错。移动状态由后端按移动包判,翻转经 SSE 推来。 */}
-          {p.pct < 100 && moving && (
-            <span className="egg-mv" title="你正在移动,孵化更快;停下后这里会变慢">移动中</span>
-          )}
-          {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p, moving)}>预计 {etaText(egg, p, now)}</span>}
+          {p.pct < 100 && <span className="egg-eta" title={etaTitle(egg, p, measured)}>预计 {etaText(egg, p, now)}</span>}
         </div>
       )}
 

@@ -209,7 +209,7 @@ func TestContractStatic(t *testing.T) {
 func TestContractEggsAndGlasses(t *testing.T) {
 	s := newTestServer(t)
 	seedContract(t, s)
-	// hatchRate 与 hatchMoving 随**当前时刻/玩家状态**而变(活动倍率按每周时间表算,
+	// hatchRate 与 hatchSpeed 随**当前时刻/玩家实测**而变(活动倍率按每周时间表算,
 	// 见 pet.HatchActivityRate),不抹掉的话 golden 会在周五~周日变成另一份、契约测试
 	// 周期性变红。它们本身由 TestHatchRateContract 单独按固定时刻锁定。
 	checkGolden(t, "eggs", get(t, s, "/api/eggs?account="+contractAcc), scrubHatch)
@@ -221,9 +221,8 @@ func TestContractEggsAndGlasses(t *testing.T) {
 // docs/api/fields.json 一类的机器消费方直接解析。
 func scrubHatch(s string) string {
 	s = regexp.MustCompile(`"hatchRate": [\d.]+`).ReplaceAllString(s, `"hatchRate": 0`)
-	// 负号也要匹配:从未移动过时是 time.Time 零值,Unix() 是个很大的负数
-	s = regexp.MustCompile(`"hatchMovingAt": -?\d+`).ReplaceAllString(s, `"hatchMovingAt": 0`)
-	return regexp.MustCompile(`"hatchMoving": (true|false)`).ReplaceAllString(s, `"hatchMoving": false`)
+	// 实测倍率:玩家测过才有值,且值随他当时状态而变,同样抹掉
+	return regexp.MustCompile(`"rate": [\d.]+`).ReplaceAllString(s, `"rate": 0`)
 }
 
 // TestHatchRateContract 按固定时刻锁定孵化倍率的**取值**(上面的 golden 抹掉了它)。
@@ -241,10 +240,6 @@ func TestHatchRateContract(t *testing.T) {
 	}
 	if got := pet.HatchActivityRate(tue); got != 1 {
 		t.Errorf("周二 12:00(窗口外)倍率 = %v,期望 1", got)
-	}
-	// 移动标记:未观测到移动时为 false
-	if s.isHatchMoving(contractAcc) {
-		t.Error("未收到移动包时 hatchMoving 应为 false")
 	}
 }
 

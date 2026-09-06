@@ -378,17 +378,23 @@ CREATE TABLE IF NOT EXISTS egg_source (
   updated_at INTEGER
 );
 
--- 孵化倍率(按账号):最近若干次「相邻采样差分」的样本,取中位数即当前倍率估计。
--- 为什么在后端算而不是前端:前端要差分就得手里有**两次**采样,而它通常只有一次 ——
--- 玩家打开页面时后端库里只躺着最后一次快照(进度只在开孵蛋器 0x0312 / 开背包 0x1344
--- 时下发,没有被动推送),于是永远算不出倍率、退回 1 倍,加速日(实测 5 倍)把预计
--- 完成时间报成 5 倍远。后端回放或实时抓包时**全程看得见**每一次下发,差分随手可得。
--- 存样本数组而非单个值,是为了取中位数抗跳变:实测 22 个差分里有 19 个精确 5.0,
--- 却混着 16.9 / 25.8 / 130.0 三个异常(服务器批量补齐),中位数能把它们滤掉。
--- 详见 docs/data.md 3.6 与 web/src/pages/eggs/hatch.js。
-CREATE TABLE IF NOT EXISTS hatch_rate (
+-- 孵化倍率实测(按账号):玩家在孵蛋页点「开始测速」后开两次孵蛋器,后端取两次
+-- 进度的差分 Δv/Δt。存的是**一次测速的过程与结果**,不是历史样本数组 ——
+-- 早先那套「自动攒差分样本取中位数」已废弃:它把活动倍率(固定时间表)与在线加成
+-- (移动/风场)混成一个数去估,移动时段污染样本、离线那还算不了,且估出来的数
+-- 没有可信定值(实测移动档 16.90~27.32)。详见 store/hatch_speed.go 文件头。
+--
+-- armed_at=0 即未测速(此时按活动倍率 1x/5x 外推)。玩家下线时整行清零
+-- (ClearStaleHatchSpeed),故这里不会有跨会话的残留。
+CREATE TABLE IF NOT EXISTS hatch_speed (
   account TEXT PRIMARY KEY,
-  samples TEXT NOT NULL,
+  armed_at INTEGER NOT NULL DEFAULT 0,  -- 点「开始测速」的时刻;0=未测速
+  t1 INTEGER NOT NULL DEFAULT 0,        -- 第一次采样时刻(抓包主机时钟,见 UpsertEggs)
+  s1 TEXT NOT NULL DEFAULT '',          -- 第一次采样:{gid: hatchedSecs} JSON
+  t2 INTEGER NOT NULL DEFAULT 0,        -- 第二次采样时刻
+  s2 TEXT NOT NULL DEFAULT '',
+  rate REAL NOT NULL DEFAULT 0,         -- 测出的倍率;>0 即完成
+  measured_at INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER
 );
 

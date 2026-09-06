@@ -1,7 +1,6 @@
 package pet
 
 import (
-	"math"
 	"testing"
 	"time"
 )
@@ -79,32 +78,31 @@ func TestHatchActivityRateIgnoresHostZone(t *testing.T) {
 	}
 }
 
-// TestHatchRateWithMoving 守「总倍率 = 活动倍率 × 移动增益」。
+// TestHatchRateNoMoveGain 守「倍率**不含**移动加成」。
 //
-// 前端按同一口径自己算(见 hatch.js 的 hatchRateNow),两边必须一致 —— 故这里把
-// 期望值写死成数字,任一侧改了算法都会对不上。
-func TestHatchRateWithMoving(t *testing.T) {
+// 这是 2026-09-06 的回退结论,务必别再改回去:早先 HatchRate 会在移动时乘一个固定
+// 增益 4.2(5×4.2=21),那等于把「在线加成」这个**没有定值**的量当成有定值去外推。
+// 实测六份 pcap:移动档倍率 16.90~27.32(中位 21.96、标准差 3.38),单一增益覆盖
+// 不了;且同速度(≈828)的三个样本极差 8.10、大于整个速度区间造成的效应 4.12
+// (见 docs/pcap-2026-09-05-hatch-rate.md §4.2)。乘上去的后果是 ETA 每几秒在
+// 5 倍与 21 倍间跳(合计翻转 212 次,最密的一份平均 3.5 秒一次),并在一半样本上
+// 虚报「快好了」。
+//
+// 现在倍率只有两档(加速日 5 / 否则 1),想要更准由玩家实测(见 store/hatch_speed.go)。
+func TestHatchRateNoMoveGain(t *testing.T) {
 	at := func(y int, mo time.Month, d, h int) int64 {
 		return time.Date(y, mo, d, h, 0, 0, 0, cstZone).Unix()
 	}
-	// 加速日窗口内(周六):静止 5、移动 5×4.2=21
-	if got := HatchRate(at(2026, 9, 5, 12), false); got != 5 {
-		t.Errorf("加速日静止应为 5,实得 %v", got)
+	// 加速日窗口内(周六):5
+	if got := HatchRate(at(2026, 9, 5, 12)); got != 5 {
+		t.Errorf("加速日应为 5,实得 %v", got)
 	}
-	if got := HatchRate(at(2026, 9, 5, 12), true); math.Abs(got-21) > 0.01 {
-		t.Errorf("加速日移动应为 21(5 × 4.2),实得 %v", got)
-	}
-	// 非加速日(周二):静止 1、移动 1×4.2=4.2
-	// ⚠️ 后者是**推算值**(六份 pcap 全抓在加速日,没有对照样本),若实测不符,
-	// 改 hatchMoveGain 时同步改这里与前端常数。
-	if got := HatchRate(at(2026, 9, 8, 12), false); got != 1 {
-		t.Errorf("非加速日静止应为 1,实得 %v", got)
-	}
-	if got := HatchRate(at(2026, 9, 8, 12), true); math.Abs(got-4.2) > 0.01 {
-		t.Errorf("非加速日移动应为 4.2(1 × 4.2),实得 %v", got)
+	// 非加速日(周二):1 —— 不含任何移动推算
+	if got := HatchRate(at(2026, 9, 8, 12)); got != 1 {
+		t.Errorf("非加速日应为 1,实得 %v", got)
 	}
 	// 异常时刻不该崩,也不该被算成某周的某天
-	if got := HatchRate(0, true); got <= 0 {
+	if got := HatchRate(0); got <= 0 {
 		t.Errorf("ts=0 时应退回安全的正倍率,实得 %v", got)
 	}
 }
