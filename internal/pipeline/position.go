@@ -42,6 +42,9 @@ func (p *Pipeline) handleScene(m capture.Message, acc string) bool {
 		p.noteGatherPick(m.Session, m.AppBody, m.Time)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpBattleFinishNotify:
 		p.onBattleFinish(m.Session, acc, m.AppBody, m.Time)
+		p.onBattleEnd(m, acc) // 同一条结算消息:那边管野怪标记,这边管玩家状态
+	case m.Direction == gcp.S2C && m.Opcode == scene.OpBattleEnterNotify:
+		p.onBattleEnter(m, acc)
 	case m.Direction == gcp.C2S && m.Opcode == scene.OpSceneMoveReq:
 		p.onMove(m, acc)
 	case m.Direction == gcp.S2C && m.Opcode == scene.OpOnlineVisitorInfoNotify:
@@ -107,7 +110,7 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	// 采集物与野生宠不同:它是「此刻有」的实时态,同场景传送也整份作废
 	// (留着就是一屏指向别处的假标记,见 resetGathers)。
 	p.resetGathers(m.Session, acc, tp.ResID, m.Time)
-	pos := p.buildPos(acc, tp.ResID, tp.Room, scene.MoveReq{
+	pos := p.buildPos(cs, acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,
 	}, m.Time)
 	p.pushPos(acc, pos)
@@ -167,7 +170,7 @@ func (p *Pipeline) onMove(m capture.Message, acc string) {
 	// 移动包在发 = 自己在操作,访客流该让位(见 riderGap / onVisitorPos)。
 	cs.lastMoveAt = m.Time
 	cs.riderPrevAt = m.Time
-	pos := p.buildPos(acc, res, cs.room, mr, m.Time)
+	pos := p.buildPos(cs, acc, res, cs.room, mr, m.Time)
 	// 分层地图:玩家当前所在区域(服务器区域进/出事件维护)命中某层的 area_func_id 即在该层,
 	// 经 layerDebounce 去抖(滤掉走动中擦出/擦进触发体接缝的百毫秒级抖动)。见 docs/data.md 3.2。
 	if l, ok := p.layerOf(m.Session, res, m.Time, true); ok {
@@ -262,7 +265,7 @@ func (p *Pipeline) onVisitorPos(m capture.Message, acc string) {
 	}
 	cs.pos = self.Pos
 	cs.riderPrevAt = m.Time
-	pos := p.buildPos(acc, cs.res, cs.room, mr, m.Time)
+	pos := p.buildPos(cs, acc, cs.res, cs.room, mr, m.Time)
 	if l, ok := p.layerOf(m.Session, cs.res, m.Time, true); ok {
 		if lp := p.layerPayload(cs.res, l); lp != nil {
 			pos.SceneName = l.Name
@@ -325,6 +328,51 @@ func (p *Pipeline) pushPos(acc string, pos *server.PositionPayload) {
 	p.srv.Hub().Broadcast("position", acc, pos)
 }
 
+// battleStale 是「一场战斗算打太久」的上限。超过它还没收到结算(0x132c)就当作已经结束 ——
+// 兜底漏包:抓包丢一条 0x132c 就会让地图上的图标永久挂着,比误判「已结束」难发现得多。
+//
+// 取 10 分钟:实测六份 pcap 里最短的一场约 20 秒、最长的几分钟(连续挑战花种时
+// 一场接一场,但每场之间必有 0x132c)。10 分钟远长于正常战斗,短到不会一直挂着。
+const battleStale = 10 * time.Minute
+
+// onBattleEnter 记录进战(0x1316),并立刻推一次位置让图标马上出现。
+//
+// 为什么要立刻推:进入战斗后客户端就**不再发移动包**了(实测如此),箭头会停在
+// 进战前的位置。若不主动推一次,图标得等到下一条位置才出现 —— 而那时可能已经
+// 打完了。这里把当前 cs.pos 原样再推一次,只改 InBattle 标志。
+func (p *Pipeline) onBattleEnter(m capture.Message, acc string) {
+	cs := p.conn(m.Session)
+	if cs == nil {
+		return
+	}
+	id := scene.ParseBattleID(m.AppBody)
+	cs.battleID, cs.battleAt = id, m.Time
+	// 复用传送落点那条路:只带 Pos 的合成 MoveReq,把当前位置重发一遍。
+	p.pushPos(acc, p.buildPos(cs, acc, cs.res, cs.room, scene.MoveReq{Pos: cs.pos}, m.Time))
+}
+
+// onBattleEnd 清掉战斗状态并推一次位置(让图标消失)。
+//
+// battleID 为 0 时不校验 id:结算消息可能解不出 id(版本变化/字段缺失),此时
+// 「收到结算」本身就足以说明打完了 —— 硬要比对 id 会让图标卡住不消失,
+// 那比误清更糟(误清最多是图标早消失几秒)。
+func (p *Pipeline) onBattleEnd(m capture.Message, acc string) {
+	cs := p.conn(m.Session)
+	if cs == nil || cs.battleID == 0 {
+		return
+	}
+	if id := scene.ParseBattleID(m.AppBody); id != 0 && id != cs.battleID {
+		return // 是别人的战斗结算
+	}
+	cs.battleID, cs.battleAt = 0, time.Time{}
+	p.pushPos(acc, p.buildPos(cs, acc, cs.res, cs.room, scene.MoveReq{Pos: cs.pos}, m.Time))
+}
+
+// battleExpired 报告这场战斗是否已超时未结算(见 battleStale)。
+func battleExpired(cs *connState, now time.Time) bool {
+	return cs.battleID != 0 && !cs.battleAt.IsZero() && now.Sub(cs.battleAt) > battleStale
+}
+
 // minSegSpan 是「值得回放的真实轨迹」的最短跨度(秒)。移动包按操作事件上报:持续改方向/变速时
 // 约 0.1s 一包(轨迹点为空或只有一两个,回放毫无意义且会拖慢箭头);推住摇杆盘旋或直线巡航时输入
 // 不变,退化成 2.5-3s 一次心跳,那几秒实际走的路(含大转弯)只在 move_seg_list 里。取 0.6s 为界。
@@ -332,7 +380,7 @@ const minSegSpan = 0.6
 
 // buildPos 组装一条位置推送(不含分层)。移动包与**传送落点**共用:传送时用一个只带 Pos/Yaw/StopMove
 // 的合成 MoveReq(无速度、无轨迹),这样传送一下发就能把地图切到目的地,不必干等第一个移动包。
-func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t time.Time) *server.PositionPayload {
+func (p *Pipeline) buildPos(cs *connState, acc string, res, room int32, mr scene.MoveReq, t time.Time) *server.PositionPayload {
 	// 地表底图始终作背景;玩家点用底图投影。坐标系统一为底图。
 	pos := &server.PositionPayload{
 		Account:    acc,
@@ -348,6 +396,7 @@ func (p *Pipeline) buildPos(acc string, res, room int32, mr scene.MoveReq, t tim
 		Paintable:  p.srv.Paintable(res), // 该场景能否涂地(见 docs/data.md 3.8),前端据此显示图层开关
 		Ts:         t.Unix(),
 		TsMs:       t.UnixMilli(), // 前端判断缓存位置是否过期(过期则不外推)
+		InBattle:   cs != nil && cs.battleID != 0,
 	}
 	u, v, ok := p.db.Project(uint32(res), mr.Pos.X, mr.Pos.Y)
 	if !ok {

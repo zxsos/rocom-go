@@ -665,6 +665,7 @@
       "account": "str",
       "heading": "float",
       "img": "str",
+      "inBattle": "bool",
       "paintable": "bool",
       "path": [
         {
@@ -695,6 +696,7 @@
       "account": "str",
       "heading": "float",
       "img": "str",
+      "inBattle": "bool",
       "paintable": "bool",
       "sceneCfgId": "int",
       "sceneName": "str",

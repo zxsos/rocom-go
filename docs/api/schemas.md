@@ -242,7 +242,7 @@
 { "account": "UID:1", "sceneResId": 10003, "sceneCfgId": 1001, "sceneName": "卡洛西亚大陆",
   "img": "bigmap/10003.webp", "x": 510000, "y": 612000, "z": 1200,
   "u": 0.5, "v": 0.5, "vu": 0.0001, "vv": -0.0002,
-  "heading": 123.5, "stop": false, "paintable": true,
+  "heading": 123.5, "stop": false, "paintable": true, "inBattle": false,
   "ts": 0, "tsMs": 0, "path": [{ "u": 0.49, "v": 0.49 }, { "u": 0.5, "v": 0.5 }] }
 ```
 
@@ -251,7 +251,7 @@
 { "account": "UID:1", "sceneResId": 10003, "sceneCfgId": 1001, "sceneName": "卡洛西亚大陆",
   "img": "bigmap/10003.webp", "x": 510000, "y": 612000, "z": 1200,
   "u": 0.5, "v": 0.5, "heading": 123.5, "stop": false, "paintable": true,
-  "ts": 0, "tsMs": 0 }
+  "inBattle": false, "ts": 0, "tsMs": 0 }
 ```
 
 | 字段 | 说明 |
@@ -262,6 +262,7 @@
 | `ts` / `tsMs` | Unix 秒 / **毫秒**（前端按 `tsMs` 判过期）；golden 中抹为 `0` |
 | `heading` | 朝向角（度），0=世界+X（地图东/右），顺时针增 |
 | `paintable` | 该场景能否涂地，前端据此显示图层开关 |
+| `inBattle` | 玩家**此刻是否在对战中**；地图据此在头顶挂脉冲图标。进战 `0x1316` 置、结算 `0x132c` 清，另有超时兜底（见 `docs/data.md` 3.9） |
 | `img` | 底图文件名（家园按等级 `<res>_<lv>`）；无底图为空串 |
 
 > 过期抹除是**有意设计**：陈旧速度会让前端外推一路飘走，故先静态回显，

@@ -2,6 +2,7 @@
   "account": "UID:1",
   "heading": 123.5,
   "img": "bigmap/10003.webp",
+  "inBattle": false,
   "paintable": true,
   "sceneCfgId": 1001,
   "sceneName": "卡洛西亚大陆",

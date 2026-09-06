@@ -58,13 +58,14 @@ func TestPositionPayloadKeys(t *testing.T) {
 		Account: "UID:1", SceneResID: 10003, SceneCfgID: 1001,
 		SceneName: "卡洛西亚大陆", Img: "bigmap/10003.webp",
 		X: 1, Y: 2, Z: 3, Heading: 1, Stop: true, Paintable: true,
-		Ts: 1, TsMs: 1000,
+		InBattle: true,
+		Ts:       1, TsMs: 1000,
 		U: &u, V: &v, VU: &vu, VV: &vv,
 		Path:      []PositionPoint{{U: 1, V: 2}},
 		LayerOnly: true, Layer: map[string]any{"k": 1},
 	}
 	eq(t, "PositionPayload", keys(t, p), []string{
-		"account", "heading", "img", "layer", "layerOnly", "paintable",
+		"account", "heading", "img", "inBattle", "layer", "layerOnly", "paintable",
 		"path", "sceneCfgId", "sceneName", "sceneResId", "stop",
 		"ts", "tsMs", "u", "v", "vu", "vv", "x", "y", "z",
 	})
