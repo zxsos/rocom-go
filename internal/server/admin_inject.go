@@ -250,11 +250,16 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 	s.injectMu.Unlock()
 
 	// 读-改-写由 snapshotStore 在锁内完成(见 mergeWild),外部拿不到 wildMu
-	s.snap.mergeWild(req.Account, sceneRes, []WildMark{mark})
+	cur := s.snap.mergeWild(req.Account, sceneRes, []WildMark{mark})
 
+	// ⚠️ 必须推**合并后的全量**,不能只推新注入的这一只:
+	// 前端收到 wildpets 是整表替换(见 useWildPets.js 的 setData(d)),只推一只就会
+	// 把已有的真实野生宠和之前注入的精灵一起清掉 —— 表现为「连投几只,地图上始终
+	// 只有最后那一只」。allPets 同理必须带上,否则「全部野生」图层也会一起空掉。
+	// (撤销路径同样推 cur.Pets 全量,两条路一致。)
 	s.hub.Broadcast("wildpets", req.Account, WildPayload{
-		Account: req.Account, SceneResID: sceneRes,
-		Pets: []WildMark{mark}, AllPets: []WildAllMark{},
+		Account: req.Account, SceneResID: cur.SceneResID,
+		Pets: cur.Pets, AllPets: cur.AllPets,
 		Inject: true,
 	})
 	writeJSON(w, map[string]any{"ok": true, "id": id, "u": u, "v": v})

@@ -60,8 +60,11 @@ type PositionPayload struct {
 	Heading    float64 `json:"heading"`   // 朝向角(度),0=世界+X(地图东/右),顺时针增
 	Stop       bool    `json:"stop"`      // 是否静止(静止时无速度向量)
 	Paintable  bool    `json:"paintable"` // 该场景能否涂地,前端据此显示图层开关
-	Ts         int64   `json:"ts"`        // Unix 秒
-	TsMs       int64   `json:"tsMs"`      // Unix 毫秒;前端判断缓存位置是否过期(过期则不外推)
+	// InBattle 表示玩家**此刻正在对战中**(地图据此在头顶挂图标,见 docs/data.md 3.7)。
+	// 进战 0x1316 置、结算 0x132c 清,另有超时兜底(漏包时不至于永久挂着)。
+	InBattle bool  `json:"inBattle"`
+	Ts       int64 `json:"ts"`   // Unix 秒
+	TsMs     int64 `json:"tsMs"` // Unix 毫秒;前端判断缓存位置是否过期(过期则不外推)
 
 	// 底图投影坐标:该场景无底图时为 nil(整组不发)。
 	U *float64 `json:"u,omitempty"`

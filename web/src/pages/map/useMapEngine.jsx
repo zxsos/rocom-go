@@ -89,6 +89,9 @@ export function useMapEngine(account) {
   const dispRef = useRef(null)
   const worldRef = useRef(null)
   const arrowRef = useRef(null)
+  // 对战图标节点(位置由 applyFrame 逐帧同步到箭头处,故只留 ref、不进 state:
+  // 每帧 setState 会把 RAF 变成 React 渲染,60fps 下开销不可接受)。
+  const battleRef = useRef(null)
   const lastFrameRef = useRef(null)
   // draggingRef:指针是否按住拖动中。静止判定见下:玩家静止时 RAF 会停,
   // 但拖动期间 focusRef 持续被平移更新,必须保持 RAF 运行才能逐帧消费,否则单指拖不动
@@ -133,6 +136,11 @@ export function useMapEngine(account) {
     lastFrameRef.current = { world, arrow, wNode: worldRef.current, aNode: arrowRef.current }
     worldRef.current.style.transform = world
     if (arrowRef.current) arrowRef.current.style.transform = arrow
+    // 对战图标跟到同一位置,但**不带 rotate**:它是「头顶挂件」,
+    // 不该随朝向一起转(箭头转它不转,才像浮在头顶)。
+    if (battleRef.current) {
+      battleRef.current.style.transform = `translate3d(${ax}px, ${ay}px, 0) translate(-50%,-50%)`
+    }
   }, [stRef, focusRef])
 
   useEffect(() => {
@@ -245,7 +253,7 @@ export function useMapEngine(account) {
 
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
-    view, worldRef, arrowRef, applyFrame,
+    view, worldRef, arrowRef, battleRef, applyFrame,
     pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap, clearUiState,
     // canvas PiP 用:暴露当前帧的渲染参数(供 renderToCanvas 画到外部 canvas)
@@ -265,7 +273,7 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
   // 本函数与 useMapEngine **不是同一个作用域**,漏传就只在运行时炸 ReferenceError
   // (vite build 不做 no-undef 检查,构建照样过)—— 曾因此地图整页白屏。
   const { pos, hasMap, layerError, setImgError, setLayerError,
-    view, worldRef, arrowRef, pois, wilds, gathers, home, paint, routes,
+    view, worldRef, arrowRef, battleRef, pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, wildDist,
     draggingRef, pokeFrame } = engine
   const mapPx = (Math.min(view.vp.w, view.vp.h) || 1) * view.zoom
@@ -352,6 +360,18 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
           <div className="map-arrow" ref={arrowRef}>
             <svg viewBox="0 0 24 24" width="30" height="30">
               <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="var(--red)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
+          </div>
+          {/* 对战图标:挂在**箭头外层**而非里面 —— 箭头每帧被 rotate(朝向),
+              放里面图标会跟着转。外层这层由 RAF 用同一个 transform 驱动,
+              故位置与箭头严格同步、图标本身不旋转(见 applyFrame)。 */}
+          <div className="map-battle" ref={battleRef} hidden={!pos.inBattle} title="对战中">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              {/* 交叉双剑:一眼能认出是「在打架」,不必区分 PVE/PK */}
+              <g fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                <path d="M5 19 L17 7" />
+                <path d="M7 7 L19 19" />
+              </g>
             </svg>
           </div>
           {ctrl}

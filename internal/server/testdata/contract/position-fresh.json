@@ -2,6 +2,7 @@
   "account": "UID:1",
   "heading": 123.5,
   "img": "bigmap/10003.webp",
+  "inBattle": false,
   "paintable": true,
   "path": [
     {

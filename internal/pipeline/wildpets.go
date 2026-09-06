@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -323,6 +324,25 @@ func (p *Pipeline) flushDirtyWilds(now time.Time) {
 			continue
 		}
 		p.pushWilds(conn, acc, now)
+	}
+	// 战斗超时兜底:漏掉一条结算(0x132c)就会让地图上的图标永久挂着,比误判
+	// 「已结束」难发现得多。跟着消息走即可 —— 与上面同一条路径,不另起定时器。
+	p.expireStaleBattles(now)
+}
+
+// expireStaleBattles 清掉超时的战斗状态(见 battleStale)。
+func (p *Pipeline) expireStaleBattles(now time.Time) {
+	for conn, cs := range p.conns {
+		if !battleExpired(cs, now) {
+			continue
+		}
+		acc := p.connAccount[conn]
+		if acc == "" {
+			continue
+		}
+		log.Printf("战斗 %d 超过 %v 未收到结算,按已结束处理(兜底漏包)", cs.battleID, battleStale)
+		cs.battleID, cs.battleAt = 0, time.Time{}
+		p.pushPos(acc, p.buildPos(cs, acc, cs.res, cs.room, scene.MoveReq{Pos: cs.pos}, now))
 	}
 }
 

@@ -99,6 +99,11 @@ type connState struct {
 	// 实体进出 AOI 会突发(实测同一只宠反复进出占 53.6%),逐条广播等于把整份视野
 	// 列表重发几十遍,故攒一攒再发(见 wildsDebounce 与 flushDirtyWilds)。
 	wildsDirtyAt time.Time
+	// battleID:正在进行的战斗 id(0=不在战斗中)。地图据此在玩家头顶挂图标。
+	// 进战 0x1316 置、结算 0x132c 清,另有 battleStale 超时兜底(漏包时不至于永久挂着)。
+	battleID uint64
+	// battleAt:进战时刻,供超时判定。
+	battleAt time.Time
 	// gathersDirtyAt:实时采集物图层的待广播时刻,语义同 wildsDirtyAt。
 	// 单独一个字段而非复用:两者的合并窗口虽同量级,但触发时机与载荷内容不同,
 	// 共用一个「脏标记」会让任一侧的广播把另一侧也拖着发一遍。
