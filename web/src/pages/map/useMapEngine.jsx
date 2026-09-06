@@ -362,16 +362,23 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
               <path d="M12 2 L20 21 L12 16 L4 21 Z" fill="var(--red)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
           </div>
-          {/* 对战图标:挂在**箭头外层**而非里面 —— 箭头每帧被 rotate(朝向),
-              放里面图标会跟着转。外层这层由 RAF 用同一个 transform 驱动,
-              故位置与箭头严格同步、图标本身不旋转(见 applyFrame)。 */}
+          {/* 对战图标:挂在**箭头外层** —— 箭头每帧被 rotate(朝向),放里面图标会跟着转。
+              位置由 applyFrame 用同一个 transform 驱动,严格同步,图标本身不旋转。 */}
           <div className="map-battle" ref={battleRef} hidden={!pos.inBattle} title="对战中">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              {/* 交叉双剑:一眼能认出是「在打架」,不必区分 PVE/PK */}
-              <g fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-                <path d="M5 19 L17 7" />
-                <path d="M7 7 L19 19" />
-              </g>
+            {/* lucide "swords" —— 交叉双剑,带剑格与剑柄,比手画的两条线好认。
+                24×24 viewBox、stroke=currentColor:颜色交给外层 .map-battle 的 color,
+                换配色不必改这里。动效见 map.css 的 map-battle-clash(两剑交击)。 */}
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+              fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="m13 19 6-6" />
+              <path d="M14.5 17.5 3.586 6.586A2 2 0 0 1 3 5.172V3h2.172a2 2 0 0 1 1.414.586L17.5 14.5" />
+              <path d="m14.828 6.172 2.586-2.586A2 2 0 0 1 18.828 3H21v2.172a2 2 0 0 1-.586 1.414l-2.586 2.586" />
+              <path d="m16 16 4 4" />
+              <path d="m19 21 2-2" />
+              <path d="m5 14 4 4" />
+              <path d="m5 21-2-2" />
+              <path d="M7.5 16.5 4 20" />
             </svg>
           </div>
           {ctrl}
