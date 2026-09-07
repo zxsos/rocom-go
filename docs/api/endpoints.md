@@ -61,7 +61,8 @@
 | `GET /api/wildpets` | — | ✓ | 最近一次野生宠物标记 |
 | `GET /api/paint` | — | ✓ | 涂地覆盖位图（`?res=&layer=`，cells 为 base64 位图） |
 | `DELETE /api/paint` | — | ✓ | 清空涂地，并广播 `{reset:true}` |
-| `GET /api/home` | — | ✓ | 最近一次家园小窝图层 |
+| `GET /api/home` | — | ✓ | 最近一次家园小窝图层（**自己**的家园，抓包数据） |
+| `GET /api/home/query` | — | — | 按 `uid` 查**任意玩家**的家园快照（回源第三方，与抓包无关；`force=1` 跳过缓存）。见 [schemas.md](schemas.md#get-apihomequery) |
 | `GET /api/trial` | — | ✓ | 最近一次草系徽章试炼状态（进行中的一局 + 账号档案） |
 | `GET /api/trial/encounters` | — | ✓ | 草系试炼**遇见记录**（三章各一张精灵图，**读库累积**，不经 SSE） |
 

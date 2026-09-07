@@ -74,6 +74,15 @@ export const IconFlower = (p) => (
   </S>
 )
 
+// 家园(屋顶 + 墙体,与"实时地图"的图钉区分开)
+export const IconHome = (p) => (
+  <S {...p}>
+    <path d="M3 10.5 12 4l9 6.5" />
+    <path d="M5.5 9.6V20h13V9.6" />
+    <path d="M10 20v-5h4v5" />
+  </S>
+)
+
 // 草系徽章试炼:三章节点连成的路径(章末带一个旗点)
 export const IconTrail = (p) => (
   <S {...p}>

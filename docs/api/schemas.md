@@ -627,6 +627,7 @@
 | `GET /api/merchant` | `{now, day, status:"open\|closed\|idle", today:[{start,end,label,empty,merchant}], prev:[...]}`，`merchant` 是第三方原始 JSON |
 | `GET /api/merchant/sub` | `{configured, subscribed, email, keywords}` |
 | `GET /api/eggs/query` | `{source, total, matches:[{name,img,hatchSecs,score,heightPct,weightPct,confId,note}]}`；**两个数据源共用此结构**，详见下节 |
+| `GET /api/home/query` | `{uid,homeName,homeLevel,roomLevel,comfort,pets:[{base,form,name,species,level,gender,mutation,status,head,book}],plants:[{seedName,harvest,ripeAt,canSteal,stolen}],cached,fetchedAt}`，详见下节 |
 | `POST /api/account/verify` | `{ok, hasPin}` |
 | 各 admin 接口 | 见 `web/src/api.js` 的注释（前端侧已逐个注明响应形状） |
 
@@ -662,6 +663,49 @@
 
 咸鱼源未配令牌时返回 **503**，且**不落统计**（统计是给「烧了多少额度」看的，
 没发出去的请求不该计入）。本地源永不因缺令牌失败。
+
+### `GET /api/home/query` —— 按 uid 查任意玩家的家园
+
+⚠️ 与 `GET /api/home` **不是一回事**，别混：
+
+| 接口 | 查谁 | 数据从哪来 |
+| --- | --- | --- |
+| `GET /api/home` | **自己** | 抓包（小窝图层、下蛋配对，见 `scene/home.go`） |
+| `GET /api/home/query` | **任意 uid** | 回源第三方 rocodex.org，与抓包无关 |
+
+参数：`uid`（必填，**非空纯数字**，**不限位数**——实测有 6 位与 9 位，位数由上游判定）、`force=1`（可选，跳过服务端 15 分钟缓存）。
+
+```json
+{ "uid": "5678116", "homeName": "牢大", "homeLevel": 25, "roomLevel": 5, "comfort": 75780, "exp": 2116674,
+  "pets": [{ "base": 3123, "form": 37147, "name": "秋天", "species": "雪影娃娃",
+             "level": 60, "gender": "雌性", "mutation": "异色", "status": "已驻守",
+             "head": "HeadIcon/3123.webp", "book": 123 }],
+  "plants": [{ "seedName": "恶魔雪茄", "harvest": 18, "ripeAt": 1786498395,
+               "canSteal": 6, "stolen": 0 }],
+  "cached": false, "fetchedAt": 1788780000 }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `pets[].base` | 品种 **petbase_id**，与本地 `gamedata` 同一套 id，故能直接查名/查图。上游把形态 id 放在 `gid` 字段，**不是**同一个东西 |
+| `pets[].form` | 形态 id（上游 `gid`）。同品种不同形态各有一个，炫彩/异色绑在这一层（实测 3121 同时有 53264、54509 两个形态） |
+| `pets[].name` | 玩家起的昵称（如「秋天」） |
+| `pets[].species` | 品种中文名，取自本地名称表；查不到时回落上游 `defaultName` |
+| `pets[].head` | 本地小头像，**相对路径**，需套 `imgURL()` 成 `/img/…`（与 `/api/eggs/query` 的 `img` 不同，那个已是完整值）。**异色个体给异色图**（`HeadIcon/<id>_1.webp`）；全库仅 19% 品种有专属异色图，没有的自动回退普通图 |
+| `pets[].mutation` | `异色` / `异色炫彩` / 空。**没有色号** —— 上游只给这个文本，`glass_type`/`glass_value` 拿不到，别指望用它补图鉴炫彩 |
+| `pets[].status` | `未喂食` / `已喂食` / `可收取灵感`，对应上游 status `1700` / `1701` / `1702`（由玩家在游戏内比对确认）。**未收录的状态码返回空串**，不用上游的 `statusText`（它把认不出的码拼成「状态 1700」这种内部枚举，给人看没有意义） |
+| `pets[].feed` | 喂食轮次（上游 `feedRound`）。**不是时间**，语义待确认 |
+| `plants[].ripeAt` | 成熟时刻（Unix 秒）；0=上游没给或格式不认 |
+| `cached` | 是否命中服务端缓存（`force=1` 时恒为 `false`） |
+| `fetchedAt` | 本份数据**回源**时刻；命中缓存时是上次回源的时间，不是本次请求时间 |
+
+两点使用注意：
+
+- **没有「是否已成熟」这个字段**，前端自己比 `ripeAt` 与当前时刻。上游的 `state` 已观察到 `1`=生长中（harvestNum 0、ripeAt 在未来）、`2`=可收获（harvestNum>0、ripeAt 已过），与 ripeAt 自洽，但样本仅两种，不足以下发布尔字段。
+- **拿不到喂食时间**。上游 pet 的全部字段是 `id/gid/name/defaultName/level/gender/genderText/energy/mutationName/haveEgg/feedRound/status/statusText/icon`，**没有任何时间戳**。`feedRound` 是累计轮次、`energy` 恒为 10，都推不出时间。
+- **回源失败会降级返回旧缓存**（同一 uid 此前成功过的话），此时 `cached` 为 `true`、HTTP 仍是 200。只有从没成功过才 502。上游是免费站，偶发失败是预期内的。
+
+上游按 clientId 限额（每天 3 次），服务端每次请求先 `GET /api/home-query/quota` 领一个新 clientId 再查询，故额度不受限 —— **这个顺序不能省**，省了会撞限额（有测试守着，见 `api_home_query_test.go`）。
 
 ### `GET|POST /api/admin/egg-source` —— 切换查蛋数据源
 

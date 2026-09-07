@@ -182,6 +182,18 @@ export const getTrialEncounters = () => getJSON('/api/trial/encounters?' + build
 // 之后由 SSE flowers 覆盖;从未收到过 0x0375(游戏内未打开过花种面板)时返回 null。
 export const getFlowers = () => getJSON('/api/flowers?' + buildQuery(), null)
 
+// getHomeQuery 按 uid 查询**任意玩家**的家园快照(回源第三方,与抓包无关):
+//   {uid,homeName,homeLevel,roomLevel,comfort,pets:[{base,form,name,species,level,
+//    gender,mutation,status,head,book}],plants:[{seedName,harvest,ripeAt,canSteal,stolen}],
+//    cached,fetchedAt}
+// 注意与 /api/home 的区别:那个是**自己**家园的小窝图层(抓包数据),这个查的是别人。
+// force=true 跳过服务端 15 分钟缓存强制回源;回源失败时后端会降级返回旧缓存。
+export const getHomeQuery = async (uid, force = false) => {
+  const r = await fetch('/api/home/query?' + buildQuery({ uid, force: force ? 1 : '' }))
+  if (!r.ok) throw await httpError(r, '查询家园失败')
+  return r.json()
+}
+
 // getFlowerSlots 返回当前账号的花种世界存档槽位列表(槽位管理用):
 //   {slots:[{key,name,ts,flowers:[…]}]}——key 为 "self"(自己世界)或 "owner:<uid>"(好友世界,
 // uid 即世界归属者)。每槽 flowers 是该世界最近一次完整花种列表(含 0x0338 详情)。
