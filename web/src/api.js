@@ -170,6 +170,28 @@ export const getHome = () => getJSON('/api/home?' + buildQuery(), null)
 // 之后由 SSE trial 覆盖;从未见过试炼报文时返回 null。
 export const getTrial = () => getJSON('/api/trial?' + buildQuery(), null)
 
+// getShanyao 返回当前账号最近一次战局(隐藏模块「闪耀大赛」#/shanyao 加载即时回显):
+//   {ts, active, finished, battleId, mode, round, result,
+//    self:{uin,name,level,hp,hpMax,pets:[{gid,petId,baseConfId,name,species,level,gender,
+//          nature,natureName,blood,bloodName,damTypes,damNames,img,shiny,glassType,glassValue,
+//          glassName,hp,hpMax,dead,onField,energy,stats,raceStats,estimated,
+//          skills:[{id,name,type,category,cost,power,hits,source,ruleId}]}]}, foe:{…}}
+// stats 是协议下发的六维(**仅我方**),数组顺序固定:
+//   [hp, physicalAttack, magicalAttack, physicalDefense, magicalDefense, speed];
+// raceStats 是静态种族值(同序),estimated=true 表示该宠六维需推算(非协议值)。
+// skills[].power 是**采用值**:对局内实时威力优先,其次静态表;source 说明来自哪一侧。
+// skills[].ruleId 非空表示该技能是**动态威力**(mana_burst 按当前能量查表 /
+// speed_difference 闪击 / physical_defense_difference 鸣沙陷阱按差值查表),
+// 此时 basePower 不能直接用。pets[].energy 是当前能量(0 合法,键缺席才是没给)。
+// 之后由 SSE 的 shanyao 覆盖;从未见过战局报文时返回 null。
+// ⚠️ hp/hpMax 是**可选指针**:键缺席表示服务端没下发,与 0(倒下)不是一回事。
+export const getShanyao = () => getJSON('/api/shanyao?' + buildQuery(), null)
+
+// getCalcRules 返回伤害估算的规则常量(隐藏模块 #/shanyao 用,**不随账号**):
+//   {statKeys:[六维键序], types:[18 系], matrix:[[攻][守] 倍率], clamp:{max,min}, source}
+// 缺数据时返回 null(后端没生成 calc_types.json),前端据此显示「缺数据」。
+export const getCalcRules = () => getJSON('/api/calc-rules', null)
+
 // getTrialEncounters 返回草系试炼的「遇见记录」:三章各一张精灵图,遇到过的置灰。
 // 与 getTrial(实时状态)不同,这是**累积的历史**,直接读库,故不随 SSE 更新 ——
 // 打完一局重新切到该页即可(或刷新)。

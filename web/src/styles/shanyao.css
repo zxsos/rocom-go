@@ -1,0 +1,409 @@
+/* 闪耀大赛(隐藏模块 #/shanyao):竞技擂台 + 数据面板。
+   全部走 base.css 的既有变量,不新增色板 —— 亮/暗主题自动跟随。 */
+
+.shanyao-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* —— 空态 —— */
+.sy-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 28px 22px;
+  background: var(--bg-1);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+}
+.sy-empty-t {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+/* —— 擂台 —— */
+.sy-arena {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 10px;
+  padding: 16px;
+  overflow: hidden;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+/* 极淡对角渐变(左上→右下):只做「擂台的空间感」,不抢卡片的注意力。 */
+.sy-arena-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-soft) 0%, transparent 45%, var(--accent-soft) 100%);
+  opacity: .5;
+  pointer-events: none;
+}
+.sy-arena > * { position: relative; }
+
+.sy-side { display: flex; flex-direction: column; gap: 6px; }
+.sy-side.self { justify-content: flex-end; }
+.sy-side-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.sy-side.self .sy-side-head { justify-content: flex-start; }
+.sy-side.foe .sy-side-head { justify-content: flex-end; }
+.sy-side-name { font-size: 13px; font-weight: 500; color: var(--fg); }
+.sy-stamina {
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* 一行精灵卡:我方靠左、对手靠右,形成对角对峙。 */
+.sy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sy-side.self .sy-row { justify-content: flex-start; }
+.sy-side.foe .sy-row { justify-content: flex-end; }
+
+.sy-vs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.sy-vs-t {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: .08em;
+  opacity: .5;
+}
+.sy-vs-r { font-size: 11px; color: var(--fg-dim); }
+
+/* —— 精灵卡 —— */
+.sy-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  width: 104px;
+  padding: 8px 6px 6px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+.sy-card:hover { transform: translateY(var(--lift)); box-shadow: var(--shadow-lift); }
+.sy-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 当前在场:高亮描边 + 轻微上浮 */
+.sy-card.on-field { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft) inset; transform: translateY(-2px); }
+.sy-card.selected { border-color: var(--gold); box-shadow: 0 0 0 2px var(--accent-soft); }
+.sy-card.dead { opacity: .45; filter: grayscale(1); }
+.sy-card.dead .sy-avatar { text-decoration: line-through; }
+.sy-card.dim { opacity: .6; }
+
+.sy-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--c-shiny);
+  background: var(--c-shiny-d);
+  border: 1px solid var(--c-shiny);
+  border-radius: 999px;
+}
+/* 隐藏炫彩(整图型)用金色描边区分:它与普通炫彩在素材层面就不是一类。 */
+.sy-badge.hidden-glass { color: var(--gold); background: var(--bg-2); border-color: var(--gold); }
+
+.sy-avatar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: 50%;
+}
+.sy-avatar { width: 100%; height: 100%; object-fit: contain; }
+
+.sy-name { display: flex; gap: 3px; align-items: center; max-width: 100%; }
+.sy-name-t {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sy-gender { font-size: 11px; }
+.sy-gender.male { color: var(--c-male); }
+.sy-gender.female { color: var(--c-female); }
+
+.sy-meta {
+  display: flex;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.sy-nature { color: var(--fg-dim); }
+
+/* —— 血条 —— */
+.sy-hp {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: 999px;
+}
+.sy-hp-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 200ms var(--ease-out);
+}
+.sy-hp-fill.self { background: var(--green); }
+.sy-hp-fill.foe { background: var(--red); }
+.sy-hp-fill.low { background: var(--danger); animation: sy-pulse 1.6s var(--ease-out) infinite; }
+.sy-hp.unknown .sy-hp-fill { background: var(--line); }
+.sy-hp-text {
+  position: absolute;
+  inset: 0;
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--fg);
+  text-shadow: 0 1px 2px rgb(0 0 0 / .5);
+}
+@keyframes sy-pulse { 50% { opacity: .55; } }
+
+/* —— 技能槽 —— */
+.sy-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  width: 100%;
+}
+.sy-skill {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--fg-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+}
+.sy-skill.empty { color: var(--fg-dim); opacity: .6; font-style: italic; }
+
+/* —— 预估面板 —— */
+.sy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.sy-panel-head { display: flex; gap: 10px; align-items: baseline; }
+.sy-panel-t { margin: 0; font-size: 15px; font-weight: 500; }
+.sy-todo {
+  padding: 1px 8px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+}
+.sy-pick { display: flex; flex-wrap: wrap; gap: 10px; }
+.sy-field { display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
+.sy-field-t { font-size: 11px; color: var(--fg-dim); }
+.sy-field select {
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.sy-field select:disabled { color: var(--fg-dim); cursor: not-allowed; }
+
+.sy-steps {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+.sy-step { display: flex; gap: 10px; justify-content: space-between; font-size: 12px; }
+.sy-step-l { color: var(--fg-dim); }
+.sy-step-v { font-variant-numeric: tabular-nums; color: var(--fg); }
+.sy-step.total { padding-top: 4px; border-top: 1px solid var(--line-soft); }
+
+/* —— 结果区 —— */
+.sy-result {
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+  padding: 10px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+.sy-result.empty { color: var(--fg-dim); font-size: 12px; }
+.sy-result-item { display: flex; flex-direction: column; gap: 2px; }
+.sy-result-k { font-size: 11px; color: var(--fg-dim); }
+.sy-result-v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fg); }
+/* 伤害用金:它是这一块的主角,也是「大赛」的点睛色。 */
+.sy-result-v.gold { color: var(--gold); }
+
+/* —— 四行算式 —— */
+.sy-formula-toggle {
+  align-self: flex-start;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+}
+.sy-formula-toggle:hover { color: var(--fg); border-color: var(--accent); }
+.sy-formula-toggle.on { color: var(--fg); border-style: solid; }
+.sy-formula {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 11px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+.sy-formula-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+}
+.sy-formula-l { color: var(--fg-dim); white-space: nowrap; }
+.sy-formula-e { color: var(--fg-dim); line-height: 1.5; word-break: break-word; }
+.sy-formula-v { font-variant-numeric: tabular-nums; color: var(--fg); }
+.sy-formula-tip { margin-top: 2px; font-size: 10px; color: var(--fg-dim); opacity: .85; }
+
+/* —— 输入区 —— */
+.sy-inputs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.sy-stage, .sy-num {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.sy-stage button {
+  width: 26px;
+  height: 30px;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sy-stage button:hover { background: var(--bg-3); }
+.sy-stage input, .sy-num input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  /* 去掉 number 的原生步进器:两端的 ± 按钮已经是步进器 */
+  -moz-appearance: textfield;
+}
+.sy-stage input::-webkit-outer-spin-button,
+.sy-stage input::-webkit-inner-spin-button,
+.sy-num input::-webkit-outer-spin-button,
+.sy-num input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
+.sy-num-u { font-size: 11px; color: var(--fg-dim); }
+
+/* —— 数据校对区 —— */
+.sy-audit {
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+.sy-audit-t { margin-bottom: 6px; font-size: 12px; font-weight: 500; color: var(--fg-dim); }
+.sy-audit-tb { width: 100%; border-collapse: collapse; font-size: 11px; }
+.sy-audit-tb th {
+  width: 68px;
+  padding: 2px 8px 2px 0;
+  font-weight: 400;
+  color: var(--fg-dim);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.sy-audit-v { padding: 2px 0; color: var(--fg); line-height: 1.5; }
+.sy-audit-src { width: 96px; padding: 2px 0; text-align: right; color: var(--fg-dim); white-space: nowrap; }
+/* 推算值用金色点出:它「能用」但「不是协议值」,必须一眼看出与精确值的区别。 */
+.sy-audit-src.est { color: var(--gold); }
+.sy-audit-src.bad { color: var(--danger); }
+
+.sy-note, .sy-foot { margin: 0; font-size: 11px; line-height: 1.6; }
+.sy-note a { color: var(--accent); }
+
+/* —— 响应式:窄屏改为上下两排(我方在下),头像缩小、技能槽折 2×2 —— */
+@media (max-width: 900px) {
+  .sy-card { width: 88px; }
+  .sy-avatar-wrap { width: 56px; height: 56px; }
+  .sy-row { justify-content: flex-start; }
+  .sy-side.foe .sy-row { justify-content: flex-start; }
+  .sy-vs { display: none; }
+  .sy-field { min-width: 130px; }
+  /* 输入区:五列 → 两列 → 单列 */
+  .sy-inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 算式卡字号不缩,允许换行(roco 的验收标准:不产生横向滚动) */
+  .sy-formula-row { grid-template-columns: 56px 1fr; }
+  .sy-formula-v { grid-column: 2; text-align: left; }
+}
+@media (max-width: 560px) {
+  .sy-inputs { grid-template-columns: minmax(0, 1fr); }
+  .sy-result { flex-wrap: wrap; gap: 12px; }
+}

@@ -1,0 +1,10694 @@
+{
+ "_source": {
+  "upstream": "Evenstar-tools/roco-calculator 赛季快照",
+  "url": "https://github.com/Evenstar-tools/roco-calculator",
+  "snapshotId": "s4-preview-2026-09-02",
+  "seasonId": "S4前瞻",
+  "rulesVersion": "s4-preview-2026-09-02",
+  "bwikiRevision": "41360/40653",
+  "fetchedAt": "2026-07-23T13:54:31.332Z",
+  "origin": "BWIKI 洛克王国：世界（https://wiki.biligame.com/rocom/）",
+  "license": "CC BY-NC-SA 4.0（署名-非商业-相同方式共享）；roco 代码为 MIT，不覆盖数据",
+  "bridgedBy": "中文名（形态 fullName ↔ names.json.petbase[].n；技能 name ↔ skills.json.names）",
+  "note": "roco 的 spirit_/skill_ 是自有哈希 id，与游戏内 petbase_id/skill_id 不是一套，只能按名桥接",
+  "patchReverted": "s4-preview-2026-09-10（S4 前瞻调整，2026.09.10）已回退到 before"
+ },
+ "_note": "形态种族值: 611 / 1136 个 petbase 命中 roco 快照(共 619 形态, 用到 460 个)。未命中多为未进化小形态, 一律留空不猜。race 六维键与 roco 一致。 快照已应用 S4 前瞻调整(2026.09.10), 本表已回退 27 个形态到 before, 与现网一致。 我方同名形态(共享同一份数据): 157 组。",
+ "stats": [
+  "hp",
+  "physicalAttack",
+  "magicalAttack",
+  "physicalDefense",
+  "magicalDefense",
+  "speed"
+ ],
+ "forms": {
+  "3001": {
+   "name": "喵喵",
+   "dexNo": "002",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 66,
+    "magicalAttack": 66,
+    "physicalDefense": 49,
+    "magicalDefense": 91,
+    "speed": 33
+   },
+   "total": 370,
+   "rocoId": "spirit_d345729d1593bff7"
+  },
+  "32000001": {
+   "name": "喵喵",
+   "dexNo": "002",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 66,
+    "magicalAttack": 66,
+    "physicalDefense": 49,
+    "magicalDefense": 91,
+    "speed": 33
+   },
+   "total": 370,
+   "rocoId": "spirit_d345729d1593bff7"
+  },
+  "3002": {
+   "name": "水蓝蓝",
+   "dexNo": "008",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 35,
+    "magicalAttack": 76,
+    "physicalDefense": 56,
+    "magicalDefense": 79,
+    "speed": 51
+   },
+   "total": 372,
+   "rocoId": "spirit_77c2085d2f6e8e87"
+  },
+  "32000003": {
+   "name": "水蓝蓝",
+   "dexNo": "008",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 35,
+    "magicalAttack": 76,
+    "physicalDefense": 56,
+    "magicalDefense": 79,
+    "speed": 51
+   },
+   "total": 372,
+   "rocoId": "spirit_77c2085d2f6e8e87"
+  },
+  "3003": {
+   "name": "火花",
+   "dexNo": "005",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 84,
+    "magicalAttack": 37,
+    "physicalDefense": 56,
+    "magicalDefense": 43,
+    "speed": 78
+   },
+   "total": 368,
+   "rocoId": "spirit_8b8175b97cd7e6a7"
+  },
+  "32000002": {
+   "name": "火花",
+   "dexNo": "005",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 84,
+    "magicalAttack": 37,
+    "physicalDefense": 56,
+    "magicalDefense": 43,
+    "speed": 78
+   },
+   "total": 368,
+   "rocoId": "spirit_8b8175b97cd7e6a7"
+  },
+  "3004": {
+   "name": "迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 582,
+   "rocoId": "spirit_db5a2cb398dc0385"
+  },
+  "8007": {
+   "name": "迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 582,
+   "rocoId": "spirit_db5a2cb398dc0385"
+  },
+  "103004": {
+   "name": "迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 582,
+   "rocoId": "spirit_db5a2cb398dc0385"
+  },
+  "16000007": {
+   "name": "迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 582,
+   "rocoId": "spirit_db5a2cb398dc0385"
+  },
+  "3005": {
+   "name": "水灵",
+   "dexNo": "010",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 58,
+    "magicalAttack": 127,
+    "physicalDefense": 94,
+    "magicalDefense": 132,
+    "speed": 85
+   },
+   "total": 621,
+   "rocoId": "spirit_4ec76429db5748d4"
+  },
+  "3006": {
+   "name": "火神",
+   "dexNo": "007",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 139,
+    "magicalAttack": 61,
+    "physicalDefense": 94,
+    "magicalDefense": 72,
+    "speed": 130
+   },
+   "total": 613,
+   "rocoId": "spirit_537679016e3ec4bb"
+  },
+  "3007": {
+   "name": "魔力猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 109,
+    "magicalAttack": 109,
+    "physicalDefense": 81,
+    "magicalDefense": 151,
+    "speed": 55
+   },
+   "total": 613,
+   "rocoId": "spirit_d7a201531161488e"
+  },
+  "3008": {
+   "name": "草头鸭",
+   "dexNo": "179",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 79,
+    "magicalAttack": 24,
+    "physicalDefense": 66,
+    "magicalDefense": 50,
+    "speed": 92
+   },
+   "total": 403,
+   "rocoId": "spirit_a1120fe1443fe89f"
+  },
+  "3010": {
+   "name": "恶魔叮",
+   "dexNo": "030",
+   "types": [
+    "恶",
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 100,
+    "magicalAttack": 42,
+    "physicalDefense": 80,
+    "magicalDefense": 56,
+    "speed": 84
+   },
+   "total": 452,
+   "rocoId": "spirit_2a9b7b8d99dba59e"
+  },
+  "3011": {
+   "name": "恶魔狼",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 114,
+    "magicalAttack": 45,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 548,
+   "rocoId": "spirit_5e186c811af5ce3b"
+  },
+  "103011": {
+   "name": "恶魔狼",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 114,
+    "magicalAttack": 45,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 548,
+   "rocoId": "spirit_5e186c811af5ce3b"
+  },
+  "103012": {
+   "name": "恶魔狼",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 114,
+    "magicalAttack": 45,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 548,
+   "rocoId": "spirit_5e186c811af5ce3b"
+  },
+  "3013": {
+   "name": "铠甲虫",
+   "dexNo": "284",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 88,
+    "magicalAttack": 39,
+    "physicalDefense": 121,
+    "magicalDefense": 77,
+    "speed": 75
+   },
+   "total": 555,
+   "rocoId": "spirit_16b76c39e12ca79d"
+  },
+  "3014": {
+   "name": "阿米亚特",
+   "dexNo": "105",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 64,
+    "physicalAttack": 95,
+    "magicalAttack": 47,
+    "physicalDefense": 67,
+    "magicalDefense": 42,
+    "speed": 45
+   },
+   "total": 360,
+   "rocoId": "spirit_f0eb58fb18c9dca0"
+  },
+  "3015": {
+   "name": "阿米樱",
+   "dexNo": "106",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 127,
+    "magicalAttack": 62,
+    "physicalDefense": 89,
+    "magicalDefense": 56,
+    "speed": 60
+   },
+   "total": 480,
+   "rocoId": "spirit_608568e7fb1fc470"
+  },
+  "3016": {
+   "name": "罗隐",
+   "dexNo": "107",
+   "types": [
+    "地",
+    "恶"
+   ],
+   "race": {
+    "hp": 107,
+    "physicalAttack": 159,
+    "magicalAttack": 78,
+    "physicalDefense": 112,
+    "magicalDefense": 70,
+    "speed": 75
+   },
+   "total": 601,
+   "rocoId": "spirit_4e7acb9d14c8f373"
+  },
+  "3025": {
+   "name": "喵呜",
+   "dexNo": "003",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 65,
+    "magicalDefense": 121,
+    "speed": 44
+   },
+   "total": 490,
+   "rocoId": "spirit_cb8c0ff92ae64653"
+  },
+  "3026": {
+   "name": "绿草精灵",
+   "dexNo": "093",
+   "types": [
+    "草",
+    "幻"
+   ],
+   "race": {
+    "hp": 87,
+    "physicalAttack": 39,
+    "magicalAttack": 96,
+    "physicalDefense": 92,
+    "magicalDefense": 118,
+    "speed": 72
+   },
+   "total": 504,
+   "rocoId": "spirit_1b3ea496d11a0eab"
+  },
+  "3027": {
+   "name": "蒲公英娃娃",
+   "dexNo": "070",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 123,
+    "magicalAttack": 117,
+    "physicalDefense": 129,
+    "magicalDefense": 97,
+    "speed": 65
+   },
+   "total": 642,
+   "rocoId": "spirit_28ae7d1286fad58b"
+  },
+  "8205": {
+   "name": "蒲公英娃娃",
+   "dexNo": "070",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 123,
+    "magicalAttack": 117,
+    "physicalDefense": 129,
+    "magicalDefense": 97,
+    "speed": 65
+   },
+   "total": 642,
+   "rocoId": "spirit_28ae7d1286fad58b"
+  },
+  "3028": {
+   "name": "冬羽雀",
+   "dexNo": "019",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 103,
+    "magicalAttack": 44,
+    "physicalDefense": 86,
+    "magicalDefense": 59,
+    "speed": 92
+   },
+   "total": 456,
+   "rocoId": "spirit_2d02e8b66152b89b"
+  },
+  "3282": {
+   "name": "冬羽雀",
+   "dexNo": "019",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 103,
+    "magicalAttack": 44,
+    "physicalDefense": 86,
+    "magicalDefense": 59,
+    "speed": 92
+   },
+   "total": 456,
+   "rocoId": "spirit_2d02e8b66152b89b"
+  },
+  "3283": {
+   "name": "冬羽雀",
+   "dexNo": "019",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 103,
+    "magicalAttack": 44,
+    "physicalDefense": 86,
+    "magicalDefense": 59,
+    "speed": 92
+   },
+   "total": 456,
+   "rocoId": "spirit_2d02e8b66152b89b"
+  },
+  "3284": {
+   "name": "冬羽雀",
+   "dexNo": "019",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 103,
+    "magicalAttack": 44,
+    "physicalDefense": 86,
+    "magicalDefense": 59,
+    "speed": 92
+   },
+   "total": 456,
+   "rocoId": "spirit_2d02e8b66152b89b"
+  },
+  "3029": {
+   "name": "奇丽草",
+   "dexNo": "041",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 69,
+    "magicalAttack": 69,
+    "physicalDefense": 73,
+    "magicalDefense": 57,
+    "speed": 48
+   },
+   "total": 383,
+   "rocoId": "spirit_170ef71f536a3f8e"
+  },
+  "3030": {
+   "name": "奇丽叶",
+   "dexNo": "042",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 92,
+    "magicalAttack": 92,
+    "physicalDefense": 97,
+    "magicalDefense": 76,
+    "speed": 64
+   },
+   "total": 511,
+   "rocoId": "spirit_4843bd1e3723d3f2"
+  },
+  "3031": {
+   "name": "奇丽花",
+   "dexNo": "043",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 115,
+    "magicalAttack": 115,
+    "physicalDefense": 121,
+    "magicalDefense": 95,
+    "speed": 80
+   },
+   "total": 638,
+   "rocoId": "spirit_dcaca25adb2a9978"
+  },
+  "8208": {
+   "name": "奇丽花",
+   "dexNo": "043",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 115,
+    "magicalAttack": 115,
+    "physicalDefense": 121,
+    "magicalDefense": 95,
+    "speed": 80
+   },
+   "total": 638,
+   "rocoId": "spirit_dcaca25adb2a9978"
+  },
+  "3032": {
+   "name": "焰火",
+   "dexNo": "006",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 111,
+    "magicalAttack": 49,
+    "physicalDefense": 75,
+    "magicalDefense": 58,
+    "speed": 104
+   },
+   "total": 490,
+   "rocoId": "spirit_e128d935f4ac4fb5"
+  },
+  "3033": {
+   "name": "波波拉",
+   "dexNo": "009",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 46,
+    "magicalAttack": 102,
+    "physicalDefense": 75,
+    "magicalDefense": 106,
+    "speed": 68
+   },
+   "total": 497,
+   "rocoId": "spirit_cb69e7131cce6f17"
+  },
+  "3034": {
+   "name": "蒲公英",
+   "dexNo": "069",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 99,
+    "magicalAttack": 94,
+    "physicalDefense": 103,
+    "magicalDefense": 78,
+    "speed": 52
+   },
+   "total": 515,
+   "rocoId": "spirit_b36b110dabf9563f"
+  },
+  "3035": {
+   "name": "魔草巫灵",
+   "dexNo": "094",
+   "types": [
+    "草",
+    "幻"
+   ],
+   "race": {
+    "hp": 109,
+    "physicalAttack": 48,
+    "magicalAttack": 120,
+    "physicalDefense": 115,
+    "magicalDefense": 147,
+    "speed": 90
+   },
+   "total": 629,
+   "rocoId": "spirit_1336bf0fd9adf6ef"
+  },
+  "3037": {
+   "name": "岚鸟",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 570,
+   "rocoId": "spirit_4bd15e249d6653b9"
+  },
+  "3285": {
+   "name": "岚鸟",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 570,
+   "rocoId": "spirit_4bd15e249d6653b9"
+  },
+  "3286": {
+   "name": "岚鸟",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 570,
+   "rocoId": "spirit_4bd15e249d6653b9"
+  },
+  "3287": {
+   "name": "岚鸟",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 570,
+   "rocoId": "spirit_4bd15e249d6653b9"
+  },
+  "3038": {
+   "name": "小甲虫",
+   "dexNo": "283",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 98,
+    "physicalAttack": 71,
+    "magicalAttack": 31,
+    "physicalDefense": 97,
+    "magicalDefense": 61,
+    "speed": 60
+   },
+   "total": 418,
+   "rocoId": "spirit_aa014ec2634077c5"
+  },
+  "3039": {
+   "name": "叮叮恶魔",
+   "dexNo": "031",
+   "types": [
+    "恶",
+    "翼"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 125,
+    "magicalAttack": 53,
+    "physicalDefense": 103,
+    "magicalDefense": 73,
+    "speed": 105
+   },
+   "total": 576,
+   "rocoId": "spirit_db847c8849145a7c"
+  },
+  "3043": {
+   "name": "伊贝儿",
+   "dexNo": "071",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 73,
+    "magicalAttack": 72,
+    "physicalDefense": 88,
+    "magicalDefense": 88,
+    "speed": 72
+   },
+   "total": 487,
+   "rocoId": "spirit_cbe29ac35310c7c6"
+  },
+  "3044": {
+   "name": "伊贝粉粉",
+   "dexNo": "072",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 91,
+    "magicalAttack": 89,
+    "physicalDefense": 110,
+    "magicalDefense": 110,
+    "speed": 90
+   },
+   "total": 607,
+   "rocoId": "spirit_744bd48ae8d9568d"
+  },
+  "8207": {
+   "name": "伊贝粉粉",
+   "dexNo": "072",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 91,
+    "magicalAttack": 89,
+    "physicalDefense": 110,
+    "magicalDefense": 110,
+    "speed": 90
+   },
+   "total": 607,
+   "rocoId": "spirit_744bd48ae8d9568d"
+  },
+  "3045": {
+   "name": "锥尾羊",
+   "dexNo": "015",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 66,
+    "magicalAttack": 29,
+    "physicalDefense": 72,
+    "magicalDefense": 49,
+    "speed": 66
+   },
+   "total": 349,
+   "rocoId": "spirit_e2a270484d0b90ea"
+  },
+  "3046": {
+   "name": "铃兰羊",
+   "dexNo": "016",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 89,
+    "magicalAttack": 39,
+    "physicalDefense": 96,
+    "magicalDefense": 65,
+    "speed": 88
+   },
+   "total": 466,
+   "rocoId": "spirit_65f19c00f2d4117f"
+  },
+  "3047": {
+   "name": "花影羚羊",
+   "dexNo": "017",
+   "types": [
+    "幽",
+    "恶"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 111,
+    "magicalAttack": 48,
+    "physicalDefense": 120,
+    "magicalDefense": 81,
+    "speed": 110
+   },
+   "total": 582,
+   "rocoId": "spirit_5147f20d585e4b28"
+  },
+  "3048": {
+   "name": "圣光迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 84,
+    "magicalAttack": 84,
+    "physicalDefense": 107,
+    "magicalDefense": 107,
+    "speed": 92
+   },
+   "total": 596,
+   "rocoId": "spirit_f60e2755ae42cf41"
+  },
+  "5025": {
+   "name": "圣光迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 84,
+    "magicalAttack": 84,
+    "physicalDefense": 107,
+    "magicalDefense": 107,
+    "speed": 92
+   },
+   "total": 596,
+   "rocoId": "spirit_f60e2755ae42cf41"
+  },
+  "103005": {
+   "name": "圣光迪莫",
+   "dexNo": "001",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 84,
+    "magicalAttack": 84,
+    "physicalDefense": 107,
+    "magicalDefense": 107,
+    "speed": 92
+   },
+   "total": 596,
+   "rocoId": "spirit_f60e2755ae42cf41"
+  },
+  "3049": {
+   "name": "白发懒人",
+   "dexNo": "073",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 100,
+    "magicalAttack": 42,
+    "physicalDefense": 86,
+    "magicalDefense": 70,
+    "speed": 45
+   },
+   "total": 437,
+   "rocoId": "spirit_f777820010f77600"
+  },
+  "3050": {
+   "name": "记忆石",
+   "dexNo": "095",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 108,
+    "magicalAttack": 97,
+    "physicalDefense": 141,
+    "magicalDefense": 79,
+    "speed": 70
+   },
+   "total": 607,
+   "rocoId": "spirit_06c4fba64eb40bd2"
+  },
+  "8012": {
+   "name": "记忆石",
+   "dexNo": "095",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 108,
+    "magicalAttack": 97,
+    "physicalDefense": 141,
+    "magicalDefense": 79,
+    "speed": 70
+   },
+   "total": 607,
+   "rocoId": "spirit_06c4fba64eb40bd2"
+  },
+  "3051": {
+   "name": "圣草迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "草"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 594,
+   "rocoId": "spirit_ec2230c14154bb52"
+  },
+  "5026": {
+   "name": "圣草迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "草"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 594,
+   "rocoId": "spirit_ec2230c14154bb52"
+  },
+  "3055": {
+   "name": "板板壳",
+   "dexNo": "012",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 28,
+    "magicalAttack": 72,
+    "physicalDefense": 64,
+    "magicalDefense": 81,
+    "speed": 45
+   },
+   "total": 357,
+   "rocoId": "spirit_4a0e048421bc230a"
+  },
+  "3516": {
+   "name": "板板壳",
+   "dexNo": "012",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 28,
+    "magicalAttack": 72,
+    "physicalDefense": 64,
+    "magicalDefense": 81,
+    "speed": 45
+   },
+   "total": 357,
+   "rocoId": "spirit_4a0e048421bc230a"
+  },
+  "3056": {
+   "name": "咔咔壳",
+   "dexNo": "013",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 37,
+    "magicalAttack": 96,
+    "physicalDefense": 85,
+    "magicalDefense": 107,
+    "speed": 60
+   },
+   "total": 475,
+   "rocoId": "spirit_ccfd03dcf48a75c3"
+  },
+  "3517": {
+   "name": "咔咔壳",
+   "dexNo": "013",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 37,
+    "magicalAttack": 96,
+    "physicalDefense": 85,
+    "magicalDefense": 107,
+    "speed": 60
+   },
+   "total": 475,
+   "rocoId": "spirit_ccfd03dcf48a75c3"
+  },
+  "3057": {
+   "name": "水泡壳",
+   "dexNo": "014",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 46,
+    "magicalAttack": 120,
+    "physicalDefense": 107,
+    "magicalDefense": 134,
+    "speed": 75
+   },
+   "total": 594,
+   "rocoId": "spirit_2d9ea3b47bd52a54"
+  },
+  "3518": {
+   "name": "水泡壳",
+   "dexNo": "014",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 46,
+    "magicalAttack": 120,
+    "physicalDefense": 107,
+    "magicalDefense": 134,
+    "speed": 75
+   },
+   "total": 594,
+   "rocoId": "spirit_2d9ea3b47bd52a54"
+  },
+  "3058": {
+   "name": "一窝蜂",
+   "dexNo": "082",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 87,
+    "physicalAttack": 32,
+    "magicalAttack": 29,
+    "physicalDefense": 27,
+    "magicalDefense": 27,
+    "speed": 26
+   },
+   "total": 228,
+   "rocoId": "spirit_56a89afc73148f54"
+  },
+  "3059": {
+   "name": "黄蜂后",
+   "dexNo": "083",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 43,
+    "magicalAttack": 39,
+    "physicalDefense": 36,
+    "magicalDefense": 36,
+    "speed": 35
+   },
+   "total": 305,
+   "rocoId": "spirit_b6d5d374fe7a4115"
+  },
+  "3060": {
+   "name": "小灵面",
+   "dexNo": "054",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 55,
+    "physicalAttack": 30,
+    "magicalAttack": 72,
+    "physicalDefense": 59,
+    "magicalDefense": 81,
+    "speed": 69
+   },
+   "total": 366,
+   "rocoId": "spirit_a4a37b0f3ab65804"
+  },
+  "103061": {
+   "name": "小灵面",
+   "dexNo": "054",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 55,
+    "physicalAttack": 30,
+    "magicalAttack": 72,
+    "physicalDefense": 59,
+    "magicalDefense": 81,
+    "speed": 69
+   },
+   "total": 366,
+   "rocoId": "spirit_a4a37b0f3ab65804"
+  },
+  "3062": {
+   "name": "小独角兽",
+   "dexNo": "116",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 48,
+    "magicalAttack": 129,
+    "physicalDefense": 62,
+    "magicalDefense": 74,
+    "speed": 84
+   },
+   "total": 476,
+   "rocoId": "spirit_efecf4d2f811fc11"
+  },
+  "3063": {
+   "name": "白金独角兽",
+   "dexNo": "117",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 99,
+    "physicalAttack": 61,
+    "magicalAttack": 161,
+    "physicalDefense": 77,
+    "magicalDefense": 92,
+    "speed": 105
+   },
+   "total": 595,
+   "rocoId": "spirit_07cdb4d4a94ac1bd"
+  },
+  "3064": {
+   "name": "幽影树",
+   "dexNo": "035",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 65,
+    "magicalDefense": 123,
+    "speed": 80
+   },
+   "total": 571,
+   "rocoId": "spirit_7c92f75ee0e707ea"
+  },
+  "3777": {
+   "name": "幽影树",
+   "dexNo": "035",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 65,
+    "magicalDefense": 123,
+    "speed": 80
+   },
+   "total": 571,
+   "rocoId": "spirit_7c92f75ee0e707ea"
+  },
+  "3065": {
+   "name": "忽幽狸",
+   "dexNo": "123",
+   "types": [
+    "幽",
+    "毒"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 87,
+    "magicalAttack": 84,
+    "physicalDefense": 84,
+    "magicalDefense": 56,
+    "speed": 104
+   },
+   "total": 493,
+   "rocoId": "spirit_4e0dc7dc0b877594"
+  },
+  "3066": {
+   "name": "影狸",
+   "dexNo": "124",
+   "types": [
+    "幽",
+    "毒"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 109,
+    "magicalAttack": 105,
+    "physicalDefense": 105,
+    "magicalDefense": 70,
+    "speed": 130
+   },
+   "total": 616,
+   "rocoId": "spirit_2d79fe35a27f9483"
+  },
+  "3067": {
+   "name": "卷毛鸭",
+   "dexNo": "180",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 98,
+    "magicalAttack": 29,
+    "physicalDefense": 83,
+    "magicalDefense": 63,
+    "speed": 115
+   },
+   "total": 504,
+   "rocoId": "spirit_5f176b5856c40b8f"
+  },
+  "8203": {
+   "name": "卷毛鸭",
+   "dexNo": "180",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 98,
+    "magicalAttack": 29,
+    "physicalDefense": 83,
+    "magicalDefense": 63,
+    "speed": 115
+   },
+   "total": 504,
+   "rocoId": "spirit_5f176b5856c40b8f"
+  },
+  "3069": {
+   "name": "锤头鹳",
+   "dexNo": "092",
+   "types": [
+    "翼",
+    "水"
+   ],
+   "race": {
+    "hp": 128,
+    "physicalAttack": 77,
+    "magicalAttack": 75,
+    "physicalDefense": 101,
+    "magicalDefense": 81,
+    "speed": 105
+   },
+   "total": 567,
+   "rocoId": "spirit_96afa437f590cc96"
+  },
+  "3070": {
+   "name": "护主犬",
+   "dexNo": "047",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 103,
+    "magicalAttack": 37,
+    "physicalDefense": 81,
+    "magicalDefense": 66,
+    "speed": 96
+   },
+   "total": 451,
+   "rocoId": "spirit_1b795d4da2571041"
+  },
+  "3071": {
+   "name": "音速犬",
+   "dexNo": "048",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 128,
+    "magicalAttack": 46,
+    "physicalDefense": 101,
+    "magicalDefense": 82,
+    "speed": 120
+   },
+   "total": 542,
+   "rocoId": "spirit_3a0b383ca1a11675"
+  },
+  "3072": {
+   "name": "格兰种子",
+   "dexNo": "274",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 31,
+    "magicalAttack": 74,
+    "physicalDefense": 48,
+    "magicalDefense": 67,
+    "speed": 36
+   },
+   "total": 321,
+   "rocoId": "spirit_fdbf0fe966093747"
+  },
+  "3073": {
+   "name": "格兰花",
+   "dexNo": "275",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 42,
+    "magicalAttack": 99,
+    "physicalDefense": 64,
+    "magicalDefense": 90,
+    "speed": 48
+   },
+   "total": 429,
+   "rocoId": "spirit_8c860bf0e5cbdc0b"
+  },
+  "3074": {
+   "name": "格兰球",
+   "dexNo": "276",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 52,
+    "magicalAttack": 124,
+    "physicalDefense": 80,
+    "magicalDefense": 112,
+    "speed": 60
+   },
+   "total": 536,
+   "rocoId": "spirit_8de88e249e9a78f0"
+  },
+  "8206": {
+   "name": "格兰球",
+   "dexNo": "276",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 52,
+    "magicalAttack": 124,
+    "physicalDefense": 80,
+    "magicalDefense": 112,
+    "speed": 60
+   },
+   "total": 536,
+   "rocoId": "spirit_8de88e249e9a78f0"
+  },
+  "3075": {
+   "name": "灵狐",
+   "dexNo": "147",
+   "types": [
+    "火",
+    "冰"
+   ],
+   "race": {
+    "hp": 69,
+    "physicalAttack": 52,
+    "magicalAttack": 52,
+    "physicalDefense": 50,
+    "magicalDefense": 64,
+    "speed": 60
+   },
+   "total": 347,
+   "rocoId": "spirit_500f4922dfc1cb1e"
+  },
+  "3076": {
+   "name": "九尾狐",
+   "dexNo": "148",
+   "types": [
+    "火",
+    "冰"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 70,
+    "magicalAttack": 70,
+    "physicalDefense": 67,
+    "magicalDefense": 86,
+    "speed": 80
+   },
+   "total": 465,
+   "rocoId": "spirit_0ff44d4938dbfb6d"
+  },
+  "3077": {
+   "name": "尖嘴狐仙",
+   "dexNo": "149",
+   "types": [
+    "火",
+    "冰"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 84,
+    "magicalDefense": 107,
+    "speed": 100
+   },
+   "total": 580,
+   "rocoId": "spirit_2f24d4018a1545f7"
+  },
+  "3078": {
+   "name": "烈钻鸟",
+   "dexNo": "376",
+   "types": [
+    "火",
+    "翼"
+   ],
+   "race": {
+    "hp": 56,
+    "physicalAttack": 49,
+    "magicalAttack": 60,
+    "physicalDefense": 43,
+    "magicalDefense": 73,
+    "speed": 72
+   },
+   "total": 353,
+   "rocoId": "spirit_ccf6a088d572393c"
+  },
+  "3079": {
+   "name": "长尾火鸟",
+   "dexNo": "377",
+   "types": [
+    "火",
+    "翼"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 65,
+    "magicalAttack": 80,
+    "physicalDefense": 58,
+    "magicalDefense": 97,
+    "speed": 96
+   },
+   "total": 471,
+   "rocoId": "spirit_a540cc055e4fa502"
+  },
+  "3080": {
+   "name": "火羽",
+   "dexNo": "378",
+   "types": [
+    "火",
+    "翼"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 82,
+    "magicalAttack": 100,
+    "physicalDefense": 72,
+    "magicalDefense": 121,
+    "speed": 120
+   },
+   "total": 511,
+   "rocoId": "spirit_fbd420db80dc3a39"
+  },
+  "8701": {
+   "name": "火羽",
+   "dexNo": "378",
+   "types": [
+    "火",
+    "翼"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 82,
+    "magicalAttack": 100,
+    "physicalDefense": 72,
+    "magicalDefense": 121,
+    "speed": 120
+   },
+   "total": 511,
+   "rocoId": "spirit_fbd420db80dc3a39"
+  },
+  "3081": {
+   "name": "治愈兔",
+   "dexNo": "255",
+   "types": [
+    "火",
+    "萌"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 28,
+    "magicalAttack": 73,
+    "physicalDefense": 60,
+    "magicalDefense": 76,
+    "speed": 54
+   },
+   "total": 358,
+   "rocoId": "spirit_df98091d3189ef45"
+  },
+  "3082": {
+   "name": "红丝绒",
+   "dexNo": "256",
+   "types": [
+    "火",
+    "萌"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 38,
+    "magicalAttack": 98,
+    "physicalDefense": 80,
+    "magicalDefense": 101,
+    "speed": 72
+   },
+   "total": 479,
+   "rocoId": "spirit_bbf5618c2d1a0750"
+  },
+  "3083": {
+   "name": "可爱猿",
+   "dexNo": "249",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 97,
+    "magicalAttack": 43,
+    "physicalDefense": 86,
+    "magicalDefense": 67,
+    "speed": 36
+   },
+   "total": 429,
+   "rocoId": "spirit_d6bf08644fc68f43"
+  },
+  "3084": {
+   "name": "炽热猿",
+   "dexNo": "250",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 133,
+    "physicalAttack": 130,
+    "magicalAttack": 57,
+    "physicalDefense": 115,
+    "magicalDefense": 89,
+    "speed": 48
+   },
+   "total": 572,
+   "rocoId": "spirit_d45d38fdc672b014"
+  },
+  "3085": {
+   "name": "火焰猿",
+   "dexNo": "251",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 167,
+    "physicalAttack": 162,
+    "magicalAttack": 72,
+    "physicalDefense": 143,
+    "magicalDefense": 111,
+    "speed": 60
+   },
+   "total": 715,
+   "rocoId": "spirit_b7b7a4110258de78"
+  },
+  "3086": {
+   "name": "可立鸡",
+   "dexNo": "266",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 72,
+    "magicalAttack": 72,
+    "physicalDefense": 61,
+    "magicalDefense": 52,
+    "speed": 66
+   },
+   "total": 390,
+   "rocoId": "spirit_73e11369a58445a9"
+  },
+  "19000005": {
+   "name": "可立鸡",
+   "dexNo": "266",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 72,
+    "magicalAttack": 72,
+    "physicalDefense": 61,
+    "magicalDefense": 52,
+    "speed": 66
+   },
+   "total": 390,
+   "rocoId": "spirit_73e11369a58445a9"
+  },
+  "3087": {
+   "name": "晕晕鸡",
+   "dexNo": "267",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 82,
+    "magicalDefense": 70,
+    "speed": 88
+   },
+   "total": 521,
+   "rocoId": "spirit_aab6e4b6314a2035"
+  },
+  "3088": {
+   "name": "绅士鸡",
+   "dexNo": "268",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 120,
+    "magicalAttack": 120,
+    "physicalDefense": 102,
+    "magicalDefense": 87,
+    "speed": 110
+   },
+   "total": 651,
+   "rocoId": "spirit_38995924fb931da3"
+  },
+  "3089": {
+   "name": "武者鸡",
+   "dexNo": "269",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 137,
+    "magicalAttack": 66,
+    "physicalDefense": 111,
+    "magicalDefense": 70,
+    "speed": 95
+   },
+   "total": 595,
+   "rocoId": "spirit_197cf12461c4fb80"
+  },
+  "18000003": {
+   "name": "武者鸡",
+   "dexNo": "269",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 137,
+    "magicalAttack": 66,
+    "physicalDefense": 111,
+    "magicalDefense": 70,
+    "speed": 95
+   },
+   "total": 595,
+   "rocoId": "spirit_197cf12461c4fb80"
+  },
+  "3090": {
+   "name": "火尾瓦特",
+   "dexNo": "216",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 70,
+    "magicalAttack": 29,
+    "physicalDefense": 81,
+    "magicalDefense": 56,
+    "speed": 39
+   },
+   "total": 338,
+   "rocoId": "spirit_5246e75d4b8d7592"
+  },
+  "3091": {
+   "name": "火尾战士",
+   "dexNo": "217",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 94,
+    "magicalAttack": 39,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 52
+   },
+   "total": 451,
+   "rocoId": "spirit_308f9aec3f5f045d"
+  },
+  "3092": {
+   "name": "烈火守护",
+   "dexNo": "218",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 117,
+    "magicalAttack": 49,
+    "physicalDefense": 135,
+    "magicalDefense": 93,
+    "speed": 65
+   },
+   "total": 465,
+   "rocoId": "spirit_8e02f5b94a74428b"
+  },
+  "3093": {
+   "name": "呆小路",
+   "dexNo": "195",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 52,
+    "physicalAttack": 60,
+    "magicalAttack": 64,
+    "physicalDefense": 68,
+    "magicalDefense": 79,
+    "speed": 57
+   },
+   "total": 380,
+   "rocoId": "spirit_f19630c316a3bfd7"
+  },
+  "3094": {
+   "name": "舞动路路",
+   "dexNo": "196",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 69,
+    "physicalAttack": 80,
+    "magicalAttack": 86,
+    "physicalDefense": 91,
+    "magicalDefense": 105,
+    "speed": 76
+   },
+   "total": 507,
+   "rocoId": "spirit_539c71eb7ab51df2"
+  },
+  "3095": {
+   "name": "白发路路",
+   "dexNo": "197",
+   "types": [
+    "草",
+    "萌"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 100,
+    "magicalAttack": 107,
+    "physicalDefense": 113,
+    "magicalDefense": 132,
+    "speed": 95
+   },
+   "total": 633,
+   "rocoId": "spirit_55072e5b883cb75c"
+  },
+  "3098": {
+   "name": "绿耳松鼠",
+   "dexNo": "049",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 69,
+    "physicalAttack": 50,
+    "magicalAttack": 47,
+    "physicalDefense": 67,
+    "magicalDefense": 52,
+    "speed": 48
+   },
+   "total": 333,
+   "rocoId": "spirit_356f9596b83c83c0"
+  },
+  "3099": {
+   "name": "抱枕松鼠",
+   "dexNo": "050",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 67,
+    "magicalAttack": 63,
+    "physicalDefense": 89,
+    "magicalDefense": 70,
+    "speed": 64
+   },
+   "total": 445,
+   "rocoId": "spirit_a9403546de6b0a52"
+  },
+  "3100": {
+   "name": "蹦床松鼠",
+   "dexNo": "051",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 114,
+    "physicalAttack": 84,
+    "magicalAttack": 79,
+    "physicalDefense": 111,
+    "magicalDefense": 87,
+    "speed": 80
+   },
+   "total": 555,
+   "rocoId": "spirit_f8063bcf10b237fc"
+  },
+  "3101": {
+   "name": "动力猿",
+   "dexNo": "074",
+   "types": [
+    "普通",
+    "武"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 134,
+    "magicalAttack": 56,
+    "physicalDefense": 114,
+    "magicalDefense": 94,
+    "speed": 60
+   },
+   "total": 583,
+   "rocoId": "spirit_a727717ad00e7342"
+  },
+  "3102": {
+   "name": "瞌睡王",
+   "dexNo": "075",
+   "types": [
+    "普通",
+    "武"
+   ],
+   "race": {
+    "hp": 156,
+    "physicalAttack": 167,
+    "magicalAttack": 70,
+    "physicalDefense": 143,
+    "magicalDefense": 117,
+    "speed": 75
+   },
+   "total": 728,
+   "rocoId": "spirit_c43a0b85bf30c248"
+  },
+  "3103": {
+   "name": "布是石",
+   "dexNo": "027",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 81,
+    "magicalAttack": 29,
+    "physicalDefense": 95,
+    "magicalDefense": 90,
+    "speed": 42
+   },
+   "total": 409,
+   "rocoId": "spirit_d52594cbbf48906b"
+  },
+  "3104": {
+   "name": "布是岩",
+   "dexNo": "028",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 108,
+    "magicalAttack": 39,
+    "physicalDefense": 127,
+    "magicalDefense": 120,
+    "speed": 56
+   },
+   "total": 546,
+   "rocoId": "spirit_07aa4349f64588ad"
+  },
+  "3105": {
+   "name": "布克棱岩",
+   "dexNo": "029",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 135,
+    "magicalAttack": 49,
+    "physicalDefense": 159,
+    "magicalDefense": 150,
+    "speed": 70
+   },
+   "total": 725,
+   "rocoId": "spirit_0573dd499a17d300"
+  },
+  "3106": {
+   "name": "石肤蜥",
+   "dexNo": "024",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 69,
+    "physicalAttack": 61,
+    "magicalAttack": 60,
+    "physicalDefense": 72,
+    "magicalDefense": 50,
+    "speed": 57
+   },
+   "total": 369,
+   "rocoId": "spirit_77fd5fcc0d4d85f0"
+  },
+  "3500": {
+   "name": "石肤蜥",
+   "dexNo": "024",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 69,
+    "physicalAttack": 61,
+    "magicalAttack": 60,
+    "physicalDefense": 72,
+    "magicalDefense": 50,
+    "speed": 57
+   },
+   "total": 369,
+   "rocoId": "spirit_77fd5fcc0d4d85f0"
+  },
+  "3107": {
+   "name": "石刺蜥",
+   "dexNo": "025",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 81,
+    "magicalAttack": 80,
+    "physicalDefense": 96,
+    "magicalDefense": 67,
+    "speed": 76
+   },
+   "total": 492,
+   "rocoId": "spirit_0f268324272b589e"
+  },
+  "3501": {
+   "name": "石刺蜥",
+   "dexNo": "025",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 81,
+    "magicalAttack": 80,
+    "physicalDefense": 96,
+    "magicalDefense": 67,
+    "speed": 76
+   },
+   "total": 492,
+   "rocoId": "spirit_0f268324272b589e"
+  },
+  "3108": {
+   "name": "石冠王蜥",
+   "dexNo": "026",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 101,
+    "magicalAttack": 100,
+    "physicalDefense": 120,
+    "magicalDefense": 84,
+    "speed": 95
+   },
+   "total": 615,
+   "rocoId": "spirit_10fa789e8a2d1a1d"
+  },
+  "3502": {
+   "name": "石冠王蜥",
+   "dexNo": "026",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 101,
+    "magicalAttack": 100,
+    "physicalDefense": 120,
+    "magicalDefense": 84,
+    "speed": 95
+   },
+   "total": 615,
+   "rocoId": "spirit_10fa789e8a2d1a1d"
+  },
+  "3109": {
+   "name": "仪使者",
+   "dexNo": "113",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 64,
+    "physicalAttack": 50,
+    "magicalAttack": 54,
+    "physicalDefense": 69,
+    "magicalDefense": 71,
+    "speed": 51
+   },
+   "total": 359,
+   "rocoId": "spirit_ba59dde12b0c0431"
+  },
+  "3110": {
+   "name": "仪式之星",
+   "dexNo": "114",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 67,
+    "magicalAttack": 71,
+    "physicalDefense": 92,
+    "magicalDefense": 95,
+    "speed": 68
+   },
+   "total": 478,
+   "rocoId": "spirit_ccd65f12c28c6c89"
+  },
+  "3111": {
+   "name": "仪式巨像",
+   "dexNo": "115",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 84,
+    "magicalAttack": 89,
+    "physicalDefense": 115,
+    "magicalDefense": 119,
+    "speed": 85
+   },
+   "total": 598,
+   "rocoId": "spirit_8f210e2e5fe10327"
+  },
+  "3112": {
+   "name": "甜田螺",
+   "dexNo": "185",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 67,
+    "magicalAttack": 70,
+    "physicalDefense": 54,
+    "magicalDefense": 80,
+    "speed": 54
+   },
+   "total": 393,
+   "rocoId": "spirit_f675aae70d91a6ee"
+  },
+  "3113": {
+   "name": "壳乙螺",
+   "dexNo": "186",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 89,
+    "magicalAttack": 94,
+    "physicalDefense": 72,
+    "magicalDefense": 107,
+    "speed": 72
+   },
+   "total": 525,
+   "rocoId": "spirit_e74caae57d4461fd"
+  },
+  "3114": {
+   "name": "卡洛儿",
+   "dexNo": "187",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 114,
+    "physicalAttack": 112,
+    "magicalAttack": 117,
+    "physicalDefense": 90,
+    "magicalDefense": 134,
+    "speed": 90
+   },
+   "total": 657,
+   "rocoId": "spirit_95db5c2218b2ed8f"
+  },
+  "3115": {
+   "name": "风铃鲨",
+   "dexNo": "108",
+   "types": [
+    "水",
+    "翼"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 59,
+    "magicalAttack": 59,
+    "physicalDefense": 63,
+    "magicalDefense": 63,
+    "speed": 75
+   },
+   "total": 373,
+   "rocoId": "spirit_37e1d041ca12cf68"
+  },
+  "3116": {
+   "name": "蓝蝶鲨",
+   "dexNo": "109",
+   "types": [
+    "水",
+    "翼"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 78,
+    "magicalAttack": 78,
+    "physicalDefense": 84,
+    "magicalDefense": 84,
+    "speed": 100
+   },
+   "total": 496,
+   "rocoId": "spirit_8dbef89746bfb3af"
+  },
+  "3117": {
+   "name": "彩蝶鲨",
+   "dexNo": "110",
+   "types": [
+    "水",
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 125
+   },
+   "total": 621,
+   "rocoId": "spirit_563a4e078a1d8cba"
+  },
+  "3118": {
+   "name": "果冻",
+   "dexNo": "313",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 26,
+    "magicalAttack": 81,
+    "physicalDefense": 75,
+    "magicalDefense": 78,
+    "speed": 96
+   },
+   "total": 437,
+   "rocoId": "spirit_5c4297c8c8eab600"
+  },
+  "19000006": {
+   "name": "果冻",
+   "dexNo": "313",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 26,
+    "magicalAttack": 81,
+    "physicalDefense": 75,
+    "magicalDefense": 78,
+    "speed": 96
+   },
+   "total": 437,
+   "rocoId": "spirit_5c4297c8c8eab600"
+  },
+  "3119": {
+   "name": "翡翠水母",
+   "dexNo": "244",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 30,
+    "magicalAttack": 68,
+    "physicalDefense": 75,
+    "magicalDefense": 109,
+    "speed": 76
+   },
+   "total": 466,
+   "rocoId": "spirit_42d4dc4ef033e5b5"
+  },
+  "3120": {
+   "name": "琉璃水母",
+   "dexNo": "245",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 134,
+    "physicalAttack": 37,
+    "magicalAttack": 85,
+    "physicalDefense": 93,
+    "magicalDefense": 136,
+    "speed": 95
+   },
+   "total": 580,
+   "rocoId": "spirit_bdc5a04507024396"
+  },
+  "3121": {
+   "name": "大耳帽兜",
+   "dexNo": "142",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 62,
+    "magicalAttack": 59,
+    "physicalDefense": 39,
+    "magicalDefense": 78,
+    "speed": 54
+   },
+   "total": 370,
+   "rocoId": "spirit_dcb0504a22dc89a2"
+  },
+  "3122": {
+   "name": "帽兜娃娃",
+   "dexNo": "143",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 83,
+    "magicalAttack": 78,
+    "physicalDefense": 52,
+    "magicalDefense": 104,
+    "speed": 72
+   },
+   "total": 493,
+   "rocoId": "spirit_5a5fe946ec981a55"
+  },
+  "3123": {
+   "name": "雪影娃娃",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 103,
+    "magicalAttack": 98,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 617,
+   "rocoId": "spirit_b5f7f523f4cb4178"
+  },
+  "3124": {
+   "name": "脆筒甜甜",
+   "dexNo": "234",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 67,
+    "magicalAttack": 72,
+    "physicalDefense": 42,
+    "magicalDefense": 55,
+    "speed": 60
+   },
+   "total": 368,
+   "rocoId": "spirit_3f805b382fb6670a"
+  },
+  "3125": {
+   "name": "香草甜甜",
+   "dexNo": "235",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 90,
+    "magicalAttack": 95,
+    "physicalDefense": 56,
+    "magicalDefense": 74,
+    "speed": 80
+   },
+   "total": 491,
+   "rocoId": "spirit_219690deb9569dc6"
+  },
+  "3478": {
+   "name": "香草甜甜",
+   "dexNo": "235",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 90,
+    "magicalAttack": 95,
+    "physicalDefense": 56,
+    "magicalDefense": 74,
+    "speed": 80
+   },
+   "total": 491,
+   "rocoId": "spirit_219690deb9569dc6"
+  },
+  "3479": {
+   "name": "香草甜甜",
+   "dexNo": "235",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 90,
+    "magicalAttack": 95,
+    "physicalDefense": 56,
+    "magicalDefense": 74,
+    "speed": 80
+   },
+   "total": 491,
+   "rocoId": "spirit_219690deb9569dc6"
+  },
+  "3126": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3458": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3459": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3460": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3461": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3462": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3463": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3464": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3465": {
+   "name": "圣代甜甜",
+   "dexNo": "236",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 112,
+    "magicalAttack": 119,
+    "physicalDefense": 70,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 612,
+   "rocoId": "spirit_41869713b59c286d"
+  },
+  "3130": {
+   "name": "圆眼蜘蛛",
+   "dexNo": "168",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 55,
+    "physicalAttack": 53,
+    "magicalAttack": 53,
+    "physicalDefense": 55,
+    "magicalDefense": 55,
+    "speed": 66
+   },
+   "total": 337,
+   "rocoId": "spirit_70cdb58d677fc0c1"
+  },
+  "3131": {
+   "name": "尖角蜘蛛",
+   "dexNo": "169",
+   "types": [
+    "虫",
+    "毒"
+   ],
+   "race": {
+    "hp": 74,
+    "physicalAttack": 70,
+    "magicalAttack": 70,
+    "physicalDefense": 73,
+    "magicalDefense": 73,
+    "speed": 88
+   },
+   "total": 448,
+   "rocoId": "spirit_68de87232e8ef07e"
+  },
+  "3132": {
+   "name": "芋香巨角蛛",
+   "dexNo": "170",
+   "types": [
+    "虫",
+    "毒"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 91,
+    "magicalDefense": 91,
+    "speed": 110
+   },
+   "total": 560,
+   "rocoId": "spirit_42ec7e9a6bdfd9fc"
+  },
+  "3136": {
+   "name": "毛毛",
+   "dexNo": "032",
+   "types": [
+    "虫",
+    "萌"
+   ],
+   "race": {
+    "hp": 32,
+    "physicalAttack": 28,
+    "magicalAttack": 28,
+    "physicalDefense": 40,
+    "magicalDefense": 40,
+    "speed": 60
+   },
+   "total": 228,
+   "rocoId": "spirit_0aa69ad38f66402d"
+  },
+  "3137": {
+   "name": "爬爬",
+   "dexNo": "033",
+   "types": [
+    "虫",
+    "萌"
+   ],
+   "race": {
+    "hp": 42,
+    "physicalAttack": 37,
+    "magicalAttack": 37,
+    "physicalDefense": 53,
+    "magicalDefense": 53,
+    "speed": 80
+   },
+   "total": 302,
+   "rocoId": "spirit_552a95c89d0867e1"
+  },
+  "3139": {
+   "name": "小草虫",
+   "dexNo": "099",
+   "types": [
+    "虫",
+    "草"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 40,
+    "magicalAttack": 43,
+    "physicalDefense": 50,
+    "magicalDefense": 57,
+    "speed": 60
+   },
+   "total": 323,
+   "rocoId": "spirit_838a843160d26986"
+  },
+  "3140": {
+   "name": "草衣虫",
+   "dexNo": "100",
+   "types": [
+    "虫",
+    "草"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 53,
+    "magicalAttack": 57,
+    "physicalDefense": 67,
+    "magicalDefense": 75,
+    "speed": 80
+   },
+   "total": 429,
+   "rocoId": "spirit_bd8da42d42852406"
+  },
+  "3141": {
+   "name": "花衣蝶",
+   "dexNo": "101",
+   "types": [
+    "虫",
+    "草"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 67,
+    "magicalAttack": 72,
+    "physicalDefense": 84,
+    "magicalDefense": 94,
+    "speed": 100
+   },
+   "total": 570,
+   "rocoId": "spirit_765165af4a4e54de"
+  },
+  "3142": {
+   "name": "小夜",
+   "dexNo": "085",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 60,
+    "physicalAttack": 69,
+    "magicalAttack": 63,
+    "physicalDefense": 62,
+    "magicalDefense": 51,
+    "speed": 69
+   },
+   "total": 374,
+   "rocoId": "spirit_bfe02d4281b32ae4"
+  },
+  "103142": {
+   "name": "小夜",
+   "dexNo": "085",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 60,
+    "physicalAttack": 69,
+    "magicalAttack": 63,
+    "physicalDefense": 62,
+    "magicalDefense": 51,
+    "speed": 69
+   },
+   "total": 374,
+   "rocoId": "spirit_bfe02d4281b32ae4"
+  },
+  "3143": {
+   "name": "紫夜",
+   "dexNo": "086",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 80,
+    "physicalAttack": 92,
+    "magicalAttack": 84,
+    "physicalDefense": 83,
+    "magicalDefense": 68,
+    "speed": 92
+   },
+   "total": 499,
+   "rocoId": "spirit_e9b50c26f5156efb"
+  },
+  "103143": {
+   "name": "紫夜",
+   "dexNo": "086",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 80,
+    "physicalAttack": 92,
+    "magicalAttack": 84,
+    "physicalDefense": 83,
+    "magicalDefense": 68,
+    "speed": 92
+   },
+   "total": 499,
+   "rocoId": "spirit_e9b50c26f5156efb"
+  },
+  "3144": {
+   "name": "朔夜伊芙",
+   "dexNo": "087",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 115,
+    "magicalAttack": 105,
+    "physicalDefense": 104,
+    "magicalDefense": 85,
+    "speed": 115
+   },
+   "total": 624,
+   "rocoId": "spirit_49ad5c69be90b5bf"
+  },
+  "3145": {
+   "name": "小灵菇",
+   "dexNo": "021",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 59,
+    "magicalAttack": 59,
+    "physicalDefense": 62,
+    "magicalDefense": 82,
+    "speed": 45
+   },
+   "total": 374,
+   "rocoId": "spirit_5b7a55721521545f"
+  },
+  "3146": {
+   "name": "幻灵菇",
+   "dexNo": "022",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 79,
+    "magicalAttack": 79,
+    "physicalDefense": 83,
+    "magicalDefense": 109,
+    "speed": 60
+   },
+   "total": 499,
+   "rocoId": "spirit_6a82dae2525231bb"
+  },
+  "3147": {
+   "name": "幻影灵菇",
+   "dexNo": "023",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 103,
+    "magicalDefense": 136,
+    "speed": 75
+   },
+   "total": 621,
+   "rocoId": "spirit_da28fd0a0beef1a6"
+  },
+  "3148": {
+   "name": "空空颅",
+   "dexNo": "327",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 7,
+    "magicalAttack": 37,
+    "physicalDefense": 54,
+    "magicalDefense": 64,
+    "speed": 48
+   },
+   "total": 280,
+   "rocoId": "spirit_afcb0198e268f000"
+  },
+  "103149": {
+   "name": "空空颅",
+   "dexNo": "327",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 7,
+    "magicalAttack": 37,
+    "physicalDefense": 54,
+    "magicalDefense": 64,
+    "speed": 48
+   },
+   "total": 280,
+   "rocoId": "spirit_afcb0198e268f000"
+  },
+  "3149": {
+   "name": "夜宿颅",
+   "dexNo": "328",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 9,
+    "magicalAttack": 49,
+    "physicalDefense": 72,
+    "magicalDefense": 85,
+    "speed": 64
+   },
+   "total": 373,
+   "rocoId": "spirit_80151523a1bdecb1"
+  },
+  "3150": {
+   "name": "夜枭",
+   "dexNo": "329",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 10,
+    "magicalAttack": 61,
+    "physicalDefense": 90,
+    "magicalDefense": 106,
+    "speed": 80
+   },
+   "total": 464,
+   "rocoId": "spirit_b0b427cf3d5241fa"
+  },
+  "3151": {
+   "name": "多多",
+   "dexNo": "125",
+   "types": [
+    "毒",
+    "地"
+   ],
+   "race": {
+    "hp": 51,
+    "physicalAttack": 53,
+    "magicalAttack": 53,
+    "physicalDefense": 80,
+    "magicalDefense": 44,
+    "speed": 54
+   },
+   "total": 335,
+   "rocoId": "spirit_be9941285a953245"
+  },
+  "3152": {
+   "name": "多啦多",
+   "dexNo": "126",
+   "types": [
+    "毒",
+    "地"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 70,
+    "magicalAttack": 70,
+    "physicalDefense": 107,
+    "magicalDefense": 59,
+    "speed": 72
+   },
+   "total": 446,
+   "rocoId": "spirit_5a759518affc4d97"
+  },
+  "3153": {
+   "name": "古啦多",
+   "dexNo": "127",
+   "types": [
+    "毒",
+    "地"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 134,
+    "magicalDefense": 74,
+    "speed": 90
+   },
+   "total": 559,
+   "rocoId": "spirit_704f8b90c87b1bf6"
+  },
+  "3154": {
+   "name": "裘洛",
+   "dexNo": "246",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 44,
+    "physicalAttack": 56,
+    "magicalAttack": 50,
+    "physicalDefense": 39,
+    "magicalDefense": 48,
+    "speed": 75
+   },
+   "total": 312,
+   "rocoId": "spirit_7122d669521799ee"
+  },
+  "103154": {
+   "name": "裘洛",
+   "dexNo": "246",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 44,
+    "physicalAttack": 56,
+    "magicalAttack": 50,
+    "physicalDefense": 39,
+    "magicalDefense": 48,
+    "speed": 75
+   },
+   "total": 312,
+   "rocoId": "spirit_7122d669521799ee"
+  },
+  "3155": {
+   "name": "裘力",
+   "dexNo": "247",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 59,
+    "physicalAttack": 74,
+    "magicalAttack": 67,
+    "physicalDefense": 52,
+    "magicalDefense": 64,
+    "speed": 100
+   },
+   "total": 416,
+   "rocoId": "spirit_a652927efc54219c"
+  },
+  "3156": {
+   "name": "裘卡",
+   "dexNo": "248",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 93,
+    "magicalAttack": 83,
+    "physicalDefense": 65,
+    "magicalDefense": 81,
+    "speed": 125
+   },
+   "total": 520,
+   "rocoId": "spirit_586560ce9f28bbbc"
+  },
+  "3157": {
+   "name": "花魁蜂后",
+   "dexNo": "084",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 145,
+    "physicalAttack": 54,
+    "magicalAttack": 49,
+    "physicalDefense": 45,
+    "magicalDefense": 45,
+    "speed": 44
+   },
+   "total": 382,
+   "rocoId": "spirit_d8b0958a9710ee37"
+  },
+  "3158": {
+   "name": "武斗酷猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 134,
+    "magicalAttack": 57,
+    "physicalDefense": 110,
+    "magicalDefense": 80,
+    "speed": 135
+   },
+   "total": 642,
+   "rocoId": "spirit_a62b9a9c4ae00665"
+  },
+  "5061": {
+   "name": "武斗酷猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 134,
+    "magicalAttack": 57,
+    "physicalDefense": 110,
+    "magicalDefense": 80,
+    "speed": 135
+   },
+   "total": 642,
+   "rocoId": "spirit_a62b9a9c4ae00665"
+  },
+  "8201": {
+   "name": "武斗酷猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 134,
+    "magicalAttack": 57,
+    "physicalDefense": 110,
+    "magicalDefense": 80,
+    "speed": 135
+   },
+   "total": 642,
+   "rocoId": "spirit_a62b9a9c4ae00665"
+  },
+  "3161": {
+   "name": "春团",
+   "dexNo": "342",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 48,
+    "physicalAttack": 51,
+    "magicalAttack": 57,
+    "physicalDefense": 65,
+    "magicalDefense": 57,
+    "speed": 63
+   },
+   "total": 341,
+   "rocoId": "spirit_5861aaece6abbc5f"
+  },
+  "3162": {
+   "name": "春兔",
+   "dexNo": "343",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 68,
+    "magicalAttack": 76,
+    "physicalDefense": 87,
+    "magicalDefense": 77,
+    "speed": 84
+   },
+   "total": 455,
+   "rocoId": "spirit_b4e949b761334e12"
+  },
+  "3165": {
+   "name": "伏地兽",
+   "dexNo": "060",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 95,
+    "physicalAttack": 56,
+    "magicalAttack": 25,
+    "physicalDefense": 70,
+    "magicalDefense": 41,
+    "speed": 51
+   },
+   "total": 338,
+   "rocoId": "spirit_0c057dc540477080"
+  },
+  "3166": {
+   "name": "贪食鼹",
+   "dexNo": "061",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 74,
+    "magicalAttack": 33,
+    "physicalDefense": 94,
+    "magicalDefense": 54,
+    "speed": 68
+   },
+   "total": 449,
+   "rocoId": "spirit_615e3788c66e51a7"
+  },
+  "3167": {
+   "name": "巨噬针鼹",
+   "dexNo": "062",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 158,
+    "physicalAttack": 93,
+    "magicalAttack": 41,
+    "physicalDefense": 117,
+    "magicalDefense": 68,
+    "speed": 85
+   },
+   "total": 562,
+   "rocoId": "spirit_14a25ce7b8d65623"
+  },
+  "3170": {
+   "name": "石石",
+   "dexNo": "111",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 76,
+    "physicalAttack": 79,
+    "magicalAttack": 79,
+    "physicalDefense": 101,
+    "magicalDefense": 56,
+    "speed": 76
+   },
+   "total": 467,
+   "rocoId": "spirit_6559cb4bdc43fc21"
+  },
+  "3171": {
+   "name": "巨灵石",
+   "dexNo": "112",
+   "types": [
+    "地",
+    "幽"
+   ],
+   "race": {
+    "hp": 95,
+    "physicalAttack": 99,
+    "magicalAttack": 99,
+    "physicalDefense": 126,
+    "magicalDefense": 70,
+    "speed": 95
+   },
+   "total": 584,
+   "rocoId": "spirit_6c627aa77d71cf89"
+  },
+  "3172": {
+   "name": "雪豆丁",
+   "dexNo": "134",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 104,
+    "magicalAttack": 47,
+    "physicalDefense": 83,
+    "magicalDefense": 62,
+    "speed": 36
+   },
+   "total": 429,
+   "rocoId": "spirit_57cf990eab0a0502"
+  },
+  "3173": {
+   "name": "雪蛮人",
+   "dexNo": "135",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 139,
+    "magicalAttack": 63,
+    "physicalDefense": 111,
+    "magicalDefense": 83,
+    "speed": 48
+   },
+   "total": 574,
+   "rocoId": "spirit_37822bc1062c0c8e"
+  },
+  "3174": {
+   "name": "雪巨人",
+   "dexNo": "136",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 162,
+    "physicalAttack": 174,
+    "magicalAttack": 79,
+    "physicalDefense": 139,
+    "magicalDefense": 104,
+    "speed": 60
+   },
+   "total": 718,
+   "rocoId": "spirit_510544553c4a7cbc"
+  },
+  "14000007": {
+   "name": "雪巨人",
+   "dexNo": "136",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 162,
+    "physicalAttack": 174,
+    "magicalAttack": 79,
+    "physicalDefense": 139,
+    "magicalDefense": 104,
+    "speed": 60
+   },
+   "total": 718,
+   "rocoId": "spirit_510544553c4a7cbc"
+  },
+  "3175": {
+   "name": "咔咔羽毛",
+   "dexNo": "096",
+   "types": [
+    "翼",
+    "普通"
+   ],
+   "race": {
+    "hp": 58,
+    "physicalAttack": 68,
+    "magicalAttack": 66,
+    "physicalDefense": 61,
+    "magicalDefense": 53,
+    "speed": 72
+   },
+   "total": 378,
+   "rocoId": "spirit_54ab5d440e31b493"
+  },
+  "3176": {
+   "name": "咔咔雀",
+   "dexNo": "097",
+   "types": [
+    "翼",
+    "普通"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 91,
+    "magicalAttack": 88,
+    "physicalDefense": 81,
+    "magicalDefense": 71,
+    "speed": 96
+   },
+   "total": 505,
+   "rocoId": "spirit_fc1fa6ffcb752915"
+  },
+  "3177": {
+   "name": "咔咔鸟",
+   "dexNo": "098",
+   "types": [
+    "翼",
+    "普通"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 114,
+    "magicalAttack": 110,
+    "physicalDefense": 101,
+    "magicalDefense": 89,
+    "speed": 120
+   },
+   "total": 631,
+   "rocoId": "spirit_8c4b702650e31f66"
+  },
+  "3178": {
+   "name": "矮脚爬爬",
+   "dexNo": "214",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 80,
+    "physicalAttack": 118,
+    "magicalAttack": 109,
+    "physicalDefense": 86,
+    "magicalDefense": 71,
+    "speed": 92
+   },
+   "total": 556,
+   "rocoId": "spirit_c169e905c91eeb74"
+  },
+  "3179": {
+   "name": "恶魔红钻",
+   "dexNo": "215",
+   "types": [
+    "虫",
+    "恶"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 147,
+    "magicalAttack": 137,
+    "physicalDefense": 108,
+    "magicalDefense": 89,
+    "speed": 115
+   },
+   "total": 696,
+   "rocoId": "spirit_7c31fbd89f093c5d"
+  },
+  "3180": {
+   "name": "小帕尔",
+   "dexNo": "293",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 76,
+    "magicalAttack": 34,
+    "physicalDefense": 79,
+    "magicalDefense": 52,
+    "speed": 60
+   },
+   "total": 379,
+   "rocoId": "spirit_5aa0cc9f4b2133c8"
+  },
+  "3181": {
+   "name": "帕尔萨斯",
+   "dexNo": "294",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 102,
+    "magicalAttack": 46,
+    "physicalDefense": 105,
+    "magicalDefense": 70,
+    "speed": 80
+   },
+   "total": 507,
+   "rocoId": "spirit_178e6939722a30b8"
+  },
+  "3182": {
+   "name": "龙息帕尔",
+   "dexNo": "295",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 127,
+    "magicalAttack": 57,
+    "physicalDefense": 131,
+    "magicalDefense": 87,
+    "speed": 100
+   },
+   "total": 632,
+   "rocoId": "spirit_684f5cd1fec1df27"
+  },
+  "3183": {
+   "name": "瑰眼仔",
+   "dexNo": "400",
+   "types": [
+    "恶",
+    "虫"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 59,
+    "magicalAttack": 60,
+    "physicalDefense": 59,
+    "magicalDefense": 71,
+    "speed": 57
+   },
+   "total": 373,
+   "rocoId": "spirit_beeaa0eedf384647"
+  },
+  "3184": {
+   "name": "耳翎瑰魅",
+   "dexNo": "401",
+   "types": [
+    "恶",
+    "虫"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 78,
+    "magicalAttack": 80,
+    "physicalDefense": 79,
+    "magicalDefense": 95,
+    "speed": 76
+   },
+   "total": 497,
+   "rocoId": "spirit_1e1a54ce9df3fa73"
+  },
+  "3185": {
+   "name": "邪眼巨魔",
+   "dexNo": "402",
+   "types": [
+    "恶",
+    "虫"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 98,
+    "magicalAttack": 99,
+    "physicalDefense": 99,
+    "magicalDefense": 119,
+    "speed": 95
+   },
+   "total": 621,
+   "rocoId": "spirit_697c9e478c126d8b"
+  },
+  "3188": {
+   "name": "拉特",
+   "dexNo": "205",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 62,
+    "magicalDefense": 78,
+    "speed": 100
+   },
+   "total": 467,
+   "rocoId": "spirit_cb0f3e33d8b40885"
+  },
+  "3189": {
+   "name": "酷拉",
+   "dexNo": "206",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 100,
+    "magicalAttack": 100,
+    "physicalDefense": 78,
+    "magicalDefense": 97,
+    "speed": 125
+   },
+   "total": 583,
+   "rocoId": "spirit_f26505a4b7777206"
+  },
+  "3190": {
+   "name": "电咩咩",
+   "dexNo": "066",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 47,
+    "physicalAttack": 49,
+    "magicalAttack": 49,
+    "physicalDefense": 55,
+    "magicalDefense": 57,
+    "speed": 75
+   },
+   "total": 332,
+   "rocoId": "spirit_4318b532ca40c05f"
+  },
+  "3191": {
+   "name": "粉咩咩",
+   "dexNo": "067",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 62,
+    "physicalAttack": 66,
+    "magicalAttack": 66,
+    "physicalDefense": 73,
+    "magicalDefense": 76,
+    "speed": 100
+   },
+   "total": 443,
+   "rocoId": "spirit_152583e8aed619c0"
+  },
+  "3192": {
+   "name": "电球咩咩",
+   "dexNo": "068",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 82,
+    "magicalAttack": 82,
+    "physicalDefense": 91,
+    "magicalDefense": 95,
+    "speed": 125
+   },
+   "total": 553,
+   "rocoId": "spirit_17446a2b41bf4052"
+  },
+  "3195": {
+   "name": "闪电环",
+   "dexNo": "207",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 64,
+    "physicalAttack": 49,
+    "magicalAttack": 49,
+    "physicalDefense": 51,
+    "magicalDefense": 50,
+    "speed": 72
+   },
+   "total": 335,
+   "rocoId": "spirit_6fc567ff2b56be9e"
+  },
+  "3196": {
+   "name": "刺电环",
+   "dexNo": "208",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 65,
+    "magicalAttack": 65,
+    "physicalDefense": 68,
+    "magicalDefense": 67,
+    "speed": 96
+   },
+   "total": 446,
+   "rocoId": "spirit_e3880bbd97706d06"
+  },
+  "3197": {
+   "name": "荆棘电环",
+   "dexNo": "209",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 81,
+    "magicalAttack": 81,
+    "physicalDefense": 85,
+    "magicalDefense": 84,
+    "speed": 120
+   },
+   "total": 557,
+   "rocoId": "spirit_57fff877bf40ffd4"
+  },
+  "3198": {
+   "name": "粉粉星",
+   "dexNo": "330",
+   "types": [
+    "电",
+    "幻"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 54,
+    "magicalAttack": 102,
+    "physicalDefense": 57,
+    "magicalDefense": 101,
+    "speed": 88
+   },
+   "total": 495,
+   "rocoId": "spirit_e5e8224c029e15ec"
+  },
+  "3199": {
+   "name": "小皮球",
+   "dexNo": "331",
+   "types": [
+    "电",
+    "幻"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 68,
+    "magicalAttack": 127,
+    "physicalDefense": 71,
+    "magicalDefense": 126,
+    "speed": 110
+   },
+   "total": 618,
+   "rocoId": "spirit_307957883064ab4d"
+  },
+  "3200": {
+   "name": "机械方方",
+   "dexNo": "263",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 62,
+    "physicalAttack": 81,
+    "magicalAttack": 32,
+    "physicalDefense": 76,
+    "magicalDefense": 60,
+    "speed": 51
+   },
+   "total": 362,
+   "rocoId": "spirit_8f600a85a8feb5d8"
+  },
+  "3201": {
+   "name": "多彩方方",
+   "dexNo": "264",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 108,
+    "magicalAttack": 43,
+    "physicalDefense": 101,
+    "magicalDefense": 80,
+    "speed": 68
+   },
+   "total": 482,
+   "rocoId": "spirit_9270c733ca1d4bd8"
+  },
+  "3202": {
+   "name": "立方人",
+   "dexNo": "265",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 135,
+    "magicalAttack": 54,
+    "physicalDefense": 127,
+    "magicalDefense": 101,
+    "speed": 85
+   },
+   "total": 605,
+   "rocoId": "spirit_53a5e4ccea57fdd0"
+  },
+  "3203": {
+   "name": "贝瑟",
+   "dexNo": "332",
+   "types": [
+    "机械",
+    "火"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 46,
+    "magicalAttack": 78,
+    "physicalDefense": 51,
+    "magicalDefense": 98,
+    "speed": 33
+   },
+   "total": 385,
+   "rocoId": "spirit_cc6013b1574cc28b"
+  },
+  "3204": {
+   "name": "贝加尔",
+   "dexNo": "333",
+   "types": [
+    "机械",
+    "火"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 61,
+    "magicalAttack": 104,
+    "physicalDefense": 68,
+    "magicalDefense": 130,
+    "speed": 44
+   },
+   "total": 512,
+   "rocoId": "spirit_aacf610856d05cc9"
+  },
+  "3205": {
+   "name": "贝古斯",
+   "dexNo": "334",
+   "types": [
+    "机械",
+    "火"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 76,
+    "magicalAttack": 130,
+    "physicalDefense": 85,
+    "magicalDefense": 163,
+    "speed": 55
+   },
+   "total": 641,
+   "rocoId": "spirit_e7f61f6680a77cd5"
+  },
+  "3206": {
+   "name": "多西",
+   "dexNo": "221",
+   "types": [
+    "机械",
+    "地"
+   ],
+   "race": {
+    "hp": 64,
+    "physicalAttack": 73,
+    "magicalAttack": 26,
+    "physicalDefense": 82,
+    "magicalDefense": 70,
+    "speed": 30
+   },
+   "total": 345,
+   "rocoId": "spirit_decbdcb651f9d96c"
+  },
+  "3207": {
+   "name": "库多西",
+   "dexNo": "222",
+   "types": [
+    "机械",
+    "地"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 98,
+    "magicalAttack": 34,
+    "physicalDefense": 109,
+    "magicalDefense": 93,
+    "speed": 40
+   },
+   "total": 459,
+   "rocoId": "spirit_57b9e1b098db23f2"
+  },
+  "3208": {
+   "name": "波多西",
+   "dexNo": "223",
+   "types": [
+    "机械",
+    "地"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 122,
+    "magicalAttack": 43,
+    "physicalDefense": 136,
+    "magicalDefense": 116,
+    "speed": 50
+   },
+   "total": 573,
+   "rocoId": "spirit_5441c31fc38c5015"
+  },
+  "3209": {
+   "name": "小翼龙",
+   "dexNo": "224",
+   "types": [
+    "龙",
+    "翼"
+   ],
+   "race": {
+    "hp": 66,
+    "physicalAttack": 91,
+    "magicalAttack": 24,
+    "physicalDefense": 73,
+    "magicalDefense": 63,
+    "speed": 92
+   },
+   "total": 409,
+   "rocoId": "spirit_4901e4794bd32f40"
+  },
+  "3210": {
+   "name": "翼龙",
+   "dexNo": "225",
+   "types": [
+    "龙",
+    "翼"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 114,
+    "magicalAttack": 31,
+    "physicalDefense": 91,
+    "magicalDefense": 79,
+    "speed": 115
+   },
+   "total": 513,
+   "rocoId": "spirit_800a0042f52851cf"
+  },
+  "8011": {
+   "name": "翼龙",
+   "dexNo": "225",
+   "types": [
+    "龙",
+    "翼"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 114,
+    "magicalAttack": 31,
+    "physicalDefense": 91,
+    "magicalDefense": 79,
+    "speed": 115
+   },
+   "total": 513,
+   "rocoId": "spirit_800a0042f52851cf"
+  },
+  "3211": {
+   "name": "伊雷龙",
+   "dexNo": "203",
+   "types": [
+    "龙"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 73,
+    "magicalAttack": 152,
+    "physicalDefense": 55,
+    "magicalDefense": 79,
+    "speed": 72
+   },
+   "total": 521,
+   "rocoId": "spirit_50b77eaae7361af5"
+  },
+  "3215": {
+   "name": "海豹战士",
+   "dexNo": "181",
+   "types": [
+    "武",
+    "水"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 91,
+    "magicalAttack": 87,
+    "physicalDefense": 89,
+    "magicalDefense": 62,
+    "speed": 80
+   },
+   "total": 481,
+   "rocoId": "spirit_46522758f37081eb"
+  },
+  "3216": {
+   "name": "海豹船长",
+   "dexNo": "182",
+   "types": [
+    "武",
+    "水"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 113,
+    "magicalAttack": 109,
+    "physicalDefense": 111,
+    "magicalDefense": 77,
+    "speed": 100
+   },
+   "total": 600,
+   "rocoId": "spirit_a09a0cefefa72268"
+  },
+  "3225": {
+   "name": "古钟蛇",
+   "dexNo": "212",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 69,
+    "magicalAttack": 69,
+    "physicalDefense": 64,
+    "magicalDefense": 91,
+    "speed": 80
+   },
+   "total": 458,
+   "rocoId": "spirit_5310c12954fea6be"
+  },
+  "3621": {
+   "name": "古钟蛇",
+   "dexNo": "212",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 69,
+    "magicalAttack": 69,
+    "physicalDefense": 64,
+    "magicalDefense": 91,
+    "speed": 80
+   },
+   "total": 458,
+   "rocoId": "spirit_5310c12954fea6be"
+  },
+  "3226": {
+   "name": "寒音蛇",
+   "dexNo": "213",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 80,
+    "magicalDefense": 114,
+    "speed": 100
+   },
+   "total": 574,
+   "rocoId": "spirit_9b74b8247cee82c7"
+  },
+  "3622": {
+   "name": "寒音蛇",
+   "dexNo": "213",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 80,
+    "magicalDefense": 114,
+    "speed": 100
+   },
+   "total": 574,
+   "rocoId": "spirit_9b74b8247cee82c7"
+  },
+  "18000002": {
+   "name": "寒音蛇",
+   "dexNo": "213",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 80,
+    "magicalDefense": 114,
+    "speed": 100
+   },
+   "total": 574,
+   "rocoId": "spirit_9b74b8247cee82c7"
+  },
+  "3227": {
+   "name": "菊花梨",
+   "dexNo": "079",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 56,
+    "magicalAttack": 127,
+    "physicalDefense": 84,
+    "magicalDefense": 125,
+    "speed": 60
+   },
+   "total": 572,
+   "rocoId": "spirit_70a40653ea0eee33"
+  },
+  "3228": {
+   "name": "友爱天天",
+   "dexNo": "396",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 26,
+    "magicalAttack": 81,
+    "physicalDefense": 70,
+    "magicalDefense": 80,
+    "speed": 76
+   },
+   "total": 446,
+   "rocoId": "spirit_d09c113d91ed876b"
+  },
+  "3229": {
+   "name": "友爱星飞",
+   "dexNo": "397",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 122,
+    "physicalAttack": 37,
+    "magicalAttack": 116,
+    "physicalDefense": 88,
+    "magicalDefense": 100,
+    "speed": 95
+   },
+   "total": 558,
+   "rocoId": "spirit_b9382967288bd429"
+  },
+  "3230": {
+   "name": "加灵",
+   "dexNo": "414",
+   "types": [
+    "普通",
+    "萌"
+   ],
+   "race": {
+    "hp": 39,
+    "physicalAttack": 22,
+    "magicalAttack": 57,
+    "physicalDefense": 50,
+    "magicalDefense": 74,
+    "speed": 66
+   },
+   "total": 308,
+   "rocoId": "spirit_58d9e599a25aa153"
+  },
+  "3231": {
+   "name": "加益",
+   "dexNo": "415",
+   "types": [
+    "普通",
+    "萌"
+   ],
+   "race": {
+    "hp": 52,
+    "physicalAttack": 29,
+    "magicalAttack": 75,
+    "physicalDefense": 67,
+    "magicalDefense": 99,
+    "speed": 88
+   },
+   "total": 410,
+   "rocoId": "spirit_e1507f26b7fe0fd7"
+  },
+  "3232": {
+   "name": "加尔",
+   "dexNo": "416",
+   "types": [
+    "普通",
+    "萌"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 36,
+    "magicalAttack": 94,
+    "physicalDefense": 84,
+    "magicalDefense": 124,
+    "speed": 110
+   },
+   "total": 551,
+   "rocoId": "spirit_837f83264c04abe9"
+  },
+  "3233": {
+   "name": "黑化加尔",
+   "dexNo": "417",
+   "types": [
+    "普通",
+    "幽"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 35,
+    "magicalAttack": 104,
+    "physicalDefense": 94,
+    "magicalDefense": 124,
+    "speed": 110
+   },
+   "total": 551,
+   "rocoId": "spirit_20d0512761016266"
+  },
+  "19000010": {
+   "name": "黑化加尔",
+   "dexNo": "417",
+   "types": [
+    "普通",
+    "幽"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 35,
+    "magicalAttack": 104,
+    "physicalDefense": 94,
+    "magicalDefense": 124,
+    "speed": 110
+   },
+   "total": 551,
+   "rocoId": "spirit_20d0512761016266"
+  },
+  "3234": {
+   "name": "牵线木偶",
+   "dexNo": "373",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 77,
+    "physicalAttack": 83,
+    "magicalAttack": 89,
+    "physicalDefense": 69,
+    "magicalDefense": 107,
+    "speed": 84
+   },
+   "total": 509,
+   "rocoId": "spirit_6aa9095643b483ba"
+  },
+  "3235": {
+   "name": "帅帅魔偶",
+   "dexNo": "374",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 104,
+    "magicalAttack": 111,
+    "physicalDefense": 86,
+    "magicalDefense": 133,
+    "speed": 105
+   },
+   "total": 636,
+   "rocoId": "spirit_9915319f405cd921"
+  },
+  "3236": {
+   "name": "星星眼",
+   "dexNo": "",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 97,
+    "magicalAttack": 120,
+    "physicalDefense": 116,
+    "magicalDefense": 71,
+    "speed": 85
+   },
+   "total": 607,
+   "rocoId": "spirit_9f9a5018b4cb3927"
+  },
+  "3237": {
+   "name": "小怂猫",
+   "dexNo": "163",
+   "types": [
+    "武"
+   ],
+   "race": {
+    "hp": 74,
+    "physicalAttack": 106,
+    "magicalAttack": 101,
+    "physicalDefense": 89,
+    "magicalDefense": 76,
+    "speed": 76
+   },
+   "total": 522,
+   "rocoId": "spirit_c1a3ba0f110ff76b"
+  },
+  "3738": {
+   "name": "小怂猫",
+   "dexNo": "163",
+   "types": [
+    "武"
+   ],
+   "race": {
+    "hp": 74,
+    "physicalAttack": 106,
+    "magicalAttack": 101,
+    "physicalDefense": 89,
+    "magicalDefense": 76,
+    "speed": 76
+   },
+   "total": 522,
+   "rocoId": "spirit_c1a3ba0f110ff76b"
+  },
+  "3238": {
+   "name": "怒目怂猫",
+   "dexNo": "164",
+   "types": [
+    "武"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 132,
+    "magicalAttack": 126,
+    "physicalDefense": 111,
+    "magicalDefense": 95,
+    "speed": 95
+   },
+   "total": 659,
+   "rocoId": "spirit_8e0dba092c6f9912"
+  },
+  "3739": {
+   "name": "怒目怂猫",
+   "dexNo": "164",
+   "types": [
+    "武"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 132,
+    "magicalAttack": 126,
+    "physicalDefense": 111,
+    "magicalDefense": 95,
+    "speed": 95
+   },
+   "total": 659,
+   "rocoId": "spirit_8e0dba092c6f9912"
+  },
+  "3239": {
+   "name": "哭哭菇",
+   "dexNo": "128",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 74,
+    "physicalAttack": 38,
+    "magicalAttack": 41,
+    "physicalDefense": 30,
+    "magicalDefense": 60,
+    "speed": 36
+   },
+   "total": 279,
+   "rocoId": "spirit_9a811efcecccda12"
+  },
+  "3240": {
+   "name": "怖须菇",
+   "dexNo": "129",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 99,
+    "physicalAttack": 50,
+    "magicalAttack": 55,
+    "physicalDefense": 40,
+    "magicalDefense": 80,
+    "speed": 48
+   },
+   "total": 372,
+   "rocoId": "spirit_c55865acda344897"
+  },
+  "3241": {
+   "name": "怖哭菇",
+   "dexNo": "130",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 124,
+    "physicalAttack": 63,
+    "magicalAttack": 69,
+    "physicalDefense": 50,
+    "magicalDefense": 100,
+    "speed": 60
+   },
+   "total": 466,
+   "rocoId": "spirit_d65c8e62b7f93bd8"
+  },
+  "3244": {
+   "name": "绒绒",
+   "dexNo": "307",
+   "types": [
+    "光",
+    "虫"
+   ],
+   "race": {
+    "hp": 58,
+    "physicalAttack": 61,
+    "magicalAttack": 62,
+    "physicalDefense": 49,
+    "magicalDefense": 80,
+    "speed": 69
+   },
+   "total": 379,
+   "rocoId": "spirit_c48b78143a3d44b3"
+  },
+  "3245": {
+   "name": "小绒茧",
+   "dexNo": "308",
+   "types": [
+    "光",
+    "虫"
+   ],
+   "race": {
+    "hp": 77,
+    "physicalAttack": 81,
+    "magicalAttack": 83,
+    "physicalDefense": 65,
+    "magicalDefense": 106,
+    "speed": 92
+   },
+   "total": 504,
+   "rocoId": "spirit_e63ebdf7c40606e6"
+  },
+  "3246": {
+   "name": "绒仙子",
+   "dexNo": "309",
+   "types": [
+    "光",
+    "虫"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 101,
+    "magicalAttack": 104,
+    "physicalDefense": 81,
+    "magicalDefense": 133,
+    "speed": 115
+   },
+   "total": 630,
+   "rocoId": "spirit_a6a97c769f74a474"
+  },
+  "3250": {
+   "name": "小鹬",
+   "dexNo": "231",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 58,
+    "physicalAttack": 59,
+    "magicalAttack": 59,
+    "physicalDefense": 67,
+    "magicalDefense": 52,
+    "speed": 69
+   },
+   "total": 364,
+   "rocoId": "spirit_8929e2beb3386bf2"
+  },
+  "3251": {
+   "name": "鄙目鹬",
+   "dexNo": "232",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 77,
+    "physicalAttack": 79,
+    "magicalAttack": 79,
+    "physicalDefense": 90,
+    "magicalDefense": 70,
+    "speed": 92
+   },
+   "total": 487,
+   "rocoId": "spirit_641ef743b4f44873"
+  },
+  "3252": {
+   "name": "高脚鹬",
+   "dexNo": "233",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 112,
+    "magicalDefense": 87,
+    "speed": 115
+   },
+   "total": 606,
+   "rocoId": "spirit_485289864e937335"
+  },
+  "3255": {
+   "name": "奔波鼠",
+   "dexNo": "193",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 37,
+    "magicalAttack": 93,
+    "physicalDefense": 74,
+    "magicalDefense": 98,
+    "speed": 92
+   },
+   "total": 476,
+   "rocoId": "spirit_e28371ed91d50b85"
+  },
+  "3256": {
+   "name": "流浪鼠",
+   "dexNo": "194",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 46,
+    "magicalAttack": 116,
+    "physicalDefense": 92,
+    "magicalDefense": 122,
+    "speed": 115
+   },
+   "total": 594,
+   "rocoId": "spirit_892bc1a170d3f187"
+  },
+  "3257": {
+   "name": "布鲁斯",
+   "dexNo": "252",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 44,
+    "physicalAttack": 60,
+    "magicalAttack": 16,
+    "physicalDefense": 68,
+    "magicalDefense": 53,
+    "speed": 54
+   },
+   "total": 295,
+   "rocoId": "spirit_f7bb3405a8942817"
+  },
+  "3258": {
+   "name": "雪顶布鲁斯",
+   "dexNo": "253",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 58,
+    "physicalAttack": 81,
+    "magicalAttack": 22,
+    "physicalDefense": 91,
+    "magicalDefense": 70,
+    "speed": 72
+   },
+   "total": 394,
+   "rocoId": "spirit_54215b23a210c8df"
+  },
+  "3259": {
+   "name": "冰钻布鲁斯",
+   "dexNo": "254",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 101,
+    "magicalAttack": 27,
+    "physicalDefense": 114,
+    "magicalDefense": 88,
+    "speed": 90
+   },
+   "total": 493,
+   "rocoId": "spirit_e926effbf164759a"
+  },
+  "3262": {
+   "name": "呼呼猪",
+   "dexNo": "137",
+   "types": [
+    "冰",
+    "地"
+   ],
+   "race": {
+    "hp": 98,
+    "physicalAttack": 95,
+    "magicalAttack": 33,
+    "physicalDefense": 88,
+    "magicalDefense": 81,
+    "speed": 68
+   },
+   "total": 463,
+   "rocoId": "spirit_485ee637489f9ad5"
+  },
+  "3263": {
+   "name": "獠牙猪",
+   "dexNo": "138",
+   "types": [
+    "冰",
+    "地"
+   ],
+   "race": {
+    "hp": 123,
+    "physicalAttack": 119,
+    "magicalAttack": 41,
+    "physicalDefense": 110,
+    "magicalDefense": 101,
+    "speed": 85
+   },
+   "total": 579,
+   "rocoId": "spirit_73f8f0f7a5af80e8"
+  },
+  "3264": {
+   "name": "卡波",
+   "dexNo": "430",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 86,
+    "magicalAttack": 27,
+    "physicalDefense": 52,
+    "magicalDefense": 41,
+    "speed": 80
+   },
+   "total": 368,
+   "rocoId": "spirit_5469448171f0ed00"
+  },
+  "3265": {
+   "name": "卡拉波斯",
+   "dexNo": "431",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 107,
+    "magicalAttack": 34,
+    "physicalDefense": 65,
+    "magicalDefense": 51,
+    "speed": 100
+   },
+   "total": 456,
+   "rocoId": "spirit_275dd104cb33f7c4"
+  },
+  "3266": {
+   "name": "胆小鳗鱼",
+   "dexNo": "242",
+   "types": [
+    "电",
+    "水"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 92,
+    "magicalAttack": 92,
+    "physicalDefense": 83,
+    "magicalDefense": 90,
+    "speed": 92
+   },
+   "total": 517,
+   "rocoId": "spirit_2f1f048f002870ce"
+  },
+  "3267": {
+   "name": "闪电鳗鱼",
+   "dexNo": "243",
+   "types": [
+    "电",
+    "水"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 115,
+    "magicalAttack": 115,
+    "physicalDefense": 104,
+    "magicalDefense": 112,
+    "speed": 115
+   },
+   "total": 646,
+   "rocoId": "spirit_6aff1bd1d0653c7f"
+  },
+  "3268": {
+   "name": "大头骨龙",
+   "dexNo": "289",
+   "types": [
+    "龙",
+    "幽"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 109,
+    "magicalAttack": 40,
+    "physicalDefense": 84,
+    "magicalDefense": 65,
+    "speed": 48
+   },
+   "total": 442,
+   "rocoId": "spirit_c62e3343e392241f"
+  },
+  "3269": {
+   "name": "寂灭骨龙",
+   "dexNo": "290",
+   "types": [
+    "龙",
+    "幽"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 137,
+    "magicalAttack": 50,
+    "physicalDefense": 104,
+    "magicalDefense": 81,
+    "speed": 60
+   },
+   "total": 552,
+   "rocoId": "spirit_2c2d72d3c0bbe704"
+  },
+  "3276": {
+   "name": "绿翼鸟",
+   "dexNo": "102",
+   "types": [
+    "萌",
+    "翼"
+   ],
+   "race": {
+    "hp": 52,
+    "physicalAttack": 63,
+    "magicalAttack": 18,
+    "physicalDefense": 56,
+    "magicalDefense": 53,
+    "speed": 81
+   },
+   "total": 323,
+   "rocoId": "spirit_3ec8454e3503abf9"
+  },
+  "3277": {
+   "name": "魔翼鸟",
+   "dexNo": "103",
+   "types": [
+    "萌",
+    "翼"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 85,
+    "magicalAttack": 23,
+    "physicalDefense": 75,
+    "magicalDefense": 70,
+    "speed": 108
+   },
+   "total": 431,
+   "rocoId": "spirit_2009a4d521042694"
+  },
+  "3278": {
+   "name": "魔眷鸟",
+   "dexNo": "104",
+   "types": [
+    "萌",
+    "翼"
+   ],
+   "race": {
+    "hp": 87,
+    "physicalAttack": 106,
+    "magicalAttack": 29,
+    "physicalDefense": 94,
+    "magicalDefense": 88,
+    "speed": 135
+   },
+   "total": 539,
+   "rocoId": "spirit_23d8e46ab3759344"
+  },
+  "3279": {
+   "name": "雪绒鸟",
+   "dexNo": "018",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 77,
+    "magicalAttack": 33,
+    "physicalDefense": 65,
+    "magicalDefense": 44,
+    "speed": 69
+   },
+   "total": 342,
+   "rocoId": "spirit_7215049b23b5cdaf"
+  },
+  "3280": {
+   "name": "雪绒鸟",
+   "dexNo": "018",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 77,
+    "magicalAttack": 33,
+    "physicalDefense": 65,
+    "magicalDefense": 44,
+    "speed": 69
+   },
+   "total": 342,
+   "rocoId": "spirit_7215049b23b5cdaf"
+  },
+  "3281": {
+   "name": "雪绒鸟",
+   "dexNo": "018",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 77,
+    "magicalAttack": 33,
+    "physicalDefense": 65,
+    "magicalDefense": 44,
+    "speed": 69
+   },
+   "total": 342,
+   "rocoId": "spirit_7215049b23b5cdaf"
+  },
+  "3533": {
+   "name": "雪绒鸟",
+   "dexNo": "018",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 77,
+    "magicalAttack": 33,
+    "physicalDefense": 65,
+    "magicalDefense": 44,
+    "speed": 69
+   },
+   "total": 342,
+   "rocoId": "spirit_7215049b23b5cdaf"
+  },
+  "3307": {
+   "name": "矿晶虫",
+   "dexNo": "039",
+   "types": [
+    "光",
+    "地"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 77,
+    "magicalAttack": 81,
+    "physicalDefense": 102,
+    "magicalDefense": 75,
+    "speed": 52
+   },
+   "total": 466,
+   "rocoId": "spirit_671f6866e48a615e"
+  },
+  "3309": {
+   "name": "犀角鸟",
+   "dexNo": "310",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 88,
+    "magicalAttack": 40,
+    "physicalDefense": 67,
+    "magicalDefense": 44,
+    "speed": 66
+   },
+   "total": 368,
+   "rocoId": "spirit_dffa44a6fdca4257"
+  },
+  "3310": {
+   "name": "光纤兽",
+   "dexNo": "311",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 117,
+    "magicalAttack": 54,
+    "physicalDefense": 90,
+    "magicalDefense": 58,
+    "speed": 88
+   },
+   "total": 490,
+   "rocoId": "spirit_1ab64fdcf97bc5b4"
+  },
+  "3311": {
+   "name": "疾光千兽",
+   "dexNo": "312",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 146,
+    "magicalAttack": 67,
+    "physicalDefense": 112,
+    "magicalDefense": 73,
+    "speed": 110
+   },
+   "total": 612,
+   "rocoId": "spirit_7212501b0d3c243e"
+  },
+  "3315": {
+   "name": "小鼠獭",
+   "dexNo": "036",
+   "types": [
+    "普通",
+    "水"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 57,
+    "magicalAttack": 57,
+    "physicalDefense": 60,
+    "magicalDefense": 60,
+    "speed": 48
+   },
+   "total": 355,
+   "rocoId": "spirit_4dbadf64799c9e23"
+  },
+  "3316": {
+   "name": "燕尾獭",
+   "dexNo": "037",
+   "types": [
+    "普通",
+    "水"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 77,
+    "magicalAttack": 77,
+    "physicalDefense": 81,
+    "magicalDefense": 81,
+    "speed": 64
+   },
+   "total": 477,
+   "rocoId": "spirit_750fb3fba9325823"
+  },
+  "3317": {
+   "name": "卷胡巨獭",
+   "dexNo": "038",
+   "types": [
+    "普通",
+    "水"
+   ],
+   "race": {
+    "hp": 121,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 101,
+    "magicalDefense": 101,
+    "speed": 80
+   },
+   "total": 595,
+   "rocoId": "spirit_e3c66cd78f05665a"
+  },
+  "3319": {
+   "name": "粉星仔",
+   "dexNo": "335",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 80,
+    "physicalAttack": 63,
+    "magicalAttack": 119,
+    "physicalDefense": 58,
+    "magicalDefense": 102,
+    "speed": 92
+   },
+   "total": 514,
+   "rocoId": "spirit_3e28ee2df02a761f"
+  },
+  "3320": {
+   "name": "粉耳星兔",
+   "dexNo": "336",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 79,
+    "magicalAttack": 148,
+    "physicalDefense": 73,
+    "magicalDefense": 127,
+    "speed": 115
+   },
+   "total": 642,
+   "rocoId": "spirit_8508bbff0538ba3e"
+  },
+  "3321": {
+   "name": "觅觅蝠",
+   "dexNo": "403",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 76,
+    "physicalAttack": 60,
+    "magicalAttack": 59,
+    "physicalDefense": 58,
+    "magicalDefense": 74,
+    "speed": 33
+   },
+   "total": 360,
+   "rocoId": "spirit_5a7139c375f14f75"
+  },
+  "3322": {
+   "name": "翻翻蝠",
+   "dexNo": "404",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 101,
+    "physicalAttack": 79,
+    "magicalAttack": 78,
+    "physicalDefense": 78,
+    "magicalDefense": 98,
+    "speed": 44
+   },
+   "total": 478,
+   "rocoId": "spirit_4621dc00a0a34768"
+  },
+  "3323": {
+   "name": "夜游魔",
+   "dexNo": "405",
+   "types": [
+    "翼",
+    "恶"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 99,
+    "magicalAttack": 98,
+    "physicalDefense": 97,
+    "magicalDefense": 123,
+    "speed": 55
+   },
+   "total": 618,
+   "rocoId": "spirit_9113b86360b2a162"
+  },
+  "3330": {
+   "name": "海盔虫",
+   "dexNo": "076",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 71,
+    "physicalAttack": 25,
+    "magicalAttack": 59,
+    "physicalDefense": 46,
+    "magicalDefense": 66,
+    "speed": 60
+   },
+   "total": 327,
+   "rocoId": "spirit_46b0f0d4bc8a27ce"
+  },
+  "3475": {
+   "name": "海盔虫",
+   "dexNo": "076",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 71,
+    "physicalAttack": 25,
+    "magicalAttack": 59,
+    "physicalDefense": 46,
+    "magicalDefense": 66,
+    "speed": 60
+   },
+   "total": 327,
+   "rocoId": "spirit_46b0f0d4bc8a27ce"
+  },
+  "3331": {
+   "name": "刺盔虫",
+   "dexNo": "077",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 33,
+    "magicalAttack": 79,
+    "physicalDefense": 61,
+    "magicalDefense": 88,
+    "speed": 80
+   },
+   "total": 435,
+   "rocoId": "spirit_ac567756b7a95b52"
+  },
+  "3476": {
+   "name": "刺盔虫",
+   "dexNo": "077",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 33,
+    "magicalAttack": 79,
+    "physicalDefense": 61,
+    "magicalDefense": 88,
+    "speed": 80
+   },
+   "total": 435,
+   "rocoId": "spirit_ac567756b7a95b52"
+  },
+  "3332": {
+   "name": "千棘盔",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 41,
+    "magicalAttack": 99,
+    "physicalDefense": 76,
+    "magicalDefense": 111,
+    "speed": 100
+   },
+   "total": 545,
+   "rocoId": "spirit_afdd04c5a8919716"
+  },
+  "3477": {
+   "name": "千棘盔",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 41,
+    "magicalAttack": 99,
+    "physicalDefense": 76,
+    "magicalDefense": 111,
+    "speed": 100
+   },
+   "total": 545,
+   "rocoId": "spirit_afdd04c5a8919716"
+  },
+  "3333": {
+   "name": "雪娃娃",
+   "dexNo": "139",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 56,
+    "physicalAttack": 67,
+    "magicalAttack": 67,
+    "physicalDefense": 63,
+    "magicalDefense": 63,
+    "speed": 69
+   },
+   "total": 385,
+   "rocoId": "spirit_990cb4aa69aae116"
+  },
+  "3334": {
+   "name": "冰封怨灵",
+   "dexNo": "140",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 90,
+    "magicalAttack": 90,
+    "physicalDefense": 84,
+    "magicalDefense": 84,
+    "speed": 92
+   },
+   "total": 515,
+   "rocoId": "spirit_8ad67cef500f03bb"
+  },
+  "3335": {
+   "name": "雪灵",
+   "dexNo": "141",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 112,
+    "magicalAttack": 112,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 115
+   },
+   "total": 643,
+   "rocoId": "spirit_7abd8c5d14815f03"
+  },
+  "3341": {
+   "name": "雪灵兽",
+   "dexNo": "390",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 62,
+    "physicalAttack": 59,
+    "magicalAttack": 19,
+    "physicalDefense": 67,
+    "magicalDefense": 62,
+    "speed": 75
+   },
+   "total": 344,
+   "rocoId": "spirit_754a6d48ff3008ca"
+  },
+  "3342": {
+   "name": "幻雪兽",
+   "dexNo": "391",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 78,
+    "magicalAttack": 26,
+    "physicalDefense": 89,
+    "magicalDefense": 82,
+    "speed": 100
+   },
+   "total": 458,
+   "rocoId": "spirit_eea3305074d126d7"
+  },
+  "3343": {
+   "name": "饮雪狂兽",
+   "dexNo": "392",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 85,
+    "magicalAttack": 24,
+    "physicalDefense": 111,
+    "magicalDefense": 103,
+    "speed": 125
+   },
+   "total": 593,
+   "rocoId": "spirit_c0b03ac594c86309"
+  },
+  "4095": {
+   "name": "饮雪狂兽",
+   "dexNo": "392",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 85,
+    "magicalAttack": 24,
+    "physicalDefense": 111,
+    "magicalDefense": 103,
+    "speed": 125
+   },
+   "total": 593,
+   "rocoId": "spirit_c0b03ac594c86309"
+  },
+  "3344": {
+   "name": "乖乖鹄",
+   "dexNo": "088",
+   "types": [
+    "翼",
+    "水"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 57,
+    "magicalAttack": 52,
+    "physicalDefense": 83,
+    "magicalDefense": 58,
+    "speed": 69
+   },
+   "total": 394,
+   "rocoId": "spirit_cf5102684c14c331"
+  },
+  "3345": {
+   "name": "蓝珠天鹅",
+   "dexNo": "089",
+   "types": [
+    "翼",
+    "水"
+   ],
+   "race": {
+    "hp": 100,
+    "physicalAttack": 76,
+    "magicalAttack": 69,
+    "physicalDefense": 110,
+    "magicalDefense": 78,
+    "speed": 92
+   },
+   "total": 525,
+   "rocoId": "spirit_e62f0702d019bbff"
+  },
+  "3346": {
+   "name": "翠顶夫人",
+   "dexNo": "090",
+   "types": [
+    "翼",
+    "水"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 95,
+    "magicalAttack": 86,
+    "physicalDefense": 138,
+    "magicalDefense": 97,
+    "speed": 115
+   },
+   "total": 656,
+   "rocoId": "spirit_b40543f05ede5824"
+  },
+  "3347": {
+   "name": "芽眼魔",
+   "dexNo": "406",
+   "types": [
+    "恶",
+    "水"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 62,
+    "magicalAttack": 59,
+    "physicalDefense": 51,
+    "magicalDefense": 59,
+    "speed": 45
+   },
+   "total": 344,
+   "rocoId": "spirit_633f294762a4edb7"
+  },
+  "3348": {
+   "name": "叶眼魔",
+   "dexNo": "407",
+   "types": [
+    "恶",
+    "水"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 82,
+    "magicalAttack": 78,
+    "physicalDefense": 68,
+    "magicalDefense": 78,
+    "speed": 60
+   },
+   "total": 457,
+   "rocoId": "spirit_7b9235bec269eae3"
+  },
+  "3349": {
+   "name": "障眼魔",
+   "dexNo": "408",
+   "types": [
+    "恶",
+    "水"
+   ],
+   "race": {
+    "hp": 134,
+    "physicalAttack": 103,
+    "magicalAttack": 98,
+    "physicalDefense": 96,
+    "magicalDefense": 110,
+    "speed": 75
+   },
+   "total": 616,
+   "rocoId": "spirit_569cad56dd846019"
+  },
+  "3350": {
+   "name": "红绒十字",
+   "dexNo": "257",
+   "types": [
+    "火",
+    "萌"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 47,
+    "magicalAttack": 122,
+    "physicalDefense": 100,
+    "magicalDefense": 127,
+    "speed": 90
+   },
+   "total": 604,
+   "rocoId": "spirit_2e7dd5cabd9695cb"
+  },
+  "3351": {
+   "name": "霹雳宝宝",
+   "dexNo": "387",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 54,
+    "physicalAttack": 66,
+    "magicalAttack": 66,
+    "physicalDefense": 67,
+    "magicalDefense": 56,
+    "speed": 72
+   },
+   "total": 381,
+   "rocoId": "spirit_b361152983cb5fcf"
+  },
+  "3352": {
+   "name": "雷鸣小子",
+   "dexNo": "388",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 90,
+    "magicalDefense": 74,
+    "speed": 96
+   },
+   "total": 508,
+   "rocoId": "spirit_8372a9cff5cfd614"
+  },
+  "3353": {
+   "name": "雷神之子",
+   "dexNo": "389",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 110,
+    "magicalAttack": 110,
+    "physicalDefense": 112,
+    "magicalDefense": 93,
+    "speed": 120
+   },
+   "total": 635,
+   "rocoId": "spirit_09c86b84dc2e2fe2"
+  },
+  "3357": {
+   "name": "电动长颈鹿",
+   "dexNo": "226",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 55,
+    "physicalAttack": 46,
+    "magicalAttack": 12,
+    "physicalDefense": 65,
+    "magicalDefense": 47,
+    "speed": 72
+   },
+   "total": 297,
+   "rocoId": "spirit_fb284359b27daddf"
+  },
+  "3358": {
+   "name": "奔乐鹿",
+   "dexNo": "227",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 61,
+    "magicalAttack": 16,
+    "physicalDefense": 86,
+    "magicalDefense": 63,
+    "speed": 96
+   },
+   "total": 395,
+   "rocoId": "spirit_5b7800d23a14248c"
+  },
+  "3359": {
+   "name": "爵士鹿",
+   "dexNo": "228",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 77,
+    "magicalAttack": 20,
+    "physicalDefense": 108,
+    "magicalDefense": 79,
+    "speed": 120
+   },
+   "total": 526,
+   "rocoId": "spirit_906f78a278f66fb9"
+  },
+  "3360": {
+   "name": "蝴蝶陶陶",
+   "dexNo": "422",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 57,
+    "physicalAttack": 47,
+    "magicalAttack": 8,
+    "physicalDefense": 65,
+    "magicalDefense": 57,
+    "speed": 75
+   },
+   "total": 309,
+   "rocoId": "spirit_4572605541ea5410"
+  },
+  "3361": {
+   "name": "铆钉毛毛",
+   "dexNo": "423",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 76,
+    "physicalAttack": 62,
+    "magicalAttack": 11,
+    "physicalDefense": 87,
+    "magicalDefense": 76,
+    "speed": 100
+   },
+   "total": 412,
+   "rocoId": "spirit_cde6b16e331c998f"
+  },
+  "3362": {
+   "name": "徘徊爪爪",
+   "dexNo": "424",
+   "types": [
+    "萌",
+    "毒"
+   ],
+   "race": {
+    "hp": 95,
+    "physicalAttack": 78,
+    "magicalAttack": 14,
+    "physicalDefense": 109,
+    "magicalDefense": 95,
+    "speed": 125
+   },
+   "total": 551,
+   "rocoId": "spirit_2b2a9041fef7f98b"
+  },
+  "3367": {
+   "name": "嘟嘟煲",
+   "dexNo": "052",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 110,
+    "physicalAttack": 29,
+    "magicalAttack": 82,
+    "physicalDefense": 71,
+    "magicalDefense": 83,
+    "speed": 84
+   },
+   "total": 459,
+   "rocoId": "spirit_a23862842c04d6d4"
+  },
+  "18000004": {
+   "name": "嘟嘟煲",
+   "dexNo": "052",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 110,
+    "physicalAttack": 29,
+    "magicalAttack": 82,
+    "physicalDefense": 71,
+    "magicalDefense": 83,
+    "speed": 84
+   },
+   "total": 459,
+   "rocoId": "spirit_a23862842c04d6d4"
+  },
+  "3368": {
+   "name": "嘟嘟锅",
+   "dexNo": "053",
+   "types": [
+    "毒"
+   ],
+   "race": {
+    "hp": 137,
+    "physicalAttack": 36,
+    "magicalAttack": 102,
+    "physicalDefense": 89,
+    "magicalDefense": 104,
+    "speed": 105
+   },
+   "total": 573,
+   "rocoId": "spirit_20c4fe45219cff2b"
+  },
+  "3369": {
+   "name": "幽星光",
+   "dexNo": "345",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 49,
+    "physicalAttack": 21,
+    "magicalAttack": 63,
+    "physicalDefense": 48,
+    "magicalDefense": 63,
+    "speed": 75
+   },
+   "total": 319,
+   "rocoId": "spirit_9e9fbd0d21db6a27"
+  },
+  "3370": {
+   "name": "曜星光",
+   "dexNo": "346",
+   "types": [
+    "幻",
+    "翼"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 28,
+    "magicalAttack": 84,
+    "physicalDefense": 64,
+    "magicalDefense": 84,
+    "speed": 100
+   },
+   "total": 425,
+   "rocoId": "spirit_868fe3816f18b653"
+  },
+  "3371": {
+   "name": "暮星辰",
+   "dexNo": "347",
+   "types": [
+    "幻",
+    "翼"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 35,
+    "magicalAttack": 106,
+    "physicalDefense": 80,
+    "magicalDefense": 105,
+    "speed": 125
+   },
+   "total": 532,
+   "rocoId": "spirit_11c4e6d87a317e03"
+  },
+  "3372": {
+   "name": "春花兔",
+   "dexNo": "344",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 85,
+    "magicalAttack": 95,
+    "physicalDefense": 103,
+    "magicalDefense": 90,
+    "speed": 105
+   },
+   "total": 547,
+   "rocoId": "spirit_698ad3439af7d73a"
+  },
+  "3373": {
+   "name": "逗逗",
+   "dexNo": "198",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 48,
+    "physicalAttack": 70,
+    "magicalAttack": 64,
+    "physicalDefense": 68,
+    "magicalDefense": 68,
+    "speed": 66
+   },
+   "total": 384,
+   "rocoId": "spirit_dd9f6c54fe833615"
+  },
+  "3374": {
+   "name": "气球猫",
+   "dexNo": "199",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 64,
+    "physicalAttack": 93,
+    "magicalAttack": 86,
+    "physicalDefense": 90,
+    "magicalDefense": 90,
+    "speed": 88
+   },
+   "total": 511,
+   "rocoId": "spirit_f544e238b20d1b57"
+  },
+  "3375": {
+   "name": "梦想三三",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 117,
+    "magicalAttack": 107,
+    "physicalDefense": 113,
+    "magicalDefense": 113,
+    "speed": 110
+   },
+   "total": 641,
+   "rocoId": "spirit_6d33a16d98f35c14"
+  },
+  "3378": {
+   "name": "菇菇丁",
+   "dexNo": "174",
+   "types": [
+    "地",
+    "草"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 66,
+    "magicalAttack": 62,
+    "physicalDefense": 75,
+    "magicalDefense": 62,
+    "speed": 42
+   },
+   "total": 396,
+   "rocoId": "spirit_83db81196f100ca8"
+  },
+  "3379": {
+   "name": "多菇丁",
+   "dexNo": "175",
+   "types": [
+    "地",
+    "草"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 88,
+    "magicalAttack": 83,
+    "physicalDefense": 100,
+    "magicalDefense": 82,
+    "speed": 56
+   },
+   "total": 528,
+   "rocoId": "spirit_d197cd68d0703776"
+  },
+  "3380": {
+   "name": "九幽菇",
+   "dexNo": "176",
+   "types": [
+    "地",
+    "草"
+   ],
+   "race": {
+    "hp": 149,
+    "physicalAttack": 110,
+    "magicalAttack": 103,
+    "physicalDefense": 125,
+    "magicalDefense": 103,
+    "speed": 70
+   },
+   "total": 660,
+   "rocoId": "spirit_fc159a604efaf226"
+  },
+  "3381": {
+   "name": "深蓝鲸",
+   "dexNo": "273",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 137,
+    "physicalAttack": 44,
+    "magicalAttack": 121,
+    "physicalDefense": 125,
+    "magicalDefense": 141,
+    "speed": 50
+   },
+   "total": 618,
+   "rocoId": "spirit_37ea034163f3e376"
+  },
+  "3382": {
+   "name": "双灯鱼",
+   "dexNo": "320",
+   "types": [
+    "水",
+    "电"
+   ],
+   "race": {
+    "hp": 102,
+    "physicalAttack": 55,
+    "magicalAttack": 111,
+    "physicalDefense": 57,
+    "magicalDefense": 93,
+    "speed": 84
+   },
+   "total": 502,
+   "rocoId": "spirit_9ca96ae79c231b4b"
+  },
+  "3383": {
+   "name": "利灯鱼",
+   "dexNo": "321",
+   "types": [
+    "水",
+    "电"
+   ],
+   "race": {
+    "hp": 128,
+    "physicalAttack": 68,
+    "magicalAttack": 138,
+    "physicalDefense": 71,
+    "magicalDefense": 116,
+    "speed": 105
+   },
+   "total": 626,
+   "rocoId": "spirit_fa1c63ad49fa3ffa"
+  },
+  "3384": {
+   "name": "豆丁鱼",
+   "dexNo": "239",
+   "types": [
+    "水",
+    "龙"
+   ],
+   "race": {
+    "hp": 53,
+    "physicalAttack": 62,
+    "magicalAttack": 65,
+    "physicalDefense": 60,
+    "magicalDefense": 62,
+    "speed": 81
+   },
+   "total": 383,
+   "rocoId": "spirit_eef6c46566381bb0"
+  },
+  "3385": {
+   "name": "快鳍鱼",
+   "dexNo": "240",
+   "types": [
+    "水",
+    "龙"
+   ],
+   "race": {
+    "hp": 71,
+    "physicalAttack": 82,
+    "magicalAttack": 87,
+    "physicalDefense": 80,
+    "magicalDefense": 83,
+    "speed": 108
+   },
+   "total": 511,
+   "rocoId": "spirit_e0314e9c0f0f09fc"
+  },
+  "3386": {
+   "name": "龙鱼",
+   "dexNo": "241",
+   "types": [
+    "水",
+    "龙"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 103,
+    "magicalAttack": 109,
+    "physicalDefense": 100,
+    "magicalDefense": 104,
+    "speed": 135
+   },
+   "total": 640,
+   "rocoId": "spirit_97b704a0026aab99"
+  },
+  "3392": {
+   "name": "凡雀",
+   "dexNo": "351",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 71,
+    "physicalAttack": 55,
+    "magicalAttack": 53,
+    "physicalDefense": 52,
+    "magicalDefense": 66,
+    "speed": 75
+   },
+   "total": 372,
+   "rocoId": "spirit_944959c9abc3c627"
+  },
+  "3393": {
+   "name": "紫翎鹰",
+   "dexNo": "352",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 74,
+    "magicalAttack": 71,
+    "physicalDefense": 69,
+    "magicalDefense": 88,
+    "speed": 100
+   },
+   "total": 496,
+   "rocoId": "spirit_bcb2369c1b3bf65e"
+  },
+  "19000004": {
+   "name": "紫翎鹰",
+   "dexNo": "352",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 74,
+    "magicalAttack": 71,
+    "physicalDefense": 69,
+    "magicalDefense": 88,
+    "speed": 100
+   },
+   "total": 496,
+   "rocoId": "spirit_bcb2369c1b3bf65e"
+  },
+  "3394": {
+   "name": "凡鹰",
+   "dexNo": "353",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 92,
+    "magicalAttack": 89,
+    "physicalDefense": 86,
+    "magicalDefense": 110,
+    "speed": 125
+   },
+   "total": 620,
+   "rocoId": "spirit_c245104fe73fad25"
+  },
+  "3395": {
+   "name": "里奥",
+   "dexNo": "150",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 65,
+    "magicalAttack": 65,
+    "physicalDefense": 77,
+    "magicalDefense": 50,
+    "speed": 75
+   },
+   "total": 411,
+   "rocoId": "spirit_a9dbb2fc3935e468"
+  },
+  "3396": {
+   "name": "灵羽勇士",
+   "dexNo": "151",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 102,
+    "magicalDefense": 66,
+    "speed": 100
+   },
+   "total": 547,
+   "rocoId": "spirit_9d2e8eeb9a1fe818"
+  },
+  "3397": {
+   "name": "圣羽翼王",
+   "dexNo": "152",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 109,
+    "magicalAttack": 109,
+    "physicalDefense": 128,
+    "magicalDefense": 83,
+    "speed": 125
+   },
+   "total": 686,
+   "rocoId": "spirit_5ee78de2be28a163"
+  },
+  "3480": {
+   "name": "圣羽翼王",
+   "dexNo": "152",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 109,
+    "magicalAttack": 109,
+    "physicalDefense": 128,
+    "magicalDefense": 83,
+    "speed": 125
+   },
+   "total": 686,
+   "rocoId": "spirit_5ee78de2be28a163"
+  },
+  "3398": {
+   "name": "星尘虫",
+   "dexNo": "317",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 49,
+    "physicalAttack": 47,
+    "magicalAttack": 47,
+    "physicalDefense": 46,
+    "magicalDefense": 58,
+    "speed": 60
+   },
+   "total": 307,
+   "rocoId": "spirit_3e8be135916b7e76"
+  },
+  "3399": {
+   "name": "落星虫",
+   "dexNo": "318",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 62,
+    "magicalAttack": 62,
+    "physicalDefense": 61,
+    "magicalDefense": 77,
+    "speed": 80
+   },
+   "total": 407,
+   "rocoId": "spirit_278f29da0bd4f52b"
+  },
+  "3400": {
+   "name": "陨星虫",
+   "dexNo": "319",
+   "types": [
+    "虫"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 78,
+    "magicalAttack": 78,
+    "physicalDefense": 76,
+    "magicalDefense": 96,
+    "speed": 100
+   },
+   "total": 509,
+   "rocoId": "spirit_6ba7b3af27da2625"
+  },
+  "3402": {
+   "name": "碎晶蝎",
+   "dexNo": "381",
+   "types": [
+    "恶",
+    "地"
+   ],
+   "race": {
+    "hp": 65,
+    "physicalAttack": 76,
+    "magicalAttack": 70,
+    "physicalDefense": 71,
+    "magicalDefense": 47,
+    "speed": 57
+   },
+   "total": 386,
+   "rocoId": "spirit_462cd79c7165004e"
+  },
+  "3403": {
+   "name": "晶尾蝎",
+   "dexNo": "382",
+   "types": [
+    "恶",
+    "地"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 101,
+    "magicalAttack": 94,
+    "physicalDefense": 95,
+    "magicalDefense": 63,
+    "speed": 76
+   },
+   "total": 515,
+   "rocoId": "spirit_25d82643f5f69e28"
+  },
+  "3404": {
+   "name": "蝎子王",
+   "dexNo": "383",
+   "types": [
+    "恶",
+    "地"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 126,
+    "magicalAttack": 117,
+    "physicalDefense": 119,
+    "magicalDefense": 79,
+    "speed": 95
+   },
+   "total": 644,
+   "rocoId": "spirit_3ba0ecc3da584c40"
+  },
+  "3406": {
+   "name": "缇塔",
+   "dexNo": "229",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 73,
+    "physicalAttack": 99,
+    "magicalAttack": 38,
+    "physicalDefense": 98,
+    "magicalDefense": 74,
+    "speed": 72
+   },
+   "total": 454,
+   "rocoId": "spirit_2663ae54113f96f0"
+  },
+  "3407": {
+   "name": "声波缇塔",
+   "dexNo": "230",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 124,
+    "magicalAttack": 48,
+    "physicalDefense": 122,
+    "magicalDefense": 92,
+    "speed": 90
+   },
+   "total": 567,
+   "rocoId": "spirit_24ff0f0e3504e1ca"
+  },
+  "3410": {
+   "name": "权杖-Ⅱ",
+   "dexNo": "145",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 84,
+    "magicalAttack": 78,
+    "physicalDefense": 109,
+    "magicalDefense": 109,
+    "speed": 60
+   },
+   "total": 522,
+   "rocoId": "spirit_b7594c978ae26ecc"
+  },
+  "3411": {
+   "name": "权杖-V",
+   "dexNo": "146",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 105,
+    "magicalAttack": 97,
+    "physicalDefense": 136,
+    "magicalDefense": 136,
+    "speed": 75
+   },
+   "total": 652,
+   "rocoId": "spirit_befdd756d3d8b3dd"
+  },
+  "3412": {
+   "name": "伊兰亚龙",
+   "dexNo": "204",
+   "types": [
+    "龙"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 91,
+    "magicalAttack": 190,
+    "physicalDefense": 69,
+    "magicalDefense": 99,
+    "speed": 90
+   },
+   "total": 651,
+   "rocoId": "spirit_b2f1251352d5f670"
+  },
+  "3419": {
+   "name": "厉毒小萝",
+   "dexNo": "291",
+   "types": [
+    "毒",
+    "恶"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 64,
+    "magicalAttack": 17,
+    "physicalDefense": 81,
+    "magicalDefense": 59,
+    "speed": 108
+   },
+   "total": 396,
+   "rocoId": "spirit_9551dc47632fbe3e"
+  },
+  "3420": {
+   "name": "厉毒修萝",
+   "dexNo": "292",
+   "types": [
+    "毒",
+    "恶"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 80,
+    "magicalAttack": 21,
+    "physicalDefense": 101,
+    "magicalDefense": 74,
+    "speed": 135
+   },
+   "total": 495,
+   "rocoId": "spirit_ed7ba8bc769c7d50"
+  },
+  "3434": {
+   "name": "小电企鹅",
+   "dexNo": "132",
+   "types": [
+    "冰",
+    "电"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 45,
+    "magicalAttack": 101,
+    "physicalDefense": 59,
+    "magicalDefense": 87,
+    "speed": 100
+   },
+   "total": 467,
+   "rocoId": "spirit_49699925c6ec1c8f"
+  },
+  "3435": {
+   "name": "电企鹅",
+   "dexNo": "133",
+   "types": [
+    "冰",
+    "电"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 56,
+    "magicalAttack": 126,
+    "physicalDefense": 73,
+    "magicalDefense": 109,
+    "speed": 125
+   },
+   "total": 583,
+   "rocoId": "spirit_d1c13ba13b0d76ff"
+  },
+  "3436": {
+   "name": "柴渣虫",
+   "dexNo": "325",
+   "types": [
+    "火",
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 96,
+    "magicalAttack": 38,
+    "physicalDefense": 82,
+    "magicalDefense": 58,
+    "speed": 80
+   },
+   "total": 462,
+   "rocoId": "spirit_534e8dc232e788d6"
+  },
+  "3437": {
+   "name": "燃薪虫",
+   "dexNo": "326",
+   "types": [
+    "火",
+    "草"
+   ],
+   "race": {
+    "hp": 135,
+    "physicalAttack": 120,
+    "magicalAttack": 48,
+    "physicalDefense": 103,
+    "magicalDefense": 73,
+    "speed": 100
+   },
+   "total": 579,
+   "rocoId": "spirit_6cf962ececae443b"
+  },
+  "3444": {
+   "name": "噼啪鸟",
+   "dexNo": "272",
+   "types": [
+    "电",
+    "翼"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 116,
+    "magicalAttack": 109,
+    "physicalDefense": 85,
+    "magicalDefense": 85,
+    "speed": 145
+   },
+   "total": 618,
+   "rocoId": "spirit_99f5d4bc7811d4a1"
+  },
+  "3457": {
+   "name": "月牙雪熊",
+   "dexNo": "322",
+   "types": [
+    "冰",
+    "幻"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 97,
+    "magicalAttack": 39,
+    "physicalDefense": 141,
+    "magicalDefense": 103,
+    "speed": 80
+   },
+   "total": 586,
+   "rocoId": "spirit_ee30eb99632df5ce"
+  },
+  "3466": {
+   "name": "星云旅者",
+   "dexNo": "409",
+   "types": [
+    "翼",
+    "幻"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 32,
+    "magicalAttack": 129,
+    "physicalDefense": 104,
+    "magicalDefense": 83,
+    "speed": 120
+   },
+   "total": 572,
+   "rocoId": "spirit_c81d428eaaa8e87b"
+  },
+  "3473": {
+   "name": "布瓜蝌",
+   "dexNo": "338",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 84,
+    "magicalAttack": 35,
+    "physicalDefense": 81,
+    "magicalDefense": 55,
+    "speed": 96
+   },
+   "total": 442,
+   "rocoId": "spirit_e56cfb17e927501f"
+  },
+  "3474": {
+   "name": "上岸蛙",
+   "dexNo": "339",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 114,
+    "physicalAttack": 106,
+    "magicalAttack": 44,
+    "physicalDefense": 101,
+    "magicalDefense": 69,
+    "speed": 120
+   },
+   "total": 554,
+   "rocoId": "spirit_895ceb36f1099b3b"
+  },
+  "3484": {
+   "name": "螺旋帕帕",
+   "dexNo": "261",
+   "types": [
+    "机械",
+    "翼"
+   ],
+   "race": {
+    "hp": 88,
+    "physicalAttack": 55,
+    "magicalAttack": 8,
+    "physicalDefense": 79,
+    "magicalDefense": 67,
+    "speed": 80
+   },
+   "total": 377,
+   "rocoId": "spirit_e2ca38af6ca8a535"
+  },
+  "3485": {
+   "name": "落陨星兔",
+   "dexNo": "337",
+   "types": [
+    "幻",
+    "幽"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 61,
+    "magicalAttack": 125,
+    "physicalDefense": 87,
+    "magicalDefense": 141,
+    "speed": 130
+   },
+   "total": 637,
+   "rocoId": "spirit_802fd62adaba698b"
+  },
+  "3567": {
+   "name": "落陨星兔",
+   "dexNo": "337",
+   "types": [
+    "幻",
+    "幽"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 61,
+    "magicalAttack": 125,
+    "physicalDefense": 87,
+    "magicalDefense": 141,
+    "speed": 130
+   },
+   "total": 637,
+   "rocoId": "spirit_802fd62adaba698b"
+  },
+  "3487": {
+   "name": "小丑豆豆",
+   "dexNo": "362",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 66,
+    "physicalAttack": 87,
+    "magicalAttack": 88,
+    "physicalDefense": 49,
+    "magicalDefense": 74,
+    "speed": 72
+   },
+   "total": 436,
+   "rocoId": "spirit_531f78b52160b070"
+  },
+  "3488": {
+   "name": "小丑兔",
+   "dexNo": "363",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 88,
+    "physicalAttack": 116,
+    "magicalAttack": 118,
+    "physicalDefense": 66,
+    "magicalDefense": 99,
+    "speed": 96
+   },
+   "total": 583,
+   "rocoId": "spirit_78f96b030afc52ad"
+  },
+  "3489": {
+   "name": "小丑公爵",
+   "dexNo": "364",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 145,
+    "magicalAttack": 147,
+    "physicalDefense": 82,
+    "magicalDefense": 124,
+    "speed": 120
+   },
+   "total": 729,
+   "rocoId": "spirit_a0dd7aaab165d94a"
+  },
+  "3490": {
+   "name": "吸泥鸥",
+   "dexNo": "287",
+   "types": [
+    "地",
+    "翼"
+   ],
+   "race": {
+    "hp": 99,
+    "physicalAttack": 89,
+    "magicalAttack": 33,
+    "physicalDefense": 87,
+    "magicalDefense": 71,
+    "speed": 76
+   },
+   "total": 455,
+   "rocoId": "spirit_05f3242dd3ab1ac6"
+  },
+  "3491": {
+   "name": "泥吼牙",
+   "dexNo": "288",
+   "types": [
+    "地",
+    "翼"
+   ],
+   "race": {
+    "hp": 124,
+    "physicalAttack": 112,
+    "magicalAttack": 41,
+    "physicalDefense": 109,
+    "magicalDefense": 88,
+    "speed": 95
+   },
+   "total": 569,
+   "rocoId": "spirit_3049dc50139f821a"
+  },
+  "8204": {
+   "name": "泥吼牙",
+   "dexNo": "288",
+   "types": [
+    "地",
+    "翼"
+   ],
+   "race": {
+    "hp": 124,
+    "physicalAttack": 112,
+    "magicalAttack": 41,
+    "physicalDefense": 109,
+    "magicalDefense": 88,
+    "speed": 95
+   },
+   "total": 569,
+   "rocoId": "spirit_3049dc50139f821a"
+  },
+  "3492": {
+   "name": "兽花蕾",
+   "dexNo": "059",
+   "types": [
+    "光",
+    "草"
+   ],
+   "race": {
+    "hp": 70,
+    "physicalAttack": 79,
+    "magicalAttack": 82,
+    "physicalDefense": 70,
+    "magicalDefense": 97,
+    "speed": 115
+   },
+   "total": 513,
+   "rocoId": "spirit_646ad89ac7e8a7e9"
+  },
+  "3499": {
+   "name": "公平鸽",
+   "dexNo": "162",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 93,
+    "magicalAttack": 93,
+    "physicalDefense": 125,
+    "magicalDefense": 125,
+    "speed": 100
+   },
+   "total": 649,
+   "rocoId": "spirit_4009f06481c98efb"
+  },
+  "4093": {
+   "name": "公平鸽",
+   "dexNo": "162",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 93,
+    "magicalAttack": 93,
+    "physicalDefense": 125,
+    "magicalDefense": 125,
+    "speed": 100
+   },
+   "total": 649,
+   "rocoId": "spirit_4009f06481c98efb"
+  },
+  "3506": {
+   "name": "花怨鳗",
+   "dexNo": "201",
+   "types": [
+    "地",
+    "草"
+   ],
+   "race": {
+    "hp": 232,
+    "physicalAttack": 73,
+    "magicalAttack": 73,
+    "physicalDefense": 110,
+    "magicalDefense": 90,
+    "speed": 52
+   },
+   "total": 630,
+   "rocoId": "spirit_a6c418b0b991f459"
+  },
+  "3507": {
+   "name": "鳗尾兽",
+   "dexNo": "202",
+   "types": [
+    "地",
+    "草"
+   ],
+   "race": {
+    "hp": 290,
+    "physicalAttack": 91,
+    "magicalAttack": 91,
+    "physicalDefense": 138,
+    "magicalDefense": 113,
+    "speed": 65
+   },
+   "total": 788,
+   "rocoId": "spirit_181a3dd66ff76d4a"
+  },
+  "3508": {
+   "name": "波波螺",
+   "dexNo": "171",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 59,
+    "magicalAttack": 59,
+    "physicalDefense": 87,
+    "magicalDefense": 66,
+    "speed": 42
+   },
+   "total": 380,
+   "rocoId": "spirit_820232ca518d0543"
+  },
+  "3511": {
+   "name": "波波螺",
+   "dexNo": "171",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 59,
+    "magicalAttack": 59,
+    "physicalDefense": 87,
+    "magicalDefense": 66,
+    "speed": 42
+   },
+   "total": 380,
+   "rocoId": "spirit_820232ca518d0543"
+  },
+  "3509": {
+   "name": "消波螺",
+   "dexNo": "172",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 78,
+    "magicalAttack": 78,
+    "physicalDefense": 116,
+    "magicalDefense": 88,
+    "speed": 56
+   },
+   "total": 505,
+   "rocoId": "spirit_6c137a25617820e8"
+  },
+  "3512": {
+   "name": "消波螺",
+   "dexNo": "172",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 78,
+    "magicalAttack": 78,
+    "physicalDefense": 116,
+    "magicalDefense": 88,
+    "speed": 56
+   },
+   "total": 505,
+   "rocoId": "spirit_6c137a25617820e8"
+  },
+  "3510": {
+   "name": "嗜波螺",
+   "dexNo": "173",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 146,
+    "magicalDefense": 110,
+    "speed": 70
+   },
+   "total": 634,
+   "rocoId": "spirit_4bc9a982e5888257"
+  },
+  "3513": {
+   "name": "嗜波螺",
+   "dexNo": "173",
+   "types": [
+    "地",
+    "水"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 146,
+    "magicalDefense": 110,
+    "speed": 70
+   },
+   "total": 634,
+   "rocoId": "spirit_4bc9a982e5888257"
+  },
+  "3514": {
+   "name": "圣水迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "水"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 113,
+    "magicalDefense": 113,
+    "speed": 92
+   },
+   "total": 598,
+   "rocoId": "spirit_32aed655cbbf0db6"
+  },
+  "5028": {
+   "name": "圣水迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "水"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 80,
+    "magicalAttack": 80,
+    "physicalDefense": 113,
+    "magicalDefense": 113,
+    "speed": 92
+   },
+   "total": 598,
+   "rocoId": "spirit_32aed655cbbf0db6"
+  },
+  "3515": {
+   "name": "圣火迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "火"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 598,
+   "rocoId": "spirit_dd14e867313fad1d"
+  },
+  "5027": {
+   "name": "圣火迪莫",
+   "dexNo": "001",
+   "types": [
+    "光",
+    "火"
+   ],
+   "race": {
+    "hp": 120,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 92
+   },
+   "total": 598,
+   "rocoId": "spirit_dd14e867313fad1d"
+  },
+  "3521": {
+   "name": "里拉鳐",
+   "dexNo": "219",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 82,
+    "magicalAttack": 89,
+    "physicalDefense": 103,
+    "magicalDefense": 147,
+    "speed": 105
+   },
+   "total": 644,
+   "rocoId": "spirit_741c2be5526d185a"
+  },
+  "3526": {
+   "name": "抹茶布丁",
+   "dexNo": "314",
+   "types": [
+    "水",
+    "草"
+   ],
+   "race": {
+    "hp": 101,
+    "physicalAttack": 32,
+    "magicalAttack": 101,
+    "physicalDefense": 94,
+    "magicalDefense": 98,
+    "speed": 120
+   },
+   "total": 546,
+   "rocoId": "spirit_6aa27664c730f95a"
+  },
+  "3527": {
+   "name": "椰浆布丁",
+   "dexNo": "315",
+   "types": [
+    "水",
+    "冰"
+   ],
+   "race": {
+    "hp": 133,
+    "physicalAttack": 34,
+    "magicalAttack": 89,
+    "physicalDefense": 81,
+    "magicalDefense": 105,
+    "speed": 120
+   },
+   "total": 562,
+   "rocoId": "spirit_80fbf0bae1147e9c"
+  },
+  "3528": {
+   "name": "熔岩布丁",
+   "dexNo": "316",
+   "types": [
+    "水",
+    "火"
+   ],
+   "race": {
+    "hp": 128,
+    "physicalAttack": 87,
+    "magicalAttack": 33,
+    "physicalDefense": 112,
+    "magicalDefense": 84,
+    "speed": 120
+   },
+   "total": 564,
+   "rocoId": "spirit_f99f67a3721ea123"
+  },
+  "3529": {
+   "name": "号儿鱼",
+   "dexNo": "183",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 24,
+    "magicalAttack": 76,
+    "physicalDefense": 76,
+    "magicalDefense": 88,
+    "speed": 84
+   },
+   "total": 438,
+   "rocoId": "spirit_2ae6b5c4d6db7310"
+  },
+  "3530": {
+   "name": "圆号鱼",
+   "dexNo": "184",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 31,
+    "magicalAttack": 95,
+    "physicalDefense": 95,
+    "magicalDefense": 110,
+    "speed": 105
+   },
+   "total": 549,
+   "rocoId": "spirit_83e3e8efde0199bf"
+  },
+  "3531": {
+   "name": "小雪人",
+   "dexNo": "354",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 101,
+    "physicalAttack": 85,
+    "magicalAttack": 80,
+    "physicalDefense": 78,
+    "magicalDefense": 105,
+    "speed": 60
+   },
+   "total": 509,
+   "rocoId": "spirit_cd1a308eb48c6ee7"
+  },
+  "3532": {
+   "name": "雪怪",
+   "dexNo": "355",
+   "types": [
+    "冰"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 107,
+    "magicalAttack": 99,
+    "physicalDefense": 98,
+    "magicalDefense": 131,
+    "speed": 75
+   },
+   "total": 636,
+   "rocoId": "spirit_d7890eda12ee6281"
+  },
+  "3534": {
+   "name": "斑斑",
+   "dexNo": "177",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 87,
+    "physicalAttack": 90,
+    "magicalAttack": 90,
+    "physicalDefense": 82,
+    "magicalDefense": 91,
+    "speed": 92
+   },
+   "total": 532,
+   "rocoId": "spirit_3e425282b9a8c9ab"
+  },
+  "3535": {
+   "name": "斑枭",
+   "dexNo": "178",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 109,
+    "physicalAttack": 112,
+    "magicalAttack": 112,
+    "physicalDefense": 102,
+    "magicalDefense": 114,
+    "speed": 115
+   },
+   "total": 664,
+   "rocoId": "spirit_3f90a2afd5df255c"
+  },
+  "3542": {
+   "name": "未完虫",
+   "dexNo": "",
+   "types": [
+    "幽",
+    "虫"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 102,
+    "magicalAttack": 111,
+    "physicalDefense": 68,
+    "magicalDefense": 100,
+    "speed": 100
+   },
+   "total": 567,
+   "rocoId": "spirit_200b70f549b632c9"
+  },
+  "3545": {
+   "name": "圣剑侍从",
+   "dexNo": "285",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 139,
+    "physicalAttack": 116,
+    "magicalAttack": 111,
+    "physicalDefense": 139,
+    "magicalDefense": 139,
+    "speed": 52
+   },
+   "total": 696,
+   "rocoId": "spirit_311edd9f5c6873f8"
+  },
+  "3546": {
+   "name": "圣剑-X",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 174,
+    "physicalAttack": 144,
+    "magicalAttack": 139,
+    "physicalDefense": 173,
+    "magicalDefense": 173,
+    "speed": 65
+   },
+   "total": 868,
+   "rocoId": "spirit_9c0a363768b55616"
+  },
+  "3547": {
+   "name": "帕帕斯卡",
+   "dexNo": "262",
+   "types": [
+    "机械",
+    "翼"
+   ],
+   "race": {
+    "hp": 110,
+    "physicalAttack": 68,
+    "magicalAttack": 10,
+    "physicalDefense": 99,
+    "magicalDefense": 84,
+    "speed": 100
+   },
+   "total": 471,
+   "rocoId": "spirit_01295eab9380e02c"
+  },
+  "3565": {
+   "name": "栗鼠",
+   "dexNo": "438",
+   "types": [
+    "毒",
+    "普通"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 61,
+    "magicalAttack": 63,
+    "physicalDefense": 62,
+    "magicalDefense": 89,
+    "speed": 80
+   },
+   "total": 446,
+   "rocoId": "spirit_740d8925b0f9e3f9"
+  },
+  "3566": {
+   "name": "壳栗丝鼠",
+   "dexNo": "439",
+   "types": [
+    "毒",
+    "普通"
+   ],
+   "race": {
+    "hp": 114,
+    "physicalAttack": 77,
+    "magicalAttack": 79,
+    "physicalDefense": 77,
+    "magicalDefense": 111,
+    "speed": 100
+   },
+   "total": 558,
+   "rocoId": "spirit_90fe6de063fbcbcd"
+  },
+  "3568": {
+   "name": "小黑猫",
+   "dexNo": "121",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 119,
+    "physicalAttack": 42,
+    "magicalAttack": 99,
+    "physicalDefense": 72,
+    "magicalDefense": 103,
+    "speed": 56
+   },
+   "total": 491,
+   "rocoId": "spirit_16c94e4954935fac"
+  },
+  "3569": {
+   "name": "黑猫巫师",
+   "dexNo": "122",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 149,
+    "physicalAttack": 53,
+    "magicalAttack": 124,
+    "physicalDefense": 90,
+    "magicalDefense": 129,
+    "speed": 70
+   },
+   "total": 615,
+   "rocoId": "spirit_b0e254d60233952f"
+  },
+  "3571": {
+   "name": "黑羽夫人",
+   "dexNo": "091",
+   "types": [
+    "翼",
+    "恶"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 93,
+    "magicalAttack": 87,
+    "physicalDefense": 130,
+    "magicalDefense": 90,
+    "speed": 120
+   },
+   "total": 652,
+   "rocoId": "spirit_d68adbb57965af94"
+  },
+  "3572": {
+   "name": "爆焰仔",
+   "dexNo": "356",
+   "types": [
+    "火",
+    "龙"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 101,
+    "magicalAttack": 50,
+    "physicalDefense": 105,
+    "magicalDefense": 65,
+    "speed": 88
+   },
+   "total": 498,
+   "rocoId": "spirit_91b6b1d0ba27d34f"
+  },
+  "3573": {
+   "name": "爆焰喷喷",
+   "dexNo": "357",
+   "types": [
+    "火",
+    "龙"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 127,
+    "magicalAttack": 63,
+    "physicalDefense": 131,
+    "magicalDefense": 81,
+    "speed": 110
+   },
+   "total": 624,
+   "rocoId": "spirit_08f17ac819b76607"
+  },
+  "3574": {
+   "name": "热团团",
+   "dexNo": "",
+   "types": [
+    "火",
+    "虫"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_62628958b4cc94fd"
+  },
+  "3575": {
+   "name": "焰米龙",
+   "dexNo": "",
+   "types": [
+    "火",
+    "虫"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_d77a1d73a14413be"
+  },
+  "3576": {
+   "name": "圣凯布米龙",
+   "dexNo": "",
+   "types": [
+    "火",
+    "虫"
+   ],
+   "race": {
+    "hp": 79,
+    "physicalAttack": 116,
+    "magicalAttack": 29,
+    "physicalDefense": 120,
+    "magicalDefense": 120,
+    "speed": 105
+   },
+   "total": 569,
+   "rocoId": "spirit_5f3ff5817d7871b8"
+  },
+  "3577": {
+   "name": "墨鱿士",
+   "dexNo": "280",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 97,
+    "magicalAttack": 42,
+    "physicalDefense": 105,
+    "magicalDefense": 79,
+    "speed": 56
+   },
+   "total": 482,
+   "rocoId": "spirit_d218885988b9c5a0"
+  },
+  "3578": {
+   "name": "混乱鱿彩",
+   "dexNo": "281",
+   "types": [
+    "幽",
+    "恶"
+   ],
+   "race": {
+    "hp": 129,
+    "physicalAttack": 122,
+    "magicalAttack": 53,
+    "physicalDefense": 131,
+    "magicalDefense": 99,
+    "speed": 70
+   },
+   "total": 604,
+   "rocoId": "spirit_3247e9dd6602e72c"
+  },
+  "3579": {
+   "name": "秩序鱿墨",
+   "dexNo": "282",
+   "types": [
+    "幽",
+    "萌"
+   ],
+   "race": {
+    "hp": 78,
+    "physicalAttack": 120,
+    "magicalAttack": 39,
+    "physicalDefense": 124,
+    "magicalDefense": 113,
+    "speed": 130
+   },
+   "total": 604,
+   "rocoId": "spirit_d4f6e1e80d4f396e"
+  },
+  "3589": {
+   "name": "玳龟",
+   "dexNo": "",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_669c6c48798e31e2"
+  },
+  "3590": {
+   "name": "玳塔",
+   "dexNo": "",
+   "types": [
+    "幻"
+   ],
+   "race": {
+    "hp": 127,
+    "physicalAttack": 47,
+    "magicalAttack": 107,
+    "physicalDefense": 72,
+    "magicalDefense": 116,
+    "speed": 50
+   },
+   "total": 519,
+   "rocoId": "spirit_fa429ea152f6bdad"
+  },
+  "3591": {
+   "name": "十字蝌蚪",
+   "dexNo": "427",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 78,
+    "magicalAttack": 31,
+    "physicalDefense": 63,
+    "magicalDefense": 47,
+    "speed": 66
+   },
+   "total": 353,
+   "rocoId": "spirit_3184ea3b2586daef"
+  },
+  "3592": {
+   "name": "十字蛙",
+   "dexNo": "428",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 104,
+    "magicalAttack": 41,
+    "physicalDefense": 85,
+    "magicalDefense": 63,
+    "speed": 88
+   },
+   "total": 472,
+   "rocoId": "spirit_8792e27bbf3c11a4"
+  },
+  "3593": {
+   "name": "深渊蛙",
+   "dexNo": "429",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 130,
+    "magicalAttack": 51,
+    "physicalDefense": 106,
+    "magicalDefense": 78,
+    "speed": 110
+   },
+   "total": 629,
+   "rocoId": "spirit_93e6120c353ab24b"
+  },
+  "3594": {
+   "name": "松仔",
+   "dexNo": "153",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 83,
+    "magicalAttack": 34,
+    "physicalDefense": 77,
+    "magicalDefense": 60,
+    "speed": 63
+   },
+   "total": 380,
+   "rocoId": "spirit_a95bdb5c1c49960e"
+  },
+  "3720": {
+   "name": "松仔",
+   "dexNo": "153",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 83,
+    "magicalAttack": 34,
+    "physicalDefense": 77,
+    "magicalDefense": 60,
+    "speed": 63
+   },
+   "total": 380,
+   "rocoId": "spirit_a95bdb5c1c49960e"
+  },
+  "3595": {
+   "name": "松叶羊",
+   "dexNo": "154",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 111,
+    "magicalAttack": 46,
+    "physicalDefense": 102,
+    "magicalDefense": 80,
+    "speed": 84
+   },
+   "total": 507,
+   "rocoId": "spirit_8dbc85f59622c36a"
+  },
+  "3721": {
+   "name": "松叶羊",
+   "dexNo": "154",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 111,
+    "magicalAttack": 46,
+    "physicalDefense": 102,
+    "magicalDefense": 80,
+    "speed": 84
+   },
+   "total": 507,
+   "rocoId": "spirit_8dbc85f59622c36a"
+  },
+  "3596": {
+   "name": "针叶巡林",
+   "dexNo": "155",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 139,
+    "magicalAttack": 57,
+    "physicalDefense": 128,
+    "magicalDefense": 100,
+    "speed": 105
+   },
+   "total": 634,
+   "rocoId": "spirit_de22accf29301363"
+  },
+  "3722": {
+   "name": "针叶巡林",
+   "dexNo": "155",
+   "types": [
+    "草",
+    "武"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 139,
+    "magicalAttack": 57,
+    "physicalDefense": 128,
+    "magicalDefense": 100,
+    "speed": 105
+   },
+   "total": 634,
+   "rocoId": "spirit_de22accf29301363"
+  },
+  "3597": {
+   "name": "水滴蛇",
+   "dexNo": "159",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 66,
+    "magicalAttack": 62,
+    "physicalDefense": 62,
+    "magicalDefense": 62,
+    "speed": 63
+   },
+   "total": 378,
+   "rocoId": "spirit_23bd8615aa9c02c8"
+  },
+  "3723": {
+   "name": "水滴蛇",
+   "dexNo": "159",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 63,
+    "physicalAttack": 66,
+    "magicalAttack": 62,
+    "physicalDefense": 62,
+    "magicalDefense": 62,
+    "speed": 63
+   },
+   "total": 378,
+   "rocoId": "spirit_23bd8615aa9c02c8"
+  },
+  "3598": {
+   "name": "水蛇锁",
+   "dexNo": "160",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 88,
+    "magicalAttack": 83,
+    "physicalDefense": 83,
+    "magicalDefense": 83,
+    "speed": 84
+   },
+   "total": 505,
+   "rocoId": "spirit_ac20eee6a2856869"
+  },
+  "3724": {
+   "name": "水蛇锁",
+   "dexNo": "160",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 84,
+    "physicalAttack": 88,
+    "magicalAttack": 83,
+    "physicalDefense": 83,
+    "magicalDefense": 83,
+    "speed": 84
+   },
+   "total": 505,
+   "rocoId": "spirit_ac20eee6a2856869"
+  },
+  "3599": {
+   "name": "游蛇魔使",
+   "dexNo": "161",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 110,
+    "magicalAttack": 104,
+    "physicalDefense": 103,
+    "magicalDefense": 103,
+    "speed": 105
+   },
+   "total": 635,
+   "rocoId": "spirit_40bee517b3857b1d"
+  },
+  "3725": {
+   "name": "游蛇魔使",
+   "dexNo": "161",
+   "types": [
+    "水",
+    "武"
+   ],
+   "race": {
+    "hp": 105,
+    "physicalAttack": 110,
+    "magicalAttack": 104,
+    "physicalDefense": 103,
+    "magicalDefense": 103,
+    "speed": 105
+   },
+   "total": 635,
+   "rocoId": "spirit_40bee517b3857b1d"
+  },
+  "3600": {
+   "name": "小勇狮",
+   "dexNo": "156",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 31,
+    "magicalAttack": 66,
+    "physicalDefense": 53,
+    "magicalDefense": 78,
+    "speed": 48
+   },
+   "total": 358,
+   "rocoId": "spirit_d5db756766ab21aa"
+  },
+  "3726": {
+   "name": "小勇狮",
+   "dexNo": "156",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 82,
+    "physicalAttack": 31,
+    "magicalAttack": 66,
+    "physicalDefense": 53,
+    "magicalDefense": 78,
+    "speed": 48
+   },
+   "total": 358,
+   "rocoId": "spirit_d5db756766ab21aa"
+  },
+  "3601": {
+   "name": "炽焰狮",
+   "dexNo": "157",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 110,
+    "physicalAttack": 41,
+    "magicalAttack": 89,
+    "physicalDefense": 70,
+    "magicalDefense": 104,
+    "speed": 64
+   },
+   "total": 478,
+   "rocoId": "spirit_e44802e1537dc447"
+  },
+  "3727": {
+   "name": "炽焰狮",
+   "dexNo": "157",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 110,
+    "physicalAttack": 41,
+    "magicalAttack": 89,
+    "physicalDefense": 70,
+    "magicalDefense": 104,
+    "speed": 64
+   },
+   "total": 478,
+   "rocoId": "spirit_e44802e1537dc447"
+  },
+  "3602": {
+   "name": "炽心勇狮",
+   "dexNo": "158",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 137,
+    "physicalAttack": 51,
+    "magicalAttack": 111,
+    "physicalDefense": 88,
+    "magicalDefense": 130,
+    "speed": 80
+   },
+   "total": 623,
+   "rocoId": "spirit_a339a9ece5b78fc4"
+  },
+  "3728": {
+   "name": "炽心勇狮",
+   "dexNo": "158",
+   "types": [
+    "火",
+    "武"
+   ],
+   "race": {
+    "hp": 137,
+    "physicalAttack": 51,
+    "magicalAttack": 111,
+    "physicalDefense": 88,
+    "magicalDefense": 130,
+    "speed": 80
+   },
+   "total": 623,
+   "rocoId": "spirit_a339a9ece5b78fc4"
+  },
+  "3603": {
+   "name": "毛头小蛛",
+   "dexNo": "296",
+   "types": [
+    "虫",
+    "地"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 80,
+    "magicalAttack": 27,
+    "physicalDefense": 93,
+    "magicalDefense": 79,
+    "speed": 88
+   },
+   "total": 452,
+   "rocoId": "spirit_cd5a04a9d9f170f9"
+  },
+  "3604": {
+   "name": "捕尘长绒",
+   "dexNo": "297",
+   "types": [
+    "虫",
+    "地"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 100,
+    "magicalAttack": 34,
+    "physicalDefense": 116,
+    "magicalDefense": 99,
+    "speed": 110
+   },
+   "total": 565,
+   "rocoId": "spirit_7c5218a85eac0018"
+  },
+  "3605": {
+   "name": "食尘短绒",
+   "dexNo": "298",
+   "types": [
+    "虫",
+    "地"
+   ],
+   "race": {
+    "hp": 109,
+    "physicalAttack": 105,
+    "magicalAttack": 37,
+    "physicalDefense": 113,
+    "magicalDefense": 97,
+    "speed": 115
+   },
+   "total": 576,
+   "rocoId": "spirit_cd669a9720f51fe4"
+  },
+  "3606": {
+   "name": "画精灵",
+   "dexNo": "299",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 61,
+    "physicalAttack": 32,
+    "magicalAttack": 78,
+    "physicalDefense": 56,
+    "magicalDefense": 72,
+    "speed": 72
+   },
+   "total": 371,
+   "rocoId": "spirit_50b9ea1cf5a9f06c"
+  },
+  "3607": {
+   "name": "画像守护",
+   "dexNo": "300",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 42,
+    "magicalAttack": 104,
+    "physicalDefense": 75,
+    "magicalDefense": 96,
+    "speed": 96
+   },
+   "total": 494,
+   "rocoId": "spirit_6eefcea5a4902052"
+  },
+  "3608": {
+   "name": "画间法师手",
+   "dexNo": "301",
+   "types": [
+    "普通",
+    "幻"
+   ],
+   "race": {
+    "hp": 101,
+    "physicalAttack": 53,
+    "magicalAttack": 131,
+    "physicalDefense": 94,
+    "magicalDefense": 120,
+    "speed": 120
+   },
+   "total": 619,
+   "rocoId": "spirit_5d306a78398c4bcd"
+  },
+  "3609": {
+   "name": "画间沉铁兽",
+   "dexNo": "302",
+   "types": [
+    "普通",
+    "武"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 147,
+    "magicalAttack": 63,
+    "physicalDefense": 100,
+    "magicalDefense": 76,
+    "speed": 92
+   },
+   "total": 604,
+   "rocoId": "spirit_4a91bd3db13b8a07"
+  },
+  "8202": {
+   "name": "画间沉铁兽",
+   "dexNo": "302",
+   "types": [
+    "普通",
+    "武"
+   ],
+   "race": {
+    "hp": 126,
+    "physicalAttack": 147,
+    "magicalAttack": 63,
+    "physicalDefense": 100,
+    "magicalDefense": 76,
+    "speed": 92
+   },
+   "total": 604,
+   "rocoId": "spirit_4a91bd3db13b8a07"
+  },
+  "3610": {
+   "name": "书魔虫",
+   "dexNo": "303",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 69,
+    "magicalAttack": 69,
+    "physicalDefense": 48,
+    "magicalDefense": 73,
+    "speed": 57
+   },
+   "total": 383,
+   "rocoId": "spirit_595b959db1b3bdec"
+  },
+  "3611": {
+   "name": "书卷守护",
+   "dexNo": "304",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 92,
+    "magicalAttack": 92,
+    "physicalDefense": 64,
+    "magicalDefense": 98,
+    "speed": 76
+   },
+   "total": 511,
+   "rocoId": "spirit_35c4507102bacd52"
+  },
+  "3612": {
+   "name": "古卷执政官",
+   "dexNo": "305",
+   "types": [
+    "普通",
+    "幻"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 115,
+    "magicalAttack": 115,
+    "physicalDefense": 80,
+    "magicalDefense": 122,
+    "speed": 95
+   },
+   "total": 638,
+   "rocoId": "spirit_b75ef6a541e92530"
+  },
+  "3613": {
+   "name": "古卷匣魔像",
+   "dexNo": "306",
+   "types": [
+    "普通",
+    "武"
+   ],
+   "race": {
+    "hp": 109,
+    "physicalAttack": 109,
+    "magicalAttack": 109,
+    "physicalDefense": 130,
+    "magicalDefense": 86,
+    "speed": 95
+   },
+   "total": 638,
+   "rocoId": "spirit_fef49211939cd9fc"
+  },
+  "3614": {
+   "name": "嗜光嗡嗡",
+   "dexNo": "323",
+   "types": [
+    "恶",
+    "光"
+   ],
+   "race": {
+    "hp": 74,
+    "physicalAttack": 91,
+    "magicalAttack": 91,
+    "physicalDefense": 57,
+    "magicalDefense": 100,
+    "speed": 92
+   },
+   "total": 505,
+   "rocoId": "spirit_5f0f752695a65545"
+  },
+  "3615": {
+   "name": "窃光蚊",
+   "dexNo": "324",
+   "types": [
+    "恶",
+    "光"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 113,
+    "magicalAttack": 113,
+    "physicalDefense": 71,
+    "magicalDefense": 125,
+    "speed": 115
+   },
+   "total": 630,
+   "rocoId": "spirit_7709f87e848d6006"
+  },
+  "3616": {
+   "name": "不咕钟",
+   "dexNo": "412",
+   "types": [
+    "机械",
+    "幻"
+   ],
+   "race": {
+    "hp": 68,
+    "physicalAttack": 67,
+    "magicalAttack": 68,
+    "physicalDefense": 58,
+    "magicalDefense": 93,
+    "speed": 76
+   },
+   "total": 430,
+   "rocoId": "spirit_530c8af0ca46270f"
+  },
+  "3617": {
+   "name": "溯源钟",
+   "dexNo": "413",
+   "types": [
+    "机械",
+    "幻"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 84,
+    "magicalAttack": 86,
+    "physicalDefense": 72,
+    "magicalDefense": 116,
+    "speed": 95
+   },
+   "total": 538,
+   "rocoId": "spirit_847ceda3de74ce90"
+  },
+  "3618": {
+   "name": "小箱怪",
+   "dexNo": "210",
+   "types": [
+    "机械",
+    "幻"
+   ],
+   "race": {
+    "hp": 111,
+    "physicalAttack": 103,
+    "magicalAttack": 103,
+    "physicalDefense": 122,
+    "magicalDefense": 122,
+    "speed": 64
+   },
+   "total": 625,
+   "rocoId": "spirit_15d9cb4663223f27"
+  },
+  "3619": {
+   "name": "迷迷箱怪",
+   "dexNo": "211",
+   "types": [
+    "机械",
+    "幻"
+   ],
+   "race": {
+    "hp": 138,
+    "physicalAttack": 129,
+    "magicalAttack": 129,
+    "physicalDefense": 153,
+    "magicalDefense": 153,
+    "speed": 80
+   },
+   "total": 782,
+   "rocoId": "spirit_85bda8a55f4058a5"
+  },
+  "3620": {
+   "name": "学院呱呱",
+   "dexNo": "375",
+   "types": [
+    "武"
+   ],
+   "race": {
+    "hp": 132,
+    "physicalAttack": 99,
+    "magicalAttack": 99,
+    "physicalDefense": 92,
+    "magicalDefense": 92,
+    "speed": 100
+   },
+   "total": 614,
+   "rocoId": "spirit_bda93c9052c59fb1"
+  },
+  "3659": {
+   "name": "加油海葵",
+   "dexNo": "360",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 87,
+    "magicalAttack": 87,
+    "physicalDefense": 102,
+    "magicalDefense": 102,
+    "speed": 76
+   },
+   "total": 547,
+   "rocoId": "spirit_ea44560ba353ca44"
+  },
+  "3660": {
+   "name": "加油蟹",
+   "dexNo": "361",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 108,
+    "magicalAttack": 108,
+    "physicalDefense": 128,
+    "magicalDefense": 128,
+    "speed": 95
+   },
+   "total": 656,
+   "rocoId": "spirit_07b444210032f19b"
+  },
+  "3743": {
+   "name": "加油蟹",
+   "dexNo": "361",
+   "types": [
+    "水",
+    "萌"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 108,
+    "magicalAttack": 108,
+    "physicalDefense": 128,
+    "magicalDefense": 128,
+    "speed": 95
+   },
+   "total": 656,
+   "rocoId": "spirit_07b444210032f19b"
+  },
+  "3663": {
+   "name": "量风碗",
+   "dexNo": "",
+   "types": [
+    "翼",
+    "机械"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_7d159935c8b45ec3"
+  },
+  "3664": {
+   "name": "测风蝉",
+   "dexNo": "",
+   "types": [
+    "翼",
+    "机械"
+   ],
+   "race": {
+    "hp": 98,
+    "physicalAttack": 98,
+    "magicalAttack": 97,
+    "physicalDefense": 116,
+    "magicalDefense": 84,
+    "speed": 120
+   },
+   "total": 613,
+   "rocoId": "spirit_8735efa1d0793f6a"
+  },
+  "3675": {
+   "name": "守夜烛",
+   "dexNo": "432",
+   "types": [
+    "火",
+    "光"
+   ],
+   "race": {
+    "hp": 89,
+    "physicalAttack": 87,
+    "magicalAttack": 94,
+    "physicalDefense": 86,
+    "magicalDefense": 98,
+    "speed": 84
+   },
+   "total": 538,
+   "rocoId": "spirit_e421bd362627ef57"
+  },
+  "3676": {
+   "name": "流明坎德拉",
+   "dexNo": "433",
+   "types": [
+    "火",
+    "光"
+   ],
+   "race": {
+    "hp": 121,
+    "physicalAttack": 96,
+    "magicalAttack": 104,
+    "physicalDefense": 108,
+    "magicalDefense": 123,
+    "speed": 105
+   },
+   "total": 657,
+   "rocoId": "spirit_94a85e8f16adabcf"
+  },
+  "3677": {
+   "name": "烟花团",
+   "dexNo": "365",
+   "types": [
+    "火",
+    "毒"
+   ],
+   "race": {
+    "hp": 61,
+    "physicalAttack": 35,
+    "magicalAttack": 89,
+    "physicalDefense": 50,
+    "magicalDefense": 78,
+    "speed": 76
+   },
+   "total": 389,
+   "rocoId": "spirit_9ea91035b620d764"
+  },
+  "3678": {
+   "name": "烟花伯爵",
+   "dexNo": "366",
+   "types": [
+    "火",
+    "毒"
+   ],
+   "race": {
+    "hp": 76,
+    "physicalAttack": 44,
+    "magicalAttack": 111,
+    "physicalDefense": 62,
+    "magicalDefense": 97,
+    "speed": 95
+   },
+   "total": 558,
+   "rocoId": "spirit_765e2b577e6118df"
+  },
+  "3683": {
+   "name": "咕咕帽",
+   "dexNo": "367",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 103,
+    "physicalAttack": 74,
+    "magicalAttack": 72,
+    "physicalDefense": 110,
+    "magicalDefense": 76,
+    "speed": 80
+   },
+   "total": 515,
+   "rocoId": "spirit_72d2072cd2a176d0"
+  },
+  "3684": {
+   "name": "咕德帽帽",
+   "dexNo": "368",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 128,
+    "physicalAttack": 92,
+    "magicalAttack": 90,
+    "physicalDefense": 137,
+    "magicalDefense": 95,
+    "speed": 100
+   },
+   "total": 642,
+   "rocoId": "spirit_a35d11156a88dcac"
+  },
+  "3697": {
+   "name": "稻草人",
+   "dexNo": "436",
+   "types": [
+    "萌",
+    "武"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 70,
+    "magicalAttack": 70,
+    "physicalDefense": 90,
+    "magicalDefense": 90,
+    "speed": 44
+   },
+   "total": 457,
+   "rocoId": "spirit_318f0eeb215e3f31"
+  },
+  "3698": {
+   "name": "稻草守护者",
+   "dexNo": "437",
+   "types": [
+    "萌",
+    "武"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 88,
+    "magicalAttack": 88,
+    "physicalDefense": 112,
+    "magicalDefense": 112,
+    "speed": 55
+   },
+   "total": 617,
+   "rocoId": "spirit_db6b6d95ebcaa2e3"
+  },
+  "3704": {
+   "name": "优优",
+   "dexNo": "270",
+   "types": [
+    "地",
+    "光"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 35,
+    "magicalAttack": 89,
+    "physicalDefense": 84,
+    "magicalDefense": 104,
+    "speed": 92
+   },
+   "total": 485,
+   "rocoId": "spirit_87025d8e98fabe3c"
+  },
+  "3705": {
+   "name": "绒光优优",
+   "dexNo": "271",
+   "types": [
+    "地",
+    "光"
+   ],
+   "race": {
+    "hp": 101,
+    "physicalAttack": 43,
+    "magicalAttack": 111,
+    "physicalDefense": 105,
+    "magicalDefense": 130,
+    "speed": 115
+   },
+   "total": 605,
+   "rocoId": "spirit_56b76e5cddf39081"
+  },
+  "3706": {
+   "name": "蜜果骸",
+   "dexNo": "434",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 34,
+    "magicalAttack": 96,
+    "physicalDefense": 68,
+    "magicalDefense": 85,
+    "speed": 88
+   },
+   "total": 463,
+   "rocoId": "spirit_55b0f9a33ceb0415"
+  },
+  "3707": {
+   "name": "半朽蜜果灵",
+   "dexNo": "435",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 43,
+    "magicalAttack": 120,
+    "physicalDefense": 84,
+    "magicalDefense": 106,
+    "speed": 110
+   },
+   "total": 620,
+   "rocoId": "spirit_3c13248ddfa2a129"
+  },
+  "3708": {
+   "name": "小鼓象",
+   "dexNo": "371",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 86,
+    "magicalAttack": 56,
+    "physicalDefense": 139,
+    "magicalDefense": 64,
+    "speed": 64
+   },
+   "total": 513,
+   "rocoId": "spirit_063422817e8deefc"
+  },
+  "3709": {
+   "name": "巨鼓象",
+   "dexNo": "372",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 107,
+    "magicalAttack": 70,
+    "physicalDefense": 173,
+    "magicalDefense": 80,
+    "speed": 80
+   },
+   "total": 596,
+   "rocoId": "spirit_faed11065c114c00"
+  },
+  "3710": {
+   "name": "咬咬小子",
+   "dexNo": "418",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 102,
+    "physicalAttack": 102,
+    "magicalAttack": 17,
+    "physicalDefense": 48,
+    "magicalDefense": 92,
+    "speed": 76
+   },
+   "total": 437,
+   "rocoId": "spirit_7852c4374166c897"
+  },
+  "3711": {
+   "name": "胡桃王子",
+   "dexNo": "419",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 128,
+    "physicalAttack": 127,
+    "magicalAttack": 21,
+    "physicalDefense": 60,
+    "magicalDefense": 115,
+    "speed": 95
+   },
+   "total": 546,
+   "rocoId": "spirit_972e038b6e427f6b"
+  },
+  "3718": {
+   "name": "足尖元件",
+   "dexNo": "420",
+   "types": [
+    "幻",
+    "机械"
+   ],
+   "race": {
+    "hp": 91,
+    "physicalAttack": 40,
+    "magicalAttack": 88,
+    "physicalDefense": 62,
+    "magicalDefense": 96,
+    "speed": 100
+   },
+   "total": 477,
+   "rocoId": "spirit_87ae52b86587400d"
+  },
+  "3719": {
+   "name": "离心舞者",
+   "dexNo": "421",
+   "types": [
+    "幻",
+    "机械"
+   ],
+   "race": {
+    "hp": 114,
+    "physicalAttack": 50,
+    "magicalAttack": 110,
+    "physicalDefense": 77,
+    "magicalDefense": 120,
+    "speed": 125
+   },
+   "total": 596,
+   "rocoId": "spirit_99a8fba5f269c210"
+  },
+  "3729": {
+   "name": "猴麦仔",
+   "dexNo": "358",
+   "types": [
+    "普通",
+    "机械"
+   ],
+   "race": {
+    "hp": 93,
+    "physicalAttack": 75,
+    "magicalAttack": 121,
+    "physicalDefense": 50,
+    "magicalDefense": 102,
+    "speed": 88
+   },
+   "total": 529,
+   "rocoId": "spirit_38ee49982b9585c9"
+  },
+  "3730": {
+   "name": "音碟吼",
+   "dexNo": "359",
+   "types": [
+    "普通",
+    "机械"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 94,
+    "magicalAttack": 151,
+    "physicalDefense": 63,
+    "magicalDefense": 127,
+    "speed": 110
+   },
+   "total": 661,
+   "rocoId": "spirit_1e6e7946ef781309"
+  },
+  "3733": {
+   "name": "钨丝贝贝",
+   "dexNo": "348",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 62,
+    "physicalAttack": 68,
+    "magicalAttack": 63,
+    "physicalDefense": 78,
+    "magicalDefense": 54,
+    "speed": 33
+   },
+   "total": 358,
+   "rocoId": "spirit_853e9c4372c22fd7"
+  },
+  "3734": {
+   "name": "辉光幕机",
+   "dexNo": "349",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 91,
+    "magicalAttack": 84,
+    "physicalDefense": 104,
+    "magicalDefense": 72,
+    "speed": 44
+   },
+   "total": 478,
+   "rocoId": "spirit_fadb3978eea5093f"
+  },
+  "3735": {
+   "name": "机幕方舟",
+   "dexNo": "350",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 104,
+    "physicalAttack": 113,
+    "magicalAttack": 105,
+    "physicalDefense": 130,
+    "magicalDefense": 90,
+    "speed": 55
+   },
+   "total": 597,
+   "rocoId": "spirit_37e0a0d6a0d4b993"
+  },
+  "3736": {
+   "name": "炫光迪迪",
+   "dexNo": "369",
+   "types": [
+    "电",
+    "光"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 95,
+    "magicalAttack": 111,
+    "physicalDefense": 52,
+    "magicalDefense": 106,
+    "speed": 104
+   },
+   "total": 551,
+   "rocoId": "spirit_86bbcbdab1a84627"
+  },
+  "3740": {
+   "name": "宝藏小狐",
+   "dexNo": "441",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 77,
+    "physicalAttack": 81,
+    "magicalAttack": 33,
+    "physicalDefense": 99,
+    "magicalDefense": 73,
+    "speed": 80
+   },
+   "total": 443,
+   "rocoId": "spirit_5f3eaa6f91c32c93"
+  },
+  "3741": {
+   "name": "宝藏沙狐",
+   "dexNo": "442",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 101,
+    "magicalAttack": 41,
+    "physicalDefense": 124,
+    "magicalDefense": 91,
+    "speed": 100
+   },
+   "total": 553,
+   "rocoId": "spirit_ad25e8d39ea8f904"
+  },
+  "3744": {
+   "name": "火红尾",
+   "dexNo": "340",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 67,
+    "physicalAttack": 56,
+    "magicalAttack": 129,
+    "physicalDefense": 70,
+    "magicalDefense": 89,
+    "speed": 100
+   },
+   "total": 511,
+   "rocoId": "spirit_e68a6ec53f0dafff"
+  },
+  "3745": {
+   "name": "雅丹鬃",
+   "dexNo": "341",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 70,
+    "magicalAttack": 162,
+    "physicalDefense": 88,
+    "magicalDefense": 111,
+    "speed": 125
+   },
+   "total": 639,
+   "rocoId": "spirit_e268b7cfd84f0a1f"
+  },
+  "3746": {
+   "name": "睡铃雪影娃娃",
+   "dexNo": "440",
+   "types": [
+    "冰",
+    "草"
+   ],
+   "race": {
+    "hp": 116,
+    "physicalAttack": 42,
+    "magicalAttack": 104,
+    "physicalDefense": 85,
+    "magicalDefense": 116,
+    "speed": 100
+   },
+   "total": 563,
+   "rocoId": "spirit_b7e38cd586b1d05c"
+  },
+  "3747": {
+   "name": "莫比乌乌",
+   "dexNo": "398",
+   "types": [
+    "龙",
+    "萌"
+   ],
+   "race": {
+    "hp": 72,
+    "physicalAttack": 36,
+    "magicalAttack": 98,
+    "physicalDefense": 66,
+    "magicalDefense": 84,
+    "speed": 80
+   },
+   "total": 436,
+   "rocoId": "spirit_e00d520c0883489b"
+  },
+  "3748": {
+   "name": "克莱因龙",
+   "dexNo": "399",
+   "types": [
+    "龙",
+    "萌"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 45,
+    "magicalAttack": 122,
+    "physicalDefense": 83,
+    "magicalDefense": 105,
+    "speed": 100
+   },
+   "total": 569,
+   "rocoId": "spirit_77a7d75ef5d795a1"
+  },
+  "3749": {
+   "name": "森豆丁",
+   "dexNo": "384",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 87,
+    "physicalAttack": 93,
+    "magicalAttack": 42,
+    "physicalDefense": 79,
+    "magicalDefense": 53,
+    "speed": 42
+   },
+   "total": 396,
+   "rocoId": "spirit_0dc6996242a7fc7f"
+  },
+  "3750": {
+   "name": "森蛮人",
+   "dexNo": "385",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 124,
+    "magicalAttack": 56,
+    "physicalDefense": 106,
+    "magicalDefense": 70,
+    "speed": 56
+   },
+   "total": 527,
+   "rocoId": "spirit_862ab314c1bbe236"
+  },
+  "3751": {
+   "name": "森巨人",
+   "dexNo": "386",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 144,
+    "physicalAttack": 155,
+    "magicalAttack": 70,
+    "physicalDefense": 132,
+    "magicalDefense": 88,
+    "speed": 70
+   },
+   "total": 659,
+   "rocoId": "spirit_59367d8effdf8a49"
+  },
+  "14000006": {
+   "name": "森巨人",
+   "dexNo": "386",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 144,
+    "physicalAttack": 155,
+    "magicalAttack": 70,
+    "physicalDefense": 132,
+    "magicalDefense": 88,
+    "speed": 70
+   },
+   "total": 659,
+   "rocoId": "spirit_59367d8effdf8a49"
+  },
+  "3752": {
+   "name": "叮叮卯",
+   "dexNo": "379",
+   "types": [
+    "机械",
+    "虫"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 45,
+    "magicalAttack": 81,
+    "physicalDefense": 75,
+    "magicalDefense": 136,
+    "speed": 48
+   },
+   "total": 502,
+   "rocoId": "spirit_b4aa42d433371d0c"
+  },
+  "3753": {
+   "name": "飞飞钥",
+   "dexNo": "380",
+   "types": [
+    "机械",
+    "虫"
+   ],
+   "race": {
+    "hp": 146,
+    "physicalAttack": 57,
+    "magicalAttack": 101,
+    "physicalDefense": 94,
+    "magicalDefense": 170,
+    "speed": 60
+   },
+   "total": 628,
+   "rocoId": "spirit_03d19450769b55c0"
+  },
+  "3754": {
+   "name": "火豆丁",
+   "dexNo": "393",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 45,
+    "physicalAttack": 46,
+    "magicalAttack": 15,
+    "physicalDefense": 49,
+    "magicalDefense": 30,
+    "speed": 29
+   },
+   "total": 214,
+   "rocoId": "spirit_5f3409c518edcf84"
+  },
+  "3755": {
+   "name": "火蛮人",
+   "dexNo": "394",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 60,
+    "physicalAttack": 62,
+    "magicalAttack": 20,
+    "physicalDefense": 65,
+    "magicalDefense": 41,
+    "speed": 39
+   },
+   "total": 287,
+   "rocoId": "spirit_f02313f5c7b8270f"
+  },
+  "3756": {
+   "name": "火巨人",
+   "dexNo": "395",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 77,
+    "magicalAttack": 26,
+    "physicalDefense": 81,
+    "magicalDefense": 51,
+    "speed": 49
+   },
+   "total": 359,
+   "rocoId": "spirit_0955dfad72f8debd"
+  },
+  "14000005": {
+   "name": "火巨人",
+   "dexNo": "395",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 75,
+    "physicalAttack": 77,
+    "magicalAttack": 26,
+    "physicalDefense": 81,
+    "magicalDefense": 51,
+    "speed": 49
+   },
+   "total": 359,
+   "rocoId": "spirit_0955dfad72f8debd"
+  },
+  "3757": {
+   "name": "点点",
+   "dexNo": "410",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 94,
+    "physicalAttack": 41,
+    "magicalAttack": 84,
+    "physicalDefense": 56,
+    "magicalDefense": 94,
+    "speed": 80
+   },
+   "total": 449,
+   "rocoId": "spirit_bad7d47694c21629"
+  },
+  "3758": {
+   "name": "珀尔鼬",
+   "dexNo": "411",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 51,
+    "magicalAttack": 105,
+    "physicalDefense": 69,
+    "magicalDefense": 117,
+    "speed": 100
+   },
+   "total": 559,
+   "rocoId": "spirit_ec7062cf16b55b35"
+  },
+  "3759": {
+   "name": "苞米仔",
+   "dexNo": "425",
+   "types": [
+    "草",
+    "火"
+   ],
+   "race": {
+    "hp": 86,
+    "physicalAttack": 74,
+    "magicalAttack": 76,
+    "physicalDefense": 84,
+    "magicalDefense": 84,
+    "speed": 60
+   },
+   "total": 464,
+   "rocoId": "spirit_e5d60f63ebdd049f"
+  },
+  "3760": {
+   "name": "炮米花",
+   "dexNo": "426",
+   "types": [
+    "草",
+    "火"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 99,
+    "magicalAttack": 100,
+    "physicalDefense": 110,
+    "magicalDefense": 110,
+    "speed": 75
+   },
+   "total": 609,
+   "rocoId": "spirit_d6dda154d3258734"
+  },
+  "3761": {
+   "name": "诅咒狼灵",
+   "dexNo": "",
+   "types": [
+    "幽",
+    "幻"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_b63c5f1a909fe37d"
+  },
+  "3762": {
+   "name": "新月狼灵",
+   "dexNo": "",
+   "types": [
+    "幽",
+    "幻"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_46a9e1d341b657aa"
+  },
+  "3763": {
+   "name": "银月狼王",
+   "dexNo": "",
+   "types": [
+    "幽",
+    "幻"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 128,
+    "magicalAttack": 51,
+    "physicalDefense": 128,
+    "magicalDefense": 98,
+    "speed": 130
+   },
+   "total": 650,
+   "rocoId": "spirit_b689c0de815c95ef"
+  },
+  "3764": {
+   "name": "新月鹭",
+   "dexNo": "",
+   "types": [
+    "翼",
+    "冰"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_44fd7ec28737bb00"
+  },
+  "3765": {
+   "name": "月辉鹭",
+   "dexNo": "",
+   "types": [
+    "翼",
+    "冰"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_31414d060023c608"
+  },
+  "3766": {
+   "name": "月使鹭纳",
+   "dexNo": "",
+   "types": [
+    "翼",
+    "冰"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 99,
+    "magicalAttack": 100,
+    "physicalDefense": 104,
+    "magicalDefense": 113,
+    "speed": 115
+   },
+   "total": 614,
+   "rocoId": "spirit_2e66129c499359af"
+  },
+  "3767": {
+   "name": "章脑丸",
+   "dexNo": "",
+   "types": [
+    "光",
+    "水"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_655fae6ca57866f1"
+  },
+  "3768": {
+   "name": "智辉章脑",
+   "dexNo": "",
+   "types": [
+    "光",
+    "水"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 53,
+    "magicalAttack": 123,
+    "physicalDefense": 87,
+    "magicalDefense": 124,
+    "speed": 100
+   },
+   "total": 599,
+   "rocoId": "spirit_18d38a10544a16ea"
+  },
+  "3771": {
+   "name": "小浣蛋",
+   "dexNo": "",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_14b3a744170db48f"
+  },
+  "3772": {
+   "name": "黑手浣熊",
+   "dexNo": "",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 97,
+    "physicalAttack": 116,
+    "magicalAttack": 110,
+    "physicalDefense": 124,
+    "magicalDefense": 115,
+    "speed": 120
+   },
+   "total": 682,
+   "rocoId": "spirit_586b8e1567f949f6"
+  },
+  "3773": {
+   "name": "幽铃",
+   "dexNo": "",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_fcf79e905db987ed"
+  },
+  "3774": {
+   "name": "摇铃魔偶",
+   "dexNo": "",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 123,
+    "physicalAttack": 46,
+    "magicalAttack": 117,
+    "physicalDefense": 99,
+    "magicalDefense": 131,
+    "speed": 95
+   },
+   "total": 611,
+   "rocoId": "spirit_d8e175477972f74d"
+  },
+  "3775": {
+   "name": "布灵",
+   "dexNo": "",
+   "types": [
+    "幻",
+    "光"
+   ],
+   "race": {
+    "hp": null,
+    "physicalAttack": null,
+    "magicalAttack": null,
+    "physicalDefense": null,
+    "magicalDefense": null,
+    "speed": null
+   },
+   "total": null,
+   "rocoId": "spirit_38e4783bc0ea21e7"
+  },
+  "3776": {
+   "name": "布灵布灵",
+   "dexNo": "",
+   "types": [
+    "幻",
+    "光"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 115,
+    "magicalAttack": 40,
+    "physicalDefense": 123,
+    "magicalDefense": 96,
+    "speed": 125
+   },
+   "total": 582,
+   "rocoId": "spirit_de488be076aaad90"
+  },
+  "4005": {
+   "name": "圣水守护",
+   "dexNo": "010",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 67,
+    "magicalAttack": 141,
+    "physicalDefense": 104,
+    "magicalDefense": 145,
+    "speed": 85
+   },
+   "total": 667,
+   "rocoId": "spirit_30c62645090ee8af"
+  },
+  "5010": {
+   "name": "圣水守护",
+   "dexNo": "010",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 67,
+    "magicalAttack": 141,
+    "physicalDefense": 104,
+    "magicalDefense": 145,
+    "speed": 85
+   },
+   "total": 667,
+   "rocoId": "spirit_30c62645090ee8af"
+  },
+  "8101": {
+   "name": "圣水守护",
+   "dexNo": "010",
+   "types": [
+    "水"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 67,
+    "magicalAttack": 141,
+    "physicalDefense": 104,
+    "magicalDefense": 145,
+    "speed": 85
+   },
+   "total": 667,
+   "rocoId": "spirit_30c62645090ee8af"
+  },
+  "4006": {
+   "name": "烈火战神",
+   "dexNo": "007",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 175,
+    "magicalAttack": 84,
+    "physicalDefense": 94,
+    "magicalDefense": 72,
+    "speed": 130
+   },
+   "total": 672,
+   "rocoId": "spirit_4c280ecf82adb90e"
+  },
+  "5017": {
+   "name": "烈火战神",
+   "dexNo": "007",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 175,
+    "magicalAttack": 84,
+    "physicalDefense": 94,
+    "magicalDefense": 72,
+    "speed": 130
+   },
+   "total": 672,
+   "rocoId": "spirit_4c280ecf82adb90e"
+  },
+  "8102": {
+   "name": "烈火战神",
+   "dexNo": "007",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 175,
+    "magicalAttack": 84,
+    "physicalDefense": 94,
+    "magicalDefense": 72,
+    "speed": 130
+   },
+   "total": 672,
+   "rocoId": "spirit_4c280ecf82adb90e"
+  },
+  "4007": {
+   "name": "叶冕魔力猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 127,
+    "magicalAttack": 127,
+    "physicalDefense": 81,
+    "magicalDefense": 151,
+    "speed": 55
+   },
+   "total": 649,
+   "rocoId": "spirit_dc6dbc4055d0d9dd"
+  },
+  "5003": {
+   "name": "叶冕魔力猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 127,
+    "magicalAttack": 127,
+    "physicalDefense": 81,
+    "magicalDefense": 151,
+    "speed": 55
+   },
+   "total": 649,
+   "rocoId": "spirit_dc6dbc4055d0d9dd"
+  },
+  "8103": {
+   "name": "叶冕魔力猫",
+   "dexNo": "004",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 108,
+    "physicalAttack": 127,
+    "magicalAttack": 127,
+    "physicalDefense": 81,
+    "magicalDefense": 151,
+    "speed": 55
+   },
+   "total": 649,
+   "rocoId": "spirit_dc6dbc4055d0d9dd"
+  },
+  "4011": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "5016": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "7001": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "7002": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "7003": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "7004": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "8104": {
+   "name": "恶魔狼王",
+   "dexNo": "131",
+   "types": [
+    "恶"
+   ],
+   "race": {
+    "hp": 115,
+    "physicalAttack": 121,
+    "magicalAttack": 50,
+    "physicalDefense": 91,
+    "magicalDefense": 63,
+    "speed": 120
+   },
+   "total": 560,
+   "rocoId": "spirit_f7e8528a743eaaf0"
+  },
+  "4020": {
+   "name": "千棘海针",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 32,
+    "magicalAttack": 85,
+    "physicalDefense": 94,
+    "magicalDefense": 133,
+    "speed": 100
+   },
+   "total": 562,
+   "rocoId": "spirit_786924cd03526ca4"
+  },
+  "5012": {
+   "name": "千棘海针",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 32,
+    "magicalAttack": 85,
+    "physicalDefense": 94,
+    "magicalDefense": 133,
+    "speed": 100
+   },
+   "total": 562,
+   "rocoId": "spirit_786924cd03526ca4"
+  },
+  "5029": {
+   "name": "千棘海针",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 32,
+    "magicalAttack": 85,
+    "physicalDefense": 94,
+    "magicalDefense": 133,
+    "speed": 100
+   },
+   "total": 562,
+   "rocoId": "spirit_786924cd03526ca4"
+  },
+  "8106": {
+   "name": "千棘海针",
+   "dexNo": "078",
+   "types": [
+    "水",
+    "毒"
+   ],
+   "race": {
+    "hp": 118,
+    "physicalAttack": 32,
+    "magicalAttack": 85,
+    "physicalDefense": 94,
+    "magicalDefense": 133,
+    "speed": 100
+   },
+   "total": 562,
+   "rocoId": "spirit_786924cd03526ca4"
+  },
+  "4021": {
+   "name": "女王蜂",
+   "dexNo": "084",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 145,
+    "physicalAttack": 50,
+    "magicalAttack": 45,
+    "physicalDefense": 42,
+    "magicalDefense": 42,
+    "speed": 40
+   },
+   "total": 364,
+   "rocoId": "spirit_7ae10f79a1849af1"
+  },
+  "5015": {
+   "name": "女王蜂",
+   "dexNo": "084",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 145,
+    "physicalAttack": 50,
+    "magicalAttack": 45,
+    "physicalDefense": 42,
+    "magicalDefense": 42,
+    "speed": 40
+   },
+   "total": 364,
+   "rocoId": "spirit_7ae10f79a1849af1"
+  },
+  "8107": {
+   "name": "女王蜂",
+   "dexNo": "084",
+   "types": [
+    "虫",
+    "翼"
+   ],
+   "race": {
+    "hp": 145,
+    "physicalAttack": 50,
+    "magicalAttack": 45,
+    "physicalDefense": 42,
+    "magicalDefense": 42,
+    "speed": 40
+   },
+   "total": 364,
+   "rocoId": "spirit_7ae10f79a1849af1"
+  },
+  "4022": {
+   "name": "奇丽果",
+   "dexNo": "043",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 128,
+    "magicalAttack": 128,
+    "physicalDefense": 133,
+    "magicalDefense": 105,
+    "speed": 80
+   },
+   "total": 686,
+   "rocoId": "spirit_6ca793b3a062580e"
+  },
+  "5005": {
+   "name": "奇丽果",
+   "dexNo": "043",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 128,
+    "magicalAttack": 128,
+    "physicalDefense": 133,
+    "magicalDefense": 105,
+    "speed": 80
+   },
+   "total": 686,
+   "rocoId": "spirit_6ca793b3a062580e"
+  },
+  "8108": {
+   "name": "奇丽果",
+   "dexNo": "043",
+   "types": [
+    "草"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 128,
+    "magicalAttack": 128,
+    "physicalDefense": 133,
+    "magicalDefense": 105,
+    "speed": 80
+   },
+   "total": 686,
+   "rocoId": "spirit_6ca793b3a062580e"
+  },
+  "4064": {
+   "name": "幻影荆棘",
+   "dexNo": "035",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 66,
+    "magicalDefense": 125,
+    "speed": 80
+   },
+   "total": 576,
+   "rocoId": "spirit_95c8a0f91aec8a68"
+  },
+  "5019": {
+   "name": "幻影荆棘",
+   "dexNo": "035",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 66,
+    "magicalDefense": 125,
+    "speed": 80
+   },
+   "total": 576,
+   "rocoId": "spirit_95c8a0f91aec8a68"
+  },
+  "8109": {
+   "name": "幻影荆棘",
+   "dexNo": "035",
+   "types": [
+    "幽",
+    "草"
+   ],
+   "race": {
+    "hp": 113,
+    "physicalAttack": 96,
+    "magicalAttack": 96,
+    "physicalDefense": 66,
+    "magicalDefense": 125,
+    "speed": 80
+   },
+   "total": 576,
+   "rocoId": "spirit_95c8a0f91aec8a68"
+  },
+  "4072": {
+   "name": "迷嶂布莱克",
+   "dexNo": "029",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 139,
+    "magicalAttack": 52,
+    "physicalDefense": 164,
+    "magicalDefense": 154,
+    "speed": 70
+   },
+   "total": 747,
+   "rocoId": "spirit_3fb98e0a461b35c8"
+  },
+  "5008": {
+   "name": "迷嶂布莱克",
+   "dexNo": "029",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 139,
+    "magicalAttack": 52,
+    "physicalDefense": 164,
+    "magicalDefense": 154,
+    "speed": 70
+   },
+   "total": 747,
+   "rocoId": "spirit_3fb98e0a461b35c8"
+  },
+  "8110": {
+   "name": "迷嶂布莱克",
+   "dexNo": "029",
+   "types": [
+    "地"
+   ],
+   "race": {
+    "hp": 125,
+    "physicalAttack": 139,
+    "magicalAttack": 52,
+    "physicalDefense": 164,
+    "magicalDefense": 154,
+    "speed": 70
+   },
+   "total": 747,
+   "rocoId": "spirit_3fb98e0a461b35c8"
+  },
+  "4073": {
+   "name": "神谕鲨",
+   "dexNo": "110",
+   "types": [
+    "水",
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 125
+   },
+   "total": 621,
+   "rocoId": "spirit_ebb2563e2410bd6a"
+  },
+  "5011": {
+   "name": "神谕鲨",
+   "dexNo": "110",
+   "types": [
+    "水",
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 98,
+    "magicalAttack": 98,
+    "physicalDefense": 105,
+    "magicalDefense": 105,
+    "speed": 125
+   },
+   "total": 621,
+   "rocoId": "spirit_ebb2563e2410bd6a"
+  },
+  "4074": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "5014": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "5030": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "5031": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "5032": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "8111": {
+   "name": "霜翼领主",
+   "dexNo": "020",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 90,
+    "physicalAttack": 142,
+    "magicalAttack": 63,
+    "physicalDefense": 108,
+    "magicalDefense": 74,
+    "speed": 115
+   },
+   "total": 592,
+   "rocoId": "spirit_7eb586d6475d99d4"
+  },
+  "4078": {
+   "name": "风暴战犬",
+   "dexNo": "048",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 128,
+    "magicalAttack": 46,
+    "physicalDefense": 101,
+    "magicalDefense": 82,
+    "speed": 120
+   },
+   "total": 542,
+   "rocoId": "spirit_41a9a2fb4a1d89c0"
+  },
+  "5018": {
+   "name": "风暴战犬",
+   "dexNo": "048",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 128,
+    "magicalAttack": 46,
+    "physicalDefense": 101,
+    "magicalDefense": 82,
+    "speed": 120
+   },
+   "total": 542,
+   "rocoId": "spirit_41a9a2fb4a1d89c0"
+  },
+  "8112": {
+   "name": "风暴战犬",
+   "dexNo": "048",
+   "types": [
+    "火"
+   ],
+   "race": {
+    "hp": 85,
+    "physicalAttack": 128,
+    "magicalAttack": 46,
+    "physicalDefense": 101,
+    "magicalDefense": 82,
+    "speed": 120
+   },
+   "total": 542,
+   "rocoId": "spirit_41a9a2fb4a1d89c0"
+  },
+  "4083": {
+   "name": "黑猫密探",
+   "dexNo": "122",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 149,
+    "physicalAttack": 65,
+    "magicalAttack": 143,
+    "physicalDefense": 90,
+    "magicalDefense": 129,
+    "speed": 70
+   },
+   "total": 646,
+   "rocoId": "spirit_7f2a9d80e7cec56e"
+  },
+  "5007": {
+   "name": "黑猫密探",
+   "dexNo": "122",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 149,
+    "physicalAttack": 65,
+    "magicalAttack": 143,
+    "physicalDefense": 90,
+    "magicalDefense": 129,
+    "speed": 70
+   },
+   "total": 646,
+   "rocoId": "spirit_7f2a9d80e7cec56e"
+  },
+  "8114": {
+   "name": "黑猫密探",
+   "dexNo": "122",
+   "types": [
+    "普通"
+   ],
+   "race": {
+    "hp": 149,
+    "physicalAttack": 65,
+    "magicalAttack": 143,
+    "physicalDefense": 90,
+    "magicalDefense": 129,
+    "speed": 70
+   },
+   "total": 646,
+   "rocoId": "spirit_7f2a9d80e7cec56e"
+  },
+  "4084": {
+   "name": "祭礼巨像",
+   "dexNo": "115",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 96,
+    "magicalAttack": 101,
+    "physicalDefense": 115,
+    "magicalDefense": 119,
+    "speed": 85
+   },
+   "total": 622,
+   "rocoId": "spirit_c8484f0c0681b6ae"
+  },
+  "5009": {
+   "name": "祭礼巨像",
+   "dexNo": "115",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 96,
+    "magicalAttack": 101,
+    "physicalDefense": 115,
+    "magicalDefense": 119,
+    "speed": 85
+   },
+   "total": 622,
+   "rocoId": "spirit_c8484f0c0681b6ae"
+  },
+  "8115": {
+   "name": "祭礼巨像",
+   "dexNo": "115",
+   "types": [
+    "地",
+    "幻"
+   ],
+   "race": {
+    "hp": 106,
+    "physicalAttack": 96,
+    "magicalAttack": 101,
+    "physicalDefense": 115,
+    "magicalDefense": 119,
+    "speed": 85
+   },
+   "total": 622,
+   "rocoId": "spirit_c8484f0c0681b6ae"
+  },
+  "4085": {
+   "name": "雪影冰灵",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 120,
+    "magicalAttack": 114,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 650,
+   "rocoId": "spirit_504ad8ae5cd9a417"
+  },
+  "4098": {
+   "name": "雪影冰灵",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 120,
+    "magicalAttack": 114,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 650,
+   "rocoId": "spirit_504ad8ae5cd9a417"
+  },
+  "4099": {
+   "name": "雪影冰灵",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 120,
+    "magicalAttack": 114,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 650,
+   "rocoId": "spirit_504ad8ae5cd9a417"
+  },
+  "5013": {
+   "name": "雪影冰灵",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 120,
+    "magicalAttack": 114,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 650,
+   "rocoId": "spirit_504ad8ae5cd9a417"
+  },
+  "8116": {
+   "name": "雪影冰灵",
+   "dexNo": "144",
+   "types": [
+    "冰",
+    "萌"
+   ],
+   "race": {
+    "hp": 130,
+    "physicalAttack": 120,
+    "magicalAttack": 114,
+    "physicalDefense": 66,
+    "magicalDefense": 130,
+    "speed": 90
+   },
+   "total": 650,
+   "rocoId": "spirit_504ad8ae5cd9a417"
+  },
+  "4087": {
+   "name": "奇梦咪",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 128,
+    "magicalAttack": 119,
+    "physicalDefense": 123,
+    "magicalDefense": 123,
+    "speed": 110
+   },
+   "total": 684,
+   "rocoId": "spirit_a9c19df7ed7f11ce"
+  },
+  "4096": {
+   "name": "奇梦咪",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 128,
+    "magicalAttack": 119,
+    "physicalDefense": 123,
+    "magicalDefense": 123,
+    "speed": 110
+   },
+   "total": 684,
+   "rocoId": "spirit_a9c19df7ed7f11ce"
+  },
+  "4097": {
+   "name": "奇梦咪",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 128,
+    "magicalAttack": 119,
+    "physicalDefense": 123,
+    "magicalDefense": 123,
+    "speed": 110
+   },
+   "total": 684,
+   "rocoId": "spirit_a9c19df7ed7f11ce"
+  },
+  "5024": {
+   "name": "奇梦咪",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 128,
+    "magicalAttack": 119,
+    "physicalDefense": 123,
+    "magicalDefense": 123,
+    "speed": 110
+   },
+   "total": 684,
+   "rocoId": "spirit_a9c19df7ed7f11ce"
+  },
+  "8118": {
+   "name": "奇梦咪",
+   "dexNo": "200",
+   "types": [
+    "萌"
+   ],
+   "race": {
+    "hp": 81,
+    "physicalAttack": 128,
+    "magicalAttack": 119,
+    "physicalDefense": 123,
+    "magicalDefense": 123,
+    "speed": 110
+   },
+   "total": 684,
+   "rocoId": "spirit_a9c19df7ed7f11ce"
+  },
+  "4088": {
+   "name": "波普鹿",
+   "dexNo": "228",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 79,
+    "magicalAttack": 21,
+    "physicalDefense": 108,
+    "magicalDefense": 79,
+    "speed": 120
+   },
+   "total": 545,
+   "rocoId": "spirit_7d22156a66708de3"
+  },
+  "5020": {
+   "name": "波普鹿",
+   "dexNo": "228",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 79,
+    "magicalAttack": 21,
+    "physicalDefense": 108,
+    "magicalDefense": 79,
+    "speed": 120
+   },
+   "total": 545,
+   "rocoId": "spirit_7d22156a66708de3"
+  },
+  "8119": {
+   "name": "波普鹿",
+   "dexNo": "228",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 92,
+    "physicalAttack": 79,
+    "magicalAttack": 21,
+    "physicalDefense": 108,
+    "magicalDefense": 79,
+    "speed": 120
+   },
+   "total": 545,
+   "rocoId": "spirit_7d22156a66708de3"
+  },
+  "4089": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "5021": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "7005": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "7006": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "7007": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "7008": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "8120": {
+   "name": "圣剑骑士",
+   "dexNo": "286",
+   "types": [
+    "机械"
+   ],
+   "race": {
+    "hp": 187,
+    "physicalAttack": 154,
+    "magicalAttack": 148,
+    "physicalDefense": 183,
+    "magicalDefense": 183,
+    "speed": 65
+   },
+   "total": 920,
+   "rocoId": "spirit_79830b56df1224ea"
+  },
+  "4090": {
+   "name": "伊兰龙",
+   "dexNo": "204",
+   "types": [
+    "龙"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 91,
+    "magicalAttack": 190,
+    "physicalDefense": 69,
+    "magicalDefense": 99,
+    "speed": 90
+   },
+   "total": 651,
+   "rocoId": "spirit_cc4129b5ab2b9c0c"
+  },
+  "5022": {
+   "name": "伊兰龙",
+   "dexNo": "204",
+   "types": [
+    "龙"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 91,
+    "magicalAttack": 190,
+    "physicalDefense": 69,
+    "magicalDefense": 99,
+    "speed": 90
+   },
+   "total": 651,
+   "rocoId": "spirit_cc4129b5ab2b9c0c"
+  },
+  "8121": {
+   "name": "伊兰龙",
+   "dexNo": "204",
+   "types": [
+    "龙"
+   ],
+   "race": {
+    "hp": 112,
+    "physicalAttack": 91,
+    "magicalAttack": 190,
+    "physicalDefense": 69,
+    "magicalDefense": 99,
+    "speed": 90
+   },
+   "total": 651,
+   "rocoId": "spirit_cc4129b5ab2b9c0c"
+  },
+  "4102": {
+   "name": "淤泥乌泽",
+   "dexNo": "288",
+   "types": [
+    "地",
+    "翼"
+   ],
+   "race": {
+    "hp": 124,
+    "physicalAttack": 138,
+    "magicalAttack": 58,
+    "physicalDefense": 132,
+    "magicalDefense": 108,
+    "speed": 95
+   },
+   "total": 655,
+   "rocoId": "spirit_77851a382e3aad75"
+  },
+  "5057": {
+   "name": "淤泥乌泽",
+   "dexNo": "288",
+   "types": [
+    "地",
+    "翼"
+   ],
+   "race": {
+    "hp": 124,
+    "physicalAttack": 138,
+    "magicalAttack": 58,
+    "physicalDefense": 132,
+    "magicalDefense": 108,
+    "speed": 95
+   },
+   "total": 655,
+   "rocoId": "spirit_77851a382e3aad75"
+  },
+  "4104": {
+   "name": "暗夜颅主",
+   "dexNo": "329",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 5,
+    "magicalAttack": 66,
+    "physicalDefense": 95,
+    "magicalDefense": 112,
+    "speed": 80
+   },
+   "total": 475,
+   "rocoId": "spirit_2d04c5a107c33674"
+  },
+  "5059": {
+   "name": "暗夜颅主",
+   "dexNo": "329",
+   "types": [
+    "幽"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 5,
+    "magicalAttack": 66,
+    "physicalDefense": 95,
+    "magicalDefense": 112,
+    "speed": 80
+   },
+   "total": 475,
+   "rocoId": "spirit_2d04c5a107c33674"
+  },
+  "4106": {
+   "name": "风暴酷拉",
+   "dexNo": "206",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 100,
+    "magicalAttack": 100,
+    "physicalDefense": 78,
+    "magicalDefense": 97,
+    "speed": 125
+   },
+   "total": 583,
+   "rocoId": "spirit_e0332c3637a510c6"
+  },
+  "5060": {
+   "name": "风暴酷拉",
+   "dexNo": "206",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 100,
+    "magicalAttack": 100,
+    "physicalDefense": 78,
+    "magicalDefense": 97,
+    "speed": 125
+   },
+   "total": 583,
+   "rocoId": "spirit_e0332c3637a510c6"
+  },
+  "13000171": {
+   "name": "风暴酷拉",
+   "dexNo": "206",
+   "types": [
+    "电"
+   ],
+   "race": {
+    "hp": 83,
+    "physicalAttack": 100,
+    "magicalAttack": 100,
+    "physicalDefense": 78,
+    "magicalDefense": 97,
+    "speed": 125
+   },
+   "total": 583,
+   "rocoId": "spirit_e0332c3637a510c6"
+  },
+  "5002": {
+   "name": "彩虹独角兽",
+   "dexNo": "117",
+   "types": [
+    "光"
+   ],
+   "race": {
+    "hp": 99,
+    "physicalAttack": 78,
+    "magicalAttack": 192,
+    "physicalDefense": 77,
+    "magicalDefense": 92,
+    "speed": 105
+   },
+   "total": 643,
+   "rocoId": "spirit_6a95a48463d87bef"
+  },
+  "5053": {
+   "name": "深渊罗隐",
+   "dexNo": "107",
+   "types": [
+    "地",
+    "恶"
+   ],
+   "race": {
+    "hp": 107,
+    "physicalAttack": 159,
+    "magicalAttack": 78,
+    "physicalDefense": 167,
+    "magicalDefense": 32,
+    "speed": 75
+   },
+   "total": 618,
+   "rocoId": "spirit_897ad3f9223a851a"
+  },
+  "8122": {
+   "name": "深渊罗隐",
+   "dexNo": "107",
+   "types": [
+    "地",
+    "恶"
+   ],
+   "race": {
+    "hp": 107,
+    "physicalAttack": 159,
+    "magicalAttack": 78,
+    "physicalDefense": 167,
+    "magicalDefense": 32,
+    "speed": 75
+   },
+   "total": 618,
+   "rocoId": "spirit_897ad3f9223a851a"
+  },
+  "13000169": {
+   "name": "深渊罗隐",
+   "dexNo": "107",
+   "types": [
+    "地",
+    "恶"
+   ],
+   "race": {
+    "hp": 107,
+    "physicalAttack": 159,
+    "magicalAttack": 78,
+    "physicalDefense": 167,
+    "magicalDefense": 32,
+    "speed": 75
+   },
+   "total": 618,
+   "rocoId": "spirit_897ad3f9223a851a"
+  },
+  "5054": {
+   "name": "高帽鹬者",
+   "dexNo": "233",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 106,
+    "magicalAttack": 106,
+    "physicalDefense": 119,
+    "magicalDefense": 93,
+    "speed": 115
+   },
+   "total": 635,
+   "rocoId": "spirit_9dff1b22873c62a9"
+  },
+  "13000170": {
+   "name": "高帽鹬者",
+   "dexNo": "233",
+   "types": [
+    "翼"
+   ],
+   "race": {
+    "hp": 96,
+    "physicalAttack": 106,
+    "magicalAttack": 106,
+    "physicalDefense": 119,
+    "magicalDefense": 93,
+    "speed": 115
+   },
+   "total": 635,
+   "rocoId": "spirit_9dff1b22873c62a9"
+  },
+  "5055": {
+   "name": "恶魔男爵",
+   "dexNo": "031",
+   "types": [
+    "恶",
+    "翼"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 103,
+    "magicalDefense": 73,
+    "speed": 120
+   },
+   "total": 596,
+   "rocoId": "spirit_67dcbe51f817669a"
+  },
+  "13000172": {
+   "name": "恶魔男爵",
+   "dexNo": "031",
+   "types": [
+    "恶",
+    "翼"
+   ],
+   "race": {
+    "hp": 117,
+    "physicalAttack": 128,
+    "magicalAttack": 55,
+    "physicalDefense": 103,
+    "magicalDefense": 73,
+    "speed": 120
+   },
+   "total": 596,
+   "rocoId": "spirit_67dcbe51f817669a"
+  }
+ }
+}
