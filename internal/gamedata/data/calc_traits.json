@@ -1,0 +1,106 @@
+{
+ "_source": {
+  "upstream": "Evenstar-tools/roco-calculator",
+  "url": "https://github.com/Evenstar-tools/roco-calculator",
+  "site": "https://rococalc.top",
+  "files": "src/domain/marks.js（印记定义）、src/domain/traits.js（TRAIT_NAME_TO_RULE）",
+  "origin": "原始资料: BWIKI 洛克王国：世界（CC BY-NC-SA 4.0）",
+  "license": "CC BY-NC-SA 4.0（署名-非商业-相同方式共享）;roco 代码为 MIT,不覆盖数据",
+  "note": "印记与特性的**名字**从 roco 源码自动抽取并校验;**系数**由本脚本人工登记,名字对不上即报错退出"
+ },
+ "_note": "特性规则: roco traits.js 的 TRAIT_NAME_TO_RULE 共 7 条, 本地实现 7 条;其余特性(快照 241 条里只有 1 条带 ruleId) 一律「未支持」不参与计算。触发条件推断不出时按未触发处理并在 UI 标注。",
+ "traits": [
+  {
+   "name": "破空",
+   "rule": "power_if_acted_before_enemy",
+   "side": "attacker",
+   "effect": "powerMultiplier",
+   "params": {
+    "multiplier": 1.3
+   },
+   "needs": [
+    "本回合已先于对手行动"
+   ],
+   "note": "先于对手行动时威力 ×1.3(roco: power_if_acted_before_enemy)",
+   "implemented": true
+  },
+  {
+   "name": "顺风",
+   "rule": "power_if_faster",
+   "side": "attacker",
+   "effect": "powerMultiplier",
+   "params": {
+    "multiplier": 1.3
+   },
+   "needs": [
+    "速度更快"
+   ],
+   "note": "速度更快时威力 ×1.3(roco: power_if_faster)",
+   "implemented": true
+  },
+  {
+   "name": "专注力",
+   "rule": "physical_power_first_turn",
+   "side": "attacker",
+   "effect": "powerMultiplier",
+   "params": {
+    "multiplier": 2
+   },
+   "needs": [
+    "首回合"
+   ],
+   "note": "首回合物攻技能威力 ×2(快照里唯一带 ruleId 的特性,params.multiplier=2)",
+   "implemented": true
+  },
+  {
+   "name": "偏振",
+   "rule": "reduce_matching_skill_type",
+   "side": "defender",
+   "effect": "damageReduction",
+   "params": {
+    "multiplier": 0.75
+   },
+   "needs": [],
+   "note": "受同系技能伤害减免(roco: reduce_matching_skill_type)",
+   "implemented": true
+  },
+  {
+   "name": "完全偏振",
+   "rule": "reduce_matching_skill_type_strong",
+   "side": "defender",
+   "effect": "damageReduction",
+   "params": {
+    "multiplier": 0.5
+   },
+   "needs": [],
+   "note": "受同系技能伤害更强减免(roco: ..._strong)",
+   "implemented": true
+  },
+  {
+   "name": "绝对秩序",
+   "rule": "reduce_off_type",
+   "side": "defender",
+   "effect": "damageReduction",
+   "params": {
+    "multiplier": 0.75
+   },
+   "needs": [],
+   "note": "受非本系技能伤害减免(roco: reduce_off_type)",
+   "implemented": true
+  },
+  {
+   "name": "冰钻",
+   "rule": "power_by_enemy_total_cost",
+   "side": "attacker",
+   "effect": "powerByEnemyCost",
+   "params": {
+    "perCost": 10
+   },
+   "needs": [
+    "对手技能总能耗"
+   ],
+   "note": "威力随对手技能总能耗提升(roco: power_by_enemy_total_cost);能耗需可取得",
+   "implemented": true
+  }
+ ]
+}

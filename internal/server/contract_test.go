@@ -221,8 +221,33 @@ func TestContractEggsAndGlasses(t *testing.T) {
 // docs/api/fields.json 一类的机器消费方直接解析。
 func scrubHatch(s string) string {
 	s = regexp.MustCompile(`"hatchRate": [\d.]+`).ReplaceAllString(s, `"hatchRate": 0`)
+	// activityRate 是「本周是否处在孵化活动期」的倍率:周五 04:00 ~ 周一 04:00 是 5,
+	// 其余日子是 1(pet.HatchActivityRate)。它随**跑测试的时刻**变 —— 漏掉这一行时,
+	// golden 会在周一~周四变成 1 而周期性变红(实测周二跑就红)。取值由
+	// TestHatchRateContract 按固定时刻单独锁定,这里只需保证**键在**。
+	s = regexp.MustCompile(`"activityRate": [\d.]+`).ReplaceAllString(s, `"activityRate": 0`)
 	// 实测倍率:玩家测过才有值,且值随他当时状态而变,同样抹掉
 	return regexp.MustCompile(`"rate": [\d.]+`).ReplaceAllString(s, `"rate": 0`)
+}
+
+// TestScrubHatchIsWeekdayProof: scrubHatch 必须把工作日与周末的响应抹成**同一份**。
+//
+// 存在的理由:activityRate 在周五 04:00~周一 04:00 是 5、其余是 1,漏抹它时
+// golden 会随星期变 —— 而且只在周一~周四暴露(周五生成的人当天跑是绿的)。
+// 这条不依赖系统时间,任何一天跑都能抓住「漏抹一个随时间变的字段」。
+func TestScrubHatchIsWeekdayProof(t *testing.T) {
+	weekday := `{"activityRate": 1, "hatchRate": 1.5, "rate": 2}`
+	weekend := `{"activityRate": 5, "hatchRate": 1.5, "rate": 2}`
+	gotDay, gotEnd := scrubHatch(weekday), scrubHatch(weekend)
+	if gotDay != gotEnd {
+		t.Errorf("同一份响应在工作日/周末应抹成一致:\n  工作日 %s\n  周末   %s", gotDay, gotEnd)
+	}
+	// 抹的是**值**不是键:契约守的是「这个字段在不在」。
+	for _, key := range []string{`"activityRate": 0`, `"hatchRate": 0`, `"rate": 0`} {
+		if !strings.Contains(gotEnd, key) {
+			t.Errorf("抹值后应保留键 %s,实得 %s", key, gotEnd)
+		}
+	}
 }
 
 // TestHatchRateContract 按固定时刻锁定孵化倍率的**取值**(上面的 golden 抹掉了它)。
@@ -411,6 +436,101 @@ func TestContractTrialShiny(t *testing.T) {
 	}
 	s.SetLastTrial(contractAcc, p)
 	checkGolden(t, "trial-shiny", get(t, s, "/api/trial?account="+contractAcc), nil)
+}
+
+// 指针取值的小工具:契约里大量可选字段是指针(0 与「没给」必须分得开),
+// 取地址不能对字面量直接 &,故各留一个泛型助手。
+func ptrU32(v uint32) *uint32 { return &v }
+func ptrI32(v int32) *int32   { return &v }
+func ptrStr(v string) *string { return &v }
+
+// contractShanyao 造一份战局快照(闪耀大赛)。
+//
+// 三条契约点,改之前先想清楚守的是什么:
+//  1. 我方 401 的 hp/hpMax 是指针且**已知**:守「0 血(倒下)与『没给』要分得开」——
+//     若哪天改成值类型 + omitempty,倒下那一下键就消失,前端会显示成「—」。
+//  2. 对手那只**没有** hp 键:服务端不下发对手未出场宠物的血量,契约里必须缺席,
+//     不能补 0(补 0 会被当成倒下)。
+//  3. 我方 402 是炫彩(mutation & 8)、对手那只不是:炫彩判据写错(如用 glass_type)
+//     这条会红,与 internal/shanyao 的单测互为两道。
+func contractShanyao() *ShanyaoPayload {
+	hp, hpMax := int32(120), int32(494)
+	foeHPMax := int32(458)
+	selfHP, selfHPMax, foeHP := int32(4), int32(6), int32(4)
+	return &ShanyaoPayload{
+		Account: contractAcc, Ts: 1700000000, Active: true,
+		BattleID: 613286970137184, Mode: 15, Round: 7,
+		Self: &ShanyaoSide{
+			UIN: 100000002, Name: "示例玩家", Level: 68, HP: &selfHP, HPMax: &selfHPMax,
+			Pets: []ShanyaoPet{
+				{
+					GID: 2181144456, PetID: 401, BaseConfID: 3141, Name: "小花仙", Species: "花衣蝶",
+					Level: 60, Gender: 2, Nature: 30, NatureName: "踏实", Blood: 3, BloodName: "火",
+					DamTypes: []int32{13, 3}, DamNames: []string{"虫", "草"},
+					Img: "HeadIcon/3141.webp", Shiny: true,
+					GlassType: 1, GlassValue: 3145748, GlassName: "粒子3/配色20",
+					HP: &hp, HPMax: &hpMax, OnField: true, Energy: ptrU32(10),
+					// 特性名按名字匹配规则表(专注力在已实现的 7 条内)
+					Trait: "专注力",
+					// buff/印记层数:只锁形状(id + stacks),名字翻译在前端按 calc_mark_ids 查
+					// 第一个有名字(已识别的印记),第二个没有 —— 前端对后者显示原始 id 并标「未识别」
+					Buffs: []ShanyaoBuff{{ID: 20010090, Stacks: 2, Name: "减速"}, {ID: 20010826, Stacks: 1, Type: 3}},
+					// 六维取自**真实抓包**(小花仙:种族 122/67/72/84/94/100,个体 60/0/0/60/60/0),
+					// 用真值而非凑数:它同时钉住「协议六维的口径」与「面板公式的系数」。
+					// 面板值 = round(baseValue × 性格) + effortAdd,如物攻 1.1×(67+0)=73.7→74,+10=84。
+					Stats: &ShanyaoStats{
+						Race:      []uint32{122, 67, 72, 84, 94, 100},
+						Talent:    []uint32{60, 0, 0, 60, 60, 0},
+						BaseValue: []uint32{328, 84, 89, 135, 146, 120},
+						EffortAdd: []uint32{100, 50, 50, 50, 50, 50},
+					},
+					RaceStats: []uint32{122, 67, 72, 84, 94, 100},
+					// 踏实 = 生命↑ / 速度↓,系数 +1.2 / −0.9(与 roco 的 natures.js 一致)。
+					NatureMult: []float64{1.2, 1, 1, 1, 1, 0.9},
+					// 技能:对局内威力优先(112),静态表兜底(90);段数与能耗同理。
+					Skills: []ShanyaoSkill{
+						{ID: 7130150, Name: "虫击", Type: "虫", Category: "physical", Cost: ptrU32(4),
+							Power: ptrI32(112), Hits: 3, Source: "battle"},
+						{ID: 7130320, Name: "虫结阵", Type: "虫", Category: "defense", Cost: ptrU32(2), Source: "static"},
+						// 动态威力规则:带 ruleId 的技能不能直接拿 basePower 算(魔能爆按当前能量查表)。
+						{ID: 7020550, Name: "魔能爆", Type: "火", Category: "magical", RuleID: ptrStr("mana_burst")},
+					},
+				},
+				// 对手:没有协议六维 → Stats 缺席、Estimated=true,只剩静态种族值。
+				{GID: 2181144457, PetID: 402, BaseConfID: 3179, Name: "恶魔虫", Level: 60, Dead: true,
+					RaceStats: []uint32{100, 147, 137, 108, 89, 115}, Estimated: true},
+			},
+		},
+		Foe: &ShanyaoSide{
+			UIN: 142792, Name: "林恩", Level: 68, HP: &foeHP,
+			Pets: []ShanyaoPet{
+				{GID: 18876, PetID: 1, BaseConfID: 3735, Name: "机幕方舟", Level: 60,
+					Img: "HeadIcon/3735.webp", HPMax: &foeHPMax, OnField: true},
+			},
+		},
+	}
+}
+
+// TestContractShanyao 锁定战局响应的结构(隐藏模块 #/shanyao)。
+func TestContractShanyao(t *testing.T) {
+	s := newTestServer(t)
+	s.SetLastShanyao(contractAcc, contractShanyao())
+	checkGolden(t, "shanyao", get(t, s, "/api/shanyao?account="+contractAcc), scrubTS)
+}
+
+// TestContractCalcRules 锁定伤害估算规则(属性克制表 + 六维键序)。
+//
+// 与战局分开放:这份是**不随账号的全局常量**,前端取一次即用;而克制矩阵一旦
+// 行列颠倒(攻/守写反)最难发现 —— 火→草必须是 2、草→火必须是 0.5。
+func TestContractCalcRules(t *testing.T) {
+	s := newTestServer(t)
+	checkGolden(t, "calc-rules", get(t, s, "/api/calc-rules"), nil)
+}
+
+// TestContractShanyaoNull:没有战局记录时返回 null(前端据此显示空态)。
+func TestContractShanyaoNull(t *testing.T) {
+	s := newTestServer(t)
+	checkGolden(t, "shanyao-null", get(t, s, "/api/shanyao?account="+contractAcc), nil)
 }
 
 // scrubEncTime 抹掉遇见记录里的时间取值。

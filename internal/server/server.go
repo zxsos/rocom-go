@@ -245,6 +245,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
 	s.mux.HandleFunc("GET /api/home/query", s.handleHomeQuery)
 	s.mux.HandleFunc("GET /api/trial", s.handleTrial)
+	// 闪耀大赛:隐藏模块 #/shanyao 的战局快照(导航不显示,需手动输入地址)
+	s.mux.HandleFunc("GET /api/shanyao", s.handleShanyao)
+	// 伤害估算的规则常量(属性克制/六维键序):不随账号,与 icons/medals 同路数
+	s.mux.HandleFunc("GET /api/calc-rules", s.handleCalcRules)
 	s.mux.HandleFunc("GET /api/trial/encounters", s.handleTrialEncounters)
 	// 曾有 DELETE /api/trial/encounters(清空遇见记录),已删除:见闻录是权威来源、
 	// 清空后会被立刻补回,该接口不可能生效。理由见 api_trial.go 里的说明。

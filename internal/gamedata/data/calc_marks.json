@@ -1,0 +1,200 @@
+{
+ "_source": {
+  "upstream": "Evenstar-tools/roco-calculator",
+  "url": "https://github.com/Evenstar-tools/roco-calculator",
+  "site": "https://rococalc.top",
+  "files": "src/domain/marks.js（印记定义）、src/domain/traits.js（TRAIT_NAME_TO_RULE）",
+  "origin": "原始资料: BWIKI 洛克王国：世界（CC BY-NC-SA 4.0）",
+  "license": "CC BY-NC-SA 4.0（署名-非商业-相同方式共享）;roco 代码为 MIT,不覆盖数据",
+  "note": "印记与特性的**名字**从 roco 源码自动抽取并校验;**系数**由本脚本人工登记,名字对不上即报错退出"
+ },
+ "_note": "印记定义: 15 条(roco marks.js)。其中参与本次伤害计算的 6 条;其余结算时机不在本次技能。⚠️ buff_id → 印记的映射不在本表,见 calc_mark_ids.json。",
+ "marks": [
+  {
+   "id": "wet",
+   "name": "湿润",
+   "polarity": "positive",
+   "summary": "技能能耗降低；本次伤害不变",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "技能能耗降低;本次伤害不变"
+  },
+  {
+   "id": "dragon-bite",
+   "name": "龙噬",
+   "polarity": "positive",
+   "summary": "使用 3 能耗技能后双攻 +40%；当前由能力配置结算",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "使用 3 能耗技能后双攻 +40%;roco 也标注「当前由能力配置结算」"
+  },
+  {
+   "id": "momentum",
+   "name": "蓄势",
+   "polarity": "positive",
+   "summary": "每层攻击技能威力 +30%",
+   "affects": "power",
+   "per": 30,
+   "unit": "percent",
+   "needs": [],
+   "affectsThisHit": true,
+   "note": "每层攻击技能威力 +30%(roco: 每层攻击技能威力 +30%)"
+  },
+  {
+   "id": "tailwind",
+   "name": "风起",
+   "polarity": "positive",
+   "summary": "先手时每层技能威力 +20%",
+   "affects": "power",
+   "per": 20,
+   "unit": "percent",
+   "needs": [
+    "先手"
+   ],
+   "affectsThisHit": true,
+   "note": "先手时每层技能威力 +20%;不先手则不生效"
+  },
+  {
+   "id": "charge",
+   "name": "蓄电",
+   "polarity": "positive",
+   "summary": "迸发时每层技能威力 +10",
+   "affects": "flatPower",
+   "per": 10,
+   "unit": "flat",
+   "needs": [
+    "迸发"
+   ],
+   "affectsThisHit": true,
+   "note": "迸发时每层技能威力 +10(绝对值,不是百分比)"
+  },
+  {
+   "id": "photosynthesis",
+   "name": "光合",
+   "polarity": "positive",
+   "summary": "回合结束回复能量；本次伤害不变",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "回合结束回复能量;本次伤害不变"
+  },
+  {
+   "id": "attack",
+   "name": "攻击",
+   "polarity": "positive",
+   "summary": "每层技能威力 +10%",
+   "affects": "power",
+   "per": 10,
+   "unit": "percent",
+   "needs": [],
+   "affectsThisHit": true,
+   "note": "每层技能威力 +10%"
+  },
+  {
+   "id": "sprout",
+   "name": "萌芽",
+   "polarity": "positive",
+   "summary": "当前伤害不变",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "当前伤害不变"
+  },
+  {
+   "id": "reassembly",
+   "name": "重组",
+   "polarity": "positive",
+   "summary": "幻伤100%/300%",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "幻伤 100%/300%;属特殊伤害类型,本期不参与主公式"
+  },
+  {
+   "id": "slow",
+   "name": "减速",
+   "polarity": "negative",
+   "summary": "每层速度 -10",
+   "affects": "speed",
+   "per": -10,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": true,
+   "note": "每层速度 −10;参与「先手」判定,不直接改伤害"
+  },
+  {
+   "id": "spirit-drop",
+   "name": "降灵",
+   "polarity": "negative",
+   "summary": "入场失去能量；本次伤害不变",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "入场失去能量;本次伤害不变"
+  },
+  {
+   "id": "starfall",
+   "name": "星陨",
+   "polarity": "negative",
+   "summary": "非幻系攻击触发额外幻系伤害",
+   "affects": "extra",
+   "per": 0,
+   "unit": "flat",
+   "needs": [
+    "非幻系攻击"
+   ],
+   "affectsThisHit": true,
+   "note": "非幻系攻击触发额外幻系伤害;数值由 roco 的 starfall 规则决定,本期按「追加伤害」手工/自动填"
+  },
+  {
+   "id": "poison",
+   "name": "中毒",
+   "polarity": "negative",
+   "summary": "回合结束结算；本次技能不追加伤害",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "回合结束结算;本次技能不追加伤害"
+  },
+  {
+   "id": "thorn",
+   "name": "棘刺",
+   "polarity": "negative",
+   "summary": "入场时结算；本次技能不追加伤害",
+   "affects": "none",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "入场时结算;本次技能不追加伤害"
+  },
+  {
+   "id": "undertow",
+   "name": "暗涌",
+   "polarity": "negative",
+   "summary": "当前伤害不变",
+   "affects": "unknown",
+   "per": 0,
+   "unit": "flat",
+   "needs": [],
+   "affectsThisHit": false,
+   "note": "roco 有此印记但本地未登记效果 → 一律不参与计算,不猜"
+  }
+ ]
+}

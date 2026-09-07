@@ -1,0 +1,81 @@
+{
+ "_source": {
+  "upstream": "pcap 对拍推断 + 游戏解包配置(后者权威)",
+  "note": "roco 的印记 id 是字符串 slug,与协议 buff_id 无关。pcap 推断的依据是「技能描述里的层数 == 实际 buff 层数」,属间接证据,需复核"
+ },
+ "_note": "buff_id → 印记/状态名,共 8 条。未收录的 buff 前端显示原始 id,不猜名字。",
+ "buffs": {
+  "20210040": {
+   "name": "风起",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "风起"
+   ],
+   "note": "技能描述「获得N层风起」与 buff 层数对上 ×2"
+  },
+  "20480071": {
+   "name": "风起",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "风起"
+   ],
+   "note": "技能描述「获得N层风起」与 buff 层数对上 ×2"
+  },
+  "20010090": {
+   "name": "减速",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "速冻"
+   ],
+   "note": "技能描述「获得N层减速」与 buff 层数对上 ×2"
+  },
+  "20490031": {
+   "name": "棘刺",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "棘刺"
+   ],
+   "note": "技能描述「获得N层棘刺」与 buff 层数对上 ×1"
+  },
+  "20170012": {
+   "name": "光合",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "光合作用"
+   ],
+   "note": "技能描述「获得N层光合」与 buff 层数对上 ×1"
+  },
+  "20320071": {
+   "name": "湿润",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "打湿"
+   ],
+   "note": "技能描述「获得N层湿润」与 buff 层数对上 ×1"
+  },
+  "20070011": {
+   "name": "中毒",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "疫病吐息"
+   ],
+   "note": "技能描述「获得N层中毒」与 buff 层数对上 ×1"
+  },
+  "20070020": {
+   "name": "冻结",
+   "source": "pcap-correlation",
+   "confidence": "medium",
+   "evidence": [
+    "冰点"
+   ],
+   "note": "技能描述「获得N层冻结」与 buff 层数对上 ×1"
+  }
+ }
+}

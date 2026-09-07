@@ -18,6 +18,7 @@ import (
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/scene"
 	"github.com/whoisnian/rocom-capture/internal/server"
+	"github.com/whoisnian/rocom-capture/internal/shanyao"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
@@ -129,6 +130,8 @@ type acctState struct {
 	// tr 是草系徽章试炼的状态(见 trial.go)。按账号而非连接存:一局跨传送/换场景,
 	// 断线重连时服务器还会用 0x1960 把整局续回来。
 	tr *trialState
+	// sy 是「闪耀大赛」的战局状态(见 shanyao.go),同样按账号存。
+	sy *shanyao.Tracker
 }
 
 // New 创建消费管线并从库中预热连接归属/场景状态(抓包服务重启后无缝续接)。
@@ -368,6 +371,9 @@ func (p *Pipeline) handle(m capture.Message) {
 	// 故不参与「消费即返回」的分发,单独过一遍。
 	p.handleEgg(m, acc)
 	p.handleTrial(m, acc)
+	// 战局同步必须排在 handleScene 之前:0x132c 也是场景消息(清野怪标记),
+	// handleScene 命中即返回,放到后面就吃不到结算包了。
+	p.handleShanyao(m, acc)
 
 	// 采集物的采摘确认走 0x0243 奖励通知。不能挂在 handleEgg 里 —— 那里只在
 	// **解析出蛋**时才继续,而采摘产出的是果子/花草,一条都没有就会提前 return。
