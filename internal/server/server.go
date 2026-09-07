@@ -2,6 +2,7 @@
 //
 // 文件划分(路由集中注册在 server.go 的 routes):
 //   - api_pets / api_map / api_eggs / api_handbook:业务接口(宠物·事件·筛选 / 实时地图 / 精灵蛋 / 图鉴炫彩)
+//   - api_home_query:按 uid 查任意玩家家园(回源第三方,与 /api/home 的抓包数据无关)
 //   - api_account / api_rank / api_debug:账号 PIN 与删除 / 排行榜 / 调试解析
 //   - admin / admin_manage / admin_inject:管理员认证会话 / 统计与黑白名单 / 注入精灵投放与生命周期
 //   - merchant / merchant_notify / merchant_mail / merchant_smtp / merchant_sub:
@@ -67,6 +68,11 @@ type Server struct {
 	eggSrc   string
 	eggSrcMu sync.Mutex
 
+	// 家园查询缓存:uid -> 最近一次回源的原始响应(见 api_home_query.go)。
+	// 按 uid 而非按账号存:查的是别人的家园,与请求方账号无关。
+	homeCacheMu sync.Mutex
+	homeCache   map[string]homeCacheItem
+
 	// 远行商人订阅提醒的进程内认领:槽开始时间戳 → 上一次认领时刻(见 merchant_notify.go)。
 	// 用途:同一槽被并发触发时只放行一个调用去发信,避免订阅者收到两份一模一样的邮件。
 	merchantClaimMu sync.Mutex
@@ -122,6 +128,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 	s.snap = newSnapshotStore()
 	s.medalIDs = map[string][]uint32{}
 	s.injects = map[string][]*injectEntry{}
+	s.homeCache = map[string]homeCacheItem{}
 	s.online = newOnlineTracker()
 	s.accounts = newAcctResolver(s.online, st)
 	s.smtp = newSMTPSender(smtpUser, smtpPass)
@@ -236,6 +243,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/paint", s.handlePaint)
 	s.mux.HandleFunc("DELETE /api/paint", s.handlePaintReset)
 	s.mux.HandleFunc("GET /api/home", s.handleHome)
+	s.mux.HandleFunc("GET /api/home/query", s.handleHomeQuery)
 	s.mux.HandleFunc("GET /api/trial", s.handleTrial)
 	s.mux.HandleFunc("GET /api/trial/encounters", s.handleTrialEncounters)
 	// 曾有 DELETE /api/trial/encounters(清空遇见记录),已删除:见闻录是权威来源、

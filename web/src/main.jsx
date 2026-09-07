@@ -14,6 +14,7 @@ const Merchant = lazy(() => import('./pages/merchant/Merchant'))
 const Flowers = lazy(() => import('./pages/flowers/Flowers'))
 const Trial = lazy(() => import('./pages/trial/Trial'))
 const HandbookGlasses = lazy(() => import('./pages/handbook/HandbookGlasses'))
+const HomeQuery = lazy(() => import('./pages/home/HomeQuery'))
 const Leaderboard = lazy(() => import('./pages/leaderboard/Leaderboard'))
 const Admin = lazy(() => import('./pages/admin/Admin'))
 // 样式按「基础 → 壳 → 共用面板/部件 → 各页」顺序引入(同名选择器的层叠顺序有意义)。
@@ -35,6 +36,7 @@ import './styles/motion.css'
 import './styles/flowers.css'
 import './styles/trial.css'
 import './styles/handbook.css'
+import './styles/home.css'
 import './styles/leaderboard.css'
 import './styles/admin.css'
 import './styles/pin.css'
@@ -65,6 +67,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="flowers" element={<Flowers />} />
             <Route path="trial" element={<Trial />} />
             <Route path="handbook" element={<HandbookGlasses />} />
+            <Route path="home-query" element={<HomeQuery />} />
             <Route path="leaderboard" element={<Leaderboard />} />
             {/* 调试页:导航不显示,需手动输入 #/debug */}
             <Route path="debug" element={<Debug />} />

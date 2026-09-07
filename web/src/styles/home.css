@@ -1,0 +1,164 @@
+/* ---- 家园查询页(HomeQuery) ---- */
+
+.hq-page { padding: 4px 0 16px; }
+
+/* 标题行:标题与说明纵向堆叠,说明不再与标题抢同一基线 */
+.hq-head { margin-bottom: 14px; }
+.hq-title {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-weight: 700; margin: 0 0 3px; /* 字号走全局 --text-h2 */
+}
+.hq-note { margin: 0; font-size: 12px; color: var(--fg-dim); }
+
+/* 查询条:输入框吃掉剩余宽度,两个按钮固定宽 */
+.hq-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.hq-input {
+  flex: 1 1 200px; min-width: 0;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius);
+  color: var(--fg); padding: 8px 12px; font-size: 14px; font-family: var(--font-num);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.hq-input::placeholder { color: var(--fg-dim); }
+.hq-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.hq-go, .hq-force { flex: none; }
+.hq-force:disabled { opacity: .35; }
+
+.hq-msg { font-size: 13px; padding: 8px 12px; border-radius: var(--radius); margin-bottom: 12px; }
+.hq-msg.err { color: var(--red, #e5576f); background: rgba(229, 87, 111, .1); }
+
+.hq-empty { padding: 40px 12px; text-align: center; color: var(--fg-dim); }
+.hq-empty p { margin: 10px 0 0; }
+.hq-empty-sub { font-size: 12px; }
+
+/* —— 概览 —— */
+/* 用卡片容器包住一组数字,而不是让六个数字裸排在页面上:
+   裸排时它们与下面的内容没有分界,读起来像同一层。 */
+.hq-stats {
+  display: flex; gap: 0; flex-wrap: wrap; margin-bottom: 16px;
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 4px 0; overflow: hidden;
+}
+.hq-stat {
+  flex: 1 1 auto; min-width: 84px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 8px 14px;
+  /* 细分隔线取代大间距:卡片内不靠留白分栏,靠 1px 竖线,密度可控 */
+  border-left: 1px solid var(--line-soft);
+}
+.hq-stat:first-child { border-left: 0; }
+.hq-stat b {
+  color: var(--fg); font-weight: 700; font-family: var(--font-num); font-size: 18px;
+  line-height: 1.25; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hq-stat span { font-size: 11px; color: var(--fg-dim); }
+/* 家园名是文字不是数字:给它更宽的空间并改用正文色,别和统计数字抢视觉重量 */
+.hq-stat.wide { flex: 1.6 1 auto; }
+.hq-stat.wide b { font-family: var(--font-display, var(--font-num)); color: var(--fg); font-size: 17px; }
+/* 待收灵感:整页唯一需要被一眼看到的数字,用强调色 + 底色点出 */
+.hq-stat.accent b { color: var(--accent); }
+.hq-stat.accent { background: var(--accent-soft); }
+
+
+.hq-block { margin-bottom: 4px; }
+.hq-sub {
+  font-size: 13px; font-weight: 700; margin: 0 0 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+/* 小节标题后接一条渐隐细线,把标题与内容连成一组(避免孤零零一行字) */
+.hq-sub::after {
+  content: ''; flex: 1 1 auto; height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+/* —— 精灵卡 —— */
+.hq-pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.hq-pet {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 12px 8px 10px; overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  /* 入场:整组卡片依次浮现。延迟按列序由内联 style 给出(见组件) */
+  animation: hq-rise .26s var(--ease-out) both;
+}
+.hq-pet:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+@keyframes hq-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 头像容器:异色标记叠在右下角,不占布局 */
+.hq-pet-imgwrap { position: relative; margin-bottom: 5px; }
+.hq-pet-img {
+  display: block; width: 56px; height: 56px; object-fit: contain;
+  background: var(--bg-3); border-radius: 12px; padding: 3px;
+}
+.hq-pet-img.noimg {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-dim); font-size: 18px;
+}
+/* 异色/异色炫彩角标:沿用全局异色语义色(--c-shiny),与列表页的异色徽标同源。
+   叠在头像右下角、不占布局,故用绝对定位并允许溢出到卡片 padding 内。 */
+.hq-mut {
+  position: absolute; right: -6px; bottom: -5px;
+  padding: 1px 5px; border-radius: 8px;
+  font-size: 10px; line-height: 1.5; white-space: nowrap;
+  background: var(--c-shiny-d); border: 1px solid var(--c-shiny);
+  color: var(--c-shiny); font-weight: 600;
+}
+
+.hq-pet-name {
+  font-weight: 600; font-size: 13px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hq-pet-sp {
+  font-size: 11px; color: var(--fg-dim); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hq-pet-lv { display: flex; align-items: baseline; gap: 5px; font-size: 12px; color: var(--fg-dim); }
+.hq-lv { font-family: var(--font-num); }
+/* 性别符号取全局性别色(与宠物列表一致),比中性灰更好扫 */
+.hq-sex { font-size: 12px; }
+.hq-sex.male { color: var(--c-male); }
+.hq-sex.female { color: var(--c-female); }
+
+/* 状态徽章:三种状态各有颜色语义,与 STATUS_KIND 对应 */
+.hq-status {
+  margin-top: 4px; padding: 1px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  background: var(--bg-3); color: var(--fg-dim); border: 1px solid transparent;
+}
+/* 待办:暖黄(种子金)描边,提示「还没喂」 */
+.hq-pet.is-todo .hq-status { color: var(--c-seed); border-color: rgba(var(--c-seed-rgb), .5); }
+/* 已喂食:中性,不吸引注意 */
+.hq-pet.is-done .hq-status { color: var(--fg-dim); }
+/* 可收取灵感:整卡高亮 + 强调色徽章,这是玩家要找的目标 */
+.hq-pet.is-ready { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--bg-1) 62%); }
+.hq-pet.is-ready .hq-status { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* —— 种植表 —— */
+.hq-table-wrap {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--bg-1); overflow: hidden;
+}
+.hq-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hq-table th, .hq-table td { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+.hq-table th { font-size: 12px; color: var(--fg-dim); font-weight: 600; background: var(--bg-2); }
+.hq-table tbody tr:last-child td { border-bottom: 0; }
+.hq-table tbody tr:hover { background: var(--bg-2); }
+.hq-table .num { font-family: var(--font-num); text-align: right; }
+.hq-table th.num { text-align: right; }
+.hq-ripe { color: var(--fg-dim); }
+/* 已成熟的行:盈利绿字 + 左侧色条,扫一眼就能挑出来 */
+.hq-table tr.is-ripe .hq-ripe { color: var(--c-earn); font-weight: 600; }
+.hq-table tr.is-ripe td:first-child { box-shadow: inset 2px 0 0 var(--c-earn); }
+
+.hq-foot { margin-top: 14px; font-size: 12px; color: var(--fg-dim); }
+
+/* 窄屏:概览由横排改两列网格,竖分隔线不再适用 */
+@media (max-width: 560px) {
+  .hq-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 0; background: var(--line-soft); }
+  .hq-stat { border-left: 0; background: var(--bg-1); min-width: 0; padding: 9px 6px; }
+  .hq-stat.wide { grid-column: span 3; }
+}
