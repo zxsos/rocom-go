@@ -17,7 +17,7 @@ import { wildTagText } from './wildMatch'
 import { useHomeNests, nestTitle } from './useHomeNests'
 import { usePaint } from './usePaint'
 import { PetDetailModal } from '../../components/PetDetailModal'
-import { GlassChip } from '../../components/badges'
+import { GlassChip, rkpetURL } from '../../components/badges'
 
 // wildTitle 组一条野生宠物标记的悬停说明(见 MapPage 原实现)。
 // rangeRules 传进去让标签带上区间规则的名字 —— 自定义区间在后端 kinds 里没有对应标签,
@@ -457,6 +457,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist, rangeRules = [] }) 
         : kinds.includes('shiny') ? 'shiny'
         : kinds.includes('colorful') ? 'colorful'
         : ''
+      const rkpet = rkpetURL(p) // 3D 外链;缺形态编号或缺炫彩数据时为 null(见 rkpetURL)
       return [
         <div key={p.id} data-id={p.id} title={wildTitle(p, rangeRules)}
           className={'map-wild' + (p.stale ? ' stale' : '') + (p.inject ? ' inject' : '') + (tip ? ' tip' : '') + (rare ? ' rare' : '')}
@@ -478,6 +479,17 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist, rangeRules = [] }) 
                 后端在 glassType != 空 时才带这两个字段,故此处判断即可;异色(仅 shiny)无炫彩数据不显示。 */}
             {p.glassType > 0 && p.glassValue > 0 && (
               <div className="twg"><GlassChip p={p} className="map-wild-tip-chip" /></div>
+            )}
+            {/* 3D 外链直接摆在面板里,而不是只藏在色卡的放大预览中:点色卡是**本地放大**,
+                而「看 3D」是**跳出去**,两者不是一回事 —— 藏在预览里要连点两次才找得到,
+                实测下来多数人根本不知道要点色卡。面板整体是 pointer-events:none
+                (免得挡住下方标记的点击),故 .map-wild-rkpet 里显式放开,否则按钮点不动。 */}
+            {rkpet && (
+              <a className="btn map-wild-rkpet" href={rkpet} target="_blank" rel="noreferrer"
+                title={'在 rkpet 新窗口打开,看这只宠物同一套炫彩的 3D 效果(需浏览器支持 WebGPU)'
+                  + ';那边按图鉴号导了 201 个包,个别形态还没有模型,会落在下载站首页'}>
+                在 rkpet 看 3D 效果 ↗
+              </a>
             )}
             <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
             <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>

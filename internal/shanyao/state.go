@@ -27,8 +27,8 @@ type Tracker struct {
 // gid 缺失时(对手未出场的宠物)退而用 pet_id 归并:同一方内 pet_id 唯一。
 type sideState struct {
 	info  Side
-	order []string          // 归并键序列
-	pets  map[string]Pet    // 归并键 -> 宠物
+	order []string      // 归并键序列
+	pets  map[string]Pet // 归并键 -> 宠物
 	byID  map[uint32]string // pet_id -> 归并键(0x1324 只给 pet_id)
 }
 
@@ -178,39 +178,7 @@ func (t *Tracker) OnPerform(p Perform) bool {
 	for _, sync := range p.SkillSyncs {
 		t.applySkillSync(sync)
 	}
-	for _, ch := range p.BuffChanges {
-		t.applyBuffChange(ch)
-	}
 	return t.takeDirty()
-}
-
-// applyBuffChange 把一次 buff 层数变化写到对应宠物上(先我方后对手,同 applyHP)。
-func (t *Tracker) applyBuffChange(ch BuffChange) {
-	for _, s := range []*sideState{&t.self, &t.foe} {
-		if _, ok := s.byID[ch.PetID]; !ok {
-			continue
-		}
-		key := s.byID[ch.PetID]
-		p := s.pets[key]
-		found := false
-		for i := range p.Buffs {
-			if p.Buffs[i].BuffID != ch.BuffID {
-				continue
-			}
-			found = true
-			if ch.HasStack && p.Buffs[i].Stacks != ch.Stacks {
-				p.Buffs[i].Stacks = ch.Stacks
-				t.dirty = true
-			}
-			break
-		}
-		if !found {
-			p.Buffs = append(p.Buffs, Buff{BuffID: ch.BuffID, Stacks: ch.Stacks})
-			t.dirty = true
-		}
-		s.pets[key] = p
-		return
-	}
 }
 
 // OnFinish 应用 0x132c 结算通知。
@@ -225,7 +193,11 @@ func (t *Tracker) OnFinish(f Finish) bool {
 		t.result, t.dirty = f.Result, true
 	}
 	for _, m := range f.Monsters {
-		t.sideOfMonster(m).applyMonster(m, &t.dirty)
+		side := &t.foe
+		if m.Side == 1 {
+			side = &t.self
+		}
+		side.applyMonster(m, &t.dirty)
 	}
 	for _, b := range f.Battlers {
 		for _, s := range []*sideState{&t.self, &t.foe} {
@@ -295,43 +267,6 @@ func (t *Tracker) takeDirty() bool {
 // 归并键优先 gid;对手未出场的宠物 gid 为 0,退化为 pet_id(此时按方内唯一处理)。
 // 已存在的宠物只补空缺字段(名字/等级/性格/系别/技能…),不覆盖既有值 ——
 // 0x131a 每回合都重发同一批宠物,但它们只带「在场」这类战斗态信息。
-// sideOfMonster 判定结算里一只宠物属于哪一边。
-//
-// ⚠️ **不能只看 monster_info.side**:实测两局 pcap 的 side 语义是相反的
-// (一局我方 side=1、对手 side=0,另一局我方 side=0、对手 side=1)—— 它是
-// 「进战包里的阵营编号」,不是「我方=1」。按 side 归类会把自己的宠物记进对手栏
-// (对手栏出现一堆自己人)。故**以 uin 为准**,side 只作 uin 缺失时的兜底。
-func (t *Tracker) sideOfMonster(m Monster) *sideState {
-	if m.UIN != 0 {
-		if t.self.info.UIN != 0 && uint64(m.UIN) == t.self.info.UIN {
-			return &t.self
-		}
-		if t.foe.info.UIN != 0 && uint64(m.UIN) == t.foe.info.UIN {
-			return &t.foe
-		}
-		// uin 两边都对不上(观战/第三方):退回 side,按旧口径
-	}
-	if m.Side == 1 {
-		return &t.self
-	}
-	return &t.foe
-}
-
-// ownsGID 报告某只宠物(按 gid)是否已经属于**另一方**。
-//
-// 存在的理由:实测一局里 0x131a 的 data_update.other 会带上**我方**的宠物
-// (对方视角的「另一方」就是我方),而 other.role_uin 有时为 0 —— 这时按
-// 「不是本方 uin 就算对手」的兜底会把自己的宠物记到对手那边,页面上对手栏
-// 出现一堆自己人(同一 gid 两边各一份)。故以**先到为准**:进战包已经给出
-// 权威阵营,后面再见到同一只就保持原阵营,不重复登记。
-func (t *Tracker) ownsGID(other *sideState, p Pet) bool {
-	if p.GID == 0 {
-		return false
-	}
-	_, ok := other.pets[petKey(p)]
-	return ok
-}
-
 func (t *Tracker) mergeSide(s *sideState, info Side) {
 	if s.pets == nil {
 		s.pets = map[string]Pet{}
@@ -358,17 +293,9 @@ func (t *Tracker) mergeSide(s *sideState, info Side) {
 		if key == "" {
 			continue
 		}
-		// 同一只宠物只归一边:已在对方阵营的(进战包先登记过)就不往这边加。
-		if t.ownsGID(&t.foe, p) && s == &t.self {
-			continue
-		}
-		if t.ownsGID(&t.self, p) && s == &t.foe {
-			continue
-		}
-		// 同一只宠物在本方只能有一个键。实测踩到过:补发包先给 gid=0 的版本
-		// (键 p<pet_id>),随后又给带 gid 的版本(键 g<gid>)—— 两个键并存就在
-		// 页面上变成两只同名同血的宠物。故带 gid 时先看本方有没有同 pet_id 的记录。
-		if _, ok := s.pets[key]; !ok {
+		// 只有 pet_id(没有 gid)的补发包要归到既有宠物上,否则会多出一只同名的空壳:
+		// 0x131a 的 data_update.pet 常只带战斗态(gid 为 0),而进战包那只的归并键是 gid。
+		if _, ok := s.pets[key]; !ok && p.GID == 0 && p.PetID != 0 {
 			if k2, ok2 := s.byID[p.PetID]; ok2 {
 				key = k2
 			}
@@ -535,10 +462,6 @@ func mergePet(old, add Pet) Pet {
 	if add.HasEnergy {
 		out.Energy, out.HasEnergy = add.Energy, true
 	}
-	// buff 是整份快照(进战/回合包重发),故整份替换;没有 buff 的包不改动(避免误清)。
-	if len(add.Buffs) > 0 {
-		out.Buffs = add.Buffs
-	}
 	// 在场/倒下/当前血量是**战斗态**,给了就以新值为准(不给就保留旧值)。
 	// 前提是「给了」必须有 HasHP 标记:0 血(倒下)与「没给」不能混淆。
 	out.OnField = add.OnField
@@ -579,14 +502,6 @@ func samePet(a, b Pet) bool {
 	}
 	if a.Stats.Has != b.Stats.Has || a.Energy != b.Energy || a.HasEnergy != b.HasEnergy {
 		return false
-	}
-	if len(a.Buffs) != len(b.Buffs) {
-		return false
-	}
-	for i := range a.Buffs {
-		if a.Buffs[i] != b.Buffs[i] {
-			return false
-		}
 	}
 	return !a.Stats.Has || a.Stats == b.Stats // 都有了才逐项比(StatLine 是可比较的结构体)
 }

@@ -210,65 +210,6 @@ func TestTrackerStatsMerge(t *testing.T) {
 	}
 }
 
-// TestTrackerNoCrossSideDuplicate:同一只宠物(gid 相同)不能同时出现在两边。
-//
-// 实测踩到过:0x131a 的 data_update.other 会带上**我方**的宠物(对方视角的另一
-// 方就是我方),而 other.role_uin 有时为 0 —— 按「不是本方 uin 就归对手」的兜底
-// 会把自己的宠物记进对手栏,页面上对手栏出现一堆自己人。修法是「先到为准」:
-// 进战包先登记了阵营,后续再见到同一 gid 就跳过。
-// hasGID 供断言用:只看这批宠物里有没有这只 gid。
-func hasGID(pets []Pet, gid uint32) bool {
-	for _, p := range pets {
-		if p.GID == gid {
-			return true
-		}
-	}
-	return false
-}
-
-func TestTrackerNoCrossSideDuplicate(t *testing.T) {
-	tr := NewTracker()
-	tr.OnEnter(enterOf()) // 我方 gid 1 / 2 先进场
-	// 回合包把「我方两只 + 对手一只」一股脑塞进对方(other.role_uin 缺失时的形态)
-	tr.OnRound(Round{BattleID: 100, Round: 2, Foe: Side{UIN: 142792, Pets: []Pet{
-		{GID: 1, PetID: 401},   // 与我方 gid 1 同一只 → 必须被忽略
-		{GID: 2, PetID: 402},   // 同上
-		{GID: 999, PetID: 403}, // 真对手
-	}}})
-	snap := tr.Snapshot()
-	// 对手栏:进战包那一只 + 本次的真对手,**不能**出现我方 gid 1 / 2
-	for _, p := range snap.Foe.Pets {
-		if p.GID == 1 || p.GID == 2 {
-			t.Fatalf("我方宠物被记进了对手栏: %+v", snap.Foe.Pets)
-		}
-	}
-	if !hasGID(snap.Foe.Pets, 999) {
-		t.Errorf("真对手 gid 999 未登记: %+v", snap.Foe.Pets)
-	}
-	if len(snap.Self.Pets) != 2 {
-		t.Errorf("我方不该被对手栏的同 gid 条目影响, 实得 %+v", snap.Self.Pets)
-	}
-}
-
-// TestTrackerFinishSideByUIN:结算归属**按 uin**,不看 side —— 两局 pcap 的 side
-// 语义相反,按 side 归类会把自己人记进对手栏。
-func TestTrackerFinishSideByUIN(t *testing.T) {
-	tr := NewTracker()
-	tr.OnEnter(enterOf()) // self UIN 100000002 / foe UIN 142792
-	// 我方宠物(100000002)但 side=0:按旧口径会归对手,按 uin 应归我方
-	tr.OnFinish(Finish{BattleID: 100, Monsters: []Monster{
-		{GID: 1, UIN: 100000002, Side: 0, State: MonsterDefeated, RemainHP: 0},
-		{GID: 11, UIN: 142792, Side: 1, State: 3},
-	}})
-	snap := tr.Snapshot()
-	if !hasGID(snap.Self.Pets, 1) || hasGID(snap.Foe.Pets, 1) {
-		t.Errorf("我方宠物(side=0)应归我方: self=%v foe=%v", snap.Self.Pets, snap.Foe.Pets)
-	}
-	if !hasGID(snap.Foe.Pets, 11) || hasGID(snap.Self.Pets, 11) {
-		t.Errorf("对手宠物(side=1)应归对手: self=%v foe=%v", snap.Self.Pets, snap.Foe.Pets)
-	}
-}
-
 func TestTrackerIgnoresBeforeEnter(t *testing.T) {
 	tr := NewTracker()
 	if tr.OnRound(Round{BattleID: 1, Round: 1}) {

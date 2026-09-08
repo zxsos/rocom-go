@@ -28,6 +28,23 @@ export function MarkIcon({ src, title, fallback, cls }) {
   return <span className={'mark ' + cls} title={title}>{fallback}</span>
 }
 
+// RKPET_LINK 是姊妹项目 rocom-pets 的站点(https://github.com/whoisnian/rocom-pets)。
+// 它能把这只宠物的**模型**按同一套炫彩渲成 3D,`/api/link` 是它给外部工具开的接口:
+// 送游戏侧编号(形态 + 异色/炫彩),302 到对应的展示页。「形态编号 → 包名/资产名」与
+// look 的写法都由它换算,这里不抄。
+const RKPET_LINK = 'https://rkpet.whoisnian.com/api/link'
+
+// rkpetURL 拼这只在 rkpet 的展示链接;缺形态编号或缺炫彩编号时返回 null。
+// 后者是**老库**才会缺(glassType/glassValue 是后加的字段,早先入库的行里没有),
+// 下次登录全量快照重写那一行就补齐了;这期间色卡照画,只是不给这条链接。
+export function rkpetURL(p) {
+  if (!p || !p.baseConfId || !p.glassType) return null
+  const q = new URLSearchParams({ petbase: String(p.baseConfId) })
+  if (p.shiny) q.set('shiny', '1')
+  q.set('glass', `${p.glassType}:${p.glassValue}`)
+  return `${RKPET_LINK}?${q}`
+}
+
 // glassMask 生成 CSS mask 层的行内样式:按素材 alpha 蒙版填色(color),素材拉伸铺满容器。
 // 与客户端 UMG 一致(见 scripts/gen_glass.py 与 docs/data.md 3.5):
 // 层1 底图 Bg 蒙版填 ui_color_2 → 层2 中层 Bg2 蒙版填 ui_color_1(顶部对齐,图内已含位置)→
@@ -51,7 +68,8 @@ export const glassMask = (img, color, top = false) => {
 
 // GlassZoom 炫彩色卡放大预览:点遮罩、点关闭按钮或按 Esc 关闭。大图保持 280:154 原始
 // 构图(与 scripts/gen_glass.py 一致),普通炫彩三层合成、隐藏炫彩直接展示整图。
-function GlassZoom({ type, value, onClose }) {
+// 卡片下方另给一条 rkpet 链接,跳过去看同一套炫彩的 3D 效果(见 rkpetURL)。
+function GlassZoom({ p, type, value, onClose }) {
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -75,6 +93,7 @@ function GlassZoom({ type, value, onClose }) {
     }
   }
   if (!body) return null
+  const rkpet = rkpetURL(p)
   // Portal 渲染到 body:彻底脱离宿主(宠物列表卡片/详情弹窗)DOM 树,避免两个问题——
   // 1. 移动端 .card:active { transform: scale(.995) } 会让祖先 transform 破坏本遮罩的
   //    position: fixed,按下瞬间遮罩被拉进卡片坐标系而偏移抖动;
@@ -93,6 +112,21 @@ function GlassZoom({ type, value, onClose }) {
       <div className="glass-zoom">
         {body}
         <button className="icon-btn glass-zoom-close" onClick={(e) => { stop(e); onClose() }} title="关闭" aria-label="关闭"><IconClose size={16} /></button>
+        {/* rkpet 链接放在**放大预览里**而不是色卡本身上:色卡那一下点击是本地放大
+            (本工具原有交互),叠一个跳转会打架;收进预览里两级分离,也不会误触外链。
+            只是个普通 <a>,不点不会有任何外部请求(本项目是局域网工具,断网照常用)。 */}
+        {rkpet && (
+          <a
+            className="btn glass-zoom-rkpet"
+            href={rkpet}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在 rkpet 新窗口打开,看这只宠物同一套炫彩的 3D 效果(需浏览器支持 WebGPU)"
+            onClick={stop}
+          >
+            在 rkpet 看 3D 效果 ↗
+          </a>
+        )}
       </div>
     </div>,
     document.body
@@ -138,7 +172,7 @@ export function GlassChip({ p, className }) {
       >
         {card}
       </span>
-      {zoom && <GlassZoom type={type} value={value} onClose={() => setZoom(false)} />}
+      {zoom && <GlassZoom p={p} type={type} value={value} onClose={() => setZoom(false)} />}
     </>
   )
 }

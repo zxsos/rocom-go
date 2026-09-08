@@ -9,9 +9,7 @@ import (
 // 字段号一览(括号内是 pcapdump 按游戏描述符渲染出的字段名)。
 //
 // 换游戏版本后必须重新核对:
-//
 //	go run ./cmd/pcapdump -pcap <文件> -op 0x1316,0x131a,0x1324,0x132c
-//
 // 渲染结果给出字段名,字段号可临时加一个读 internal/pbdesc 的小程序打印
 // (db.FindOp(op) → 遍历 Fields())。
 //
@@ -28,10 +26,10 @@ const (
 	fInitFoeTeam  = 6 // enemy_team
 
 	// team(player_team / enemy_team 同构)
-	fTeamBase  = 1  // base
-	fTeamPets  = 2  // pets
-	fBaseUIN   = 1  // role_uin
-	fBaseName  = 2  // name
+	fTeamBase  = 1 // base
+	fTeamPets  = 2 // pets
+	fBaseUIN   = 1 // role_uin
+	fBaseName  = 2 // name
 	fBaseLevel = 14 // role_level
 	fBaseHP    = 18 // hp(剩余体力)
 	fBaseHPMax = 17 // raw_hp(体力上限)
@@ -51,10 +49,10 @@ const (
 	fInEntered = 70 // is_entered(是否已在场上)
 
 	// skill_round_data(与 pet_skill.skills 同构,字段号一致)
-	fSkillRdID      = 39 // skill_id(skills.json 口径的 7 位 id)
-	fSkillRdHits    = 4  // cast_cnt(连击段数)
-	fSkillRdCost    = 9  // cost_energy(能耗)
-	fSkillRdExPow   = 18 // ex_damage_param(额外威力参数)
+	fSkillRdID     = 39 // skill_id(skills.json 口径的 7 位 id)
+	fSkillRdHits   = 4  // cast_cnt(连击段数)
+	fSkillRdCost   = 9  // cost_energy(能耗)
+	fSkillRdExPow  = 18 // ex_damage_param(额外威力参数)
 	fSkillRdRulePow = 22 // rule_damage_param(规则威力参数)
 
 	// battle_common_pet_info.attribute_info(14):hp=1 attack=2 special_attack=3
@@ -72,26 +70,6 @@ const (
 	fAtBase = 3
 	fAtEff  = 6
 
-	// —— buff / 印记层数(印记规则的输入,见 roco 的 marks.js)——
-	// battle_inside_pet_info.buffs(5,repeated):buff_id(2) stack(4) buff_type(6) from_skill_id(15)
-	// battle_inside_pet_info.remain_buff_infos(39,repeated):buff_id(1) stack(2)
-	// 0x1324 perform_info.buff_change(4):target_id(2) buff_id(3) type(4) buff_info(8){buff_id(2) stack(4)}
-	// 0x1324 sync_data.pet_sync_info(3):buff_id(14) buff_stack_change(15) buff_stack_result(16)
-	fInBuffs      = 5
-	fInRemainBuff = 39
-	fBuffID       = 2
-	fBuffStack    = 4
-	fBuffType     = 6
-	fBuffSkill    = 15
-	fRemainID     = 1
-	fRemainStack  = 2
-	fPIBuffChange = 4
-	fBCTarget     = 2
-	fBCBuffID     = 3
-	fBCInfo       = 8
-	fSyncBuffID   = 14
-	fSyncStackRes = 16
-
 	// battle_common_pet_info.energy = 33:当前能量。
 	//
 	// 只在为「魔能爆」(ruleId=mana_burst,威力随消耗的能量变)这类动态威力技能准备的:
@@ -99,12 +77,12 @@ const (
 	fCmEnergy = 33
 
 	// 0x1324 perform_cmd.perform_info.sync_data.skill_sync_info(3)
-	fSyncSkill  = 3
-	fSSPetID    = 1
-	fSSSkillID  = 2
-	fSSParamRes = 4  // damage_param_result:对局内**实时威力**(含融合/被动修正)
-	fSSHitsRes  = 6  // cast_cnt_result
-	fSSCostRes  = 10 // cost_energy_result
+	fSyncSkill   = 3
+	fSSPetID     = 1
+	fSSSkillID   = 2
+	fSSParamRes  = 4  // damage_param_result:对局内**实时威力**(含融合/被动修正)
+	fSSHitsRes   = 6  // cast_cnt_result
+	fSSCostRes   = 10 // cost_energy_result
 
 	// battle_common_pet_info
 	fCmGID     = 1  // gid
@@ -204,40 +182,21 @@ type StatLine struct {
 	EffortAdd uint32
 }
 
-// Buff 是一个挂在宠物身上的 buff / 印记。
-//
-// 印记层数(蓄势/风起/星陨…)就是靠它带出来的:roco 的印记模型是「每方一个槽 +
-// 层数」,而协议给的是 buff 列表,故这里原样保留 id 与层数,翻译交给前端的印记表。
-type Buff struct {
-	BuffID uint32
-	Stacks uint32
-	Type   uint32
-	Skill  uint32 // 来自哪个技能(部分 buff 带)
-}
-
-// BuffChange 是 0x1324 里一次 buff 变化(层数以**结果值**为准,同 hp_result 的口径)。
-type BuffChange struct {
-	PetID    uint32
-	BuffID   uint32
-	Stacks   uint32
-	HasStack bool
-}
-
 // PetStats 是六维。Has 为 false 表示服务端没下发(对手即如此)。
 type PetStats struct {
-	Has                                                                       bool
+	Has bool
 	HP, PhysicalAttack, MagicalAttack, PhysicalDefense, MagicalDefense, Speed StatLine
 }
 
 // SkillSync 是 0x1324 里一条技能同步:某只宠物的某个技能的实时威力/段数/能耗。
 type SkillSync struct {
-	PetID    uint32
-	SkillID  uint32
-	Power    int32
+	PetID   uint32
+	SkillID uint32
+	Power   int32
 	HasPower bool
-	Hits     uint32
-	Cost     uint32
-	HasCost  bool
+	Hits    uint32
+	Cost    uint32
+	HasCost bool
 }
 
 // Pet 是一只参战精灵。
@@ -259,10 +218,8 @@ type Pet struct {
 	// Energy 是当前能量(0..10 量级)。HasEnergy 区分「0 能量」与「没给」—— 0 是常见状态。
 	Energy    uint32
 	HasEnergy bool
-	// Buffs 是当前挂在身上的 buff / 印记层数。进战与回合包会整份重发,故 merge 时整份替换。
-	Buffs      []Buff
 	Skills     []Skill
-	Mutation   uint32 // 炫彩判据:Mutation & MutationShinyBit
+	Mutation   uint32   // 炫彩判据:Mutation & MutationShinyBit
 	GlassType  uint32
 	GlassValue uint32
 	HPMax      int32 // 上限(battle_attr[1] 实测即最大 HP)
@@ -316,10 +273,9 @@ type HPUpdate struct {
 
 // Perform 是 0x1324 演出通知里用到的部分。
 type Perform struct {
-	Round       uint32
-	Updates     []HPUpdate
-	SkillSyncs  []SkillSync  // 技能实时威力/段数/能耗
-	BuffChanges []BuffChange // buff / 印记层数变化
+	Round    uint32
+	Updates  []HPUpdate
+	SkillSyncs []SkillSync // 技能实时威力/段数/能耗
 }
 
 // Monster 是 0x132c 结算里一只宠物的最终状态。
@@ -483,30 +439,6 @@ func ParsePerform(body []byte) (Perform, bool) {
 		out.Round = uint32(v)
 	}
 	for _, pi := range wire.Subs(cmd, fPerformInfo) {
-		// buff_change(4):target_id 是**战斗编号**(pet_id);层数取 buff_info.stack(结果值),
-		// 顶层 buff_id 也可作为兜底(部分包只在 info 里给)。
-		for _, bc := range wire.Subs(pi, fPIBuffChange) {
-			var ch BuffChange
-			if v, ok := wire.Varint(bc, fBCTarget); ok {
-				ch.PetID = uint32(v)
-			}
-			if v, ok := wire.Varint(bc, fBCBuffID); ok {
-				ch.BuffID = uint32(v)
-			}
-			if info := wire.SubMsg(bc, fBCInfo); info != nil {
-				if v, ok := wire.Varint(info, fBuffStack); ok {
-					ch.Stacks, ch.HasStack = uint32(v), true
-				}
-				if ch.BuffID == 0 {
-					if v, ok := wire.Varint(info, fBuffID); ok {
-						ch.BuffID = uint32(v)
-					}
-				}
-			}
-			if ch.PetID != 0 && ch.BuffID != 0 {
-				out.BuffChanges = append(out.BuffChanges, ch)
-			}
-		}
 		sd := wire.SubMsg(pi, fPISyncData)
 		if sd == nil {
 			continue
@@ -546,21 +478,9 @@ func ParsePerform(body []byte) (Perform, bool) {
 			if sync.PetID != 0 && (sync.HasPower || sync.HasCost || sync.Hits > 0) {
 				out.SkillSyncs = append(out.SkillSyncs, sync)
 			}
-			// 同一次同步里也可能只带 buff 层数:单独收一条 BuffChange(pet_id 在本条里)。
-			var bc BuffChange
-			if v, ok := wire.Varint(ss, fSyncBuffID); ok {
-				bc.BuffID = uint32(v)
-			}
-			if v, ok := wire.Varint(ss, fSyncStackRes); ok {
-				bc.Stacks, bc.HasStack = uint32(v), true
-			}
-			bc.PetID = sync.PetID
-			if bc.PetID != 0 && bc.BuffID != 0 && bc.HasStack {
-				out.BuffChanges = append(out.BuffChanges, bc)
-			}
 		}
 	}
-	return out, len(out.Updates) > 0 || len(out.SkillSyncs) > 0 || len(out.BuffChanges) > 0
+	return out, len(out.Updates) > 0 || len(out.SkillSyncs) > 0
 }
 
 // ParseFinish 解析 0x132c 结算通知。
@@ -762,7 +682,6 @@ func parsePet(inside, common []byte) Pet {
 		if v, ok := wire.Varint(common, fCmEnergy); ok {
 			p.Energy, p.HasEnergy = uint32(v), true
 		}
-		p.Buffs = parseBuffs(inside)
 	}
 	return p
 }
@@ -786,48 +705,6 @@ func parseSkill(sd []byte) Skill {
 		s.Power, s.HasPower = int32(v), true
 	}
 	return s
-}
-
-// parseBuffs 解析 battle_inside_pet_info 的 buff 列表(buffs 优先,其次 remain_buff_infos)。
-func parseBuffs(inside []byte) []Buff {
-	if inside == nil {
-		return nil
-	}
-	var out []Buff
-	for _, b := range wire.Subs(inside, fInBuffs) {
-		var bf Buff
-		if v, ok := wire.Varint(b, fBuffID); ok {
-			bf.BuffID = uint32(v)
-		}
-		if v, ok := wire.Varint(b, fBuffStack); ok {
-			bf.Stacks = uint32(v)
-		}
-		if v, ok := wire.Varint(b, fBuffType); ok {
-			bf.Type = uint32(v)
-		}
-		if v, ok := wire.Varint(b, fBuffSkill); ok {
-			bf.Skill = uint32(v)
-		}
-		if bf.BuffID != 0 {
-			out = append(out, bf)
-		}
-	}
-	if len(out) > 0 {
-		return out
-	}
-	for _, b := range wire.Subs(inside, fInRemainBuff) {
-		var bf Buff
-		if v, ok := wire.Varint(b, fRemainID); ok {
-			bf.BuffID = uint32(v)
-		}
-		if v, ok := wire.Varint(b, fRemainStack); ok {
-			bf.Stacks = uint32(v)
-		}
-		if bf.BuffID != 0 {
-			out = append(out, bf)
-		}
-	}
-	return out
 }
 
 // parseStats 解析 attribute_info 的六维。

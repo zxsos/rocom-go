@@ -237,16 +237,6 @@ func (p *Pipeline) shanyaoSide(s shanyao.Side) *server.ShanyaoSide {
 			v := pet.Energy
 			item.Energy = &v
 		}
-		if t := p.db.FeatureNameOfBase(pet.BaseConfID); t != "" {
-			item.Trait = t
-		}
-		for _, b := range pet.Buffs {
-			buf := server.ShanyaoBuff{ID: b.BuffID, Stacks: b.Stacks, Type: b.Type, Skill: b.Skill}
-			if n, ok := p.db.MarkNameOfBuff(b.BuffID); ok {
-				buf.Name = n
-			}
-			item.Buffs = append(item.Buffs, buf)
-		}
 		for _, sk := range pet.Skills {
 			item.Skills = append(item.Skills, p.shanyaoSkill(sk))
 		}

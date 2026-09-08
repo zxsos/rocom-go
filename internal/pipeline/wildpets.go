@@ -417,14 +417,18 @@ func (p *Pipeline) pushWilds(conn, acc string, now time.Time) {
 			m.GlassValue = w.glassValue
 		}
 		if base, ok := p.db.NpcPetBase(uint32(w.cfgID)); ok {
-			// 反查到形态编号后:取形态名、体重百分位与头像(异色个体有专属头像的
-			// 用异色版,无则 PetImageByBase 自动回退普通)。
+			// 形态编号与是否异色:色卡的「在 rkpet 看 3D 效果」外链靠这两项拼 URL
+			// (缺编号没链接、缺 shiny 则 3D 是普通配色)。反查不到形态时不给编号,
+			// 前端按无按钮处理 —— 比给个错号强。
+			m.BaseConfID = base
+			m.Shiny = w.mutation&scene.MutationShiny != 0
 			if info, ok := p.db.PetBase(base); ok {
 				m.Name = info.Name
 				// 体重单位与 PetData 一致(÷1000 千克),百分位口径同宠物列表。
 				m.WeightPct = pet.SizePercentile(float64(w.weight)/1000,
 					float64(info.WeightLow)/1000, float64(info.WeightHigh)/1000)
 			}
+			// 异色个体有专属头像的就用异色版(无则 PetImageByBase 自动回退普通)。
 			m.Img = p.db.PetImageByBase(base, w.mutation&scene.MutationShiny != 0).Head
 		}
 		marks = append(marks, m)
