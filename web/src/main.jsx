@@ -17,8 +17,6 @@ const HandbookGlasses = lazy(() => import('./pages/handbook/HandbookGlasses'))
 const HomeQuery = lazy(() => import('./pages/home/HomeQuery'))
 const Leaderboard = lazy(() => import('./pages/leaderboard/Leaderboard'))
 const Admin = lazy(() => import('./pages/admin/Admin'))
-// 闪耀大赛:隐藏模块,导航不显示,需手动输入 #/shanyao
-const Shanyao = lazy(() => import('./pages/shanyao/Shanyao'))
 // 样式按「基础 → 壳 → 共用面板/部件 → 各页」顺序引入(同名选择器的层叠顺序有意义)。
 import './styles/base.css'
 import './styles/dropdown.css'
@@ -41,7 +39,6 @@ import './styles/handbook.css'
 import './styles/home.css'
 import './styles/leaderboard.css'
 import './styles/admin.css'
-import './styles/shanyao.css'
 import './styles/pin.css'
 import './styles/rules.css'
 
@@ -76,8 +73,6 @@ createRoot(document.getElementById('root')).render(
             <Route path="debug" element={<Debug />} />
             {/* 隐式管理面板:导航不显示,需手动输入 #/admin */}
             <Route path="admin" element={<Admin />} />
-            {/* 闪耀大赛:隐藏模块,导航不显示,需手动输入 #/shanyao */}
-            <Route path="shanyao" element={<Shanyao />} />
           </Route>
         </Routes>
       </Suspense>

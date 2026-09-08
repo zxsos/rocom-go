@@ -127,35 +127,32 @@ func (a *acctResolver) resolve(r *http.Request) string {
 // snapshotStore 存放各账号的「最近一次」实时快照,供页面加载时即时回显,
 // 不必等下一条推送(位置要等下一次移动、野生宠要等下一条 AOI 通知)。
 //
-// 各类数据**互不相干**,原先共用 Server 上一把 posMu(见重构前的 server.go),
+// 四类数据**互不相干**,原先共用 Server 上一把 posMu(见重构前的 server.go),
 // 读代码分不清保护范围、也容易顺手拿错锁;现各自一把锁,读写路径更短。
 type snapshotStore struct {
-	posMu     sync.Mutex
-	wildMu    sync.Mutex
-	homeMu    sync.Mutex
-	flowerMu  sync.Mutex
-	trialMu   sync.Mutex
-	gatherMu  sync.Mutex
-	shanyaoMu sync.Mutex
+	posMu    sync.Mutex
+	wildMu   sync.Mutex
+	homeMu   sync.Mutex
+	flowerMu sync.Mutex
+	trialMu  sync.Mutex
+	gatherMu sync.Mutex
 
-	pos     map[string]*PositionPayload // 账号 -> 最近一次位置
-	wild    map[string]*WildPayload     // 账号 -> 最近一次野生宠物标记
-	home    map[string]*HomePayload     // 账号 -> 最近一次家园小窝图层
-	flower  map[string]*FlowerPayload   // 账号 -> 最近一次花种 BOSS 分组
-	trial   map[string]*TrialPayload    // 账号 -> 最近一次草系试炼状态
-	gather  map[string]*GatherPayload   // 账号 -> 最近一次实时采集物
-	shanyao map[string]*ShanyaoPayload  // 账号 -> 最近一次战局(闪耀大赛,#/shanyao)
+	pos    map[string]*PositionPayload // 账号 -> 最近一次位置
+	wild   map[string]*WildPayload     // 账号 -> 最近一次野生宠物标记
+	home   map[string]*HomePayload     // 账号 -> 最近一次家园小窝图层
+	flower map[string]*FlowerPayload   // 账号 -> 最近一次花种 BOSS 分组
+	trial  map[string]*TrialPayload    // 账号 -> 最近一次草系试炼状态
+	gather map[string]*GatherPayload   // 账号 -> 最近一次实时采集物
 }
 
 func newSnapshotStore() *snapshotStore {
 	return &snapshotStore{
-		pos:     map[string]*PositionPayload{},
-		wild:    map[string]*WildPayload{},
-		home:    map[string]*HomePayload{},
-		flower:  map[string]*FlowerPayload{},
-		trial:   map[string]*TrialPayload{},
-		gather:  map[string]*GatherPayload{},
-		shanyao: map[string]*ShanyaoPayload{},
+		pos:    map[string]*PositionPayload{},
+		wild:   map[string]*WildPayload{},
+		home:   map[string]*HomePayload{},
+		flower: map[string]*FlowerPayload{},
+		trial:  map[string]*TrialPayload{},
+		gather: map[string]*GatherPayload{},
 	}
 }
 
@@ -233,21 +230,6 @@ func (sn *snapshotStore) getTrial(acc string) *TrialPayload {
 	sn.trialMu.Lock()
 	defer sn.trialMu.Unlock()
 	return sn.trial[acc]
-}
-
-func (sn *snapshotStore) setShanyao(acc string, v *ShanyaoPayload) {
-	if acc == "" || v == nil {
-		return
-	}
-	sn.shanyaoMu.Lock()
-	sn.shanyao[acc] = v
-	sn.shanyaoMu.Unlock()
-}
-
-func (sn *snapshotStore) getShanyao(acc string) *ShanyaoPayload {
-	sn.shanyaoMu.Lock()
-	defer sn.shanyaoMu.Unlock()
-	return sn.shanyao[acc]
 }
 
 // injectFlower 在锁内把一个花种插入某账号快照的「当前分组」与「自己世界」槽,
@@ -445,9 +427,6 @@ func (sn *snapshotStore) forget(acc string) {
 	sn.gatherMu.Lock()
 	delete(sn.gather, acc)
 	sn.gatherMu.Unlock()
-	sn.shanyaoMu.Lock()
-	delete(sn.shanyao, acc)
-	sn.shanyaoMu.Unlock()
 }
 
 // smtpSender 发送远行商人订阅邮件。

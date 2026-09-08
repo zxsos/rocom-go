@@ -81,10 +81,6 @@
   URL 从 `sitemap-zh-hans-jini.xml` 取,不硬编码数量;4 并发约 6 分钟,增量续传。
   `gen_features.py` 会把它并进 features.json 的 `petbase_feature`,**新代码一律用
   按 id 建键的那份**,`pet_feature`(按名字)仅为兼容保留)。
-  `uv run python scripts/gen_calcdata.py`(roco-calculator 赛季快照 → data/calc_race.json /
-  calc_skills.json / calc_types.json:**形态种族值 + 技能威力·系别·类别·能耗 + 18 系克制表**,
-  供隐藏模块「闪耀大赛」的伤害估算用;**这是唯一一份非解包的外部数据**,按中文名桥接,
-  且默认回退 S4 前瞻调整,来源与 CC BY-NC-SA 4.0 许可见 docs/calc-data.md)、
   `uv run python scripts/fetch_trial_data.py`(草系试炼静态配置:wiki 的
   Module:GrassTrialData → ~/Downloads/rocom/grassTrialData.lua;页面由 Lua 渲染,
   数据在模块里不在正文)、`uv run python scripts/gen_trial.py`(→ data/trial.json:

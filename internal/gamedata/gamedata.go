@@ -83,9 +83,6 @@ type DB struct {
 	trial *trialDB
 	// 特性词典(独立于 names.json,数据源是 wiki 精灵图鉴页,只有名字没有 id,见 features.go)。
 	features *featuresDB
-	// 伤害估算的静态数据(独立于 names.json,数据源是 roco-calculator 赛季快照,
-	// 见 calc.go)。nil 表示没生成,一律按「缺数据」处理。
-	calc *calcDB
 }
 
 // Load 加载 embed 的名称表。
@@ -348,7 +345,6 @@ func Load() (*DB, error) {
 		skills:         loadSkills(),
 		trial:          loadTrial(),
 		features:       loadFeatures(),
-		calc:           loadCalc(),
 	}, nil
 }
 

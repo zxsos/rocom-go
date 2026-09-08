@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/shanyao"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -82,22 +81,5 @@ func TestBattleOpcodesWired(t *testing.T) {
 	}
 	if scene.OpBattleFinishNotify != 0x132c {
 		t.Errorf("结算 opcode 应为 0x132c,实得 %#x", scene.OpBattleFinishNotify)
-	}
-	// 闪耀大赛(shanyao.go)复用同一批战斗 opcode:数值必须仍指向这两条,
-	// 且回合/演出两条新常量不能与它们撞号(撞号会让一条消息被两个 handler 抢)。
-	if shanyao.OpBattleEnterNotify != scene.OpBattleEnterNotify {
-		t.Errorf("shanyao 的进战 opcode 应复用 scene 的 0x1316,实得 %#x", shanyao.OpBattleEnterNotify)
-	}
-	if shanyao.OpBattleFinishNotify != scene.OpBattleFinishNotify {
-		t.Errorf("shanyao 的结算 opcode 应复用 scene 的 0x132c,实得 %#x", shanyao.OpBattleFinishNotify)
-	}
-	for _, tc := range []struct {
-		op   uint16
-		name string
-	}{{shanyao.OpBattleRoundStartNotify, "回合开始"}, {shanyao.OpBattlePerformStartNotify, "演出"}} {
-		switch tc.op {
-		case 0x1316, 0x132c:
-			t.Errorf("%s 的 opcode %#x 与进战/结算撞号", tc.name, tc.op)
-		}
 	}
 }

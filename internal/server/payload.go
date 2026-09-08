@@ -110,24 +110,10 @@ type WildPayload struct {
 
 // WildMark 是一只稀有野生宠的标记。
 type WildMark struct {
-	ID   string `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
-	Name string `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
-	Img  string `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	// 形态编号(petbase id),用于「在 rkpet 看 3D 效果」的外链 —— 大地图与宠物列表
-	// 的色卡弹出预览里那条按钮靠它拼 URL,没有它按钮就不显示。
-	//
-	// ⚠️ 不要从 Img 的 HeadIcon/<n>.webp 反推这个号 —— 那只是图片**文件名**,与形态
-	// 编号之间没有换算关系(多个形态常共用同一张素材):实测 names.json 的 images 里
-	// 1112 个形态中 461 个的 h 与形态编号不同(如 3242 的图是 3012),220 个有异色头像
-	// 的里 75 个 sh 不以形态编号开头。反推会静默地把外链指向别的宠物,页面却一切正常。
-	BaseConfID uint32 `json:"baseConfId,omitempty"`
-	// 是否异色。rkpet 外链靠它加 shiny=1,否则 3D 模型是普通配色 —— 而异色炫彩恰恰
-	// 是炫彩里最常见的情况,缺了它链接就指向错配色。与 PetData.Shiny 同一口径。
-	//
-	// ⚠️ 与那边一样:前端**不可**拿 Img 反推异色(多个形态共用素材,普通图与异色图
-	// 文件名没有可靠对应关系,见 BaseConfID 的注释),只看这个字段。
-	Shiny  bool     `json:"shiny,omitempty"`
-	Kinds  []string `json:"kinds"` // 命中的类别:colorful / shiny / pollution / big / small / high / low
+	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
+	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
+	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
+	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / big / small / high / low
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`
@@ -618,112 +604,4 @@ type TrialLogBook struct {
 	Discovered uint32 `json:"discovered"`
 	Total      uint32 `json:"total"`
 	Unlocked   bool   `json:"unlocked"`
-}
-
-// ShanyaoPayload 是「闪耀大赛」(隐藏模块 #/shanyao)的战局快照。
-//
-// 与 trial / wildpets / flowers 同一路数:管线把状态推给 server 缓存,页面加载时
-// 经 GET /api/shanyao 即时回显,之后由 SSE 的 shanyao 消息实时覆盖。
-//
-// 数据全部来自抓包实时解析(0x1316 进战 / 0x131a 回合 / 0x1324 演出 / 0x132c 结算),
-// 不读库也不读内存 —— 它描述的是「此刻正在打的这一局」,不是历史。
-type ShanyaoPayload struct {
-	Account  string       `json:"account"`
-	Ts       int64        `json:"ts"`     // 本份快照的 Unix 秒
-	Active   bool         `json:"active"` // 是否有一局正在进行(进战后、结算前)
-	Finished bool         `json:"finished"`
-	BattleID uint64       `json:"battleId"`
-	Mode     uint32       `json:"mode"`  // battle_mode(15=PVP 资格赛,枚举含义随版本增,仅原样透传)
-	Round    uint32       `json:"round"` // 当前回合数
-	Result   uint32       `json:"result,omitempty"`
-	Self     *ShanyaoSide `json:"self,omitempty"`
-	Foe      *ShanyaoSide `json:"foe,omitempty"`
-}
-
-// ShanyaoSide 是战局中的一方(左下我方 / 右上他方)。
-type ShanyaoSide struct {
-	UIN   uint64       `json:"uin"`
-	Name  string       `json:"name"`
-	Level uint32       `json:"level"`
-	HP    *int32       `json:"hp,omitempty"`    // 剩余体力(角色血,不是宠物血)
-	HPMax *int32       `json:"hpMax,omitempty"` // 体力上限
-	Pets  []ShanyaoPet `json:"pets"`
-}
-
-// ShanyaoPet 是战局中的一只精灵。
-//
-// HP / HPMax 用**指针**:服务端只在血量发生变化时才下发,0 血(倒下)与「没给」
-// 必须区分得开,值类型 + omitempty 会把 0 抹掉(AGENTS.md 里 u/v 那条约定)。
-// 未拿到时前端显示「—」,不要当成 0。
-type ShanyaoPet struct {
-	GID        uint32   `json:"gid"`
-	PetID      uint32   `json:"petId"`      // 战斗内编号(我方 401..406,对手小编号)
-	BaseConfID uint32   `json:"baseConfId"` // petbase_id(形态)
-	Name       string   `json:"name"`
-	Species    string   `json:"species,omitempty"` // 形态全名(查不到时为空)
-	Level      uint32   `json:"level"`
-	Gender     uint32   `json:"gender"` // 1=♂ 2=♀
-	Nature     uint32   `json:"nature"` // 性格 id
-	NatureName string   `json:"natureName,omitempty"`
-	Blood      uint32   `json:"blood,omitempty"` // 血脉 id
-	BloodName  string   `json:"bloodName,omitempty"`
-	DamTypes   []int32  `json:"damTypes,omitempty"` // 属性系 id(可能双系)
-	DamNames   []string `json:"damNames,omitempty"`
-	Img        string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp;空=无图
-	Shiny      bool     `json:"shiny"`         // 炫彩(判据 mutation_type & 8)
-	GlassType  uint32   `json:"glassType,omitempty"`
-	GlassValue uint32   `json:"glassValue,omitempty"`
-	GlassName  string   `json:"glassName,omitempty"` // 隐藏炫彩名 / 普通炫彩的粒子+配色
-	HP         *int32   `json:"hp,omitempty"`        // 当前血量(缺省=服务端未下发)
-	HPMax      *int32   `json:"hpMax,omitempty"`     // 血量上限
-	Dead       bool     `json:"dead"`
-	OnField    bool     `json:"onField"` // 是否当前在场
-	// Stats 是协议下发的六维(attribute_info)。**只有我方有**:对手六维服务端不下发,
-	// 故缺省;那种情况只能拿 RaceStats(静态种族值)推算,Estimated 置 true。
-	Stats     *ShanyaoStats `json:"stats,omitempty"`
-	RaceStats []uint32      `json:"raceStats,omitempty"` // 静态种族值,顺序见 ShanyaoStats
-	Estimated bool          `json:"estimated"`           // 六维是否为推算值(非协议值)
-	// Energy 是当前能量(0..10 量级)。**0 是合法值**(能量耗尽),故用指针:
-	// 键缺席表示服务端没下发,与 0 不是一回事(与 hp 那条约定同理)。
-	// 目前只被动态威力规则 mana_burst(魔能爆,威力随能量变)用到。
-	Energy *uint32 `json:"energy,omitempty"`
-	// NatureMult 是该宠物性格的六维系数(同序):+1.2 / −0.9 / 1(roco 口径,**不是** 1.1/0.9)。
-	// 单独下发而非让前端查表:系数与性格 id 的对应关系属于规则,与克制表同理,
-	// 由后端一处维护;未知性格时缺省(前端按无修正处理)。
-	NatureMult []float64      `json:"natureMult,omitempty"`
-	Skills     []ShanyaoSkill `json:"skills,omitempty"`
-}
-
-// ShanyaoStats 是六维明细。**数组顺序固定**:
-//
-//	hp, physicalAttack, magicalAttack, physicalDefense, magicalDefense, speed
-//
-// 与 roco-calculator 的 STAT_KEYS 一致(前端 calc.js 里有同一份常量)。做成数组而非
-// 对象是为了省掉重复的键名:六组 × 四项,光键名就比数值长。
-// 面板值 = round(baseValue × 性格系数) + effortAdd(见 web/src/pages/shanyao/calc.js)。
-type ShanyaoStats struct {
-	Race      []uint32 `json:"race,omitempty"`
-	Talent    []uint32 `json:"talent,omitempty"`
-	BaseValue []uint32 `json:"baseValue,omitempty"`
-	EffortAdd []uint32 `json:"effortAdd,omitempty"`
-}
-
-// ShanyaoSkill 是技能槽里的一项。
-//
-// Power 是**采用值**:对局内实时威力(0x1324 的 damage_param_result,含融合与被动修正)
-// 优先,其次静态表的基准威力;Source 说明来自哪一侧,便于前端标注可信度。
-// 变化/防御类技能没有威力,Power 缺席(不是 0)。
-type ShanyaoSkill struct {
-	ID       uint32  `json:"id"`
-	Name     string  `json:"name,omitempty"`
-	Type     string  `json:"type,omitempty"`     // 系别(静态表)
-	Category string  `json:"category,omitempty"` // physical 物攻 / magical 魔攻 / status 变化 / defense 防御
-	Cost     *uint32 `json:"cost,omitempty"`
-	Power    *int32  `json:"power,omitempty"`
-	Hits     uint32  `json:"hits,omitempty"`   // 连击段数(0 视为 1)
-	Source   string  `json:"source,omitempty"` // battle 对局内 / static 静态表 /(空) 未收录
-	// RuleID 是动态威力规则(快照里只有 3 个技能带):mana_burst 魔能爆(按当前能量查表)、
-	// speed_difference 闪击、physical_defense_difference 鸣沙陷阱(后两者按差值查同一张表)。
-	// 有 ruleId 的技能,其 basePower 不可直接用,必须按规则重算;缺输入时按「缺数据」处理。
-	RuleID *string `json:"ruleId,omitempty"`
 }
