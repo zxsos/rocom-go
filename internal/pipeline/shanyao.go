@@ -120,11 +120,7 @@ func (p *Pipeline) shanyaoSkill(sk shanyao.Skill) server.ShanyaoSkill {
 	out := server.ShanyaoSkill{ID: sk.ID, Name: p.db.SkillName(sk.ID), Hits: sk.Hits}
 	static, hasStatic := p.db.CalcSkillOf(sk.ID)
 	if hasStatic {
-		// ⚠️ 系别在 DamType,**不是** Type —— CalcSkill.Type 是「主动/被动」。
-		// 前端把 ShanyaoSkill.Type 当系别用(本系加成 1.25 与克制倍率都靠它),
-		// 填成「主动」时 indexOf 查不到,会静默退化成「无克制、无本系加成」,
-		// 页面上看不出来 —— 故此处取值必须与 payload 注释的语义一致。
-		out.Type, out.Category = static.DamType, static.Category
+		out.Type, out.Category = static.Type, static.Category
 	}
 	switch {
 	case sk.HasPower:

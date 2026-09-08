@@ -2105,24 +2105,14 @@ HTML,**不走 api.php** —— api.php 的 GET 连续调用会被 CDN 限流返�
 GET 限流影响),正则提取 `|特性=` 与 `|特性描述=`。输出 `~/Downloads/rocom/
 features_raw.jsonl`(增量续传)。
 
-`data/features.json` 三块(**均已改用官方客户端解包**,见下):
+`data/features.json` 三块(第三块来自 roco.world,见下):
 ```
-features:        [[特性名, 描述, [出现该特性的形态...]], ...]  词典(278 个,均带描述)
-pet_feature:     {精灵页名: 特性名}        wiki,**按名字建键**,兼容保留(官方无"页名"概念)
-petbase_feature: {petbase_id: 特性名}      官方解包,**按 id 建键,新代码首选**(954 条)
+features:        [[特性名, 描述, [出现该特性的精灵...]], ...]   词典(234 个,均带描述)
+pet_feature:     {精灵页名: 特性名}        wiki,**按名字建键**,兼容保留
+petbase_feature: {petbase_id: 特性名}      roco.world,**按 id 建键,新代码首选**
 ```
 
-官方口径:特性就是 `SKILL_CONF` 里的**被动技能**(type=2),宠物侧由
-`PETBASE_CONF.pet_feature` 指向它 —— 按 id 直取,不需要名字匹配,也不会抄串。
-
-##### roco.world(`scripts/fetch_rocoworld.py`)—— 按 petbase_id 索引,**已停用(仅存档)**
-
-> ⚠️ 2026-09-09 起特性表改用官方解包数据(见上)。停用理由:官方 954 条**完全覆盖**
-> roco.world 的 594 条(实测 roco 独有 0 条),且两者冲突的 2 条(3740/3741)以官方为准
-> —— 官方给「宝藏沙狐」并带技能描述「在场时识破敌方的伪装」,roco 给「博物」。
-> 抓取脚本保留仅用于对拍,已无生成脚本依赖它。
-
-##### roco.world 的历史记录(停用前的实测)
+##### roco.world(`scripts/fetch_rocoworld.py`)—— 按 petbase_id 索引,首选
 
 `https://roco.world/zh/jini/<图鉴号>` 的图鉴页内嵌一份 SSR 的
 `<script type="application/json">`,里面有:

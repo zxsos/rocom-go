@@ -22,10 +22,6 @@ type CalcRulesPayload struct {
 	Types    []string       `json:"types"`    // 18 个系别名
 	Matrix   [][]float64    `json:"matrix"`   // matrix[攻][守] = 单系倍率
 	Clamp    CalcRulesClamp `json:"clamp"`    // 双系相乘后的钳制
-	// Floor:单次伤害下限(官方客户端 `ATTR_GLOBAL_CONFIG`)。nil = 官方数据缺失,
-	// 前端按「无下限」处理 —— 没有依据时不兜底默认值。
-	// ⚠️ 它作用在「每段」还是「总伤害」尚未用真实对局验证,前端当前按每段兜底。
-	Floor *int `json:"floor,omitempty"`
 	// 印记与特性的规则:两者都是「名字 → 效果」(我们与 roco 之间只有名字是共用的),
 	// 与克制表同属规则常量,故放同一份里一次取回。
 	Marks  []gamedata.CalcMark  `json:"marks"`  // 印记定义与效果
@@ -56,7 +52,6 @@ func (s *Server) handleCalcRules(w http.ResponseWriter, r *http.Request) {
 		Types:    tc.Types,
 		Matrix:   tc.Matrix,
 		Clamp:    CalcRulesClamp{Max: tc.Clamp.Max, Min: tc.Clamp.Min},
-		Floor:    tc.Floor,
 		Marks:    s.db.CalcMarks(),
 		Traits:   s.db.CalcTraits(),
 		Weather:  s.db.CalcWeatherAll(),

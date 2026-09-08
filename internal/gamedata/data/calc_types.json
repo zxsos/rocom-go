@@ -12,7 +12,7 @@
   "bridgedBy": "中文名（形态 fullName ↔ names.json.petbase[].n；技能 name ↔ skills.json.names）",
   "note": "roco 的 spirit_/skill_ 是自有哈希 id，与游戏内 petbase_id/skill_id 不是一套，只能按名桥接"
  },
- "_note": "属性克制: 单系 ×2 / ×0.5, 双系相乘后钳制(raw>=4 记 3, raw<=0.25 记 0.25), 与 roco-calculator 的 type-chart.js 一致。来源: 官方客户端 TYPE_DICTIONARY(按 id 直取)。 与 roco 快照逐格对拍: 完全一致。 伤害下限 floor=2(官方 ATTR_GLOBAL_CONFIG 的 phy/spe_dam_floor)。",
+ "_note": "属性克制: 单系 ×2 / ×0.5, 双系相乘后钳制(raw>=4 记 3, raw<=0.25 记 0.25), 与 roco-calculator 的 type-chart.js 一致。",
  "types": [
   "普通",
   "草",
@@ -398,6 +398,5 @@
  "clamp": {
   "max": 3,
   "min": 0.25
- },
- "floor": 2
+ }
 }
