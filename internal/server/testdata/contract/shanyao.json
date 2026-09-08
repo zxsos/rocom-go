@@ -38,18 +38,6 @@
         "baseConfId": 3141,
         "blood": 3,
         "bloodName": "火",
-        "buffs": [
-          {
-            "id": 20010090,
-            "name": "减速",
-            "stacks": 2
-          },
-          {
-            "id": 20010826,
-            "stacks": 1,
-            "type": 3
-          }
-        ],
         "damNames": [
           "虫",
           "草"
@@ -153,8 +141,7 @@
             60,
             0
           ]
-        },
-        "trait": "专注力"
+        }
       },
       {
         "baseConfId": 3179,

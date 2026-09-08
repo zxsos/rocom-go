@@ -29,15 +29,6 @@ var calcSkillsJSON []byte
 //go:embed data/calc_types.json
 var calcTypesJSON []byte
 
-//go:embed data/calc_marks.json
-var calcMarksJSON []byte
-
-//go:embed data/calc_traits.json
-var calcTraitsJSON []byte
-
-//go:embed data/calc_mark_ids.json
-var calcMarkIDsJSON []byte
-
 // 六维键顺序与 roco-calculator 一致,便于前端直接按序取用。
 var calcStatKeys = []string{"hp", "physicalAttack", "magicalAttack", "physicalDefense", "magicalDefense", "speed"}
 
@@ -59,16 +50,10 @@ type CalcSkill struct {
 	Name      string  `json:"name"`
 	Type      string  `json:"type"`
 	Category  string  `json:"category"`
-	DamType   string  `json:"damType"`
 	Cost      *int    `json:"cost"`
 	BasePower *int    `json:"basePower"`
 	RuleID    *string `json:"ruleId"`
 	RocoID    string  `json:"rocoId"`
-	// Source: official-client(官方表按 id 直取) / roco-snapshot(按名桥接兜底)。
-	Source string `json:"source"`
-	// DynamicPower=true 表示威力随条件变化(官方表 dam_para 多段取值,如魔能爆按能量),
-	// **不能**拿单一威力当数;见 scripts/gen_calcdata.py。
-	DynamicPower bool `json:"dynamicPower"`
 }
 
 // CalcTypeChart 是 18 系克制关系。
@@ -84,55 +69,10 @@ type CalcTypeChart struct {
 	} `json:"clamp"`
 }
 
-// CalcMark 是一个印记的定义与效果。
-//
-// AffectsThisHit=false 表示「结算时机不在本次技能」(回合末/入场/特殊伤害类型),
-// **不参与主公式** —— 这是 roco 的口径,别把「中毒」这类算进本次伤害。
-type CalcMark struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Polarity       string   `json:"polarity"`
-	Summary        string   `json:"summary"`
-	Affects        string   `json:"affects"`
-	Per            int      `json:"per"`
-	Unit           string   `json:"unit"`
-	Needs          []string `json:"needs"`
-	AffectsThisHit bool     `json:"affectsThisHit"`
-	Note           string   `json:"note"`
-}
-
-// CalcTrait 是一个特性的规则(roco 的 TRAIT_NAME_TO_RULE)。
-type CalcTrait struct {
-	Name        string         `json:"name"`
-	Rule        string         `json:"rule"`
-	Side        string         `json:"side"`
-	Effect      string         `json:"effect"`
-	Params      map[string]any `json:"params"`
-	Needs       []string       `json:"needs"`
-	Note        string         `json:"note"`
-	Implemented bool           `json:"implemented"`
-	// BuffIds:战斗里该特性挂的 buff(官方 BUFF_CONF type=3),用于**从宠物 buff 自动识别特性**。
-	// 同名特性可能有多个 buff 变体(不同数值档)。
-	BuffIds  []uint32 `json:"buffIds"`
-	Desc     string   `json:"desc"`
-	TalentID string   `json:"talentId"`
-	Source   string   `json:"source"`
-}
-
-// CalcWeather 是一种天气及其在战斗里挂的 buff。
-type CalcWeather struct {
-	Name  string   `json:"name"`
-	Buffs []uint32 `json:"buffs"`
-}
-
 type calcDB struct {
-	race    map[uint32]CalcRace
-	skills  map[uint32]CalcSkill
-	types   *CalcTypeChart
-	marks   []CalcMark
-	traits  []CalcTrait
-	buffIDs map[uint32]string
-	weather map[uint32]CalcWeather
+	race   map[uint32]CalcRace
+	skills map[uint32]CalcSkill
+	types  *CalcTypeChart
 }
 
 // loadCalc 解析三份表;任何一份缺失都返回 nil,调用方一律按「缺数据」处理 ——
@@ -165,45 +105,7 @@ func loadCalc() *calcDB {
 	if json.Unmarshal(calcTypesJSON, &tc) == nil && len(tc.Types) > 0 {
 		db.types = &tc
 	}
-	var marks struct {
-		Marks []CalcMark `json:"marks"`
-	}
-	if json.Unmarshal(calcMarksJSON, &marks) == nil {
-		db.marks = marks.Marks
-	}
-	var traits struct {
-		Traits []CalcTrait `json:"traits"`
-	}
-	if json.Unmarshal(calcTraitsJSON, &traits) == nil {
-		db.traits = traits.Traits
-	}
-	// calc_mark_ids.json 的每条是 {name, source, confidence, evidence} —— 带来源与可信度,
-	// 便于人工复核(对拍推断来的只是候选,不是事实)。
-	var w struct {
-		Weather map[string]CalcWeather `json:"weather"`
-	}
-	if json.Unmarshal(calcMarkIDsJSON, &w) == nil && len(w.Weather) > 0 {
-		db.weather = make(map[uint32]CalcWeather, len(w.Weather))
-		for k, v := range w.Weather {
-			if id, err := strconv.ParseUint(k, 10, 32); err == nil {
-				db.weather[uint32(id)] = v
-			}
-		}
-	}
-	var ids struct {
-		Buffs map[string]struct {
-			Name string `json:"name"`
-		} `json:"buffs"`
-	}
-	if json.Unmarshal(calcMarkIDsJSON, &ids) == nil && len(ids.Buffs) > 0 {
-		db.buffIDs = make(map[uint32]string, len(ids.Buffs))
-		for k, v := range ids.Buffs {
-			if id, err := strconv.ParseUint(k, 10, 32); err == nil && v.Name != "" {
-				db.buffIDs[uint32(id)] = v.Name
-			}
-		}
-	}
-	if db.race == nil && db.skills == nil && db.types == nil && len(db.marks) == 0 && len(db.traits) == 0 {
+	if db.race == nil && db.skills == nil && db.types == nil {
 		return nil
 	}
 	return db
@@ -241,107 +143,6 @@ func (db *DB) CalcTypeChart() *CalcTypeChart {
 		return nil
 	}
 	return db.calc.types
-}
-
-// CalcMarks 返回全部印记定义;没数据返回 nil。
-func (db *DB) CalcMarks() []CalcMark {
-	if db.calc == nil {
-		return nil
-	}
-	return db.calc.marks
-}
-
-// CalcMarkByName 按**中文名**查印记(我们与 roco 之间只有名字是共用的)。
-func (db *DB) CalcMarkByName(name string) (*CalcMark, bool) {
-	if db.calc == nil {
-		return nil, false
-	}
-	for i := range db.calc.marks {
-		if db.calc.marks[i].Name == name {
-			return &db.calc.marks[i], true
-		}
-	}
-	return nil, false
-}
-
-// CalcTraits 返回特性规则;没数据返回 nil。
-func (db *DB) CalcTraits() []CalcTrait {
-	if db.calc == nil {
-		return nil
-	}
-	return db.calc.traits
-}
-
-// CalcTraitByName 按中文名查特性规则(形态→特性名来自 features.json 的 petbase_feature)。
-func (db *DB) CalcTraitByName(name string) (*CalcTrait, bool) {
-	if db.calc == nil {
-		return nil, false
-	}
-	for i := range db.calc.traits {
-		if db.calc.traits[i].Name == name {
-			return &db.calc.traits[i], true
-		}
-	}
-	return nil, false
-}
-
-// MarkNameOfBuff 把协议的 buff_id 翻成印记名;未收录返回 false。
-//
-// 调用方拿到 false 时应显示原始 id,**不要**拿相近名字顶替 —— 这张表本来就稀有,
-// 猜错的代价比「显示 buff #20010090」大得多。
-func (db *DB) MarkNameOfBuff(buffID uint32) (string, bool) {
-	if db.calc == nil {
-		return "", false
-	}
-	v, ok := db.calc.buffIDs[buffID]
-	return v, ok
-}
-
-// WeatherOf 返回某 weather_type 的天气名与其 buff;未收录返回 false。
-func (db *DB) WeatherOf(weatherType uint32) (CalcWeather, bool) {
-	if db.calc == nil {
-		return CalcWeather{}, false
-	}
-	v, ok := db.calc.weather[weatherType]
-	return v, ok
-}
-
-// WeatherFromBuff 反查:某个 buff_id 代表哪种天气(暴风雪的 buff 20170910/20171230 → 暴风雪。
-func (db *DB) WeatherFromBuff(buffID uint32) (uint32, CalcWeather, bool) {
-	if db.calc == nil {
-		return 0, CalcWeather{}, false
-	}
-	for t, w := range db.calc.weather {
-		for _, b := range w.Buffs {
-			if b == buffID {
-				return t, w, true
-			}
-		}
-	}
-	return 0, CalcWeather{}, false
-}
-
-// TraitByBuff 按 buff_id 反查特性;用于「宠物身上有哪个 buff 就带哪个特性」。
-func (db *DB) TraitByBuff(buffID uint32) (*CalcTrait, bool) {
-	if db.calc == nil {
-		return nil, false
-	}
-	for i := range db.calc.traits {
-		for _, b := range db.calc.traits[i].BuffIds {
-			if b == buffID {
-				return &db.calc.traits[i], true
-			}
-		}
-	}
-	return nil, false
-}
-
-// CalcWeatherAll 返回全部天气(weather_type → 天气);没数据返回 nil。
-func (db *DB) CalcWeatherAll() map[uint32]CalcWeather {
-	if db.calc == nil {
-		return nil
-	}
-	return db.calc.weather
 }
 
 // CalcStatKeys 返回六维键的固定顺序(与 roco 一致),供前端按序取用。

@@ -18,17 +18,11 @@ import (
 
 // CalcRulesPayload 是伤害估算的规则常量。
 type CalcRulesPayload struct {
-	StatKeys []string       `json:"statKeys"` // 六维键的固定顺序(race/… 数组按它展开)
-	Types    []string       `json:"types"`    // 18 个系别名
-	Matrix   [][]float64    `json:"matrix"`   // matrix[攻][守] = 单系倍率
-	Clamp    CalcRulesClamp `json:"clamp"`    // 双系相乘后的钳制
-	// 印记与特性的规则:两者都是「名字 → 效果」(我们与 roco 之间只有名字是共用的),
-	// 与克制表同属规则常量,故放同一份里一次取回。
-	Marks  []gamedata.CalcMark  `json:"marks"`  // 印记定义与效果
-	Traits []gamedata.CalcTrait `json:"traits"` // 特性规则(roco 的 TRAIT_NAME_TO_RULE + 官方表)
-	// Weather:weather_type → 天气名 + 该天气挂的 buff —— 有了它才能从场上 buff 反推当前天气。
-	Weather map[uint32]gamedata.CalcWeather `json:"weather,omitempty"`
-	Source  string                          `json:"source,omitempty"` // 数据来源说明(快照 id + 许可)
+	StatKeys []string       `json:"statKeys"`         // 六维键的固定顺序(race/… 数组按它展开)
+	Types    []string       `json:"types"`            // 18 个系别名
+	Matrix   [][]float64    `json:"matrix"`           // matrix[攻][守] = 单系倍率
+	Clamp    CalcRulesClamp `json:"clamp"`            // 双系相乘后的钳制
+	Source   string         `json:"source,omitempty"` // 数据来源说明(快照 id + 许可)
 }
 
 // CalcRulesClamp 是克制倍率的钳制规则(roco: raw>=4 记 3,raw<=0.25 记 0.25)。
@@ -52,9 +46,6 @@ func (s *Server) handleCalcRules(w http.ResponseWriter, r *http.Request) {
 		Types:    tc.Types,
 		Matrix:   tc.Matrix,
 		Clamp:    CalcRulesClamp{Max: tc.Clamp.Max, Min: tc.Clamp.Min},
-		Marks:    s.db.CalcMarks(),
-		Traits:   s.db.CalcTraits(),
-		Weather:  s.db.CalcWeatherAll(),
 		Source:   source,
 	})
 }

@@ -11,7 +11,6 @@ import {
   normalizeIv, defaultEffortAdd, ROUNDING, NATURE_MULT, DEFAULT_DISPLAY_IV,
   abilityLevelMultiplier, abilityAdjustedStat, clampAbilityStage,
   resolveDynamicPower, differencePower, MANA_BURST_POWER, calculateDamage, estimate,
-  resolveMarkEffects, resolveTraitEffects,
 } from '../src/pages/shanyao/calc.js'
 
 let failed = 0
@@ -186,73 +185,8 @@ const manaMissing = estimate({
 eq('魔能爆缺能量 → 算不出', manaMissing.ok, false)
 eq('缺的是「当前能量」', (manaMissing.missing || []).join(), '当前能量')
 
-console.log('— 印记(按名字匹配规则表,层数来自协议 buff)—')
-// 规则表取自 roco 的 marks.js(名字 + summary),系数由 scripts/gen_calcrules.py 登记。
-const MARK_RULES = [
-  { name: '蓄势', affects: 'power', per: 30, unit: 'percent', needs: [], affectsThisHit: true },
-  { name: '风起', affects: 'power', per: 20, unit: 'percent', needs: ['先手'], affectsThisHit: true },
-  { name: '攻击', affects: 'power', per: 10, unit: 'percent', needs: [], affectsThisHit: true },
-  { name: '蓄电', affects: 'flatPower', per: 10, unit: 'flat', needs: ['迸发'], affectsThisHit: true },
-  { name: '减速', affects: 'speed', per: -10, unit: 'flat', needs: [], affectsThisHit: true },
-  { name: '中毒', affects: 'none', per: 0, unit: 'flat', needs: [], affectsThisHit: false },
-]
-// 注意:中毒特意给了映射,以便验证「不影响本次伤害」的印记**被排除而不是被当成 +0 加成**
-const MARK_IDS = { 20010090: '减速', 20010826: '蓄势', 20350310: '中毒' }
-const mk = (buffs, context = {}) => resolveMarkEffects({ buffs, rules: MARK_RULES, markIds: MARK_IDS, context })
-
-eq('未识别的 buff → 跳过(不猜名字)', mk([{ id: 999, stacks: 3 }]).applied.length, 0)
-eq('未识别的 buff 记进 skipped', mk([{ id: 999, stacks: 3 }]).skipped[0].why, '未识别的 buff')
-// 中毒:结算在回合末,不能算进本次伤害
-eq('不影响本次伤害的印记被排除', mk([{ id: 20350310, stacks: 2 }]).applied.length, 0)
-eq('排除原因是「不影响本次伤害」', mk([{ id: 20350310, stacks: 2 }]).skipped[0].why, '不影响本次伤害')
-eq('蓄势 3 层 = +90%', mk([{ id: 20010826, stacks: 3 }]).powerPercent, 90)
-eq('减速 2 层 = 速度 −20', mk([{ id: 20010090, stacks: 2 }]).speedDelta, -20)
-// 风起需要「先手」:不给 context 时不能无条件加成
-eq('风起缺先手条件 → 不生效', mk([{ id: 1, stacks: 2, name: '风起' }]).powerPercent, 0)
-function mkNamed(name, stacks, context) {
-  return resolveMarkEffects({
-    buffs: [{ id: 1, stacks }],
-    rules: [{ name, affects: 'power', per: 20, unit: 'percent', needs: ['先手'], affectsThisHit: true }],
-    markIds: { 1: name },
-    context,
-  })
-}
-eq('风起 + 先手 → +40%(2 层)', mkNamed('风起', 2, { faster: true }).powerPercent, 40)
-eq('风起 + 不先手 → 0', mkNamed('风起', 2, { faster: false }).powerPercent, 0)
-
-console.log('— 特性(roco 的 7 条命名规则,按名字匹配)—')
-const TRAIT_RULES = [
-  { name: '专注力', rule: 'physical_power_first_turn', side: 'attacker', effect: 'powerMultiplier', params: { multiplier: 2 }, needs: ['首回合'], implemented: true },
-  { name: '偏振', rule: 'reduce_matching_skill_type', side: 'defender', effect: 'damageReduction', params: { multiplier: 0.75 }, needs: [], implemented: true },
-  { name: '破空', rule: 'power_if_acted_before_enemy', side: 'attacker', effect: 'powerMultiplier', params: { multiplier: 1.3 }, needs: ['本回合已先于对手行动'], implemented: true },
-]
-const tr = (name, side, context = {}) => resolveTraitEffects({ traitName: name, rules: TRAIT_RULES, side, context })
-eq('首回合专注力 ×2', tr('专注力', 'attacker', { firstTurn: true }).powerMultiplier, 2)
-eq('非首回合专注力 ×1', tr('专注力', 'attacker', { firstTurn: false }).powerMultiplier, 1)
-eq('首回合信息缺失 → 假定未触发', tr('专注力', 'attacker', {}).note, '假定未触发：首回合')
-eq('未知特性 → ×1 且不报错', tr('不存在的特性', 'attacker', {}).powerMultiplier, 1)
-eq('守方偏振减伤 0.75', tr('偏振', 'defender', {}).damageReduction, 0.75)
-// side 不对时不能生效(攻方特性不能当守方用)
-eq('side 不匹配 → ×1', tr('专注力', 'defender', { firstTurn: true }).powerMultiplier, 1)
-eq('未实现的规则 → ×1', resolveTraitEffects({
-  traitName: '未知规则', side: 'attacker',
-  rules: [{ name: '未知规则', side: 'attacker', effect: 'powerMultiplier', params: { multiplier: 9 }, needs: [], implemented: false }],
-}).powerMultiplier, 1)
-
-// 端到端:守方带「偏振」(减伤 0.75)时,伤害必须比无特性时低
-const rulesWithTraits = { ...rulesFull, traits: TRAIT_RULES, marks: MARK_RULES }
-const base = estimate({ attacker: atkPet, defender: defPet, skill: atkPet.skills[0], rules: rulesWithTraits, conditions: { level: 60 } })
-const withTrait = estimate({
-  attacker: atkPet, defender: { ...defPet, trait: '偏振' },
-  skill: atkPet.skills[0], rules: rulesWithTraits, conditions: { level: 60 },
-})
-eq('守方偏振使伤害下降', withTrait.damage < base.damage, true)
-eq('下降幅度符合 0.75 减伤', withTrait.damage, Math.floor(Math.floor(base.damage / (base.ctx.finalOneHit ?? 1)) * 1) === 0 ? withTrait.damage : withTrait.damage)
-// 直接核对:偏振的减伤确实进了 reduction 乘区
-eq('守方特性进入 reduction', withTrait.ctx.traits.defender.damageReduction, 0.75)
-
 if (failed) {
   console.error(`\n✗ 对拍失败 ${failed} 项`)
   process.exit(1)
 }
-console.log('\n✓ 数据管道 + 公式 + 印记/特性对拍通过(口径与 roco-calculator 一致)')
+console.log('\n✓ 数据管道 + 公式对拍通过(口径与 roco-calculator 一致)')

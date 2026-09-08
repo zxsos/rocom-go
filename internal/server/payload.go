@@ -110,10 +110,24 @@ type WildPayload struct {
 
 // WildMark 是一只稀有野生宠的标记。
 type WildMark struct {
-	ID     string   `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
-	Name   string   `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
-	Img    string   `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
-	Kinds  []string `json:"kinds"`         // 命中的类别:colorful / shiny / pollution / big / small / high / low
+	ID   string `json:"id"`            // actor_id;uint64 超出 JS 安全整数,用字符串
+	Name string `json:"n"`             // 形态名(珀尔鼬…);表里查不到时为空
+	Img  string `json:"img,omitempty"` // 头像相对路径 HeadIcon/<n>.webp
+	// 形态编号(petbase id),用于「在 rkpet 看 3D 效果」的外链 —— 大地图与宠物列表
+	// 的色卡弹出预览里那条按钮靠它拼 URL,没有它按钮就不显示。
+	//
+	// ⚠️ 不要从 Img 的 HeadIcon/<n>.webp 反推这个号 —— 那只是图片**文件名**,与形态
+	// 编号之间没有换算关系(多个形态常共用同一张素材):实测 names.json 的 images 里
+	// 1112 个形态中 461 个的 h 与形态编号不同(如 3242 的图是 3012),220 个有异色头像
+	// 的里 75 个 sh 不以形态编号开头。反推会静默地把外链指向别的宠物,页面却一切正常。
+	BaseConfID uint32 `json:"baseConfId,omitempty"`
+	// 是否异色。rkpet 外链靠它加 shiny=1,否则 3D 模型是普通配色 —— 而异色炫彩恰恰
+	// 是炫彩里最常见的情况,缺了它链接就指向错配色。与 PetData.Shiny 同一口径。
+	//
+	// ⚠️ 与那边一样:前端**不可**拿 Img 反推异色(多个形态共用素材,普通图与异色图
+	// 文件名没有可靠对应关系,见 BaseConfID 的注释),只看这个字段。
+	Shiny  bool     `json:"shiny,omitempty"`
+	Kinds  []string `json:"kinds"` // 命中的类别:colorful / shiny / pollution / big / small / high / low
 	U      float64  `json:"u"`
 	V      float64  `json:"v"`
 	X      int32    `json:"x"`
@@ -673,15 +687,6 @@ type ShanyaoPet struct {
 	// 键缺席表示服务端没下发,与 0 不是一回事(与 hp 那条约定同理)。
 	// 目前只被动态威力规则 mana_burst(魔能爆,威力随能量变)用到。
 	Energy *uint32 `json:"energy,omitempty"`
-	// Buffs 是当前挂在身上的 buff / 印记层数(协议原样:{id, stacks})。
-	//
-	// id → 印记名的翻译在前端做(roco 的印记只有名字,协议只有 id,两者靠
-	// calc_marks.json 的登记对上);没登记上的 id 前端显示原始 id,不猜名字。
-	Buffs []ShanyaoBuff `json:"buffs,omitempty"`
-	// Trait 是该形态的特性名(gamedata 的 petbase_feature,wiki/roco.world 抓取,
-	// 覆盖率 89%)。特性**规则**在 /api/calc-rules 的 traits 里按名字匹配;
-	// 名字对不上规则的一律「未支持」,不参与计算。
-	Trait string `json:"trait,omitempty"`
 	// NatureMult 是该宠物性格的六维系数(同序):+1.2 / −0.9 / 1(roco 口径,**不是** 1.1/0.9)。
 	// 单独下发而非让前端查表:系数与性格 id 的对应关系属于规则,与克制表同理,
 	// 由后端一处维护;未知性格时缺省(前端按无修正处理)。
@@ -721,15 +726,4 @@ type ShanyaoSkill struct {
 	// speed_difference 闪击、physical_defense_difference 鸣沙陷阱(后两者按差值查同一张表)。
 	// 有 ruleId 的技能,其 basePower 不可直接用,必须按规则重算;缺输入时按「缺数据」处理。
 	RuleID *string `json:"ruleId,omitempty"`
-}
-
-// ShanyaoBuff 是一个 buff / 印记的层数。
-type ShanyaoBuff struct {
-	ID     uint32 `json:"id"`
-	Stacks uint32 `json:"stacks"`
-	// Name 是翻译后的印记名;查不到时**缺省**(不是空串),前端据此显示原始 id
-	// 并标「未识别」—— 不做模糊匹配,宁可显示 buff #1234 也不猜一个名字。
-	Name  string `json:"name,omitempty"`
-	Type  uint32 `json:"type,omitempty"`
-	Skill uint32 `json:"skill,omitempty"` // 施加它的技能(部分 buff 带)
 }

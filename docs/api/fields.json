@@ -25,20 +25,6 @@
         "max": "int",
         "min": "float"
       },
-      "marks": [
-        {
-          "affects": "str",
-          "affectsThisHit": "bool",
-          "id": "str",
-          "name": "str",
-          "needs": "array<empty>",
-          "note": "str",
-          "per": "int",
-          "polarity": "str",
-          "summary": "str",
-          "unit": "str"
-        }
-      ],
       "matrix": [
         {}
       ],
@@ -46,117 +32,9 @@
       "statKeys": [
         {}
       ],
-      "traits": [
-        {
-          "buffIds": [
-            {}
-          ],
-          "desc": "str",
-          "effect": "str",
-          "implemented": "bool",
-          "name": "str",
-          "needs": [
-            {}
-          ],
-          "note": "str",
-          "params": {
-            "multiplier": "float"
-          },
-          "rule": "str",
-          "side": "str",
-          "source": "str",
-          "talentId": "str"
-        }
-      ],
       "types": [
         {}
-      ],
-      "weather": {
-        "1": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "10": {
-          "buffs": "array<empty>",
-          "name": "str"
-        },
-        "11": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "12": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "13": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "14": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "15": {
-          "buffs": "array<empty>",
-          "name": "str"
-        },
-        "2": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "3": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "4": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "5": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "6": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "7": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        },
-        "8": {
-          "buffs": "array<empty>",
-          "name": "str"
-        },
-        "9": {
-          "buffs": [
-            {}
-          ],
-          "name": "str"
-        }
-      }
+      ]
     }
   },
   "eggs": {
@@ -898,14 +776,6 @@
             "baseConfId": "int",
             "blood": "int",
             "bloodName": "str",
-            "buffs": [
-              {
-                "id": "int",
-                "name": "str",
-                "stacks": "int",
-                "type": "int"
-              }
-            ],
             "damNames": [
               {}
             ],
@@ -963,8 +833,7 @@
               "talent": [
                 {}
               ]
-            },
-            "trait": "str"
+            }
           }
         ],
         "uin": "int"

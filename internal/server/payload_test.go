@@ -121,9 +121,10 @@ func TestWildPayloadKeys(t *testing.T) {
 
 // TestWildMarkAndFlowerItemKeys 钉住**嵌套项**的键名(WildMark / FlowerItem)。
 //
-// 为什么补这条:上面几个只查载荷顶层,嵌套项的键名一直没人管。结构体化只防住了
-// 「读」的一侧(pos.U 写错编译报错),「写」的一侧(json tag)仍是无保护的字符串
-// 字面量:拼错一个,前端读到 undefined,而 Go 编译照样通过。
+// 为什么补这条:上面几个只查载荷顶层,嵌套项的键名一直没人管。而 rkpet 外链要用的
+// baseConfId / shiny 是新增的 json tag —— 结构体化只防住了「读」的一侧(pos.U 写错
+// 编译报错),「写」的一侧(json tag)仍是无保护的字符串字面量:拼错一个,前端读到
+// undefined,Go 编译照样通过,色卡上的 3D 按钮也就此消失且毫无报错。
 //
 // 故这里把所有字段填成**非零值**再断言键集(见文件头说明:否则 omitempty 会省掉,
 // 断言就成了空转)。
@@ -131,19 +132,20 @@ func TestWildMarkAndFlowerItemKeys(t *testing.T) {
 	pct := 88.5
 	wm := WildMark{
 		ID: "1", Name: "珀尔鼬", Img: "a.webp",
+		BaseConfID: 3242, Shiny: true,
 		Kinds: []string{"shiny", "colorful"}, U: 1, V: 2, X: 3, Y: 4, Z: 5,
 		Lv: 45, Voice: 96, Height: 120, Weight: 8800, WeightPct: &pct,
 		GlassType: 1, Glass: "暗夜拾光", GlassValue: 131073,
 		Mutation: 1, Stale: true, Inject: true,
 	}
 	eq(t, "WildMark", keys(t, wm), []string{
-		"glass", "glassType", "glassValue", "height", "id", "img", "inject",
-		"kinds", "lv", "mutation", "n", "stale", "u", "v", "voice", "weight",
+		"baseConfId", "glass", "glassType", "glassValue", "height", "id", "img", "inject",
+		"kinds", "lv", "mutation", "n", "shiny", "stale", "u", "v", "voice", "weight",
 		"weightPct", "x", "y", "z",
 	})
 
 	fi := FlowerItem{
-		ID: 7001, Name: "火神", Img: "h.webp", Star: 7,
+		ID: 7001, Name: "火神", Img: "h.webp", BaseConfID: 3242, Star: 7,
 		Blood: 3, BloodName: "火", BloodIcon: "blood/3.webp", NpcLogicID: 70010,
 		ChallengeCount: 2, EndTs: 1700000000, SpecSeedID: 9, ActivityID: 1,
 		OwnerUserID: 10001, Detail: true,
@@ -152,7 +154,7 @@ func TestWildMarkAndFlowerItemKeys(t *testing.T) {
 		MedalName: "大块头", MedalIcon: "medal/1.webp",
 	}
 	eq(t, "FlowerItem", keys(t, fi), []string{
-		"activityId", "bindEvo", "bindImg", "bindName", "blood", "bloodIcon",
+		"activityId", "baseConfId", "bindEvo", "bindImg", "bindName", "blood", "bloodIcon",
 		"bloodName", "challengeCount", "detail", "endTs", "glass", "glassType", "glassValue",
 		"id", "img", "lv", "medalIcon", "medalName", "name", "npcLogicId", "ownerUserId",
 		"specSeedId", "star",

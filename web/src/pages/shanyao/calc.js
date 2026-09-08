@@ -267,79 +267,6 @@ export function calculateDamage({
   return { ok: true, coefficient, numerator, oneHit, finalOneHit, hits, total, steps }
 }
 
-// ——— 印记与特性 ———
-//
-// 规则表来自 /api/calc-rules(marks / traits),**按中文名匹配** —— 我们与 roco
-// 之间只有名字是共用的(roco 的印记 id 是 "momentum" 这类 slug,协议是数字 buff_id)。
-// 匹配不到的一律「未支持」、不参与计算:猜一个系数比不算更糟。
-
-// resolveMarkEffects 把宠物身上的 buff 层数折算成修正。
-//
-// 只处理 affectsThisHit 的印记;需要前置条件(先手/迸发/非幻系攻击)的,条件不满足时不生效。
-// buff_id → 印记名 的映射在 markIds 里(来自游戏解包配置,可能为空)—— 查不到就跳过,
-// 绝不拿「层数」硬套一个名字。
-export function resolveMarkEffects({ buffs, rules, markIds, context = {} }) {
-  const out = { powerPercent: 0, flatPower: 0, speedDelta: 0, applied: [], skipped: [] }
-  if (!Array.isArray(buffs) || !Array.isArray(rules)) return out
-  for (const b of buffs) {
-    const name = markIds?.[b.id] ?? markIds?.[String(b.id)]
-    if (!name) {
-      out.skipped.push({ id: b.id, stacks: b.stacks, why: '未识别的 buff' })
-      continue
-    }
-    const mark = rules.find((m) => m.name === name)
-    if (!mark) {
-      out.skipped.push({ id: b.id, name, stacks: b.stacks, why: '规则未登记' })
-      continue
-    }
-    if (!mark.affectsThisHit) {
-      out.skipped.push({ id: b.id, name, stacks: b.stacks, why: '不影响本次伤害' })
-      continue
-    }
-    const need = (mark.needs || [])[0]
-    if (need && !context[NEED_KEY[need]]) {
-      out.skipped.push({ id: b.id, name, stacks: b.stacks, why: `未满足条件：${need}` })
-      continue
-    }
-    const stacks = Number(b.stacks) || 0
-    if (mark.affects === 'power' && mark.unit === 'percent') out.powerPercent += mark.per * stacks
-    else if (mark.affects === 'flatPower') out.flatPower += mark.per * stacks
-    else if (mark.affects === 'speed') out.speedDelta += mark.per * stacks
-    else if (mark.affects === 'extra') out.skipped.push({ id: b.id, name, stacks, why: '追加伤害按面板填' })
-    out.applied.push({ name, stacks, per: mark.per, unit: mark.unit, affects: mark.affects })
-  }
-  return out
-}
-
-// 前置条件 → context 里的键(由 estimate 按可取得的数据自动推断)
-export const NEED_KEY = { 先手: 'faster', 迸发: 'burst', 非幻系攻击: 'nonIllusion', 首回合: 'firstTurn' }
-
-// resolveTraitEffects 按特性名取规则并把修正算出来。
-//
-// side=attacker 的只取攻方特性、defender 的只取守方;触发条件(首回合/先手)由 context 判定,
-// 判定不了时按**未触发**处理,并把「假定未触发」暴露给 UI —— 不静默当成已触发。
-export function resolveTraitEffects({ traitName, rules, side, context = {} }) {
-  const empty = { powerMultiplier: 1, damageReduction: 1, note: null, assumed: [] }
-  if (!traitName || !Array.isArray(rules)) return empty
-  const tr = rules.find((t) => t.name === traitName)
-  if (!tr || !tr.implemented || tr.side !== side) return empty
-  const assumed = []
-  for (const need of tr.needs || []) {
-    const key = NEED_KEY[need]
-    if (context[key] === undefined) assumed.push(need) // 推断不出 → 视为未触发
-    else if (!context[key]) return { ...empty, note: `未满足：${need}` }
-  }
-  if (assumed.length) return { ...empty, note: `假定未触发：${assumed.join('、')}`, assumed }
-  const params = tr.params || {}
-  if (tr.effect === 'powerMultiplier') {
-    return { ...empty, powerMultiplier: Number(params.multiplier) || 1 }
-  }
-  if (tr.effect === 'damageReduction') {
-    return { ...empty, damageReduction: Number(params.multiplier) || 1 }
-  }
-  return { ...empty, note: '规则未接入公式' }
-}
-
 // damageInput 归一一次预估的输入。
 export function damageInput({ attacker, defender, skill, rules = null, buffs = [], conditions = {} } = {}) {
   // rules(克制表)也进 ctx:它参与计算,且缺它时算出的克制倍率是「假精确」的 1。
@@ -378,12 +305,6 @@ export function estimate(input) {
   const atkStat = atk.values[category] * stageMult
   const defStat = def.values[defKey]
 
-  // 2) 触发上下文:能推断的自动推断,推断不出的一律视为**未触发**并标出来。
-  const context = {
-    firstTurn: ctx.conditions?.round === undefined ? undefined : Number(ctx.conditions.round) === 1,
-    faster: atk.values.speed == null || def.values.speed == null ? undefined : atk.values.speed > def.values.speed,
-  }
-
   // 2) 技能威力:静态/对局内的采用值,带 ruleId 时按动态规则重算。
   const bySpeed = skill.ruleId === 'speed_difference'
   const dyn = resolveDynamicPower({
@@ -394,37 +315,15 @@ export function estimate(input) {
     defenderValue: bySpeed ? def.values.speed : def.values.physicalDefense,
   })
   if (dyn.power == null) return fail(dyn.missing, ctx, steps, { attackerStats: atk, defenderStats: def })
-  // 2.5) 印记(攻方)与特性(双方):按名字匹配规则表,匹配不到就不参与。
-  const marks = resolveMarkEffects({
-    buffs: attacker.buffs,
-    rules: rules?.marks,
-    markIds: ctx.markIds,
-    context,
-  })
-  const atkTrait = resolveTraitEffects({ traitName: attacker.trait, rules: rules?.traits, side: 'attacker', context })
-  const defTrait = resolveTraitEffects({ traitName: defender.trait, rules: rules?.traits, side: 'defender', context })
-
-  // 威力:动态规则值 → + 印记固定加值 → × 印记百分比 → × 特性倍率
-  const withFlat = dyn.power + marks.flatPower
-  const withPercent = withFlat * (1 + marks.powerPercent / 100)
-  const power = Math.floor(withPercent * atkTrait.powerMultiplier) // effectiveSkillPower 向下取整
-  steps[0] = {
-    label: STEP_LABELS[0],
-    expr: [dyn.expr ?? `威力 ${dyn.power}`,
-      marks.flatPower ? `+ 印记 ${marks.flatPower}` : '',
-      marks.powerPercent ? `× 印记 ${100 + marks.powerPercent}%` : '',
-      atkTrait.powerMultiplier !== 1 ? `× 特性 ${atkTrait.powerMultiplier}` : '',
-    ].filter(Boolean).join(' ') + ' → 向下取整',
-    value: power,
-  }
+  steps[0] = { label: STEP_LABELS[0], expr: dyn.expr ?? `威力 ${dyn.power}`, value: dyn.power }
 
   // 3) 显示威力 = 技能威力 × 本系(1.25)× 克制;四舍五入(ROUNDING.displayedPower)。
   const stab = (attacker.damNames || []).includes(skill.type) ? 1.25 : 1
   const mult = typeMultiplier(skill.type, defender.damNames, rules) ?? 1
-  const displayed = Math.round(power * stab * mult)
+  const displayed = Math.round(dyn.power * stab * mult)
   steps[1] = {
     label: STEP_LABELS[1],
-    expr: `${power}${stab !== 1 ? ' × 本系1.25' : ''}${mult !== 1 ? ` × 克制${mult}` : ''} → 四舍五入`,
+    expr: `${dyn.power}${stab !== 1 ? ' × 本系1.25' : ''}${mult !== 1 ? ` × 克制${mult}` : ''} → 四舍五入`,
     value: displayed,
   }
 
@@ -433,8 +332,7 @@ export function estimate(input) {
     attackerStat: atkStat,
     displayedPower: displayed,
     defenderDefense: defStat,
-    // 守方特性的伤害减免与面板减伤**相乘**(两个独立乘区)
-    reduction: (cond.reduction ?? 1) * defTrait.damageReduction,
+    reduction: cond.reduction ?? 1,
     finalMultiplier: cond.finalMultiplier ?? 1,
     hitCount: skill.hits || 1,
     extraDamage: cond.extraDamage ?? 0,
@@ -462,9 +360,6 @@ export function estimate(input) {
       abilityStageMultiplier: stageMult,
       typeMultiplier: mult,
       stab,
-      marks,
-      traits: { attacker: atkTrait, defender: defTrait },
-      triggerContext: context,
       displayedPower: displayed,
       levelCoefficient: calc.coefficient,
       estimated: { attacker: atk.estimated, defender: def.estimated },

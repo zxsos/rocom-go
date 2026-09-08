@@ -206,10 +206,6 @@ function NumInput({ label, suffix = '', value, onChange, step = 1, min = 0 }) {
   )
 }
 
-// 需要提醒的来源:红色 = 缺/未识别/未支持,金色 = 推算或假定(能用但不是实测值)。
-const BAD_SRC = new Set(['缺数据', '未识别', '未支持', '未实现'])
-const EST_SRC = new Set(['推算（静态种族值）', '假定未触发', '部分未知'])
-
 // Audit 是「数据校对」区:把每一类输入数据的**来源**摊开。
 function Audit({ attacker, defender, skill, rules, res }) {
   const rows = []
@@ -232,39 +228,6 @@ function Audit({ attacker, defender, skill, rules, res }) {
     }
     if (attacker?.energy != null) rows.push({ k: '当前能量', v: String(attacker.energy), src: '协议' })
   }
-
-  // 印记:层数来自协议 buff,名字由后端按 calc_mark_ids 翻译;认不出的显示原始 id。
-  for (const [who, pet] of [['攻方', attacker], ['守方', defender]]) {
-    for (const b of pet?.buffs || []) {
-      rows.push({
-        k: `${who}印记`,
-        v: `${b.name ? `${b.name} ×${b.stacks}` : `buff #${b.id} ×${b.stacks}`}`,
-        src: b.name ? '协议' : '未识别',
-      })
-    }
-  }
-  // 特性:按名字匹配规则表,未实现的/条件不满足的都要说清。
-  for (const [who, pet] of [['攻方', attacker], ['守方', defender]]) {
-    if (!pet?.trait) continue
-    const known = (rules?.traits || []).find((t) => t.name === pet.trait)
-    rows.push({
-      k: `${who}特性`,
-      v: pet.trait,
-      src: !known ? '未支持' : known.implemented ? '已实现' : '未实现',
-    })
-  }
-  // 触发条件:自动推断的结果摆出来,「假定未触发」的必须让用户看见。
-  const trig = res?.ctx?.triggerContext
-  if (trig) {
-    rows.push({
-      k: '触发条件',
-      v: `首回合 ${trig.firstTurn === undefined ? '未知' : trig.firstTurn ? '是' : '否'} / 先手 ${trig.faster === undefined ? '未知' : trig.faster ? '是' : '否'}`,
-      src: trig.firstTurn === undefined || trig.faster === undefined ? '部分未知' : '已推断',
-    })
-  }
-  for (const t of [res?.ctx?.traits?.attacker, res?.ctx?.traits?.defender]) {
-    if (t?.note) rows.push({ k: '特性说明', v: t.note, src: '假定未触发' })
-  }
   if (!rows.length) return null
   return (
     <div className="sy-audit">
@@ -275,7 +238,7 @@ function Audit({ attacker, defender, skill, rules, res }) {
             <tr key={r.k}>
               <th>{r.k}</th>
               <td className="sy-audit-v">{r.v}</td>
-              <td className={'sy-audit-src' + (BAD_SRC.has(r.src) ? ' bad' : EST_SRC.has(r.src) ? ' est' : '')}>{r.src}</td>
+              <td className={'sy-audit-src' + (r.src === '缺数据' ? ' bad' : r.src.startsWith('推算') ? ' est' : '')}>{r.src}</td>
             </tr>
           ))}
         </tbody>

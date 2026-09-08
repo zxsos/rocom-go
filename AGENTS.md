@@ -51,14 +51,6 @@
    只写在文档里，改代码的人看不到。
 4. 沟通文件（`AI_*.md`）在重构结束后删除；长期共识沉淀到 `docs/`。
 
-- 官方客户端解包:`scripts/unpack.sh` + `scripts/unpack/`(C#/CUE4Parse,内置 GAME_RocoKingdomWorld);
-  解包根 `ROCOM_PARSED`(默认 `~/Downloads/rocom/parsed`),统一读取入口 `scripts/gamedata_sources.py`。
-  已核对可用:技能 `SKILL_CONF` / 印记状态 `BUFF_CONF` / 天气 `WEATHER_CONF` / 特性 `PET_TALENT_CONF`。
-  实测记录与字段口径见 docs/apk-unpack-notes.md。
-- 伤害估算生成脚本:`uv run python scripts/gen_calcdata.py`(种族值/技能/克制表;技能走官方表按 id 直取、roco 快照桥接兜底)、
-  `uv run python scripts/gen_calcrules.py`(印记与特性规则,从 roco 源码校验名字 + 官方表补 buffIds/talents)、
-  `uv run python scripts/gen_markids.py --from-parsed`(buff_id → 名字,权威)或 `--from-pcap <tsv>`(对拍推断,medium,需复核,tsv 由 `go run ./cmd/markprobe -pcap <文件>` 产出。
-
 ## 约定
 
 - Go：`go build ./...`。代码生成:`uv run python scripts/gen_proto.py`(all.pb → internal/pb)、

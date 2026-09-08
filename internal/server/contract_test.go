@@ -470,11 +470,6 @@ func contractShanyao() *ShanyaoPayload {
 					Img: "HeadIcon/3141.webp", Shiny: true,
 					GlassType: 1, GlassValue: 3145748, GlassName: "粒子3/配色20",
 					HP: &hp, HPMax: &hpMax, OnField: true, Energy: ptrU32(10),
-					// 特性名按名字匹配规则表(专注力在已实现的 7 条内)
-					Trait: "专注力",
-					// buff/印记层数:只锁形状(id + stacks),名字翻译在前端按 calc_mark_ids 查
-					// 第一个有名字(已识别的印记),第二个没有 —— 前端对后者显示原始 id 并标「未识别」
-					Buffs: []ShanyaoBuff{{ID: 20010090, Stacks: 2, Name: "减速"}, {ID: 20010826, Stacks: 1, Type: 3}},
 					// 六维取自**真实抓包**(小花仙:种族 122/67/72/84/94/100,个体 60/0/0/60/60/0),
 					// 用真值而非凑数:它同时钉住「协议六维的口径」与「面板公式的系数」。
 					// 面板值 = round(baseValue × 性格) + effortAdd,如物攻 1.1×(67+0)=73.7→74,+10=84。

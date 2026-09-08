@@ -38,8 +38,6 @@ import pathlib
 import sys
 import urllib.request
 
-from gamedata_sources import require_conf  # noqa: E402
-
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / "internal" / "gamedata" / "data"
 
@@ -167,54 +165,8 @@ def build_race(snapshot, names, source):
     }, len(out), len(petbase), ambiguous
 
 
-def build_official_skills():
-    """官方客户端 `SKILL_CONF` → 技能数值。**按 id 直取**,不靠中文名桥接,故覆盖率远高于 roco 快照那条路。
-
-    字段口径(实测核对过):
-      dam_para[0] = 威力(天洪 150 / 突袭 70 / 虫击 90,与 roco 的 basePower 一致);多个取值的(如魔能爆
-      [1, 450000, 700000…])是随能量/条件变化的动态威力,**不能**取第一个当威力,一律留 None 并标 dynamic=True
-      energy_cost[0] = 能耗;skill_dam_type = 系别(1..21,与 names.json 的 skill_dam_type 同一套编号)
-      type: 1=主动 2=被动;damage_type: 1=无伤害 2=物攻 3=魔攻
-
-    ⚠️ 段数(连击)不在这张表里:SKILL_CONF 的 hit_para 恒为 10000(即 ×1),描述里的「3连击」对应的段数在别处,
-    官方表里没找到 —— 这条仍是缺口,别拿 hit_para 当段数用。
-    """
-    rows = require_conf("SKILL_CONF.json")
-    dam_names = (load_json(DATA / "names.json").get("skill_dam_type") or {})
-
-    out = {}
-    for sid, r in rows.items():
-        if not isinstance(r, dict):
-            continue
-        try:
-            i = int(sid)
-        except (TypeError, ValueError):
-            continue
-        dam = r.get("dam_para") or []
-        power = None
-        dynamic = False
-        if len(dam) == 1 and isinstance(dam[0], int):
-            power = dam[0] or None
-        elif len(dam) > 1:
-            dynamic = True  # 多段取值 = 条件/能量决定威力
-        cost = (r.get("energy_cost") or [None])[0] if isinstance(r.get("energy_cost"), list) else r.get("energy_cost")
-        dt = r.get("skill_dam_type")
-        out[str(i)] = {
-            "name": r.get("name") or "",
-            "type": {1: "主动", 2: "被动"}.get(r.get("type"), ""),
-            "category": {1: "无", 2: "物攻", 3: "魔攻"}.get(r.get("damage_type"), ""),
-            "damType": dam_names.get(str(dt), ""),
-            "cost": cost if isinstance(cost, int) else None,
-            "basePower": power,
-            "dynamicPower": dynamic,
-            "source": "official-client",
-        }
-    return out
-
-
 def build_skills(snapshot, skills, source):
-    """技能 → 威力 / 系别 / 类别 / 能耗。官方表优先,roco 快照按名桥接兜底。"""
-    official = build_official_skills()
+    """技能 → 威力 / 系别 / 类别 / 能耗。"""
     names = skills.get("names") or {}
     name_to_ids = {}
     for sid, n in names.items():
@@ -229,20 +181,17 @@ def build_skills(snapshot, skills, source):
             by_name[n] = s
 
     out = {}
-    for sid in names:
-        # 1) 官方表有就是权威,直接采用
-        if sid in official:
-            out[sid] = official[sid]
-            continue
-        # 2) 官方没有,退回 roco 按名桥接
-        n = names[sid]
+    for n, ids in name_to_ids.items():
         sk = by_name.get(n)
         if not sk:
             continue
+        # roco 用 0 表示「无威力」(变化/防御类),与我们 skills.json 的 '—' 同义。
+        # 归一成 null:0 与「没收录」在 JSON 里看不出区别,而「这技能没有威力」
+        # 与「我们不知道威力」对计算是两回事。
         power = sk.get("basePower")
         if not power:
             power = None
-        out[sid] = {
+        entry = {
             "name": n,
             "type": sk.get("type") or "",
             "category": sk.get("category") or "",
@@ -250,16 +199,18 @@ def build_skills(snapshot, skills, source):
             "basePower": power,
             "ruleId": sk.get("ruleId"),
             "rocoId": sk.get("id", ""),
-            "source": "roco-snapshot",
         }
-
+        for sid in ids:
+            out[str(sid)] = entry
+    used = {s.get("id") for s in (snapshot.get("skills") or []) if s.get("name") in name_to_ids}
     return {
         "_source": source,
         "_note": (
-            f"技能数值: 共 {len(out)} 条(官方客户端 {sum(1 for v in out.values() if v.get('source') == 'official-client')} 条按 id 直取,"
-            "其余为 roco 快照按中文名桥接兜底)。"
-            "basePower 为 null = 无威力(变化/防御类);dynamicPower=true = 威力随条件变化(如魔能爆按能量),不能取单一威力。"
-            "⚠️ 连击段数官方表里没找到(SKILL_CONF 的 hit_para 恒为 10000=×1),仍是缺口,靠协议内的 cast_cnt 兜底。"
+            f"技能数值: {len(out)} / {len(names)} 个已知 skill_id 命中 roco 快照"
+            f"(共 {len(snapshot.get('skills') or [])} 技能, 用到 {len(used)} 个)。"
+            "basePower 为 null 表示无威力技能(roco 的 0 已归一为 null, 与「没收录」区分开);"
+            "category: physical 物攻 / magical 魔攻 / status 变化 / defense 防御。"
+            "未命中留空, 由协议内的实时威力参数(skill_round_data / 0x1324 damage_param_result)兜底。"
         ),
         "skills": out,
     }, len(out), len(names)
