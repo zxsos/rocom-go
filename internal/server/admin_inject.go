@@ -205,23 +205,21 @@ func (s *Server) handleAdminInjectWild(w http.ResponseWriter, r *http.Request) {
 
 	id := "admin-inject-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	mark := WildMark{
-		ID:         id,
-		Name:       info.Name,
-		BaseConfID: req.Base,            // 色卡的「在 rkpet 看 3D 效果」外链要用;这里直接就是形态编号
-		Shiny:      req.Kind == "shiny", // 同上:异色要给外链加 shiny=1,否则 3D 是普通配色
-		Img:        s.db.PetImageByBase(req.Base, req.Kind == "shiny").Head,
-		Kinds:      []string{req.Kind},
-		U:          u,
-		V:          v,
-		X:          wx,
-		Y:          wy,
-		Z:          wz,
-		Lv:         req.Level,
-		Voice:      voice,
-		Height:     height,
-		Weight:     weight,
-		Mutation:   mutation,
-		Inject:     true, // 前端据此显示撤销按钮与视觉提示
+		ID:       id,
+		Name:     info.Name,
+		Img:      s.db.PetImageByBase(req.Base, req.Kind == "shiny").Head,
+		Kinds:    []string{req.Kind},
+		U:        u,
+		V:        v,
+		X:        wx,
+		Y:        wy,
+		Z:        wz,
+		Lv:       req.Level,
+		Voice:    voice,
+		Height:   height,
+		Weight:   weight,
+		Mutation: mutation,
+		Inject:   true, // 前端据此显示撤销按钮与视觉提示
 	}
 	// 体重百分位与真实野生宠同一口径(pet.SizePercentile),前端资料卡才能显示「体重 xx%」。
 	if info.WeightHigh > info.WeightLow {
@@ -333,7 +331,6 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 		ID:         req.Base,
 		Name:       info.Name,
 		Img:        head,
-		BaseConfID: req.Base, // 花种卡片色卡的「在 rkpet 看 3D 效果」外链要用
 		Star:       star,
 		Blood:      blood,
 		BloodName:  s.db.BloodName(blood),
@@ -357,11 +354,7 @@ func (s *Server) handleAdminInjectFlower(w http.ResponseWriter, r *http.Request)
 	s.injects[req.Account] = append(s.injects[req.Account], &injectEntry{
 		id: id, account: req.Account, mark: &WildMark{
 			ID: id, Name: info.Name + "(花种)", Kinds: []string{"colorful"},
-			// 编号给外链用。这里**不给 shiny**:花种没有异色(0x0375/0x0338 都不带
-			// mutation,注入接口也没有 kind 字段,头像同样按非异色取),与真实花种
-			// 保持一致 —— 不要因为它是「假精灵」就比真的多给一个字段。
-			BaseConfID: req.Base,
-			Glass:      glassDesc, GlassType: glassType, GlassValue: glassValue,
+			Glass: glassDesc, GlassType: glassType, GlassValue: glassValue,
 		},
 		created: now, kind: "flower", flowerLogicID: f.NpcLogicID,
 	})

@@ -1,0 +1,44 @@
+# 云原生开发(沙盒)环境:直接拉取预构建镜像,开环境即秒开,不再每次重建。
+#
+# 镜像内容见 .ide/Dockerfile(Go 1.26.4 + cgo 依赖 + Node + Playwright Chromium),
+# 由下方 main.push 流水线构建并推送到 CNB Docker 制品库:
+#   改 .ide/Dockerfile → 推送到 main → 流水线自动重建并覆盖 dev-env:latest
+#   → 之后再开环境就是新镜像。分支上改 Dockerfile 不会触发,合回 main 才会。
+#
+# ⚠️ 沙盒容器没有 CAP_NET_RAW/NET_ADMIN,**无法实时抓包**(-iface 会报
+# operation not permitted)。在沙盒里请用 -pcap <文件> 离线回放调试。
+
+$: # 兜底匹配所有分支
+  vscode:
+    - docker:
+        # 只写 image、不写 build:写了 build 每次开环境都会构建一次(数分钟);
+        # 预构建镜像走拉取,是"秒开"的关键。
+        image: ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/dev-env:latest
+      services:
+        - vscode
+      env:
+        # 打开环境时在终端自动执行一次,顺带自检工具链是否齐活
+        CNB_WELCOME_CMD: go version && node -v && ls /root/.cache/ms-playwright
+      stages:
+        # node_modules 被 .gitignore 忽略、不随工作区备份,每次新建环境都要装
+        - name: 前端依赖
+          script: cd web && npm install
+        # 镜像里已内置与 playwright@1.62.1 匹配的 Chromium;这里再跑一次是为了
+        # 升级 web/package.json 里的 playwright 后能自动补装新 revision。
+        # 已存在时是秒级空操作,离线/无网时跳过而不是让环境起不来。
+        - name: 浏览器
+          script: cd web && (npx playwright install chromium || echo "跳过:浏览器已内置或当前离线")
+
+main:
+  push:
+    - name: 重建并推送开发环境镜像
+      services:
+        - docker
+      # 只有开发环境定义变了才重建,业务代码提交不碰镜像
+      ifModify:
+        - .ide/Dockerfile
+      stages:
+        - name: docker build
+          script: docker build -f .ide/Dockerfile -t ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/dev-env:latest .
+        - name: docker push
+          script: docker push ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/dev-env:latest

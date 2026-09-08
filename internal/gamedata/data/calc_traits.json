@@ -22,7 +22,11 @@
     "本回合已先于对手行动"
    ],
    "note": "先于对手行动时威力 ×1.3(roco: power_if_acted_before_enemy)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20210070,
+    28910260
+   ]
   },
   {
    "name": "顺风",
@@ -36,7 +40,11 @@
     "速度更快"
    ],
    "note": "速度更快时威力 ×1.3(roco: power_if_faster)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20210050,
+    28910057
+   ]
   },
   {
    "name": "专注力",
@@ -50,7 +58,12 @@
     "首回合"
    ],
    "note": "首回合物攻技能威力 ×2(快照里唯一带 ruleId 的特性,params.multiplier=2)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20010014,
+    20230760,
+    28910081
+   ]
   },
   {
    "name": "偏振",
@@ -62,7 +75,10 @@
    },
    "needs": [],
    "note": "受同系技能伤害减免(roco: reduce_matching_skill_type)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20130010
+   ]
   },
   {
    "name": "完全偏振",
@@ -74,7 +90,8 @@
    },
    "needs": [],
    "note": "受同系技能伤害更强减免(roco: ..._strong)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": []
   },
   {
    "name": "绝对秩序",
@@ -86,7 +103,11 @@
    },
    "needs": [],
    "note": "受非本系技能伤害减免(roco: reduce_off_type)",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20110560,
+    28910187
+   ]
   },
   {
    "name": "冰钻",
@@ -100,7 +121,2431 @@
     "对手技能总能耗"
    ],
    "note": "威力随对手技能总能耗提升(roco: power_by_enemy_total_cost);能耗需可取得",
-   "implemented": true
+   "implemented": true,
+   "buffIds": [
+    20340060,
+    20630010,
+    20630190,
+    28910052
+   ]
+  },
+  {
+   "name": "奇袭",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "101",
+   "buffIds": [],
+   "desc": "投掷本精灵一定可以触发背袭，包括警惕性极高的噩梦污染精灵。"
+  },
+  {
+   "name": "巧手",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "102",
+   "buffIds": [],
+   "desc": "本精灵挖矿和采集时，有概率获得大量产物。"
+  },
+  {
+   "name": "亲密",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "103",
+   "buffIds": [],
+   "desc": "更喜欢与小洛克互动，容易触发摸摸头。并且亲密度的获取效率也将大幅提升。"
+  },
+  {
+   "name": "灵巧",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "104",
+   "buffIds": [],
+   "desc": "本精灵的采集范围更大。"
+  },
+  {
+   "name": "疾行",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "401",
+   "buffIds": [
+    20460050
+   ],
+   "desc": "骑乘时移动速度将略微提升；\n若恰逢精灵偏爱的地形或天气，还可获得移动增益。"
+  },
+  {
+   "name": "同乘",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "402",
+   "buffIds": [],
+   "desc": "本精灵可以携带其他洛克同乘。"
+  },
+  {
+   "name": "好斗",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "501",
+   "buffIds": [],
+   "desc": "战斗胜利或投掷捕捉成功时，精灵自身获得的经验显著增加。"
+  },
+  {
+   "name": "无畏",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "502",
+   "buffIds": [],
+   "desc": "同种群会触发抵触的环境，本精灵会触发亲和。"
+  },
+  {
+   "name": "爱分享",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "1001",
+   "buffIds": [],
+   "desc": "当本精灵位于出战编队中，任意精灵挖矿和采集时有概率获得大量产物。"
+  },
+  {
+   "name": "爱旅行",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "2001",
+   "buffIds": [],
+   "desc": "精灵很喜欢旅行，并且总是会多带回来一点东西。"
+  },
+  {
+   "name": "家里蹲",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "3001",
+   "buffIds": [],
+   "desc": "由精灵获得的打造灵感和家园经验略微增加。"
+  },
+  {
+   "name": "热心教",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "5001",
+   "buffIds": [],
+   "desc": "战斗胜利或投掷捕捉成功时，编队中其他精灵获得经验值略微增加，但精灵自身获得经验值显著减少。"
+  },
+  {
+   "name": "星夜兼程",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "40001",
+   "buffIds": [],
+   "desc": "夜幕时分与本精灵同行，移动速度将略微提升，耐力消耗将显著降低；\n若恰逢精灵偏爱的地形或天气，还可获得移动增益。"
+  },
+  {
+   "name": "慈悲为怀",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "50001",
+   "buffIds": [],
+   "desc": "对野生精灵造成致命伤害时，必定保留对方1点生命值。"
+  },
+  {
+   "name": "爱矿石",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100001",
+   "buffIds": [],
+   "desc": "本精灵采矿时有概率挖出大量矿石。"
+  },
+  {
+   "name": "爱采集",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100002",
+   "buffIds": [],
+   "desc": "本精灵采摘植物时有概率多采摘一株。"
+  },
+  {
+   "name": "爱偷袭",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100003",
+   "buffIds": [],
+   "desc": "位于野生精灵视野盲区时，一定可以触发背袭。"
+  },
+  {
+   "name": "很正直",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100005",
+   "buffIds": [],
+   "desc": "本精灵期望能堂堂正正地战斗，所以不会触发背袭。"
+  },
+  {
+   "name": "小木匠",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100006",
+   "buffIds": [],
+   "desc": "在家园内照顾本精灵后，收到本精灵回赠家具的概率略微增加%。"
+  },
+  {
+   "name": "大木匠",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100007",
+   "buffIds": [],
+   "desc": "在家园内照顾本精灵后，收到本精灵回赠主题家具的概率略微增加。"
+  },
+  {
+   "name": "小管家",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100010",
+   "buffIds": [],
+   "desc": "由精灵获得的家园经验略微增加。"
+  },
+  {
+   "name": "很护家",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100011",
+   "buffIds": [],
+   "desc": "精灵触发偷窃反击的概率略微增加。"
+  },
+  {
+   "name": "都是好人",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100012",
+   "buffIds": [],
+   "desc": "精灵触发偷窃反击的概率显著减少。"
+  },
+  {
+   "name": "大管家",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100013",
+   "buffIds": [],
+   "desc": "由精灵获得的家园经验显著增加，但是获得的打造灵感显著减少。"
+  },
+  {
+   "name": "跑得快",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100014",
+   "buffIds": [],
+   "desc": "精灵会跑得更快，但是耐力消耗也会增加。"
+  },
+  {
+   "name": "游得快",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100015",
+   "buffIds": [],
+   "desc": "精灵会游得更快，但是耐力消耗也会增加。"
+  },
+  {
+   "name": "飞得快",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100016",
+   "buffIds": [],
+   "desc": "精灵的飞行速度和上升高度增加，但是运动能力的耐力消耗略微增加。"
+  },
+  {
+   "name": "恐高症",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100017",
+   "buffIds": [],
+   "desc": "精灵的飞行速度和上升高度显著减少。"
+  },
+  {
+   "name": "攀得快",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100018",
+   "buffIds": [],
+   "desc": "精灵的攀爬速度更快，但是耐力消耗也会增加。"
+  },
+  {
+   "name": "跳得高",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100019",
+   "buffIds": [],
+   "desc": "精灵可以跳得更高，但是耐力消耗也会增加。"
+  },
+  {
+   "name": "跳得远",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100020",
+   "buffIds": [],
+   "desc": "精灵可以跳得更远，但是耐力消耗也会增加。"
+  },
+  {
+   "name": "超耐力",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100021",
+   "buffIds": [],
+   "desc": "精灵运动能力的耐力消耗速度略微减少。"
+  },
+  {
+   "name": "爱荣誉",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100022",
+   "buffIds": [],
+   "desc": "佩戴徽章时，精灵运动能力的耐力消耗速度略微减少。"
+  },
+  {
+   "name": "旱鸭子",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100023",
+   "buffIds": [],
+   "desc": "精灵的游泳速度显著减少。"
+  },
+  {
+   "name": "体力差",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100024",
+   "buffIds": [],
+   "desc": "精灵运动能力的耐力消耗速度显著增加。"
+  },
+  {
+   "name": "按时睡",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100026",
+   "buffIds": [],
+   "desc": "由于精灵的作息非常健康，所以在夜晚时发生战斗，本精灵会进入睡眠状态。"
+  },
+  {
+   "name": "夜猫子",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100027",
+   "buffIds": [],
+   "desc": "由于精灵喜欢熬夜，所以在白天时发生战斗，本精灵会进入睡眠状态。"
+  },
+  {
+   "name": "心如止水",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100028",
+   "buffIds": [],
+   "desc": "不会触发亲和，也不会触发抵触。"
+  },
+  {
+   "name": "特立独行",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100029",
+   "buffIds": [],
+   "desc": "同种群会触发亲和的环境，本精灵会触发抵触；而同种群会触发抵触的环境，本精灵反而会触发亲和。"
+  },
+  {
+   "name": "欺软怕硬",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100030",
+   "buffIds": [],
+   "desc": "面对比自身等级低较多的对手时，精灵的技能威力会增加；若与对手的等级接近或更高，则本精灵的技能威力会减少。"
+  },
+  {
+   "name": "胆子小",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100031",
+   "buffIds": [],
+   "desc": "面对幽灵系对手时，招式威力会有所下降。"
+  },
+  {
+   "name": "痛点低",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100032",
+   "buffIds": [],
+   "desc": "当精灵血量较低时，战斗水平会受到影响，招式威力会有所下降。"
+  },
+  {
+   "name": "超自私",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100033",
+   "buffIds": [],
+   "desc": "战斗结束时，精灵自身获得经验值显著增加，但编队中其他精灵获得经验值略微减少。"
+  },
+  {
+   "name": "超无私",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100034",
+   "buffIds": [],
+   "desc": "战斗结束时，编队中其他精灵获得经验值略微增加，但精灵自身获得经验值显著减少。"
+  },
+  {
+   "name": "if1",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100035",
+   "buffIds": [],
+   "desc": "白天时，精灵入场必定触发亲和"
+  },
+  {
+   "name": "if2",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100036",
+   "buffIds": [],
+   "desc": "夜晚时，精灵入场必定触发抵触 "
+  },
+  {
+   "name": "骑乘感知测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100071",
+   "buffIds": [],
+   "desc": "骑乘感知耐力消耗减少"
+  },
+  {
+   "name": "非骑乘感知测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100072",
+   "buffIds": [],
+   "desc": "非骑乘感知耐力消耗减少"
+  },
+  {
+   "name": "优势地形",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100076",
+   "buffIds": [],
+   "desc": "优势地形"
+  },
+  {
+   "name": "优势天气",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100077",
+   "buffIds": [],
+   "desc": "优势天气"
+  },
+  {
+   "name": "战斗多条件测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100078",
+   "buffIds": [],
+   "desc": "佩戴徽章+白天，精灵自身获得战斗经验值翻倍。"
+  },
+  {
+   "name": "骑乘多条件测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100081",
+   "buffIds": [],
+   "desc": "佩戴徽章+白天，精灵移速增加"
+  },
+  {
+   "name": "投掷多条件测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100082",
+   "buffIds": [],
+   "desc": "白天+概率，采矿或采集奖励翻倍"
+  },
+  {
+   "name": "家园多条件测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100083",
+   "buffIds": [],
+   "desc": "佩戴徽章+白天，家园灵感和家园经验产出增加"
+  },
+  {
+   "name": "AI多条件测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100090",
+   "buffIds": [],
+   "desc": "佩戴徽章+白天，必定触发背袭。"
+  },
+  {
+   "name": "爱分享测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100091",
+   "buffIds": [],
+   "desc": "当本精灵位于出战编队中，任意精灵挖矿和采集时100%获得大量产物。"
+  },
+  {
+   "name": "摸头值和亲密经验",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100092",
+   "buffIds": [],
+   "desc": "获得亲昵值和亲密度经验值将翻倍。"
+  },
+  {
+   "name": "热心教叠加",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100093",
+   "buffIds": [],
+   "desc": "战斗胜利或投掷捕捉成功时，出战编队内的精灵获得经验值将显著增加。"
+  },
+  {
+   "name": "旧巧手测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100094",
+   "buffIds": [],
+   "desc": "本精灵挖矿和采集时可以获得大量产物。"
+  },
+  {
+   "name": "采集范围测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100095",
+   "buffIds": [],
+   "desc": "本精灵的采集范围更大。"
+  },
+  {
+   "name": "投掷采集",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100096",
+   "buffIds": [],
+   "desc": ""
+  },
+  {
+   "name": "骑乘采集",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100097",
+   "buffIds": [],
+   "desc": ""
+  },
+  {
+   "name": "条件采集范围测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100098",
+   "buffIds": [],
+   "desc": "佩戴徽章后，本精灵的采集范围更大。"
+  },
+  {
+   "name": "S2赛季特长测试",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100103",
+   "buffIds": [],
+   "desc": "采集和挖矿时，100%概率获得2倍产出，50%概率变为4倍"
+  },
+  {
+   "name": "叠层A",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100106",
+   "buffIds": [],
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层"
+  },
+  {
+   "name": "叠层B",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100107",
+   "buffIds": [],
+   "desc": "采集和挖矿时，100%概率获得3倍产出，叠1层"
+  },
+  {
+   "name": "叠层C",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100108",
+   "buffIds": [],
+   "desc": "采集和挖矿时，50%概率获得3倍产出，叠1层"
+  },
+  {
+   "name": "复合特长else",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100109",
+   "buffIds": [],
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层"
+  },
+  {
+   "name": "复合特长both",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100110",
+   "buffIds": [],
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层"
+  },
+  {
+   "name": "亲和变抵触",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100111",
+   "buffIds": [],
+   "desc": "亲和变抵触"
+  },
+  {
+   "name": "抵触变亲和",
+   "rule": "",
+   "side": "?",
+   "effect": "?",
+   "params": {},
+   "needs": [],
+   "note": "官方表已登记,规则未接入 → 不参与计算",
+   "implemented": false,
+   "source": "official-client",
+   "talentId": "100112",
+   "buffIds": [],
+   "desc": "抵触变亲和"
   }
- ]
+ ],
+ "talents": {
+  "101": {
+   "name": "奇袭",
+   "desc": "投掷本精灵一定可以触发背袭，包括警惕性极高的噩梦污染精灵。",
+   "effectGroup": [
+    {
+     "effect": 101,
+     "effect_param": 1
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "102": {
+   "name": "巧手",
+   "desc": "本精灵挖矿和采集时，有概率获得大量产物。",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    },
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "103": {
+   "name": "亲密",
+   "desc": "更喜欢与小洛克互动，容易触发摸摸头。并且亲密度的获取效率也将大幅提升。",
+   "effectGroup": [
+    {
+     "effect": 122,
+     "effect_param": 20000
+    },
+    {
+     "effect": 121,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "104": {
+   "name": "灵巧",
+   "desc": "本精灵的采集范围更大。",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 105
+    },
+    {
+     "effect": 1,
+     "effect_param": 106
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "105": {
+   "name": "灵巧",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 119,
+     "effect_param": 150
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "106": {
+   "name": "灵巧",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 120,
+     "effect_param": 150
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "401": {
+   "name": "疾行",
+   "desc": "骑乘时移动速度将略微提升；\n若恰逢精灵偏爱的地形或天气，还可获得移动增益。",
+   "effectGroup": [
+    {
+     "effect": 105,
+     "effect_param": 11500
+    },
+    {
+     "effect": 106,
+     "effect_param": 11500
+    },
+    {
+     "effect": 107,
+     "effect_param": 11500
+    },
+    {
+     "effect": 108,
+     "effect_param": 11500
+    },
+    {
+     "effect": 114,
+     "effect_param": 11500
+    },
+    {
+     "effect": 117
+    },
+    {
+     "effect": 118
+    }
+   ],
+   "buffIds": [
+    20460050
+   ],
+   "source": "official-client"
+  },
+  "402": {
+   "name": "同乘",
+   "desc": "本精灵可以携带其他洛克同乘。",
+   "effectGroup": [
+    {
+     "effect": 115
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "403": {
+   "name": "同乘",
+   "desc": "本精灵不愿再携带其他洛克同乘。",
+   "effectGroup": [
+    {
+     "effect": 115
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "501": {
+   "name": "好斗",
+   "desc": "战斗胜利或投掷捕捉成功时，精灵自身获得的经验显著增加。",
+   "effectGroup": [
+    {
+     "effect": 201,
+     "effect_param": 15000
+    },
+    {
+     "effect": 208,
+     "effect_param": 15000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "502": {
+   "name": "无畏",
+   "desc": "同种群会触发抵触的环境，本精灵会触发亲和。",
+   "effectGroup": [
+    {
+     "effect": 213
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "1001": {
+   "name": "爱分享",
+   "desc": "当本精灵位于出战编队中，任意精灵挖矿和采集时有概率获得大量产物。",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 20000
+    },
+    {
+     "effect": 10,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "2001": {
+   "name": "爱旅行",
+   "desc": "精灵很喜欢旅行，并且总是会多带回来一点东西。",
+   "effectGroup": [
+    {
+     "effect": 4,
+     "effect_param": 2000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "3001": {
+   "name": "家里蹲",
+   "desc": "由精灵获得的打造灵感和家园经验略微增加。",
+   "effectGroup": [
+    {
+     "effect": 8,
+     "effect_param": 11500
+    },
+    {
+     "effect": 7,
+     "effect_param": 11500
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "5001": {
+   "name": "热心教",
+   "desc": "战斗胜利或投掷捕捉成功时，编队中其他精灵获得经验值略微增加，但精灵自身获得经验值显著减少。",
+   "effectGroup": [
+    {
+     "effect": 201,
+     "effect_param": 5000
+    },
+    {
+     "effect": 202,
+     "effect_param": 11000
+    },
+    {
+     "effect": 208,
+     "effect_param": 5000
+    },
+    {
+     "effect": 209,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "5002": {
+   "name": "热心教",
+   "desc": "战斗胜利或投掷捕捉成功时，出战编队内的精灵获得经验值将显著增加。",
+   "effectGroup": [
+    {
+     "effect": 210,
+     "effect_param": 15000
+    },
+    {
+     "effect": 211,
+     "effect_param": 15000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "40001": {
+   "name": "星夜兼程",
+   "desc": "夜幕时分与本精灵同行，移动速度将略微提升，耐力消耗将显著降低；\n若恰逢精灵偏爱的地形或天气，还可获得移动增益。",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 6000
+    },
+    {
+     "effect": 105,
+     "effect_param": 11500
+    },
+    {
+     "effect": 106,
+     "effect_param": 11500
+    },
+    {
+     "effect": 107,
+     "effect_param": 11500
+    },
+    {
+     "effect": 108,
+     "effect_param": 11500
+    },
+    {
+     "effect": 114,
+     "effect_param": 11500
+    },
+    {
+     "effect": 117
+    },
+    {
+     "effect": 118
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "50001": {
+   "name": "慈悲为怀",
+   "desc": "对野生精灵造成致命伤害时，必定保留对方1点生命值。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 21310010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100001": {
+   "name": "爱矿石",
+   "desc": "本精灵采矿时有概率挖出大量矿石。",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100002": {
+   "name": "爱采集",
+   "desc": "本精灵采摘植物时有概率多采摘一株。",
+   "effectGroup": [
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100003": {
+   "name": "爱偷袭",
+   "desc": "位于野生精灵视野盲区时，一定可以触发背袭。",
+   "effectGroup": [
+    {
+     "effect": 101,
+     "effect_param": 1
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100004": {
+   "name": "爱旅行",
+   "desc": "精灵很喜欢旅行，并且总是会多带回来一点东西。",
+   "effectGroup": [
+    {
+     "effect": 4,
+     "effect_param": 1000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100005": {
+   "name": "很正直",
+   "desc": "本精灵期望能堂堂正正地战斗，所以不会触发背袭。",
+   "effectGroup": [
+    {
+     "effect": 101
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100006": {
+   "name": "小木匠",
+   "desc": "在家园内照顾本精灵后，收到本精灵回赠家具的概率略微增加%。",
+   "effectGroup": [
+    {
+     "effect": 5,
+     "effect_param": 1000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100007": {
+   "name": "大木匠",
+   "desc": "在家园内照顾本精灵后，收到本精灵回赠主题家具的概率略微增加。",
+   "effectGroup": [
+    {
+     "effect": 6,
+     "effect_param": 1000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100008": {
+   "name": "小木匠",
+   "desc": "由精灵获得的打造灵感略微增加。",
+   "effectGroup": [
+    {
+     "effect": 8,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100009": {
+   "name": "大木匠",
+   "desc": "由精灵获得的打造灵感显著增加，但是获得的家园经验显著减少。",
+   "effectGroup": [
+    {
+     "effect": 8,
+     "effect_param": 13000
+    },
+    {
+     "effect": 7,
+     "effect_param": 7000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100010": {
+   "name": "小管家",
+   "desc": "由精灵获得的家园经验略微增加。",
+   "effectGroup": [
+    {
+     "effect": 7,
+     "effect_param": 10500
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100011": {
+   "name": "很护家",
+   "desc": "精灵触发偷窃反击的概率略微增加。",
+   "effectGroup": [
+    {
+     "effect": 102,
+     "effect_param": 1000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100012": {
+   "name": "都是好人",
+   "desc": "精灵触发偷窃反击的概率显著减少。",
+   "effectGroup": [
+    {
+     "effect": 102,
+     "effect_param": -5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100013": {
+   "name": "大管家",
+   "desc": "由精灵获得的家园经验显著增加，但是获得的打造灵感显著减少。",
+   "effectGroup": [
+    {
+     "effect": 7,
+     "effect_param": 13000
+    },
+    {
+     "effect": 8,
+     "effect_param": 7000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100014": {
+   "name": "跑得快",
+   "desc": "精灵会跑得更快，但是耐力消耗也会增加。",
+   "effectGroup": [
+    {
+     "effect": 105,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100015": {
+   "name": "游得快",
+   "desc": "精灵会游得更快，但是耐力消耗也会增加。",
+   "effectGroup": [
+    {
+     "effect": 106,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100016": {
+   "name": "飞得快",
+   "desc": "精灵的飞行速度和上升高度增加，但是运动能力的耐力消耗略微增加。",
+   "effectGroup": [
+    {
+     "effect": 107,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100017": {
+   "name": "恐高症",
+   "desc": "精灵的飞行速度和上升高度显著减少。",
+   "effectGroup": [
+    {
+     "effect": 107,
+     "effect_param": 5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100018": {
+   "name": "攀得快",
+   "desc": "精灵的攀爬速度更快，但是耐力消耗也会增加。",
+   "effectGroup": [
+    {
+     "effect": 108,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100019": {
+   "name": "跳得高",
+   "desc": "精灵可以跳得更高，但是耐力消耗也会增加。",
+   "effectGroup": [
+    {
+     "effect": 109,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100020": {
+   "name": "跳得远",
+   "desc": "精灵可以跳得更远，但是耐力消耗也会增加。",
+   "effectGroup": [
+    {
+     "effect": 110,
+     "effect_param": 11000
+    },
+    {
+     "effect": 112,
+     "effect_param": 11000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100021": {
+   "name": "超耐力",
+   "desc": "精灵运动能力的耐力消耗速度略微减少。",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 9000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100022": {
+   "name": "爱荣誉",
+   "desc": "佩戴徽章时，精灵运动能力的耐力消耗速度略微减少。",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 9000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100023": {
+   "name": "旱鸭子",
+   "desc": "精灵的游泳速度显著减少。",
+   "effectGroup": [
+    {
+     "effect": 106,
+     "effect_param": 5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100024": {
+   "name": "体力差",
+   "desc": "精灵运动能力的耐力消耗速度显著增加。",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 15000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100025": {
+   "name": "慈悲为怀",
+   "desc": "对敌方造成致命伤害时，必定保留对方1点生命值。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 21310010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100026": {
+   "name": "按时睡",
+   "desc": "由于精灵的作息非常健康，所以在夜晚时发生战斗，本精灵会进入睡眠状态。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20500010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100027": {
+   "name": "夜猫子",
+   "desc": "由于精灵喜欢熬夜，所以在白天时发生战斗，本精灵会进入睡眠状态。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20500010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100028": {
+   "name": "心如止水",
+   "desc": "不会触发亲和，也不会触发抵触。",
+   "effectGroup": [
+    {
+     "effect": 203
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100029": {
+   "name": "特立独行",
+   "desc": "同种群会触发亲和的环境，本精灵会触发抵触；而同种群会触发抵触的环境，本精灵反而会触发亲和。",
+   "effectGroup": [
+    {
+     "effect": 204
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100030": {
+   "name": "欺软怕硬",
+   "desc": "面对比自身等级低较多的对手时，精灵的技能威力会增加；若与对手的等级接近或更高，则本精灵的技能威力会减少。",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100037
+    },
+    {
+     "effect": 1,
+     "effect_param": 100038
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100031": {
+   "name": "胆子小",
+   "desc": "面对幽灵系对手时，招式威力会有所下降。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010030
+    },
+    {
+     "effect": 207,
+     "effect_param": 20010040
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100032": {
+   "name": "痛点低",
+   "desc": "当精灵血量较低时，战斗水平会受到影响，招式威力会有所下降。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010030
+    },
+    {
+     "effect": 207,
+     "effect_param": 20010040
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100033": {
+   "name": "超自私",
+   "desc": "战斗结束时，精灵自身获得经验值显著增加，但编队中其他精灵获得经验值略微减少。",
+   "effectGroup": [
+    {
+     "effect": 201,
+     "effect_param": 13000
+    },
+    {
+     "effect": 202,
+     "effect_param": 9500
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100034": {
+   "name": "超无私",
+   "desc": "战斗结束时，编队中其他精灵获得经验值略微增加，但精灵自身获得经验值显著减少。",
+   "effectGroup": [
+    {
+     "effect": 201,
+     "effect_param": 7000
+    },
+    {
+     "effect": 202,
+     "effect_param": 10500
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100035": {
+   "name": "if1",
+   "desc": "白天时，精灵入场必定触发亲和",
+   "effectGroup": [
+    {
+     "effect": 205,
+     "effect_param": 10
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100036": {
+   "name": "if2",
+   "desc": "夜晚时，精灵入场必定触发抵触 ",
+   "effectGroup": [
+    {
+     "effect": 206,
+     "effect_param": 10
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100037": {
+   "name": "if1",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    },
+    {
+     "effect": 207,
+     "effect_param": 20010020
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100038": {
+   "name": "if2",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010030
+    },
+    {
+     "effect": 207,
+     "effect_param": 20010040
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100071": {
+   "name": "骑乘感知测试",
+   "desc": "骑乘感知耐力消耗减少",
+   "effectGroup": [
+    {
+     "effect": 116,
+     "effect_param": 5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100072": {
+   "name": "非骑乘感知测试",
+   "desc": "非骑乘感知耐力消耗减少",
+   "effectGroup": [
+    {
+     "effect": 113,
+     "effect_param": 5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100073": {
+   "name": "骑乘感知测试",
+   "desc": "骑乘感知耐力消耗减少",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 5000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100074": {
+   "name": "非骑乘感知测试",
+   "desc": "非骑乘感知耐力消耗增加",
+   "effectGroup": [
+    {
+     "effect": 113,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100075": {
+   "name": "骑乘感知测试",
+   "desc": "骑乘感知耐力消耗增加",
+   "effectGroup": [
+    {
+     "effect": 112,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100076": {
+   "name": "优势地形",
+   "desc": "优势地形",
+   "effectGroup": [
+    {
+     "effect": 117
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100077": {
+   "name": "优势天气",
+   "desc": "优势天气",
+   "effectGroup": [
+    {
+     "effect": 118
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100078": {
+   "name": "战斗多条件测试",
+   "desc": "佩戴徽章+白天，精灵自身获得战斗经验值翻倍。",
+   "effectGroup": [
+    {
+     "effect": 201,
+     "effect_param": 20000
+    },
+    {
+     "effect": 208,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100079": {
+   "name": "战斗多条件测试",
+   "desc": "（回合开始时检测）佩戴徽章+白天，精灵获得物攻加成。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100080": {
+   "name": "战斗多条件测试",
+   "desc": "（入场时检测）佩戴徽章+白天，精灵获得物攻加成。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100081": {
+   "name": "骑乘多条件测试",
+   "desc": "佩戴徽章+白天，精灵移速增加",
+   "effectGroup": [
+    {
+     "effect": 105,
+     "effect_param": 11500
+    },
+    {
+     "effect": 106,
+     "effect_param": 11500
+    },
+    {
+     "effect": 107,
+     "effect_param": 11500
+    },
+    {
+     "effect": 108,
+     "effect_param": 11500
+    },
+    {
+     "effect": 114,
+     "effect_param": 11500
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100082": {
+   "name": "投掷多条件测试",
+   "desc": "白天+概率，采矿或采集奖励翻倍",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    },
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100083": {
+   "name": "家园多条件测试",
+   "desc": "佩戴徽章+白天，家园灵感和家园经验产出增加",
+   "effectGroup": [
+    {
+     "effect": 8,
+     "effect_param": 20000
+    },
+    {
+     "effect": 7,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100084": {
+   "name": "家园多条件测试",
+   "desc": "佩戴徽章+概率，家园灵感和家园经验产出增加",
+   "effectGroup": [
+    {
+     "effect": 8,
+     "effect_param": 20000
+    },
+    {
+     "effect": 7,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100085": {
+   "name": "投掷多条件测试",
+   "desc": "白天+徽章，采矿或采集奖励翻倍",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    },
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100086": {
+   "name": "投掷多条件测试",
+   "desc": "徽章+概率，采矿或采集奖励翻倍",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    },
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100087": {
+   "name": "战斗多条件测试",
+   "desc": "幽系+佩戴徽章+白天，回合开始时物攻增加。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100088": {
+   "name": "战斗多条件测试",
+   "desc": "等级差≥5级+佩戴徽章+白天，入场时物攻增加。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100089": {
+   "name": "战斗多条件测试",
+   "desc": "血量少于90%+佩戴徽章+白天，回合开始时物攻增加。",
+   "effectGroup": [
+    {
+     "effect": 207,
+     "effect_param": 20010010
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100090": {
+   "name": "AI多条件测试",
+   "desc": "佩戴徽章+白天，必定触发背袭。",
+   "effectGroup": [
+    {
+     "effect": 101,
+     "effect_param": 1
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100091": {
+   "name": "爱分享测试",
+   "desc": "当本精灵位于出战编队中，任意精灵挖矿和采集时100%获得大量产物。",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 20000
+    },
+    {
+     "effect": 10,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100092": {
+   "name": "摸头值和亲密经验",
+   "desc": "获得亲昵值和亲密度经验值将翻倍。",
+   "effectGroup": [
+    {
+     "effect": 122,
+     "effect_param": 20000
+    },
+    {
+     "effect": 121,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100093": {
+   "name": "热心教叠加",
+   "desc": "战斗胜利或投掷捕捉成功时，出战编队内的精灵获得经验值将显著增加。",
+   "effectGroup": [
+    {
+     "effect": 210,
+     "effect_param": 15000
+    },
+    {
+     "effect": 211,
+     "effect_param": 15000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100094": {
+   "name": "旧巧手测试",
+   "desc": "本精灵挖矿和采集时可以获得大量产物。",
+   "effectGroup": [
+    {
+     "effect": 2,
+     "effect_param": 20000
+    },
+    {
+     "effect": 3,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100095": {
+   "name": "采集范围测试",
+   "desc": "本精灵的采集范围更大。",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100096
+    },
+    {
+     "effect": 1,
+     "effect_param": 100097
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100096": {
+   "name": "投掷采集",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 119,
+     "effect_param": 300
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100097": {
+   "name": "骑乘采集",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 120,
+     "effect_param": 300
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100098": {
+   "name": "条件采集范围测试",
+   "desc": "佩戴徽章后，本精灵的采集范围更大。",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100099
+    },
+    {
+     "effect": 1,
+     "effect_param": 100100
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100099": {
+   "name": "投掷采集",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 119,
+     "effect_param": 300
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100100": {
+   "name": "骑乘采集",
+   "desc": "",
+   "effectGroup": [
+    {
+     "effect": 120,
+     "effect_param": 300
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100101": {
+   "name": "摸头值和亲密经验",
+   "desc": "佩戴徽章后，获得亲昵值和亲密度经验值将翻倍。",
+   "effectGroup": [
+    {
+     "effect": 122,
+     "effect_param": 20000
+    },
+    {
+     "effect": 121,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100102": {
+   "name": "热心教",
+   "desc": "战斗胜利或投掷捕捉成功时，若佩戴徽章，则出战编队内的精灵获得经验值将显著增加。",
+   "effectGroup": [
+    {
+     "effect": 210,
+     "effect_param": 20000
+    },
+    {
+     "effect": 211,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100103": {
+   "name": "S2赛季特长测试",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，50%概率变为4倍",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100104
+    },
+    {
+     "effect": 1,
+     "effect_param": 100105
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100104": {
+   "name": "S2赛季特长测试",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，50%概率变为4倍",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 20000
+    },
+    {
+     "effect": 10,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100105": {
+   "name": "S2赛季特长测试",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，50%概率变为4倍",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 40000
+    },
+    {
+     "effect": 10,
+     "effect_param": 40000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100106": {
+   "name": "叠层A",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 20000
+    },
+    {
+     "effect": 10,
+     "effect_param": 20000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100107": {
+   "name": "叠层B",
+   "desc": "采集和挖矿时，100%概率获得3倍产出，叠1层",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 30000
+    },
+    {
+     "effect": 10,
+     "effect_param": 30000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100108": {
+   "name": "叠层C",
+   "desc": "采集和挖矿时，50%概率获得3倍产出，叠1层",
+   "effectGroup": [
+    {
+     "effect": 9,
+     "effect_param": 30000
+    },
+    {
+     "effect": 10,
+     "effect_param": 30000
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100109": {
+   "name": "复合特长else",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100108
+    },
+    {
+     "effect": 1,
+     "effect_param": 100106
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100110": {
+   "name": "复合特长both",
+   "desc": "采集和挖矿时，100%概率获得2倍产出，叠2层",
+   "effectGroup": [
+    {
+     "effect": 1,
+     "effect_param": 100108
+    },
+    {
+     "effect": 1,
+     "effect_param": 100106
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100111": {
+   "name": "亲和变抵触",
+   "desc": "亲和变抵触",
+   "effectGroup": [
+    {
+     "effect": 212
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  },
+  "100112": {
+   "name": "抵触变亲和",
+   "desc": "抵触变亲和",
+   "effectGroup": [
+    {
+     "effect": 213
+    }
+   ],
+   "buffIds": [],
+   "source": "official-client"
+  }
+ }
 }

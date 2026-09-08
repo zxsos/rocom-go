@@ -37,6 +37,9 @@ DATA = ROOT / "internal" / "gamedata" / "data"
 PARSED = pathlib.Path(os.environ.get("ROCOM_PARSED", pathlib.Path.home() / "Downloads" / "rocom" / "parsed"))
 OUT = DATA / "calc_mark_ids.json"
 MARKS = DATA / "calc_marks.json"
+
+from gamedata_sources import conf_path, require_conf  # noqa: E402  (需先拼好 ROOT/DATA)
+WEATHER_FILE = conf_path("WEATHER_CONF.json")
 S3 = "https://raw.githubusercontent.com/Evenstar-tools/roco-calculator/main/data/skill-query/s3-source.json"
 
 # 「(自己|敌方|对方|己方队伍)获得N层X」—— 与 roco marks.js 的提取正则同思路,
@@ -108,30 +111,61 @@ def from_pcap(tsv_paths):
 
 
 def from_parsed():
-    if not PARSED.exists():
-        sys.exit(
-            f"缺解包数据: {PARSED}\n"
-            "  (先跑 scripts/unpack.sh,或设 ROCOM_PARSED 指向解包目录)"
-        )
+    """权威来源:官方客户端解出的 BUFF_CONF(3000+ 条 id → 名字 + 描述)。
+
+    以前只能靠 pcap 对拍推断(medium),且**推断错过**:把 20070020 判成冻结,官方是**灼烧**;
+    冻结其实是 20580010。故官方表一来,medium 一律被 high 覆盖(见 main 的合并规则)。
+    """
     names = known_names()
+    buffs = require_conf("BUFF_CONF.json")
     found = {}
-    for path in PARSED.rglob("*.json"):
-        if "buff" not in path.name.lower():
+    for bid, r in buffs.items():
+        if not isinstance(r, dict):
+            continue
+        nm = str(r.get("name") or "")
+        if not nm:
             continue
         try:
-            rows = json.load(open(path, encoding="utf-8"))
-        except Exception as exc:
-            print(f"  跳过 {path.name}: {exc}")
+            i = int(bid)
+        except (TypeError, ValueError):
             continue
-        items = rows if isinstance(rows, list) else rows.get("rows") or rows.get("items") or []
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            nm = str(it.get("name") or it.get("Name") or "")
-            bid = it.get("id") or it.get("Id") or it.get("confId") or it.get("ConfID")
-            if nm in names and isinstance(bid, int):
-                found[str(bid)] = {"name": nm, "source": "parsed-config", "confidence": "high", "evidence": []}
+        info = {
+            "name": nm,
+            "source": "official-client",
+            "confidence": "high",
+            "evidence": [],
+            "buffType": r.get("type"),
+        }
+        desc = str(r.get("desc") or "")
+        if desc:
+            info["desc"] = desc
+        # 名字正好是已登记印记 → 顺带标出来(规则表里有效果系数);否则只登记名字(前端能显示,规则未接入)
+        info["ruleRegistered"] = nm in names
+        found[str(i)] = info
     return found
+
+
+def weather_section():
+    """天气:WEATHER_CONF 给 `weather_type → 名字 + 该天气挂的 buff`。
+
+    有了它就能从场上的 buff 反推当前天气(暴风雪 = buff 20170910/20171230),
+    天气的伤害修正才有输入。
+    """
+    rows = require_conf("WEATHER_CONF.json")
+    out = {}
+    for k, r in rows.items():
+        if not isinstance(r, dict):
+            continue
+        try:
+            i = int(k)
+        except (TypeError, ValueError):
+            continue
+        wt = r.get("weather_type", i)
+        out[str(wt)] = {
+            "name": r.get("name") or "",
+            "buffs": [int(x) for x in (r.get("weather_buff") or []) if isinstance(x, int)],
+        }
+    return out
 
 
 def main():
@@ -161,14 +195,18 @@ def main():
         print("(未指定来源,保持原表不变。用法见文件头)")
         return
 
+    # 天气单独一段:它不是 buff,而是「哪个 buff 代表哪种天气」的反查表。
+    weather = weather_section() if (args.from_parsed or WEATHER_FILE.exists()) else {}
     payload = {
         "_source": {
-            "upstream": "pcap 对拍推断 + 游戏解包配置(后者权威)",
+            "upstream": "官方客户端解包配置(权威) + pcap 对拍推断(候选)",
             "note": ("roco 的印记 id 是字符串 slug,与协议 buff_id 无关。"
-                     "pcap 推断的依据是「技能描述里的层数 == 实际 buff 层数」,属间接证据,需复核"),
+                     "官方 BUFF_CONF 直给 id → 名字;pcap 推断仅作候选(层数对拍),需复核"),
         },
-        "_note": f"buff_id → 印记/状态名,共 {len(merged)} 条。未收录的 buff 前端显示原始 id,不猜名字。",
+        "_note": (f"buff_id → 印记/状态名,共 {len(merged)} 条;天气 {len(weather)} 条。"
+                  "未收录的 buff 前端显示原始 id,不猜名字。"),
         "buffs": merged,
+        "weather": weather,
     }
     OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"已写入 {OUT.relative_to(ROOT)}: {len(merged)} 条(本次新增/更新 {added})")
