@@ -11,7 +11,7 @@ rocom-capture 的 HTTP 接口契约。**前端与后端以此为准**，任一�
 
 > ⚠️ **`fields.json` 是 golden 样本，不是完备字段清单**：`omitempty` 字段在构造数据
 > 取零值时不会出现在 golden 里。做全量改名这类操作须另以 Go 源码为准。
-> 好消息是 position / wildpets / gathers / home / flowers / trial / shanyao 七个实时接口的字段已由
+> 好消息是 position / wildpets / gathers / home / flowers / trial 六个实时接口的字段已由
 > `internal/server/payload.go` 的 struct 定义，**那才是完备清单**（含 `omitempty` 字段）。
 
 ## 事实来源优先级
@@ -21,7 +21,7 @@ rocom-capture 的 HTTP 接口契约。**前端与后端以此为准**，任一�
 1. **golden 快照** `internal/server/testdata/contract/*.json` —— 跑真实 handler 落盘的响应，
    由 `internal/server/contract_test.go` 守护。**最高权威。**
 2. **载荷类型定义** `internal/server/payload.go` —— position / wildpets / gathers /
-   home / flowers / trial / shanyao 七个实时接口的字段由 Go struct 定义，pipeline 与 server
+   home / flowers / trial 六个实时接口的字段由 Go struct 定义，pipeline 与 server
    共用同一份。
 3. 本文档
 4. Go struct 的 `json` tag
@@ -63,7 +63,7 @@ CI 会在不带 `UPDATE_CONTRACT` 时比对 golden，JSON 变了就红 —— �
 > `omitempty`，于是 `false` 被省掉、字段从响应里消失。重新生成的 diff 只显示
 > 「新增了几个字段」，看上去完全合理 —— **因为根本没有基线可比对**。
 >
-> 改动实时推送侧（position / wildpets / gathers / home / flowers / trial / shanyao）后，请用
+> 改动实时推送侧（position / wildpets / gathers / home / flowers）后，请用
 > `bash scripts/capture_sse.sh <pcap>` 抓真实推送，与改动前的构建逐字段对比。
 > 该脚本会先挂上 SSE 再启动回放（回放是一次性的，约 40ms，反序会错过），
 > 默认端口 4940（4939 是前端 dev server 的代理目标，别占用）。

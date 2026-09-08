@@ -46,8 +46,7 @@
 ```
 
 - `type`：`pet` / `event` / `position` / `wildpets` / `stars` / `starzones` / `paint` /
-  `home` / `flowers` / `gathers` / `trial` / `shanyao` / `eggs` / `debug` / `accounts`
-  （`shanyao` 是隐藏模块「闪耀大赛」的战局推送，载荷与 `GET /api/shanyao` 同构）
+  `home` / `flowers` / `eggs` / `debug` / `accounts`
 - `account`：**带 `omitempty`** —— 值为 `""`（全局消息）时**该字段不出现在 JSON 里**，
   JS 侧读到 `undefined`（不是空串）。
 

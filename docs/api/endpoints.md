@@ -65,8 +65,6 @@
 | `GET /api/home/query` | — | — | 按 `uid` 查**任意玩家**的家园快照（回源第三方，与抓包无关；`force=1` 跳过缓存）。见 [schemas.md](schemas.md#get-apihomequery) |
 | `GET /api/trial` | — | ✓ | 最近一次草系徽章试炼状态（进行中的一局 + 账号档案） |
 | `GET /api/trial/encounters` | — | ✓ | 草系试炼**遇见记录**（三章各一张精灵图，**读库累积**，不经 SSE） |
-| `GET /api/shanyao` | — | ✓ | 最近一次**战局**（闪耀大赛，隐藏模块 `#/shanyao`：双方阵容/血量/技能槽）；无记录返回 `null` |
-| `GET /api/calc-rules` | — | — | 伤害估算的**规则常量**（不随账号）：18 系克制矩阵 + 钳制 + 六维键序；缺数据返回 `null` |
 
 ## 花种
 

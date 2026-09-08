@@ -49,12 +49,6 @@ ENDPOINTS = {
     # 这类改动就能静默溜过 golden —— 两份 golden 的 pet 段必须不一样。
     "trial-shiny": ("GET /api/trial", "试炼状态(异色+炫彩宠物的外观字段与异色头像)"),
     "trial-encounters": ("GET /api/trial/encounters", "草系试炼遇见记录(三章精灵图,读库累积)"),
-    # 闪耀大赛(隐藏模块 #/shanyao):与 trial 同路数,管线推快照 + SSE 覆盖。
-    "shanyao": ("GET /api/shanyao", "最近一次战局(闪耀大赛:双方阵容/血量/技能槽)"),
-    # 与 shanyao 成对:这份是「从未收到过战局」的 null 形态,前端据此显示空态。
-    "shanyao-null": ("GET /api/shanyao", "无战局记录(返回 null,而非空对象)"),
-    # 伤害估算的规则常量:不随账号,与 icons/medals 同路数。
-    "calc-rules": ("GET /api/calc-rules", "伤害估算规则常量(18 系克制矩阵/钳制/六维键序)"),
 }
 
 
