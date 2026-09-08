@@ -23,6 +23,8 @@ import re
 import sys
 import urllib.request
 
+from gamedata_sources import require_conf, OFFICIAL_NOTE  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / "internal" / "gamedata" / "data"
 BASE = "https://raw.githubusercontent.com/Evenstar-tools/roco-calculator/main"
@@ -152,6 +154,55 @@ def write_if_changed(path, payload):
     return True
 
 
+def trait_buff_index():
+    """官方「特性名 → buff_id 列表」。
+
+    实测:战斗里的特性就是挂在宠物身上的 buff(BUFF_CONF 中 type=3 那一类,带 desc,如
+    「专注力」=20010014「物攻+10%」。故这里按名字建索引,用于从宠物 buff 自动识别它带哪个特性 ——
+    不再只靠「形态 → 特性名」那份(覆盖率 89%,且同名特性可能有多个 buff 变体(不同数值档),故返回列表。
+    """
+    try:
+        buffs = require_conf("BUFF_CONF.json")
+    except Exception:
+        return {}
+    idx = {}
+    for bid, r in buffs.items():
+        if not isinstance(r, dict) or r.get("type") != 3:
+            continue
+        nm = r.get("name") or ""
+        if not nm:
+            continue
+        try:
+            i = int(bid)
+        except (TypeError, ValueError):
+            continue
+        idx.setdefault(nm, []).append(i)
+    for v in idx.values():
+        v.sort()
+    return idx
+
+
+def official_traits():
+    """官方 `PET_TALENT_CONF` → 特性清单(98 条,含 desc 与 effect_group)。"""
+    rows = require_conf("PET_TALENT_CONF.json")
+    idx = trait_buff_index()
+    out = {}
+    for tid, r in rows.items():
+        if not isinstance(r, dict):
+            continue
+        nm = r.get("name") or ""
+        if not nm or nm == "无":
+            continue
+        out[str(tid)] = {
+            "name": nm,
+            "desc": r.get("desc") or "",
+            "effectGroup": r.get("effect_group") or [],
+            "buffIds": idx.get(nm) or [],
+            "source": "official-client",
+        }
+    return out
+
+
 def main():
     marks_js, traits_js = fetch(MARKS_SRC), fetch(TRAITS_SRC)
     roco_marks = parse_mark_names(marks_js)
@@ -191,12 +242,34 @@ def main():
             entry.update(dict(side="?", effect="?", params={}, needs=[],
                               note="roco 有规则但本地未实现 → 不参与计算", implemented=False))
         traits.append(entry)
+    official_t = official_traits()
+    tbidx = trait_buff_index()
+    for tid, info in official_t.items():
+        name = info["name"]
+        if any(t["name"] == name for t in traits):
+            continue
+        traits.append(dict(name=name, rule="", side="?", effect="?", params={}, needs=[],
+                           note="官方表已登记,规则未接入 → 不参与计算", implemented=False,
+                           source="official-client", talentId=tid, buffIds=info.get("buffIds") or tbidx.get(name) or [],
+                           desc=info.get("desc", "")))
+    # 已有规则的特性也补上官方 buffId(用于从 buff 自动识别)
+    for t in traits:
+        t.setdefault("buffIds", [])
+        if not t["buffIds"]:
+            t["buffIds"] = tbidx.get(t["name"]) or []
+        for tid, info in official_t.items():
+            if info["name"] == t["name"]:
+                t["buffIds"] = info.get("buffIds") or tbidx.get(t["name"]) or []
+                t["talentId"] = tid
+                break
+
     payload_traits = {
         "_source": SOURCE,
         "_note": (f"特性规则: roco traits.js 的 TRAIT_NAME_TO_RULE 共 {len(roco_traits)} 条, "
                   f"本地实现 {len(roco_traits) - len(unknown)} 条;其余特性(快照 241 条里只有 1 条带 ruleId) "
                   "一律「未支持」不参与计算。触发条件推断不出时按未触发处理并在 UI 标注。"),
         "traits": traits,
+        "talents": official_t,
     }
 
     # buff_id → 印记:这张表只能来自游戏解包配置,这里只保证文件存在(空也写)。
