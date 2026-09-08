@@ -25,7 +25,6 @@
         "max": "int",
         "min": "float"
       },
-      "floor": "int",
       "marks": [
         {
           "affects": "str",

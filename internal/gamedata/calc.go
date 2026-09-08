@@ -82,15 +82,6 @@ type CalcTypeChart struct {
 		Max float64 `json:"max"`
 		Min float64 `json:"min"`
 	} `json:"clamp"`
-	// Floor 是单次伤害的下限,取自官方客户端 `ATTR_GLOBAL_CONFIG` 的
-	// phy_dam_floor / spe_dam_floor(实测同为 2)。
-	//
-	// nil = 官方数据缺失。此时**不**兜底一个默认值,由调用方按「无下限」处理 ——
-	// 没有依据时宁可不设,也不要自己编一个。
-	//
-	// ⚠️ 官方只给了数值,没说明它作用在「每段伤害」还是「总伤害」;当前前端按**每段**
-	// 兜底(见 web/src/pages/shanyao/calc.js),口径尚未用真实对局验证。
-	Floor *int `json:"floor"`
 }
 
 // CalcMark 是一个印记的定义与效果。
@@ -315,33 +306,19 @@ func (db *DB) WeatherOf(weatherType uint32) (CalcWeather, bool) {
 	return v, ok
 }
 
-// WeatherFromBuff 反查:某个 buff_id 出现在哪种天气里(暴风雪的 buff 20170910/20171230)。
-//
-// ⚠️ **反查不唯一**:官方 `WEATHER_CONF` 里多个天气**共享**同一批 buff —— 实测
-// 暴风雪(5)与小雪(9)的 buffs 完全相同,共有 6 个 buff 被 2~3 个天气引用。
-// 故这里返回 **weather_type 最小的那个**(并如实给出它的名字);要知道全部候选,
-// 调用方得自己遍历全部天气比对。
-//
-// 为什么固定取最小:map 的遍历顺序是随机的,不排序的话同一份数据每次会返回不同
-// 的天气 —— 函数行为不确定,测试也随之随机红。
+// WeatherFromBuff 反查:某个 buff_id 代表哪种天气(暴风雪的 buff 20170910/20171230 → 暴风雪。
 func (db *DB) WeatherFromBuff(buffID uint32) (uint32, CalcWeather, bool) {
 	if db.calc == nil {
 		return 0, CalcWeather{}, false
 	}
-	best, bestW, ok := uint32(0), CalcWeather{}, false
 	for t, w := range db.calc.weather {
-		hit := false
 		for _, b := range w.Buffs {
 			if b == buffID {
-				hit = true
-				break
+				return t, w, true
 			}
 		}
-		if hit && (!ok || t < best) {
-			best, bestW, ok = t, w, true
-		}
 	}
-	return best, bestW, ok
+	return 0, CalcWeather{}, false
 }
 
 // TraitByBuff 按 buff_id 反查特性;用于「宠物身上有哪个 buff 就带哪个特性」。

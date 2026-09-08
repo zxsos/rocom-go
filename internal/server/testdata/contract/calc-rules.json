@@ -3,7 +3,6 @@
     "max": 3,
     "min": 0.25
   },
-  "floor": 2,
   "marks": [
     {
       "affects": "none",
