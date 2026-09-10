@@ -198,6 +198,68 @@ func (p *Pipeline) claimHatchedChild(cs *connState, sc *store.Scoped, acc string
 	p.srv.Hub().Broadcast("breeding", acc, map[string]any{"account": acc})
 }
 
+// claimPendingChildren 全量对账收尾后补扫一次:把「记着子代 gid、却还没快照」的代补上。
+//
+// 为什么需要它:认领挂在 applyNewPet(增量消息 + isNew)里,而**断网期间孵出的子代**是随
+// 背包分页全量(applyPetPage)进库的 —— 那条路不调认领,于是那一代永远停在「待认领」。
+// 培育线是**事件流**产物:宠物与蛋都有全量对账可以自愈,唯独它没有,故缺口只能在这里补。
+//
+// 时点必须是**全量对账之后**:对账前宠物库可能还没收全,查不到不代表那只宠不在了;
+// 查不到的处理是「跳过并留给页面提示」,绝不猜、绝不自动丢弃 —— 认错一只比不认更糟。
+//
+// 仍用 pet.ClaimChild(按 gid),与 claimHatchedChild 的慢路径共用 claimAt:搬动逻辑只有一处。
+func (p *Pipeline) claimPendingChildren(sc *store.Scoped, acc string, now time.Time) {
+	lines, err := sc.ListBreedingLines()
+	if err != nil {
+		log.Printf("用户 %s 补扫认领时读培育线失败: %v", acc, err)
+		return
+	}
+	for _, l := range lines {
+		// 先收集再逐个认领:ClaimChild 会从 Pending 里删元素,边遍历边改会错乱。
+		var gids []uint32
+		for _, g := range l.Pending {
+			if g.ChildGid != 0 && g.Child == nil {
+				gids = append(gids, g.ChildGid)
+			}
+		}
+		if len(gids) == 0 {
+			continue
+		}
+		reachedBefore := pet.ReachGoal(l)
+		claimed := 0
+		for _, gid := range gids {
+			pp, err := sc.GetPet(gid)
+			if err != nil {
+				log.Printf("用户 %s 补扫认领取宠物 %d 失败: %v", acc, gid, err)
+				continue
+			}
+			if pp == nil {
+				// 不在库:放生/送人,或断网期间入库又放生(工具从未见过它)。
+				// 留着 ChildGid 让页面说清「孵出的 #gid 已不在库」,由玩家决定补录还是丢弃。
+				continue
+			}
+			pet.FillSizePercentile(p.db, pp)
+			if !pet.ClaimChild(l, gid, pet.ParentSnapshot(pp)) {
+				continue
+			}
+			claimed++
+		}
+		if claimed == 0 {
+			continue
+		}
+		l.UpdatedAt = now.Unix()
+		if pet.AutoDoneOnReach(l, reachedBefore) {
+			log.Printf("用户 %s 的培育线 %s 已刷到目标,自动标记为已达成", acc, l.ID)
+		}
+		if err := sc.UpsertBreedingLine(l); err != nil {
+			log.Printf("用户 %s 补扫认领后保存培育线 %s 失败: %v", acc, l.ID, err)
+			continue
+		}
+		log.Printf("用户 %s 补扫认领 %d 代(断网/漏包期间孵出的子代)", acc, claimed)
+		p.srv.Hub().Broadcast("breeding", acc, map[string]any{"account": acc})
+	}
+}
+
 // autoLineID 造一条自动建的线的 id。
 //
 // 带时刻后缀而不是「auto-<品种>」:同品种的线可以被归档后再开新的,固定 id 会把上一次的

@@ -865,6 +865,36 @@ func seedBreeding(t *testing.T, s *Server) {
 		}},
 		CreatedAt: 1700000000, UpdatedAt: 1700000100,
 	}
+
+	// 第 3 代是**待孵**的一代(收了蛋、还没孵),并留一颗真蛋在库里 —— 这一支要进 golden:
+	// 响应里的 eggs(回查蛋表给的体重/推算嗓音/奖牌)是读取时算出来的,单测守不住
+	// 「响应里到底有没有这个字段」,只有 golden 能。嗓音由双亲推出,故一定算得出来。
+	const eggGid = 9101
+	eggWp := 99.0
+	if err := sc.UpsertEggs([]*pet.EggView{{
+		Gid: eggGid, ItemID: 107003, ConfID: 3006001, Name: "火神的蛋", Species: "火神",
+		Icon: "egg/egg_huoshen.webp", WeightKg: 4.2, HeightM: 0.28, WeightPct: &eggWp,
+		ObtainedAt: 1700000050,
+	}}, 1700000050, nil); err != nil {
+		t.Fatalf("写蛋 %d: %v", eggGid, err)
+	}
+	if err := sc.SetEggParents(eggGid, &pet.EggParents{
+		Mother:  parent(mother),
+		Fathers: []pet.EggParent{*parent(father)},
+	}); err != nil {
+		t.Fatalf("记双亲: %v", err)
+	}
+	line.Pending = append(line.Pending, pet.Generation{
+		Gen: 3, Mother: parent(mother), Father: parent(father), EggGid: eggGid,
+		Source: pet.GenSourceAuto, At: 1700000050,
+	})
+	// 第 4 代:孵出的那只已不在宠物库(放生/送人)—— 后端要把它列进 lostChildGens,
+	// 前端据此说「已不在库」,而不是笼统地挂在「待认领」下让玩家空等。
+	line.Pending = append(line.Pending, pet.Generation{
+		Gen: 4, Mother: parent(mother), Father: parent(father), ChildGid: 9999,
+		Source: pet.GenSourceAuto, At: 1700000200,
+	})
+
 	if err := sc.UpsertBreedingLine(line); err != nil {
 		t.Fatalf("写培育线: %v", err)
 	}

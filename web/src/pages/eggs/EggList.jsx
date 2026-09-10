@@ -399,7 +399,11 @@ function EggCard({ egg, now, rate, measured, onPet }) {
             .filter(Boolean).join(' · ')}>{name}</div>
           <div className="egg-tags">
             {(egg.medals || []).map((m) => (
-              <span key={m.dim} className="egg-chip" title={`${DIM_NAME[m.dim] || ''}奖牌`}>{m.name}</span>
+              <span key={m.dim} className="egg-chip" title={`${DIM_NAME[m.dim] || ''}奖牌`}>
+                {/* 奖牌小图:缺图时(未 embed)只退成纯文字,不留空位 */}
+                {m.icon ? <img className="egg-chip-img" src={imgURL(m.icon)} alt="" draggable={false} /> : null}
+                {m.name}
+              </span>
             ))}
           </div>
         </div>

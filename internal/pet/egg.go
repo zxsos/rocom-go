@@ -372,8 +372,37 @@ type EggParents struct {
 // EggMedal 是这颗蛋**确定**能拿到的一枚百分位奖牌(拿不到、或还判不了的都不进这个列表)。
 // 体重那两枚(大块头/小不点)靠蛋自己的百分位;嗓音那两枚(婉转声/粗嗓门)靠双亲推出的嗓音。
 type EggMedal struct {
-	Dim  int32  `json:"dim"`  // 判定维度:2=体重 3=嗓音
-	Name string `json:"name"` // 奖牌名
+	Dim  int32  `json:"dim"`            // 判定维度:2=体重 3=嗓音
+	Name string `json:"name"`           // 奖牌名
+	Icon string `json:"icon,omitempty"` // 奖牌小图 medal/<原名>.webp(未 embed 时为空串)
+}
+
+// EggSnapshot 是一颗蛋给培育页看的精简投影(**只读,不进培育史**)。
+//
+// 为什么不存进 Generation:破壳后子代快照已含同样的体重百分位(孵化后原样保留)与嗓音
+// (就是双亲均值向下取整),存下来只是一份会与蛋表不一致的冗余;而待孵期间蛋**就在库里**,
+// 回查即可。更重要的是回查能发现「蛋已经不在了」—— 对一条永远停在待孵的记录,这句比
+// 任何属性都重要(它可能已经被送人、丢弃,或断网期间孵掉了)。
+type EggSnapshot struct {
+	Gid       uint32     `json:"gid"`
+	Name      string     `json:"name,omitempty"`      // 蛋名(如「阿米亚特的蛋」)
+	Icon      string     `json:"icon,omitempty"`      // 蛋图标
+	WeightKg  float64    `json:"weightKg,omitempty"`  // 蛋自身体重
+	WeightPct *float64   `json:"weightPct,omitempty"` // 体重百分位(破壳后原样继承,故提前可判)
+	Voice     *int32     `json:"voice,omitempty"`     // 由双亲推出的嗓音(见 parentVoice)
+	Medals    []EggMedal `json:"medals,omitempty"`    // 确定能拿到的百分位奖牌
+}
+
+// EggSnapshotOf 把蛋视图投影成培育页要的那几个字段。
+// 调用前需已算过派生属性(RefreshEggView / FillEggDerived),否则嗓音与奖牌是空的。
+func EggSnapshotOf(v *EggView) *EggSnapshot {
+	if v == nil {
+		return nil
+	}
+	return &EggSnapshot{
+		Gid: v.Gid, Name: v.Name, Icon: v.Icon,
+		WeightKg: v.WeightKg, WeightPct: v.WeightPct, Voice: v.Voice, Medals: v.Medals,
+	}
 }
 
 // EggView 是精灵蛋页面展示用的业务模型(已中文化、含百分位与孵化进度)。
@@ -613,7 +642,9 @@ func eggMedals(db *gamedata.DB, weight, voice pctRange) []EggMedal {
 			loIn := r.pct.lo >= float64(sm.Low) && r.pct.lo <= float64(sm.High)
 			hiIn := r.pct.hi >= float64(sm.Low) && r.pct.hi <= float64(sm.High)
 			if loIn && hiIn {
-				out = append(out, EggMedal{Dim: r.dim, Name: sm.Name})
+				// 带上小图:奖牌在页面上一直只有名字,因为这里当初没存 id;
+				// MedalIcon 内部校验 embed,缺图返回空串(前端不画即可,不会 404)。
+				out = append(out, EggMedal{Dim: r.dim, Name: sm.Name, Icon: db.MedalIcon(sm.ID)})
 				break
 			}
 			if loIn != hiIn {

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 )
 
 // eggBagItem 拼一件带 egg_data 的 BagItem:gid(1)/id(2)/update_time(4)/type(14)/egg_data(15)。
@@ -239,5 +241,67 @@ func TestBackpackHatchSlots(t *testing.T) {
 	junk := protowire.AppendVarint(protowire.AppendTag(nil, 1, protowire.VarintType), 7)
 	if _, ok := BackpackHatchSlots(junk); ok {
 		t.Error("无 PetBackpackInfo 不该判为有效快照")
+	}
+}
+
+// TestEggMedalsHaveIcon 奖牌要带小图 —— 蛋页与培育页都靠它显示。
+//
+// 此前 EggMedal 只有 dim 与 name(丢了奖牌 id),于是页面只能画出文字;
+// 缺图(未 embed)时 Icon 为空串,前端不画即可,绝不能是拼出来的 404 路径。
+func TestEggMedalsHaveIcon(t *testing.T) {
+	db, err := gamedata.Load()
+	if err != nil {
+		t.Fatalf("加载名称库: %v", err)
+	}
+	var wm gamedata.SizeMedal
+	for _, m := range db.SizeMedals() {
+		if m.Dim == gamedata.MedalDimWeight {
+			wm = m
+			break
+		}
+	}
+	if wm.Name == "" {
+		t.Fatal("奖牌表里没有体重奖牌")
+	}
+	// 百分位摆进窗口正中:一定落在这枚奖牌里
+	mid := float64(wm.Low+wm.High) / 2
+	got := eggMedals(db, pctRange{lo: mid, hi: mid, known: true}, pctRange{})
+	if len(got) != 1 {
+		t.Fatalf("奖牌 = %+v, 期望 1 枚(体重维度)", got)
+	}
+	if got[0].Name != wm.Name {
+		t.Errorf("奖牌名 = %q, 期望 %q", got[0].Name, wm.Name)
+	}
+	if got[0].Icon == "" {
+		t.Errorf("奖牌 %q 没有图标:蛋页与培育页都靠它显示", wm.Name)
+	}
+	// 嗓音维度未知时只出体重那一枚
+	only := eggMedals(db, pctRange{known: false}, pctRange{known: false})
+	if len(only) != 0 {
+		t.Errorf("两个维度都未知时 = %+v, 期望不给奖牌", only)
+	}
+}
+
+// TestEggSnapshotOf 蛋视图 → 培育页投影:只带培育史要的那几项,且 nil 安全。
+func TestEggSnapshotOf(t *testing.T) {
+	if EggSnapshotOf(nil) != nil {
+		t.Error("nil 蛋视图应返回 nil")
+	}
+	wp, voice := 95.5, int32(64)
+	v := &EggView{Gid: 9001, Name: "阿米亚特的蛋", Icon: "egg/egg_amiyate.webp",
+		WeightKg: 12.5, WeightPct: &wp, Voice: &voice,
+		Medals: []EggMedal{{Dim: gamedata.MedalDimWeight, Name: "大块头", Icon: "medal/x.webp"}}}
+	got := EggSnapshotOf(v)
+	if got.Gid != 9001 || got.Name != v.Name || got.Icon != v.Icon {
+		t.Errorf("身份字段没带上: %+v", got)
+	}
+	if got.WeightKg != 12.5 || got.WeightPct == nil || *got.WeightPct != 95.5 {
+		t.Errorf("体重没带上: %+v", got)
+	}
+	if got.Voice == nil || *got.Voice != 64 {
+		t.Errorf("推算嗓音没带上: %+v", got)
+	}
+	if len(got.Medals) != 1 || got.Medals[0].Name != "大块头" {
+		t.Errorf("奖牌没带上: %+v", got.Medals)
 	}
 }

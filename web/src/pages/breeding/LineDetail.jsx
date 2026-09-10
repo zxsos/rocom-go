@@ -134,6 +134,7 @@ export default function LineDetail({
                 {rows.map(({ g, pending }, i) => (
                   <GenerationRow key={pending ? 'p' + g.gen : 'g' + g.gen}
                     g={g} pending={pending} line={line}
+                    prev={i > 0 ? rows[i - 1].g : null}
                     prevChild={prevChildOf(rows, i)}
                     fathers={pets.fathers} kids={pets.kids} matrix={natureMatrix}
                     onEdit={saveGen} onClaim={onClaim} onDelete={delGen} onPet={onPet} busy={busy} />

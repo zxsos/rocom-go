@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/whoisnian/rocom-capture/internal/store"
 )
 
 // 建议最多返回多少条组合。5 条够玩家在小窝里挑 —— 再多只是把同一只母本换个父亲再列一遍,
@@ -37,9 +38,11 @@ func (s *Server) handleBreeding(w http.ResponseWriter, r *http.Request) {
 	for _, p := range pets {
 		byGid[p.Gid] = p
 	}
+	// 蛋只在这一刻回查:有待孵代的线才需要,没有就完全不碰蛋表。
+	eggs := s.eggSnapshots(sc, lines)
 	out := make([]BreedingLinePayload, 0, len(lines))
 	for _, l := range lines {
-		out = append(out, s.breedingView(l, pets, byGid))
+		out = append(out, s.breedingView(l, pets, byGid, eggs))
 	}
 	writeJSON(w, map[string]any{"lines": out})
 }
@@ -89,9 +92,20 @@ func (s *Server) handleBreedingPool(w http.ResponseWriter, r *http.Request) {
 //
 // byGid 是全库宠物按 gid 索引的快照(已算过百分位):缺失属性的亲本/子代按它**投影补全**
 // (见 fillSnapshots)—— 补出来的值只进这一次响应,不落库。
-func (s *Server) breedingView(l *pet.BreedingLine, pets []*pet.Pet, byGid map[uint32]*pet.Pet) BreedingLinePayload {
+//
+// eggs 是本账号全部蛋按 gid 索引的投影(见 eggSnapshots);本线只挑用得上的那几颗。
+func (s *Server) breedingView(l *pet.BreedingLine, pets []*pet.Pet, byGid map[uint32]*pet.Pet, eggs map[uint32]*pet.EggSnapshot) BreedingLinePayload {
 	fillSnapshots(l, byGid)
 	v := BreedingLinePayload{BreedingLine: l}
+	// 只带本线待孵代要用的蛋:别把全账号的蛋都下发下去。
+	v.Eggs = eggsForLine(l, eggs)
+	// 「孵出的那只已不在库」的代:依据本次取的全库宠物 —— 在库的话早被认领了,
+	// 故这里只会列出真正等不到的那些(见 LostChildGens 的注释)。
+	for _, g := range l.Pending {
+		if g.ChildGid != 0 && g.Child == nil && byGid[g.ChildGid] == nil {
+			v.LostChildGens = append(v.LostChildGens, g.Gen)
+		}
+	}
 	// 品种的展示名(链上各阶段都列出来,见 gamedata.ChainLabelOf):只显示 Species 会让人以为
 	// 这条线只认那一个形态,而链上其它阶段的 ♀ 同样能用 —— 那正是这个页面最容易踩的坑。
 	v.ChainName = s.db.ChainLabelOf(l.Evo, l.Species)
@@ -158,6 +172,58 @@ func breedMothers(pool []pet.Candidate) []pet.EggParent {
 		}
 		seen[c.Mother.Gid] = true
 		out = append(out, c.Mother)
+	}
+	return out
+}
+
+// eggSnapshots 回查「待孵的那几代」各自对应的蛋,按蛋 gid 索引。
+//
+// 只在**真的有待孵代**时才读蛋表:没有待孵代是常态(绝大多数请求),不该为它付一次全表读。
+// 有则一次 ListEggs 取全量再按 gid 筛 —— 逐代各查一次是白花钱。
+//
+// 读不到某颗蛋时不报错、只是不给:那意味着蛋已经不在背包(孵掉 / 送人 / 对账清理),
+// 前端比对着「代上有 eggGid、响应里没有这颗蛋」就能说出这句,而不是让用户干等。
+func (s *Server) eggSnapshots(sc *store.Scoped, lines []*pet.BreedingLine) map[uint32]*pet.EggSnapshot {
+	want := map[uint32]bool{}
+	for _, l := range lines {
+		for _, g := range l.Pending {
+			if g.EggGid != 0 && g.ChildGid == 0 {
+				want[g.EggGid] = true
+			}
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+	eggs, err := sc.ListEggs(store.EggFilter{})
+	if err != nil {
+		log.Printf("读蛋表失败(待孵代暂不显示蛋属性): %v", err)
+		return nil
+	}
+	out := make(map[uint32]*pet.EggSnapshot, len(want))
+	for _, e := range eggs {
+		if !want[e.Gid] {
+			continue
+		}
+		// 补算「要双亲快照才推得出」的嗓音与奖牌 —— ListEggs 不负责这一步(见其注释)。
+		out[e.Gid] = pet.EggSnapshotOf(pet.RefreshEggView(e, s.db))
+	}
+	return out
+}
+
+// eggsForLine 从全账号的蛋里挑出这条线用得上的那几颗(只有待孵代需要)。
+func eggsForLine(l *pet.BreedingLine, all map[uint32]*pet.EggSnapshot) map[uint32]*pet.EggSnapshot {
+	var out map[uint32]*pet.EggSnapshot
+	for _, g := range l.Pending {
+		if g.EggGid == 0 || g.ChildGid != 0 {
+			continue
+		}
+		if snap, ok := all[g.EggGid]; ok {
+			if out == nil {
+				out = make(map[uint32]*pet.EggSnapshot, 1)
+			}
+			out[g.EggGid] = snap
+		}
 	}
 	return out
 }

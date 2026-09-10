@@ -255,6 +255,9 @@ func (p *Pipeline) applyPetPage(m capture.Message, sc *store.Scoped, acc string)
 			p.srv.Hub().Broadcast("pet", acc, map[string]any{"locUpdate": true})
 		}
 		sw.proc += time.Since(pruneT0)
+		// 全量对账刚做完:此刻宠物库是权威现状,正是补扫认领的唯一可靠时点 ——
+		// 早了那只宠可能还没入库,会被误判成「已不在库」(见 claimPendingChildren 的注释)。
+		p.claimPendingChildren(sc, acc, time.Now())
 		log.Printf("用户 %s 宠物同步完成: %d 只 %d 页, 请求耗时 %v, 解析耗时 %v",
 			acc, len(sw.gids), res.TotalPage, time.Since(sw.start), sw.proc)
 		as.sweep = nil // 本轮结束,防止后续单独请求某页复用旧累积
