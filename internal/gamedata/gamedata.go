@@ -74,6 +74,8 @@ type DB struct {
 	eggConf    map[uint32]EggConf // 物种 conf_id -> 蛋自身的身高体重区间与孵化时长
 	eggItems   map[uint32]EggItem // 背包蛋物品 id -> 显示名/物种/图标/品质
 	eggNPCs    map[uint32]uint32  // 窝上蛋 NPC 的 NPC_CONF id -> 蛋物品 id
+	eggByGroup map[uint32]uint32  // 形态组 id(= 宠物形态 petbase id)-> 该物种的普通蛋物品 id
+	eggByName  map[string]uint32  // 形态名 -> 同名形态里有普通蛋的最小 petbase id(见 EggIconOfBase)
 	eggTypes   map[int32]EggType  // 蛋品类 precious_egg_type -> 名称/排序号/角标
 	sizeMedals []SizeMedal        // 按百分位自动授予的奖牌(体重两枚 + 嗓音两枚)
 	nestFurn   map[uint32]string  // 小窝家具 config_id -> 家具名(实测仅 1001071 精灵小窝)
@@ -201,6 +203,9 @@ func Load() (*DB, error) {
 			if prev, ok := petNames[full]; !ok || uint32(id) < prev {
 				petNames[full] = uint32(id)
 			}
+			// 注意:裸名 → 品种的补全(ChainByName)不在这里建索引 —— 它要判「同名形态是否
+			// 并属一条链」,拿去重后的最小 id 是判不出来的,故那边是现算的(线/快照个位数,
+			// 见 ChainByName)。
 		}
 		if v.E != 0 {
 			evoIndex[v.E] = append(evoIndex[v.E], uint32(id))
@@ -267,6 +272,34 @@ func Load() (*DB, error) {
 		eggItems[uint32(id)] = EggItem{ID: uint32(id), Name: v.N, Conf: v.C, Icon: v.Img, Quality: v.Q, SortID: v.S}
 		if v.NPC != 0 {
 			eggNPCs[v.NPC] = uint32(id)
+		}
+	}
+	// 形态组 → 普通蛋物品:蛋配置 id 的前 4 位就是形态组 id(等于宠物形态的 petbase id,
+	// 见 egg.go 对 EggConf.ModelID 的说明),组内 1 号(conf%1000==1)是普通蛋,其余是活动/
+	// 珍稀变体。同一形态组有多件蛋物品时取**最小物品 id**,让「这个品种的蛋图」(见
+	// EggIconOfBase)在一份数据上永远是同一张 —— 取最大或随机取会让同一物种在两台机器上
+	// 长得不一样。
+	eggByGroup := make(map[uint32]uint32, len(eggItems))
+	for id, it := range eggItems {
+		if it.Conf == 0 || it.Conf%1000 != 1 {
+			continue
+		}
+		if g := it.Conf / 1000; eggByGroup[g] == 0 || id < eggByGroup[g] {
+			eggByGroup[g] = id
+		}
+	}
+	// 同名形态里**有蛋的那一个**(取最小 id,理由同上):有些形态自己没有蛋 id —— 后天形态
+	// (被污染/黑化…)官方设定就是孵不出自己的蛋、孵的是本来形态那颗,同一物种在 petbase 里的
+	// 另一条目上才有蛋(板板壳 3055 有、3516 没有)。查不到自己的蛋 id 时按名字退回这一个,
+	// 详见 egg.go 的 EggIconOfBase。
+	eggByName := make(map[string]uint32, len(eggByGroup))
+	for id := range eggByGroup {
+		n := petbase[id].Name
+		if n == "" {
+			continue
+		}
+		if cur, ok := eggByName[n]; !ok || id < cur {
+			eggByName[n] = id
 		}
 	}
 	eggTypes := make(map[int32]EggType, len(raw.EggTypes))
@@ -339,6 +372,8 @@ func Load() (*DB, error) {
 		eggConf:        eggConf,
 		eggItems:       eggItems,
 		eggNPCs:        eggNPCs,
+		eggByGroup:     eggByGroup,
+		eggByName:      eggByName,
 		eggTypes:       eggTypes,
 		sizeMedals:     raw.SizeMedals,
 		nestFurn:       nestFurn,

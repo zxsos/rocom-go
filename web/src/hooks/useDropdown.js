@@ -56,7 +56,11 @@ export function useOutsideClick(ref, onClose, active = true, extraRef = null) {
 //
 // extraRef 可选:透传给 useOutsideClick,供 portal 到别处的浮层(账号的手机端 sheet)
 // 一并纳入「点内部」判断。Dropdown / NavBar 不传,行为不变。
-export function useDropdown({ count, selectedIndex = -1, disabled = false, onPick, extraRef = null }) {
+//
+// searchRef 可选:菜单里带搜索框的浮层(PetPicker)传它,指到那个 <input> 上。焦点在搜索框里
+// 时不接管可打印字符与退格(否则空格会被当成「选中」、退格什么也删不掉),只接管导航 / 选中 /
+// 收起这几类键。不传时走原来的分支,行为与现在完全一致。
+export function useDropdown({ count, selectedIndex = -1, disabled = false, onPick, extraRef = null, searchRef = null }) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false) // 菜单向上翻转(下方空间不足,见下面的 useLayoutEffect)
   const [hi, setHi] = useState(0)
@@ -114,6 +118,9 @@ export function useDropdown({ count, selectedIndex = -1, disabled = false, onPic
     onPick(i)
   }, [onPick])
 
+  // inSearch 焦点是否在菜单里的搜索框内(见 searchRef 的说明)。
+  const inSearch = (e) => !!(searchRef && searchRef.current && searchRef.current.contains(e.target))
+
   const onKeyDown = (e) => {
     if (disabled) return
     if (!open) {
@@ -122,6 +129,35 @@ export function useDropdown({ count, selectedIndex = -1, disabled = false, onPic
         setOpen(true)
       }
       return
+    }
+    // 输入法组合中的按键不是「用户按了回车」,而是「确认候选词」:此时选中的是候选词,
+    // 不该顺手把当前高亮的宠物也定了(中文名很常见,这一步错得很隐蔽)。
+    const composing = e.nativeEvent && (e.nativeEvent.isComposing || e.keyCode === 229)
+    if (inSearch(e)) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          if (count) setHi((i) => (i + 1) % count)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          if (count) setHi((i) => (i - 1 + count) % count)
+          break
+        case 'Enter':
+          // 输入框里的回车 = 选中当前高亮项(搜完直接回车就定下来,手不用离开键盘)。
+          if (composing) break
+          e.preventDefault()
+          if (count && hi >= 0 && hi < count) pickAt(hi)
+          break
+        case 'Escape':
+          e.preventDefault()
+          setOpen(false)
+          break
+        case 'Tab':
+          setOpen(false)
+          break
+      }
+      return // 其余按键(字符、退格、左右键、Home/End)交还给输入框自己
     }
     if (!count) return
     switch (e.key) {

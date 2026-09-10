@@ -226,3 +226,32 @@ func (sc *Scoped) GetPet(gid uint32) (*pet.Pet, error) {
 	}
 	return &p, nil
 }
+
+// ListAllPets 返回本账号全部宠物(不分页、不注入盒位/队位/奖牌)。
+//
+// 培育页要拿整个宠物库当选种候选(见 internal/pet/breeding.go 的 BreedPool),而 ListPets
+// 的 clampPageSize 把页大小压在 200 内 —— 候选池不能按页取:漏掉一页就会推荐出一个「更差的
+// 种公」,而玩家无从知道库里还有更好的,正好与这个页面的目的相反。
+//
+// 只解 data、不 attachLocations:选种不看盒子/队伍位置,省两次 IN 查询;百分位由调用方按
+// 当前 gamedata 注入(与 /api/pets 同法,见 server/api_pets.go)。上游实测 983 只共约 1.2MB
+// JSON,解析一次几十毫秒、单机自用可接受。
+func (sc *Scoped) ListAllPets() ([]*pet.Pet, error) {
+	rows, err := sc.rdb.Query(`SELECT data FROM pets WHERE account=?`, sc.account)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*pet.Pet
+	for rows.Next() {
+		var data string
+		if rows.Scan(&data) != nil {
+			continue
+		}
+		var p pet.Pet
+		if json.Unmarshal([]byte(data), &p) == nil {
+			out = append(out, &p)
+		}
+	}
+	return out, rows.Err()
+}

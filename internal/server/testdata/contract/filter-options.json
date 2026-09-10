@@ -2,6 +2,26 @@
   "box": [
     "1-常用"
   ],
+  "chains": [
+    {
+      "base": 3001,
+      "count": 1,
+      "egg": "egg/egg_miaomiao.webp",
+      "evo": 3001,
+      "img": "HeadIcon/3001.webp",
+      "label": "喵喵（喵呜/魔力猫/叶冕魔力猫/武斗酷猫）",
+      "species": "喵喵"
+    },
+    {
+      "base": 3003,
+      "count": 1,
+      "egg": "egg/egg_huohua.webp",
+      "evo": 3003,
+      "img": "HeadIcon/3003.webp",
+      "label": "火花（焰火/火神/烈火战神）",
+      "species": "火花"
+    }
+  ],
   "medal": null,
   "nature": [
     "固执"

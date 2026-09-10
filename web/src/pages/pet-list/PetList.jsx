@@ -5,9 +5,10 @@ import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { SkeletonRows } from '../../components/Skeleton'
+import { buildContainers, boxIndexOf } from '../../components/boxLayout'
 import { SORTS, withCatch, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter, DEFAULT_VIEW, sanitizeView } from './filters'
 import FilterPanel from './FilterPanel'
-import BoxMap from './BoxMap'
+import BoxMap from '../../components/BoxMap'
 import PetTable from './PetTable'
 import PetGallery from './PetGallery'
 import ContextMenu from './ContextMenu'
@@ -82,17 +83,10 @@ export default function PetList() {
 
 
 
-  // 示意图容器:大世界队伍(6 排 × 3 队,竖向)排在所有盒子前,其后各盒子(5 排 × 6 格)
-  const containers = useMemo(() => {
-    // 原始 18 格为队序(team*6+pos);转置为「行=位置、列=队伍」的显示序(pos*3+team)
-    const raw = teams.slots && teams.slots.length ? teams.slots : new Array(18).fill(0)
-    const teamDisplay = []
-    for (let pos = 0; pos < 6; pos++) for (let t = 0; t < 3; t++) teamDisplay.push(raw[t * 6 + pos])
-    const list = [{ type: 'team', name: '大世界队伍', cols: 3, slots: teamDisplay, heads: teams.heads || {} }]
-    for (const b of boxes) list.push({ type: 'box', id: b.id, name: b.name || ('盒' + b.id), cols: 6, slots: b.slots, heads: b.heads || {} })
-    return list
-  }, [teams, boxes])
-  const boxIdxById = useCallback((id) => containers.findIndex((c) => c.type === 'box' && c.id === id), [containers])
+  // 示意图容器:大世界队伍(6 排 × 3 队,竖向)排在所有盒子前,其后各盒子(5 排 × 6 格)。
+  // 拼装下沉到 components/boxLayout.js —— 培育页的定位弹窗要用同一张图,口径只能有一份。
+  const containers = useMemo(() => buildContainers(teams, boxes), [teams, boxes])
+  const boxIdxById = useCallback((id) => boxIndexOf(containers, id), [containers])
   // 宠物盒筛选变化时,示意图跟随展示该盒
   useEffect(() => {
     const id = parseInt((filter.box || '').split('-')[0], 10)

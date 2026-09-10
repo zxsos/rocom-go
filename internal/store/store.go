@@ -261,6 +261,24 @@ CREATE TABLE IF NOT EXISTS eggs (
   PRIMARY KEY(account, gid)
 );
 
+-- 培育线(培育页,见 internal/pet/breeding.go)。一条线 = 一个品种 + 一个目标,
+-- 逐代记录「母 × 父 → 子代」。代数整份存 data JSON:一条线不过几十代,拆成线/代两张表
+-- 要 JOIN、删线还要级联,不如整体读写;前面的投影列只供列表筛选与排序(见 store/breeding.go)。
+-- 双亲与子代存的都是**快照**(EggParent),不引用 pets:亲本可能被放生/送人,而这条
+-- 培育史应当留存 —— 与 eggs.parents 同一取舍。
+-- 品种 = **进化链**(evo 列,见 gamedata.ChainOf):链上任一阶段的个体都算这个品种,故
+-- species 只在 evo=0(无链形态)时才是匹配键。
+CREATE TABLE IF NOT EXISTS breeding_line (
+  account TEXT NOT NULL, id TEXT NOT NULL,
+  species TEXT, evo INTEGER NOT NULL DEFAULT 0, conf_id INTEGER,
+  target_voice INTEGER, target_weight_pct REAL, target_nature TEXT,
+  status TEXT, gen_count INTEGER,
+  best_voice INTEGER, best_weight_pct REAL,
+  created_at INTEGER, updated_at INTEGER, data TEXT,
+  PRIMARY KEY(account, id)
+);
+CREATE INDEX IF NOT EXISTS idx_breeding_line_account ON breeding_line(account, updated_at);
+
 -- 眠枭之星的收集状态(按账号、按刷新点)。1=未收集(收到过该点的 NPC 实体),2=已收集(走近了却
 -- 没有实体——已收集的星星服务器不刷,见 docs/data.md 3.4)。没有行 = 尚未确认(前端照常显示)。
 CREATE TABLE IF NOT EXISTS star_state (
@@ -474,6 +492,13 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
 	// 老库补 flower_challenges.end_ts 列(花种活动结束时间):本轮实现花种挑战计数时
 	// 老表无此列,直接 ALTER 加列;新库建表已含该列,报 duplicate column 可忽略。
 	if _, err := s.db.Exec(`ALTER TABLE flower_challenges ADD COLUMN end_ts INTEGER NOT NULL DEFAULT 0`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	// 老库补 breeding_line.evo 列(培育线认的品种 = 进化链 id,见 internal/pet/breeding.go):
+	// 品种口径从「形态名」改成「进化链」时新增,老线一律为 0 —— 读取时按 species 反查补齐
+	// (见 store/breeding.go 的 fillLineChain),故不必在此回填。
+	if _, err := s.db.Exec(`ALTER TABLE breeding_line ADD COLUMN evo INTEGER NOT NULL DEFAULT 0`); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}

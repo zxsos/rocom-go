@@ -91,10 +91,10 @@ export function usePois(account, res) {
   // 本场景有点位的图层才给开关(如魔法学院只有魔力之源);标记只画开启的图层。
   // 这些都只随 poi 数据走,useMemo 缓存,位置推送不触发重算。
   //
-  // 排除 gather:3552 个候选点全画出来糊成一片,没有实用价值 ——
+  // 排除 gather:3766 个候选点全画出来糊成一片,没有实用价值 ——
   // 想知道「此刻能采什么」有实时采集物图层(见 useGathers.js),它只画服务器
-  // 当下真下发的那几个(实测刷出率三到四成)。候选点**仍会加载**并用于品种清单
-  // (allPois),只是不再提供「全部画出来」这个开关。
+  // 当下真下发的那几个(实测刷出率三到四成)。候选点仍随 /api/pois 下发(后端按场景给),
+  // 但前端一个也不画:面板里已没有「全部画出来」这个开关,下面 marks 里再挡一道。
   const kinds = useMemo(() => poi.kinds.filter((k) => k.num > 0 && k.k !== GATHER_KIND), [poi])
   const iconOf = useMemo(() => Object.fromEntries(poi.kinds.map((k) => [k.k, k.icon])), [poi])
   const doneZones = useMemo(

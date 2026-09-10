@@ -4,7 +4,7 @@
     "image": {
       "bigHead": "BigHeadIcon256/3003.webp",
       "head": "HeadIcon/3003.webp",
-      "portrait": "Pet1024/JL_huohua.webp",
+      "portrait": "",
       "portraitSmall": "Pet256/JL_huohua.webp"
     },
     "name": "火花",
@@ -16,7 +16,7 @@
     "image": {
       "bigHead": "BigHeadIcon256/3032.webp",
       "head": "HeadIcon/3032.webp",
-      "portrait": "Pet1024/JL_yanhuo.webp",
+      "portrait": "",
       "portraitSmall": "Pet256/JL_yanhuo.webp"
     },
     "name": "焰火",
@@ -28,7 +28,7 @@
     "image": {
       "bigHead": "BigHeadIcon256/3006.webp",
       "head": "HeadIcon/3006.webp",
-      "portrait": "Pet1024/JL_huoshen.webp",
+      "portrait": "",
       "portraitSmall": "Pet256/JL_huoshen.webp"
     },
     "name": "火神",
@@ -40,7 +40,7 @@
     "image": {
       "bigHead": "BigHeadIcon256/4006.webp",
       "head": "HeadIcon/4006.webp",
-      "portrait": "Pet1024/JL_huoshen_shouling.webp",
+      "portrait": "",
       "portraitSmall": "Pet256/JL_huoshen_shouling.webp"
     },
     "name": "烈火战神",

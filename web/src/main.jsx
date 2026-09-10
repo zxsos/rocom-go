@@ -10,6 +10,7 @@ const PetDetail = lazy(() => import('./pages/pet-detail/PetDetail'))
 const Debug = lazy(() => import('./pages/debug/Debug'))
 const MapPage = lazy(() => import('./pages/map/MapPage'))
 const EggList = lazy(() => import('./pages/eggs/EggList'))
+const Breeding = lazy(() => import('./pages/breeding/Breeding'))
 const Merchant = lazy(() => import('./pages/merchant/Merchant'))
 const Flowers = lazy(() => import('./pages/flowers/Flowers'))
 const Trial = lazy(() => import('./pages/trial/Trial'))
@@ -26,6 +27,7 @@ import './styles/pet.css'
 import './styles/list.css'
 import './styles/events.css'
 import './styles/eggs.css'
+import './styles/breeding.css'
 import './styles/merchant.css'
 import './styles/detail.css'
 import './styles/map.css'
@@ -62,6 +64,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="pets/:gid" element={<PetDetail />} />
             <Route path="events" element={<Events />} />
             <Route path="eggs" element={<EggList />} />
+            <Route path="breeding" element={<Breeding />} />
             <Route path="merchant" element={<Merchant />} />
             <Route path="map" element={<MapPage />} />
             <Route path="flowers" element={<Flowers />} />

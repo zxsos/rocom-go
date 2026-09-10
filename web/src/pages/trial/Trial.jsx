@@ -46,16 +46,24 @@ export default function Trial() {
   const { data, setData } = useAsyncData(useCallback(() => getTrial(), []), { reloadKey: account })
   const [tab, setTab] = useState('run') // run | history | encounters
 
-  // 遇见记录是**累积历史**(读库,不经 SSE),且只在切到该页时才需要 ——
-  // 三章近 800 只精灵,随本局状态一起加载纯属浪费。故按需拉取,
-  // 换账号时清掉重来。
+  // 遇见记录是**累积历史**(读库,不经 SSE)。
+  //
+  // 「本局」也要用它:候选精灵里哪些是「图鉴未解锁」(本章还没遇见过)得靠它判定,
+  // 故除「档案」页外都拉(档案只看战绩,用不上)。
   const [enc, setEnc] = useState(null)
-  // 加一个自增序号当重拉信号:清空记录后要让页面重新取数,而 tab/account 都没变,
+  // 加一个自增序号当重拉信号:要让页面重新取数,而 tab/account 都没变,
   // 光靠依赖数组触发不了 —— 用这个「世代」把刷新意图显式传下去。
   const [encGen, setEncGen] = useState(0)
+  // 只有换账号才把记录整份作废:旧数据不再属于这个账号,留着会把别人的战绩当成这一章的。
+  useEffect(() => { setEnc(null) }, [account])
+  // 重拉(切页 / 打完一场)时要不要先清空,看这一页自己需不需要「加载中…」这个反馈:
+  // 遇见记录页正是靠它(EncountersView 见 !data 就显示加载中)回应点「刷新」的,
+  // 本局页的「未解锁」角标却挂在 enc 上 —— 清空就是整片先灭再亮,而打完一场就重拉一次,
+  // 那一下闪得很明显。故只有前者清,拉到再整份替换;拉不到时 getTrialEncounters 给
+  // null,两边都退回「不判定」。
   useEffect(() => {
-    setEnc(null)
-    if (tab !== 'encounters') return
+    if (tab === 'history') return
+    if (tab === 'encounters') setEnc(null)
     let alive = true
     getTrialEncounters().then((d) => { if (alive) setEnc(d) })
     return () => { alive = false }
@@ -117,7 +125,7 @@ export default function Trial() {
 
       {tab === 'run'
         ? (run
-          ? <RunView run={run} active={data.active} />
+          ? <RunView run={run} active={data.active} enc={enc} />
           : <div className="empty">还没有进行过一局(游戏内进入一次草系徽章试炼后自动同步)</div>)
         : tab === 'history'
           ? (history
@@ -248,9 +256,25 @@ function PetGrid({ pets }) {
 }
 
 // RunView 展示一局:进度条 + 试炼宠物 + 当前节点/祝福/奖励/商店 + 操作流水。
-function RunView({ run, active }) {
+function RunView({ run, active, enc }) {
   const pet = run.pet
   const chapters = run.chapters || []
+  // 「图鉴未解锁」= 本章遇见记录里还没遇到过的精灵(遇见记录按章独立,见 EncountersView:
+  // 第 1 章打过照面不解锁第 2 章)。候选精灵遇到了就能点亮,故未解锁的才是值得留意的。
+  //
+  // enc 没拉到时**不判定**(book 为空 → isLocked 为 null):宁可一个都不标,
+  // 也不能在数据没到时把已经解锁的标成未解锁 —— 标错比不标更糟。
+  // chapterIdx 为 0 表示后端没推出章节(见 pipeline.chapterIdxOf),这时同样不判定 ——
+  // 兜底成第 1 章会拿第 1 章的记录去判第 2 章的精灵,正好撞上上面那条。
+  const chapterIdx = run.chapterIdx || 0
+  const book = chapterIdx
+    ? ((enc && enc.chapters) || []).find((b) => b.chapter === chapterIdx)
+    : null
+  const seenBases = new Set()
+  for (const group of [book && book.normal, book && book.boss, book && book.extra]) {
+    for (const p of group || []) if (p.seen) seenBases.add(p.base)
+  }
+  const isLocked = book ? (base) => Boolean(base) && !seenBases.has(base) : null
   // 章节进度:chapters 是服务器给的可选章节(如 3000/3001/3002),chapterIdx 为第几章
   const perChapter = 8 // 每章 8 个节点(实测 3 章 × 8 节点)
   const doneNodes = chapters.length
@@ -312,7 +336,7 @@ function RunView({ run, active }) {
         <section className="trial-group">
           <h4 className="trial-group-t">当前节点({run.options.length} 个事件)</h4>
           <div className="trial-opts">
-            {run.options.map((o) => <OptionCard key={o.slot} o={o} />)}
+            {run.options.map((o) => <OptionCard key={o.slot} o={o} isLocked={isLocked} />)}
           </div>
           {run.refreshCost > 0 && (
             <div className="muted trial-note">本节点刷新已花费 {run.refreshCost} 金币</div>
@@ -331,7 +355,7 @@ function RunView({ run, active }) {
             进入战斗前只能列出候选;实际遭遇以游戏内为准
           </div>
           <div className="trial-opps">
-            {run.opponents.map((o) => <OpponentCard key={o.id} o={o} />)}
+            {run.opponents.map((o) => <OpponentCard key={o.id} o={o} isLocked={isLocked} />)}
           </div>
         </section>
       )}
@@ -463,7 +487,7 @@ function ResultCard({ result }) {
 // OpponentCard 是第 7 层的一个候选 NPC 阵容:标题是 NPC 名,下面是它带的精灵。
 // 每只精灵带名字与头像 —— 都由后端补齐(头像并非每个形态都有,缺图时 img 为空,
 // ImgAvatar 会自己占位,这里不用管)。
-function OpponentCard({ o }) {
+function OpponentCard({ o, isLocked }) {
   return (
     <div className="trial-opp">
       <div className="trial-opp-name">
@@ -471,12 +495,20 @@ function OpponentCard({ o }) {
         <span className="muted trial-opp-id"> #{o.id}</span>
       </div>
       <div className="trial-opp-pets">
-        {(o.pets || []).map((p) => (
-          <div key={p.base} className="trial-opp-pet" title={p.name || String(p.base)}>
-            <ImgAvatar src={p.img} alt={p.name} className="trial-opp-img" />
-            <span>{p.name || p.base}</span>
-          </div>
-        ))}
+        {(o.pets || []).map((p) => {
+          const locked = Boolean(isLocked && isLocked(p.base))
+          return (
+            <div
+              key={p.base}
+              className={'trial-opp-pet' + (locked ? ' is-locked' : '')}
+              title={(p.name || String(p.base)) + (locked ? ' · 图鉴未解锁:本章还没遇到过' : '')}
+            >
+              <ImgAvatar src={p.img} alt={p.name} className="trial-opp-img" />
+              <span>{p.name || p.base}</span>
+              {locked && <span className="trial-locked">未解锁</span>}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -658,20 +690,26 @@ function IdChip({ id, name, used, current, desc }) {
 // 两种重掷都花金币但换的东西不同,故分开摆:换奖励只在这只精灵的 5 选 1 里重抽,
 // 换事件连精灵一起换掉(抽取池随之变成新精灵的那一套)—— 它不属于"这只精灵"
 // 的内容,放在方框外,免得被读成"这只精灵的一项"。
-function OptionCard({ o }) {
+function OptionCard({ o, isLocked }) {
   // 精灵:后端按官方 GRASS_TRIAL_EVENT_CONF 回填(带头像);官方表外的事件
   // (NPC 阵容/祝福/商人等)没有单只精灵可映射 —— 其中商人/魔力之源这类有官方
   // 事件名(o.eventName),头像位就显示它;真的查不到名字才退回「事件 {id}」占位。
   const petName = (o.pet && o.pet.name) || ''
   const petImg = (o.pet && o.pet.img) || ''
+  // 图鉴未解锁:这只精灵本章的遇见记录里还没有(isLocked 为空=数据未加载,不判定)。
+  // 事件没映射到精灵时(pet 缺失)也无从判定,不标。
+  const locked = Boolean(isLocked && o.pet && isLocked(o.pet.base))
   const pool = o.pool || []
   const used = new Set(o.used || [])
   const name = (id) => (o.names || {})[String(id)]
   // 效果文案:后端只给技能类 id 带(见 TrialOption.Descs),特性/碎片查不到。
   const desc = (id) => (o.descs || {})[String(id)]
   return (
-    <div className="trial-opt">
-      <div className="trial-opt-box">
+    <div
+      className="trial-opt"
+      title={locked ? '图鉴未解锁:本章遇见记录里还没有这只精灵,选它打一场即可点亮' : undefined}
+    >
+      <div className={'trial-opt-box' + (locked ? ' is-locked' : '')}>
         <div className="trial-opt-pet">
           {/* 头像右上角挂额外奖励(多是碎片):它是挂在**这个事件**上的,
               与抽取池里的奖励不是一回事,故单独成角标而非混进池子。 */}
@@ -690,6 +728,7 @@ function OptionCard({ o }) {
           </div>
           <div className="trial-opt-petname">
             {petName || o.eventName || <span className="trial-chip" title={`未知事件 id ${o.event}`}>事件 {o.event}</span>}
+            {locked && <span className="trial-locked">未解锁</span>}
           </div>
         </div>
 

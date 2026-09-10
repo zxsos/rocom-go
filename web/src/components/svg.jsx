@@ -40,6 +40,17 @@ export const IconEgg = (p) => (
   </S>
 )
 
+// 培育(逐代谱系:上代一点、下代两支)
+export const IconBreeding = (p) => (
+  <S {...p}>
+    <circle cx="12" cy="4.8" r="2.2" />
+    <circle cx="6" cy="19.2" r="2.2" />
+    <circle cx="18" cy="19.2" r="2.2" />
+    <path d="M12 7v3.6" />
+    <path d="M6 17v-2.4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2V17" />
+  </S>
+)
+
 // 炫彩星(四角星)
 export const IconSparkle = (p) => (
   <S {...p}>

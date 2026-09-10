@@ -25,10 +25,10 @@ import { fireWildNotify, NOTIFY_KEY, NOTIFY_DUAL_ONLY_KEY } from './wildNotify'
 // 体重/声音的阈值与开关已移出,改为共享的区间规则(见 utils/rules.js)。
 // 旧 v6 的 medals / medalOn / dual.medals 读出来后在下面的迁移 effect 里搬到规则上。
 const loadState = () => {
-  const base = { on: new Set(DEFAULT_SWITCHES), open: false, dual: false, legacy: null }
+  const base = { on: new Set(DEFAULT_SWITCHES), open: false, dual: false, hideStale: false, legacy: null }
   try {
     const v = JSON.parse(localStorage.getItem(LS_KEY))
-    // 旧键:读出来做迁移,同时把开关/展开/双牌这三个仍有效的字段带过来
+    // 旧键:读出来做迁移,同时把开关/展开/双牌/隐藏灰点这几个仍有效的字段带过来
     if ((!v || typeof v !== 'object' || Array.isArray(v)) && LEGACY_LS_KEY) {
       const old = JSON.parse(localStorage.getItem(LEGACY_LS_KEY) || 'null')
       if (old && typeof old === 'object' && !Array.isArray(old)) {
@@ -36,6 +36,7 @@ const loadState = () => {
           on: new Set(Array.isArray(old.on) ? old.on.filter((k) => SWITCH_KEYS.has(k)) : DEFAULT_SWITCHES),
           open: !!old.open,
           dual: !!(old.dual && old.dual.on),
+          hideStale: !!old.hideStale,
           legacy: old, // 交给迁移 effect 处理(阈值/开关搬到区间规则上)
         }
       }
@@ -46,13 +47,16 @@ const loadState = () => {
       on: new Set(Array.isArray(v.on) ? v.on.filter((k) => SWITCH_KEYS.has(k)) : DEFAULT_SWITCHES),
       open: !!v.open,
       dual: !!v.dual,
+      hideStale: !!v.hideStale,
       legacy: null,
     }
   } catch { return base }
 }
 const persist = (st) => {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({ on: [...st.on], open: st.open, dual: st.dual }))
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      on: [...st.on], open: st.open, dual: st.dual, hideStale: st.hideStale,
+    }))
   } catch { /* 隐私模式下 localStorage 不可写,忽略即可 */ }
 }
 
@@ -73,6 +77,7 @@ export function useWildPets(account) {
   const [on, setOn] = useState(st.on)
   const [open, setOpen] = useState(st.open)
   const [dual, setDual] = useState(st.dual)
+  const [hideStale, setHideStale] = useState(st.hideStale)
 
   // —— 迁移:把旧版「奖牌四件套」的阈值与开关搬到共享区间规则上 ——
   //
@@ -123,6 +128,9 @@ export function useWildPets(account) {
   const seenIdsRef = useRef(new Set())
   const initedRef = useRef(false)
   useEffect(() => {
+    // 空列表不参与「已见」结转:点过「清空」或这会儿确实一只都没有时,不能把已见集合清光 ——
+    // 否则同一批宠下次推回来会被当成「新出现」,走回去一趟能把提醒重弹一遍。
+    if (!pets.length) return
     const ids = new Set(pets.map((p) => p.id))
     for (const id of [...seenIdsRef.current]) if (!ids.has(id)) seenIdsRef.current.delete(id)
     if (!notify || !initedRef.current) {
@@ -169,8 +177,8 @@ export function useWildPets(account) {
   // 写盘本身幂等,但同类的「申请通知权限」不是(见下方 toggleNotify 的说明),
   // 故统一收口到此,避免将来再踩同一个坑。
   useEffect(() => {
-    persist({ on, open, dual })
-  }, [on, open, dual])
+    persist({ on, open, dual, hideStale })
+  }, [on, open, dual, hideStale])
 
   const toggle = (k) => {
     setOn((prev) => {
@@ -181,6 +189,14 @@ export function useWildPets(account) {
   }
 
   const toggleDual = () => setDual((prev) => !prev)
+  const toggleHideStale = () => setHideStale((prev) => !prev)
+
+  // clear 清掉当前这一批标记 —— **只清前端**:后端管线里的观测态(见过谁、什么时候离开)
+  // 一点没动。后端按 150ms 窗口推全量(见后端 wildsDebounce 的实测),玩家一走动、有实体
+  // 进出就再推一批过来 —— 故这是「卡顿得受不了时把这一屏先清干净」,站着不动时一直有效,
+  // 不是删数据。真删要动后端,而那与「不值得为它留删数据入口」的既有决定相左
+  // (见 server.go 里 DELETE /api/wildpets 那段注释)。
+  const clear = useCallback(() => setData({ pets: [], allPets: [] }), [setData])
   // 双牌开关变化时联动「仅双牌时提醒」:开 → 自动勾选(一步到位「只看双牌 + 只提醒双牌」);
   // 关时不自动取消(保留用户选择;关后 isDualMedal 仍按 ≥2 条判,仍能工作)。
   // 只改 state,落盘交给上面那个 effect(避免 updater 里的副作用)。
@@ -198,23 +214,27 @@ export function useWildPets(account) {
   // 「全部野生」图层(all 开关):数据源是 allPets(普通野生宠,后端 wildAllMark),不走
   // kinds 命中也不走区间规则,style 给空对象(无描边,渲染层靠 .map-wild-all 降级样式)。
   const marks = useMemo(() => {
+    // 隐藏灰点:已离开视野的「最后所见」在图上一样占一个标记,而它们回答不了
+    // 「此刻有什么」—— 只是「这一带见过什么」的备忘。TTL 4 小时(见后端 wildStaleTTL),
+    // 跑久了灰点能比视野内的还多,是标记数量的大头,故给一道独立的闸。
+    const keep = (p) => !(hideStale && p.stale)
     const rare = pets
-      .filter((p) => wildShown(p, on, rangeRules, dual))
+      .filter((p) => keep(p) && wildShown(p, on, rangeRules, dual))
       .map((p) => ({ ...p, style: wildRing(p, on, rangeRules) }))
     // 普通野生宠:all 开关打开时才加入,标记上挂 all:true 让渲染层用降级样式。
     const all = on.has('all')
-      ? allPets.map((p) => ({ ...p, all: true, style: {} }))
+      ? allPets.filter(keep).map((p) => ({ ...p, all: true, style: {} }))
       : []
     // 稀有在后(数组末尾),DOM 顺序靠后 → 默认压在普通宠之上(z-index 相同时后者居上)。
     return [...all, ...rare]
-  }, [pets, allPets, on, rangeRules, dual])
+  }, [pets, allPets, on, rangeRules, dual, hideStale])
 
   // 计数与地图上画出的标记一一对应:灰点(已离开视野的最后所见)也画在图上,
   // 故也计入——否则侧栏显示 0 而图上还挂着几个,只会让人以为标记出错了。
   // 另单算其中的灰点数,供侧栏悬浮说明拆开「视野内 / 已离开」(见 LayerPanel)。
   // all 行的计数取 allPets 长度(普通宠不参与稀有类别的判定)。
   // ruleNum 是**逐条规则**的命中数,供规则编辑器显示(与事件页同一个 counts 接口)。
-  const [num, numStale, ruleNum] = useMemo(() => {
+  const [num, numStale, ruleNum, staleTotal] = useMemo(() => {
     const layerHit = (l, p) => (p.kinds || []).some((k) => l.kinds.includes(k))
     const countLayer = (l, pick) => pets.filter((p) => pick(p) && layerHit(l, p)).length
     const num = Object.fromEntries(
@@ -229,15 +249,22 @@ export function useWildPets(account) {
     // 双牌计数:命中 ≥2 条(与 wildShown 双牌段的口径一致)。
     num.dual = pets.filter((p) => isDualMedal(p, rangeRules)).length
     numStale.dual = pets.filter((p) => p.stale && isDualMedal(p, rangeRules)).length
-    return [num, numStale, ruleNum]
+    // 灰点总数(面板上「隐藏已离开视野的」那行显示它能减掉多少):pets 与 allPets 的键
+    // 不重叠,直接数一遍即精确值 —— 不能拿 numStale 各层求和,一只宠同时命中异色与某条
+    // 规则会被好几层重复计上。
+    let staleTotal = 0
+    for (const p of pets) if (p.stale) staleTotal++
+    for (const p of allPets) if (p.stale) staleTotal++
+    return [num, numStale, ruleNum, staleTotal]
   }, [pets, allPets, rangeRules])
 
   return {
-    marks, num, numStale, ruleNum,
+    marks, num, numStale, ruleNum, staleTotal,
     on, toggle,
     open, toggleOpen,
     rangeRules, setRangeRules,
     dual, toggleDual,
+    hideStale, toggleHideStale, clear,
     notify, toggleNotify, notifyDualOnly, toggleNotifyDualOnly,
   }
 }

@@ -1,0 +1,504 @@
+/* 培育页(见 pages/breeding/):培育线列表 + 详情(代数时间线 / 目标 / 选配建议 / 手动补录)。
+
+   与「精灵蛋」页同族:深底 + 毛玻璃面板 + accent 蓝高亮,数据密集、信息优先,
+   全部走 base.css 的既有变量(不新增色板)。
+
+   数值一律等宽对齐(tabular-nums 已由 base.css 全站开启,数值字体走 --font-num):
+   这一页的核心是**纵向比较**(第 N 代 vs 第 N-1 代、回交 vs 换种),数字不对齐就没法扫。 */
+
+/* ---- 页面骨架 ---- */
+
+.br-page { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.br-page .toolbar { margin-bottom: 0; }
+.br-page .toolbar h3 { display: flex; align-items: center; gap: 6px; margin: 0; }
+
+/* 培育线卡片网格:自适应列宽,窄屏一列。最小 300px 是卡片里
+   「母 × 父 → 子代」一行放得下的宽度,再窄就只能折行、失去「一行一代」的可读性。 */
+.br-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* 详情两栏:左时间线(宽、纵向长)、右决策栏(目标 / 进度 / 建议)。
+   右侧固定窄列而不是等分:建议与进度是**短数字块**,给宽了只是多留白,
+   而时间线每宽一点就能少折一次行。 */
+.br-cols {
+  display: grid; gap: 14px; align-items: start;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 26vw, 380px);
+}
+.br-main, .br-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* ---- 面板 / 区块 ---- */
+
+.br-panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 82%, transparent), var(--bg-1));
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 13px 14px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+}
+.br-sec-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.br-sec-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.br-sec-head h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.br-sec-head .muted { font-size: 12px; }
+.br-hint { font-size: 12px; line-height: 1.6; margin: 0; }
+.br-error { color: var(--red); font-size: 12px; margin: 0; }
+
+/* 表单字段:标签在上、控件在下(窄列里横排会把控件压到看不清选中的那一项) */
+.br-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.br-field > span { font-size: 11px; color: var(--fg-dim); }
+.br-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.br-check {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--fg-dim); cursor: pointer;
+}
+.br-check input { cursor: pointer; }
+
+/* ---- 目标编辑 ---- */
+
+.br-goal-inputs { display: grid; gap: 9px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.br-goal-tpl { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 「性格正面加某维」开关。与上面的目标模板同一种 chip 外观,故靠行首标签把它和模板分开 ——
+   两排 chip 挨着、又不加标签时,会被读成「都是把某项推极限的模板」,而它们改的是性格目标。
+   不加「只在窄屏可见」一类的折叠:这一排就是目标编辑器的主入口之一,藏起来玩家找不到。 */
+.br-natdims { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.br-natdims-k { font-size: 11px; color: var(--fg-dim); }
+.br-natdim { font-variant-numeric: tabular-nums; }
+.br-goal-act { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 12px; }
+
+/* 新建线:品种一行独占(它是这条线以后自动记录的匹配键,填错就收不到自动代数了) */
+.br-new-species { max-width: 260px; }
+.br-new { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.br-filters { gap: 9px; }
+.br-filters .input { max-width: 200px; }
+.br-status-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---- 培育线卡片 ---- */
+
+.br-card {
+  display: flex; flex-direction: column; gap: 9px; text-align: left;
+  padding: 12px 13px; border-radius: var(--radius-lg); cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 82%, transparent), var(--bg-1));
+  border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  color: var(--fg); font: inherit;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.br-card:hover {
+  border-color: var(--accent); transform: translateY(var(--lift));
+  box-shadow: var(--shadow);
+}
+.br-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
+/* 待认领的线在网格里要能一眼挑出来(它是唯一「需要你动手」的状态) */
+.br-card.has-pending { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+/* 已达成 / 归档的线退到后面:不删,但别抢进行中那几条的注意力 */
+.br-card.s-done, .br-card.s-archived { opacity: .78; }
+.br-card.s-archived { opacity: .62; }
+
+.br-card-top { display: flex; align-items: center; gap: 9px; }
+.br-card-img {
+  width: 38px; height: 38px; flex: none; border-radius: var(--radius-md);
+  background: var(--bg-3); object-fit: contain;
+}
+.br-card-img.ph { display: grid; place-items: center; color: var(--fg-dim); font-size: 15px; }
+.br-card-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.br-card-species {
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.br-card-sub { font-size: 11px; }
+.br-status {
+  flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--fg-dim); background: var(--bg-3);
+}
+.br-status.s-active { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+.br-status.s-done { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+
+/* 目标徽标:三枚都画(没填的显示「—」),卡片高度才不会一张高一张矮 */
+.br-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.br-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.br-badge em { font-style: normal; font-size: 10px; opacity: .65; }
+.br-badge.on { color: var(--fg); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--accent-soft); }
+
+/* 离目标还有多远:条 + 文字。只用一条进度语言(与建议面板的差距条同款),
+   两处都表示「越满越好」,不出现反向的条。 */
+.br-bars { display: flex; flex-direction: column; gap: 5px; }
+.br-bar { display: flex; align-items: center; gap: 7px; font-size: 11px; min-width: 0; }
+.br-bar-k { flex: none; width: 14px; color: var(--fg-dim); font-weight: 600; }
+.br-bar-t {
+  flex: 1; min-width: 0; height: 6px; border-radius: 999px;
+  background: var(--bg-3); overflow: hidden;
+}
+.br-bar-f {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+  transition: width var(--dur-base) var(--ease-out);
+}
+.br-bar-f.w { background: linear-gradient(90deg, var(--c-earn), var(--green)); }
+.br-bar-f.s { background: linear-gradient(90deg, var(--accent), var(--green)); }
+.br-bar-v { flex: none; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.br-card-hint { font-size: 11px; line-height: 1.5; }
+.br-card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.br-pend {
+  color: var(--gold); font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--gold) 50%, var(--line));
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  padding: 1px 7px; border-radius: 999px;
+}
+.br-best { color: var(--fg-dim); display: inline-flex; align-items: center; gap: 5px; }
+.br-best b { color: var(--fg); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* ---- 宠物一行(时间线里的母 / 父 / 子代共用) ----
+
+   「角色 V 头像 名字 V值 W值 性格 Δ」一行。所有数值带 V/W 前缀:
+   窄屏折行时位置关系就没了,靠前缀才分得清哪个数是嗓音。 */
+.br-pi {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  padding: 3px 8px 3px 6px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line);
+  font-size: 12px; color: var(--fg); white-space: nowrap;
+}
+button.br-pi { cursor: pointer; font: inherit; font-size: 12px; }
+button.br-pi:hover { border-color: var(--accent); background: var(--accent-soft); }
+button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.br-pi-ph { border-style: dashed; color: var(--fg-dim); }
+.br-pi-role { font-size: 11px; color: var(--fg-dim); flex: none; }
+.br-pi-img { width: 20px; height: 20px; flex: none; border-radius: 4px; object-fit: contain; background: var(--bg-2); }
+.br-pi-img.ph { display: grid; place-items: center; color: var(--fg-dim); }
+.br-pi-name { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+.br-pi-v, .br-pi-w { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--fg-dim); }
+.br-pi-nature { color: var(--c-form); font-size: 11px; }
+/* 缺性格:留一个灰占位而不是整列消失(见 PetInline 的注释)——
+   时间线逐行对齐扫,少一列会让同一列的数字错位。 */
+.br-pi-nature.na { color: var(--fg-dim); opacity: .55; }
+.br-pi-delta { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.br-pi-delta.up { color: var(--c-earn); }
+.br-pi-delta.down { color: var(--fg-dim); }
+
+/* ---- 代数时间线 ---- */
+
+.br-timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+/* 纵向主轴:一条从第一代连到最后一代的细线,让「逐代推进」这件事一眼可见 */
+.br-timeline::before {
+  content: ''; position: absolute; left: 5px; top: 10px; bottom: 10px; width: 2px;
+  background: linear-gradient(180deg, var(--accent-soft), var(--line));
+}
+.br-gen {
+  position: relative; padding: 9px 0 9px 24px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.br-gen:last-child { border-bottom: 0; }
+.br-gen::before {
+  content: ''; position: absolute; left: 0; top: 14px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--bg-1); border: 2px solid var(--accent); box-sizing: border-box;
+}
+/* 待认领的一代:金色虚线圈 + 主轴上的点也换成金色 —— 这是唯一需要玩家动手的状态 */
+.br-gen.pending::before { border-color: var(--gold); border-style: dashed; }
+.br-gen.backcross::before { border-color: var(--c-flower); }
+
+.br-gen-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; }
+.br-gen-no { font-weight: 600; font-variant-numeric: tabular-nums; }
+.br-gen-at { font-size: 11px; margin-left: 2px; }
+.br-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--fg-dim); background: var(--bg-3);
+}
+.br-tag.bc { color: var(--c-flower); border-color: color-mix(in srgb, var(--c-flower) 45%, var(--line)); }
+.br-tag.amb { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.br-tag.wait { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+/* 待认领(破壳已确认)与待孵(还在等蛋)用两种颜色分开:都是「还没完」,但一个在等
+   游戏、一个在等玩家 —— 混成同色的话,那条可能永远停在原地的待孵代会被当成待办。 */
+.br-tag.claim { color: var(--c-form); border-color: color-mix(in srgb, var(--c-form) 50%, var(--line)); background: color-mix(in srgb, var(--c-form) 12%, transparent); }
+
+.br-gen-body {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 6px;
+}
+.br-gen-x, .br-gen-arrow { color: var(--fg-dim); flex: none; font-size: 12px; }
+.br-gen-fathers { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.br-gen-child { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+/* 备注换行而不是截断:截断后靠 title 才能读全,而触摸屏根本没有 hover ——
+   手机上一条被截掉的备注就等于没写(备注上限 80 字,最多两行)。 */
+.br-gen-note {
+  margin-top: 5px; font-size: 11px; padding-left: 2px;
+  overflow-wrap: anywhere;
+}
+/* 串窝的「其它候选」:比正式父本低一级(小一档字号 + 无边框底线),
+   它是**参考信息**而不是这一代的实际记录,不该和父本那一行争视觉重量。 */
+.br-gen-cands {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 11px;
+}
+.br-gen-edit {
+  margin-top: 8px; padding: 9px 10px; border-radius: var(--radius-md);
+  background: var(--bg-2); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+/* 手填属性:比外层编辑区再低一级(虚线框 + 更紧的内距)—— 它是「补缺省值」的兜底动作,
+   不是这一代的主编辑项(那是换父本/换子代),压得太重会抢走注意力。 */
+.br-fill {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 7px 8px; border-radius: var(--radius-md);
+  border: 1px dashed var(--line);
+}
+.br-fill-k { font-size: 11px; color: var(--fg-dim); }
+.br-fill-roles { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.br-fill-inputs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.br-gen-act { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ---- 手动补录 ---- */
+
+.br-record { flex-direction: column; }
+.br-rec-form { display: grid; gap: 9px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+/* ---- 进度概览 ---- */
+
+.br-stat-row {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 10px;
+  align-items: baseline; font-size: 12px;
+}
+.br-stat-k { color: var(--fg-dim); }
+.br-stat-v { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* ---- 选配建议 ---- */
+
+.br-sugs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.br-sug {
+  /* 头像边长,以及由它派生的头像中线 —— × 要对齐的就是这条线(见下面的 .br-x)。
+     两处都从这里算:断点里缩小头像时,若 × 的高度还写死着旧数字,它就是唯一没跟上的一处,
+     表现为「窄屏下 × 掉到名字那一行」。 */
+  --sug-av: 44px;
+  --sug-av-c: calc((var(--sug-av) + 14px) / 2); /* = 描边 1 + 卡片上内边距 6 + 边长/2 */
+  display: grid; gap: 6px 9px; align-items: center;
+  /* 序号一列 + 内容一列:母×父、理论值、差距条各占整行。
+     曾经是「序号 / 母×父 / 差距条」三列(挤成两行),但差距条那列是 auto(最少 108px),
+     内容列于是变成 1fr 的余量:右栏 clamp 到最窄 300px 时只剩 ~108px,两张竖排卡各分到
+     46px —— 连 44px 的头像都放不下,更别说下面那行 V/W 数值。
+     关键在「右栏窄于 380px」覆盖了 1080~1400px 这整段常见窗口宽度,不是手机上才会遇到的情况,
+     故不按视口断点分两套,直接以两列为准(内容列恒等于整行宽度,320px 视口下每张卡仍有 ~98px)。 */
+  grid-template-columns: 18px minmax(0, 1fr);
+  padding: 7px 9px; border-radius: var(--radius-md);
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+}
+.br-sug-rank {
+  grid-row: 1 / span 3; font-family: var(--font-num); font-size: 13px; font-weight: 700;
+  color: var(--fg-dim); text-align: center;
+}
+
+/* 「母 × 父」是**等宽三列**网格(卡 / × / 卡),不是 flex-wrap。
+   原先两只各是一枚横排胶囊 + flex-wrap:内容列窄时第二只必然被折到下一行,
+   中间的 × 就孤零零留在种母后面(看着就是「× 没对齐」)。
+   固定三列后:两卡永远等宽(× 恒在正中)、头像彼此对齐,且任何宽度都不折行。 */
+.br-sug-pair {
+  grid-column: 2; grid-row: 1;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 8px; min-width: 0;
+}
+/* × 与**头像**对齐,而不是与整张卡垂直居中:卡是竖排的,居中的话 × 会落在名字/数值那一带。
+   高度 = 2 × 头像中线(见 .br-sug 的 --sug-av-c),自身居中即落在中线上。 */
+.br-x {
+  align-self: start; height: calc(var(--sug-av-c) * 2); display: grid; place-items: center;
+  color: var(--fg-dim); font-size: 12px;
+}
+
+/* 候选卡片:头像在上、名字与数值在下(竖排)。
+   为什么竖排:内容列最窄时两只卡各约 100px,而横排一行(头像 + ♀ + 名字 + V + W)要 180 余px
+   —— 塞不下就只能截断数值。竖排后卡宽由最长的一行(V100 W118%,约 70px)决定,
+   头像因此能放大到 44px 而不加宽,而「认出是哪一只」靠的正是它。 */
+.br-sug-c {
+  display: grid; justify-items: center; gap: 3px; min-width: 0;
+  padding: 6px; border-radius: var(--radius-md); font-size: 12px;
+  border: 1px solid transparent; background: transparent; color: var(--fg);
+  cursor: pointer;
+}
+.br-sug-c em { font-style: normal; font-size: 10px; opacity: .6; }
+.br-sug-c.f em { color: var(--c-female); }
+.br-sug-c.m em { color: var(--c-male); }
+.br-sug-c:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.br-sug-c:disabled { cursor: default; }
+/* 这只宠已不在库里(快照里只剩个 gid):留一个同高的空位,免得整行塌下去。
+   高度随头像走(44 + 40 = 84),反正没有头像可画,别让两张卡一高一低。 */
+.br-sug-c.ph { place-items: center; min-height: calc(var(--sug-av) + 40px); color: var(--fg-dim); }
+
+.br-sug-av { width: var(--sug-av); height: var(--sug-av); border-radius: 9px; object-fit: cover; }
+/* 缺图(形态没图源)也占同样的位置:两张卡一高一低会让 × 看着又歪了 */
+.br-sug-av.ph { display: grid; place-items: center; background: var(--bg-3); font-size: 18px; }
+.br-sug-pn { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; }
+.br-sug-pv {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+}
+
+/* 双亲的性格:独占一行(上一行是等宽数字,性格是文字,混在一行会在最窄的列里被挤掉 ——
+   而它正是选种时要看的第三个数)。超长时截断,不换行:卡片宽度由最长那行决定,
+   一换行两张卡就一高一低,中间的 × 也跟着歪。 */
+.br-sug-nat {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--c-form);
+}
+
+/* .br-sug-n 两处共用:上面卡片里的名字,以及时间线里「当时可配的其它父本候选」的小胶囊 */
+.br-sug-n { max-width: 7em; overflow: hidden; text-overflow: ellipsis; font-family: inherit; }
+
+/* 「其它父本候选」的轻量胶囊(见 GenerationRow):一排可能十几个,故不做成上面的卡片。
+   12em 的上限让过长的名字截断,而不是把胶囊撑到换行。 */
+.br-sug-p {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 12em;
+  padding: 1px 6px; border-radius: 999px; font: inherit; font-size: 12px;
+  border: 1px solid transparent; background: transparent; color: var(--fg);
+  cursor: pointer; white-space: nowrap; overflow: hidden;
+}
+.br-sug-p em { font-style: normal; font-size: 10px; opacity: .6; }
+.br-sug-p.f em { color: var(--c-female); }
+.br-sug-p.m em { color: var(--c-male); }
+.br-sug-p span { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.br-sug-p:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.br-sug-p:disabled { cursor: default; }
+.br-sug-p.ph { color: var(--fg-dim); }
+
+.br-sug-exp { grid-column: 2; grid-row: 2; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; font-size: 12px; }
+.br-sug-exp-t { font-size: 10px; color: var(--fg-dim); }
+.br-sug-exp b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.br-sug-nature { color: var(--c-form); font-variant-numeric: tabular-nums; }
+/* 差距条独占一行:它要横着比(「哪一组更强」靠条长),被挤在窄列里就只能整体缩短,
+   比的精度跟着掉。min-width 不再是 108px —— 条的长度现在等于整行宽度,不需要兜底。 */
+.br-sug-score { grid-column: 2; grid-row: 3; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.br-sug-gap { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 嗓音达标标记:双亲达标(实心绿 —— 目标是上限时唯一能孵出目标的情形)/ 预计达标(描边) */
+.br-sug-vt {
+  font-size: 10px; padding: 1px 6px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--fg-dim); background: var(--bg-3);
+}
+.br-sug-vt.on {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, var(--line));
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+}
+
+/* 嗓音可达性:排在建议列表**之前**的一条前提 —— 够不着时列表照样给(最接近的几组仍有
+   参考价值),但必须先让玩家知道「照这批候选再配也到不了」。用警示色而非红色:
+   这不是错误,是「配法不对」的提示。 */
+.br-reach {
+  margin: 0; font-size: 12px; line-height: 1.6; padding: 7px 9px;
+  border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-2);
+}
+.br-reach.warn {
+  color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line));
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.br-reach.ok {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+.br-reach b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* ---- 回交对比 ----
+
+   刻意不用「推荐色底」盖满整块:这里给的是**两套数字 + 一句理由**,
+   玩家要自己权衡。故只在被推荐的那一栏加一条左侧色条,而不是把另一栏变灰。 */
+.br-back {
+  margin-top: 4px; padding: 10px; border-radius: var(--radius-md);
+  background: var(--bg-2); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.br-back.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.br-back-head { display: flex; align-items: center; gap: 8px; }
+.br-back-head h4 { margin: 0; }
+.br-verdict { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.br-verdict.yes { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+.br-verdict.no { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.br-back-reason { margin: 0; font-size: 12px; line-height: 1.6; }
+.br-back-cols { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.br-back-col {
+  padding: 8px 9px; border-radius: var(--radius-md);
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--line);
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.br-back-col.on { border-left-color: var(--accent); }
+.br-back-t { font-size: 11px; color: var(--fg-dim); }
+.br-back-v { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.br-back-p {
+  align-self: flex-start; padding: 0; border: 0; background: transparent;
+  color: var(--accent); font: inherit; font-size: 11px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.br-back-p:hover { text-decoration: underline; }
+
+/* ---- 详情头部 ---- */
+
+.br-detail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.br-detail-head { margin-bottom: 0; }
+.br-detail-meta { font-size: 12px; }
+/* 详情头部的品种选择器:它同时是这一屏的**标题**(见 LineDetail 的 changeKind),故按标题的
+   字重与字号画;宽度给上限 —— 链名最长会到「阿米亚特（阿米樱/罗隐/深渊罗隐）」这种,
+   不设上限会把状态胶囊挤出可视区。 */
+.br-detail-kind { flex: 0 1 300px; min-width: 170px; }
+.br-detail-kind .combo-input { font-weight: 600; font-size: 15px; }
+
+/* ---- 仓库定位弹窗 ----
+   复用 .detail-backdrop(全屏遮罩 + 点外部关闭)的交互,但卡片比宠物详情宽:
+   里面要放得下一整张盒子示意图(6 列 × 40px),460px 的窄卡片塞不进。
+   图本身在弹窗里去掉自己的底色与描边(见下面 .boxmap),免得卡片里再套一个盒子。 */
+.br-loc-card { width: 100%; max-width: 420px; margin: auto; display: flex; flex-direction: column; gap: 10px; }
+.br-loc-card .toolbar { margin-bottom: 0; }
+.br-loc-body {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 82%, transparent), var(--bg-1));
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 12px 13px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.br-loc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.br-loc-av { width: 34px; height: 34px; border-radius: 9px; object-fit: cover; flex: none; }
+.br-loc-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.br-loc-title b { font-size: 14px; }
+.br-loc-title .muted { font-size: 11px; }
+.br-loc-tag { font-size: 12px; }
+.br-loc-body .boxmap { background: transparent; border: none; padding: 0; }
+
+/* ---- 响应式 ---- */
+
+@media (max-width: 1080px) {
+  /* 两栏放不下时**整体转成单列**并按「先看时间线、再看建议」的顺序堆叠:
+     把右侧窄列压到 260px 以下只会让建议里的数字换行换得没法读。 */
+  .br-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 620px) {
+  .br-grid { grid-template-columns: minmax(0, 1fr); }
+  .br-goal-inputs { grid-template-columns: minmax(0, 1fr); }
+  /* 时间线的缩进与轴点收窄:手机上一行内容本就紧,24px 的左缩进白占掉了两个字符宽 */
+  .br-gen { padding-left: 18px; }
+  .br-timeline::before { left: 4px; }
+  /* PetInline 的 W 值在极窄屏可省(名字与 V 值才是第一眼要的),
+     不隐藏 —— 尺寸信息在点开详情里仍在,但这里是「培育」页,数值不能消失。
+     故只把名字的截断上限收紧,而不是丢列。 */
+  .br-pi-name { max-width: 6em; }
+
+  /* 补录表单强制单列:auto-fit + minmax(200px,1fr) 在 260px 里会算出「两列各 130px」,
+     两个下拉挤成一条 —— 触发按钮里连名字都放不下,更别说选中的数值。 */
+  .br-rec-form { grid-template-columns: minmax(0, 1fr); }
+
+  /* 详情头部竖着堆:标题 / 状态 / 元信息 / 删除各占整行(元信息本身较长,320 下它就会占满
+     一行,删除按钮因此落到下一行;实测 320 是四行)。原先全挤在一行,状态胶囊与
+     「N 代已记录 · 最近…」互相顶着换行,「删除这条线」还常被顶到单独一行最右边
+     (旁边一片空,像是页面出错了)。 */
+  .br-detail-kind, .br-detail-head .br-status-seg { flex: 1 1 100%; }
+  .br-detail-head .spacer { display: none; }
+  .br-detail-meta { flex: 1 1 auto; }
+
+  /* 建议卡的头像缩一档:把宽度让给名字与数值(× 的高度由 --sug-av-c 自动跟随,不会掉队) */
+  .br-sug { --sug-av: 34px; }
+}
+
+@media (max-width: 400px) {
+  /* 320~400:名字的截断上限再收一档。这一档里 V/W 数值与「Δ」仍要完整可读 ——
+     丢掉数值等于这一页白记(名字被截成「小」还能靠头像认出来,数值截掉就没得猜了)。 */
+  .br-pi-name { max-width: 4.5em; }
+  /* 侧栏/窄屏再收紧一次头像:44 → 34 → 30,同时 × 与缺图占位跟着缩 */
+  .br-sug { --sug-av: 30px; }
+}

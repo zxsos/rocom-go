@@ -1,5 +1,5 @@
 import React from 'react'
-import { imgURL } from '../../components/icons'
+import { imgURL } from './icons'
 
 // BoxMap 位置示意图:盒子 6 列 × 5 排(30 格)、队伍 3 列 × 6 行(18 格);
 // 有宠物格显示头像,灰=空,选中高亮。
@@ -7,6 +7,9 @@ import { imgURL } from '../../components/icons'
 //
 // 格子边长由 CSS 变量 --boxmap-cell 自适应(见 list.css),这里只按容器类型给列数:
 // 盒子 6 列是**最宽**的形态,窄侧栏下必须让格子缩小才不撑破侧栏。
+//
+// 住在 components/ 而非某个页面下:宠物页拿它当侧栏示意图,培育页的「定位」弹窗拿它指认
+// 建议里那只是哪一格 —— 两处必须是同一张图,玩家才能一次认位。
 export default function BoxMap({ container, selected, onCell, onPrev, onNext }) {
   const slots = (container && container.slots) || []
   const heads = (container && container.heads) || {}

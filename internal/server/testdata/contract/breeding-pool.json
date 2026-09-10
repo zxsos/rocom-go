@@ -1,0 +1,177 @@
+{
+  "evo": 3003,
+  "fathers": [
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2004,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小公丙",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 60,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2002,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小公乙",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": -20,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2003,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小子",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 88,
+      "weightKg": 88,
+      "weightPct": 0
+    }
+  ],
+  "kids": [
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2004,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小公丙",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 60,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2002,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小公乙",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": -20,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♂",
+      "gid": 2003,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小子",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 88,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♀",
+      "gid": 2001,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小母",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 40,
+      "weightKg": 88,
+      "weightPct": 0
+    },
+    {
+      "confId": 2000672,
+      "gender": "♂",
+      "gid": 1001,
+      "heightM": 1.8,
+      "heightPct": 42.42,
+      "img": "HeadIcon/3006.webp",
+      "name": "小火",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "S",
+      "voice": 12,
+      "weightKg": 92.5,
+      "weightPct": 10.26
+    }
+  ],
+  "mothers": [
+    {
+      "confId": 2000672,
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
+      "gender": "♀",
+      "gid": 2001,
+      "heightM": 1.5,
+      "heightPct": 0,
+      "img": "HeadIcon/3006.webp",
+      "name": "小母",
+      "nature": "固执",
+      "species": "火神",
+      "talentRank": "A",
+      "voice": 40,
+      "weightKg": 88,
+      "weightPct": 0
+    }
+  ],
+  "species": "火神"
+}

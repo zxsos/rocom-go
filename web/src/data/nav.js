@@ -1,5 +1,5 @@
 import {
-  IconBag, IconPaw, IconEgg, IconSparkle, IconBell,
+  IconBag, IconPaw, IconEgg, IconBreeding, IconSparkle, IconBell,
   IconMap, IconFlower, IconCoin, IconSuitcase, IconTrophy, IconTrail, IconHome,
 } from '../components/svg'
 
@@ -11,6 +11,7 @@ export const NAV = [
     children: [
       { to: '/pets', label: '精灵列表', icon: IconPaw },
       { to: '/eggs', label: '精灵蛋', icon: IconEgg },
+      { to: '/breeding', label: '培育', icon: IconBreeding },
       { to: '/handbook', label: '炫彩图鉴', icon: IconSparkle },
       { to: '/events', label: '捕获事件', icon: IconBell },
     ],

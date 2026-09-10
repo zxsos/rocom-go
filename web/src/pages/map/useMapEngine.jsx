@@ -408,7 +408,9 @@ const PoiLayer = React.memo(({ marks, mapPx }) => (
 ))
 
 // GatherLayer 实时采集物:此刻玩家周围真刷着的那些(与 PoiLayer 的候选点相对)。
-// 图标用**实体自己的品种图标**;查不到品种时退回一个通用标记,不在图上留空白。
+// 图标用**实体自己的品种图标**;10 个品种客户端没出图标资产,后端已退回图层标记
+// (见 internal/gamedata 的 GatherLayerIcon),故这里的圆点只是最后一道兜底 ——
+// 连图层标记都没 embed 时,别在图上留空白。
 const GatherLayer = React.memo(({ marks, mapPx }) => (
   <>{marks.map((g) => (
     <div key={g.id} className="map-gather" title={g.n || '采集物'}

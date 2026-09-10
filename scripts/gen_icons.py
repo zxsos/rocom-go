@@ -77,14 +77,44 @@ WORLDMAP_TEX = {
 
 
 def gather_icons() -> dict:
-    """采集物(花/草/菌/矿/果树)的大地图钉:MEGAMAP_CONF.class==8 的 48 个品种。
+    """采集物(花/草/菌/矿/果树)的大地图钉:MEGAMAP_CONF.class==8 里能取到图标的 46 个品种。
 
     与不咕钟零件同一机制——游戏大地图直接复用背包图标,icon 列就是 BagItem 编号
     (如 100211 可可果),不在 WorldMapNpc 图集里,故走 copy_texture。
     清单从表里读而非手抄编号:品种随版本增删时免得漏。
+
+    56 个品种里 46 个能这么取:另有 10 个的 icon 不是编号 —— 或为空(创愈草/星芒花),或写着
+    模型/蓝图名 BP_NPC_EnvComInte_<拼音>(icon 列只存拼音:结晶花 jiejinghua/机械零件…)。
+    后一类里有 5 个能在 BAG_ITEM_CONF 里找到同名物品(采集物采出的本就是那件物品),图标改取
+    物品的 icon 字段(见 gather_icon_fallback,与 gen_gamedata.py 的 _gather_icon 同规则);
+    剩下 5 个确实没有图标,不筛掉的话每跑一次都会报「缺 PNG」,像缺口却不是:它们的点位在
+    实时层由 GatherLayerIcon 退回图层标记(见 docs/data.md 3.3)。判据用 isdigit():能取的
+    icon 全是纯数字的 BagItem 编号,缺图的那些一律是拼音蓝图名。
     """
-    return {str(r["icon"]): r["genre"] for r in load_rows("MEGAMAP_CONF").values()
-            if r.get("class") == 8 and r.get("icon") and r.get("genre")}
+    out = {str(r["icon"]): r["genre"] for r in load_rows("MEGAMAP_CONF").values()
+           if r.get("class") == 8 and r.get("genre")
+           and str(r.get("icon") or "").isdigit()}
+    out.update(gather_icon_fallback())
+    return out
+
+
+def gather_icon_fallback() -> dict:
+    """icon 不是 BagItem 编号的品种,回退到 BAG_ITEM_CONF 里同名物品的背包图标。
+
+    这批品种(结晶花/紫绒花/结晶枝/蛇蔓藤/机械零件)的 icon 列写的是模型/蓝图名,客户端没有
+    以此命名的图标;但采集物采出的本就是那件同名物品(结晶花 100851),物品的 icon 字段指向
+    真正的图标资产(BagItem/101005)。返回 {图标资产名: 品种名},走 copy_texture 与数字编号
+    那批同路。与 gen_gamedata.py 的 _gather_icon **必须同源**:那边把图标名写进点位的 i,
+    这边负责把同名 webp 拷出来,只改一处就是「有 i 无图」。
+    """
+    genres = {r["genre"] for r in load_rows("MEGAMAP_CONF").values()
+              if r.get("class") == 8 and r.get("genre") and not str(r.get("icon") or "").isdigit()}
+    out = {}
+    for r in load_rows("BAG_ITEM_CONF").values():
+        n, ic = r.get("name"), r.get("icon")
+        if n in genres and isinstance(ic, str) and ic:
+            out.setdefault(basename(ic), n)
+    return out
 
 
 # ── 基础设施 ──────────────────────────────────────────────

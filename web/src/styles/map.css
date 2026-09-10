@@ -332,8 +332,8 @@
 .map-poi.sure { filter: drop-shadow(0 0 3px var(--c-star)) drop-shadow(0 0 6px var(--c-star)); }
 
 /* 实时采集物(此刻真刷着的那几个)。与 .map-poi 同源同形,但**加一圈亮边把它抬出来**:
-   它常常叠在 POI 图层的候选点上(同一个品种的候选点可能有几十个),没有视觉区分时
-   玩家分不清哪个是「这会儿真有」、哪个只是「这儿会有」。
+   图标是背包物品图,没有这圈亮边就和底图上的贴图混在一起了。
+   (它从前还要与 POI 图层的候选点区分,而候选点现已不画,见 usePois 的 kinds。)
    采完即撤、不留灰点(见 useGathers.js),故不需要 .sure 那类状态样式。 */
 .map-gather {
   position: absolute; display: flex; align-items: center; justify-content: center;
@@ -343,7 +343,8 @@
     drop-shadow(0 0 3px var(--c-star)) drop-shadow(0 0 6px rgba(255, 215, 120, .75));
 }
 .map-gather img { width: auto; height: 30px; display: block; }
-/* 品种图标缺失时的兜底圆点:不留空白,免得图上有个说不出是什么的洞。 */
+/* 最后一道兜底圆点:品种没有图标资产时后端已退回图层标记(见 useMapEngine 的 GatherLayer),
+   真走到这里(连图层标记都没 embed)也别留空白,免得图上有个说不出是什么的洞。 */
 .map-gather-dot {
   width: 12px; height: 12px; border-radius: 50%;
   background: var(--c-star); box-shadow: 0 0 0 2px rgba(255, 255, 255, .85);

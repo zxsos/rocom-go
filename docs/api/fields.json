@@ -16,6 +16,276 @@
       }
     ]
   },
+  "breeding": {
+    "desc": "培育线列表(含选种建议、回交对比与嗓音可达性)",
+    "endpoint": "GET /api/breeding",
+    "sample": "internal/server/testdata/contract/breeding.json",
+    "shape": {
+      "lines": [
+        {
+          "backcross": {
+            "advised": "bool",
+            "altExp": {
+              "natureFrom": "str",
+              "natureP": "int",
+              "voice": "int",
+              "weightHi": "int",
+              "weightPct": "int"
+            },
+            "exp": {
+              "natureFrom": "str",
+              "natureP": "float",
+              "voice": "int",
+              "weightHi": "int",
+              "weightPct": "int"
+            },
+            "reason": "str",
+            "withParent": {
+              "confId": "int",
+              "gender": "str",
+              "gid": "int",
+              "heightM": "float",
+              "heightPct": "int",
+              "img": "str",
+              "name": "str",
+              "nature": "str",
+              "species": "str",
+              "talentRank": "str",
+              "voice": "int",
+              "weightKg": "int",
+              "weightPct": "int"
+            }
+          },
+          "chainName": "str",
+          "confId": "int",
+          "createdAt": "int",
+          "evo": "int",
+          "gens": [
+            {
+              "at": "int",
+              "child": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "father": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "gen": "int",
+              "mother": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "note": "str",
+              "source": "str"
+            }
+          ],
+          "goal": {
+            "nature": "str",
+            "natureIn": [
+              {}
+            ],
+            "voice": "int",
+            "weightPct": "int"
+          },
+          "id": "str",
+          "pending": [
+            {
+              "at": "int",
+              "fathers": [
+                {
+                  "confId": "int",
+                  "gender": "str",
+                  "gid": "int",
+                  "heightM": "float",
+                  "heightPct": "int",
+                  "img": "str",
+                  "name": "str",
+                  "nature": "str",
+                  "species": "str",
+                  "talentRank": "str",
+                  "voice": "int",
+                  "weightKg": "int",
+                  "weightPct": "int"
+                }
+              ],
+              "gen": "int",
+              "mother": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "source": "str"
+            }
+          ],
+          "reach": {
+            "best": "int",
+            "hit": "bool",
+            "target": "int"
+          },
+          "species": "str",
+          "status": "str",
+          "suggest": [
+            {
+              "ambiguous": "bool",
+              "backcross": "bool",
+              "exp": {
+                "natureFrom": "str",
+                "natureP": "float",
+                "voice": "int",
+                "weightHi": "int",
+                "weightPct": "int"
+              },
+              "father": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "mother": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
+              "score": "float"
+            }
+          ],
+          "updatedAt": "int"
+        }
+      ]
+    }
+  },
+  "breeding-pool": {
+    "desc": "补录候选池(按品种给种母/种公/子代)",
+    "endpoint": "GET /api/breeding/pool",
+    "sample": "internal/server/testdata/contract/breeding-pool.json",
+    "shape": {
+      "evo": "int",
+      "fathers": [
+        {
+          "confId": "int",
+          "eggGroups": [
+            {}
+          ],
+          "gender": "str",
+          "gid": "int",
+          "heightM": "float",
+          "heightPct": "int",
+          "img": "str",
+          "name": "str",
+          "nature": "str",
+          "species": "str",
+          "talentRank": "str",
+          "voice": "int",
+          "weightKg": "int",
+          "weightPct": "int"
+        }
+      ],
+      "kids": [
+        {
+          "confId": "int",
+          "eggGroups": [
+            {}
+          ],
+          "gender": "str",
+          "gid": "int",
+          "heightM": "float",
+          "heightPct": "int",
+          "img": "str",
+          "name": "str",
+          "nature": "str",
+          "species": "str",
+          "talentRank": "str",
+          "voice": "int",
+          "weightKg": "int",
+          "weightPct": "int"
+        }
+      ],
+      "mothers": [
+        {
+          "confId": "int",
+          "eggGroups": [
+            {}
+          ],
+          "gender": "str",
+          "gid": "int",
+          "heightM": "float",
+          "heightPct": "int",
+          "img": "str",
+          "name": "str",
+          "nature": "str",
+          "species": "str",
+          "talentRank": "str",
+          "voice": "int",
+          "weightKg": "int",
+          "weightPct": "int"
+        }
+      ],
+      "species": "str"
+    }
+  },
   "eggs": {
     "desc": "背包精灵蛋",
     "endpoint": "GET /api/eggs",
@@ -188,6 +458,17 @@
     "shape": {
       "box": [
         {}
+      ],
+      "chains": [
+        {
+          "base": "int",
+          "count": "int",
+          "egg": "str",
+          "evo": "int",
+          "img": "str",
+          "label": "str",
+          "species": "str"
+        }
       ],
       "medal": "null",
       "nature": [
