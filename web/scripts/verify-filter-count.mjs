@@ -22,7 +22,7 @@ const server = await createServer({
   root: process.cwd(), logLevel: 'error',
   server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true },
 })
-const { countPicked, DEFAULT_FILTER } = await server.ssrLoadModule('/src/pages/pet-list/filters.js')
+const { countPicked, DEFAULT_FILTER, sanitizeFilter } = await server.ssrLoadModule('/src/pages/pet-list/filters.js')
 await server.close()
 
 const eq = (name, got, want) => ({ name, got, want, ok: JSON.stringify(got) === JSON.stringify(want) })
@@ -51,6 +51,11 @@ R.push(eq('四组各一条', countPicked(oneEach), { look: 1, gift: 1, body: 1, 
 // 4. 多选系别按个数算(选 3 个系 = 3 条,不是 1 条)
 R.push(eq('系别多选按个数', countPicked({ types: ['火', '龙', '萌'] }).look, 3))
 
+// 4b. 蛋组多选同口径(改单值 eggGroup → 数组 eggGroups 后,若仍按 0/1 算,
+//     选 3 组只会显示「已选 +1」,用户看不到自己设了几条)
+R.push(eq('蛋组多选按个数', countPicked({ eggGroups: ['巨灵', '天空'] }).from, 2))
+R.push(eq('蛋组单选', countPicked({ eggGroups: ['巨灵'] }).from, 1))
+
 // 5. 性格:单选 nature 与多选 natureIn 是同一条件的两种存法,只算一条
 R.push(eq('性格单选', countPicked({ nature: '固执' }).gift, 1))
 R.push(eq('性格多选', countPicked({ natureIn: '固执,顽皮,大胆' }).gift, 1))
@@ -65,6 +70,12 @@ R.push(eq('奖牌特征全开', countPicked({
 // 7. 空值/伪值不算:'' 与 0 与 undefined 都表示「未设」
 R.push(eq('空串不计数', countPicked({ gender: '', box: '', catchRange: '' }).total, 0))
 R.push(eq('undefined 不计数', countPicked({ gender: undefined, types: undefined }).total, 0))
+
+// 8. 旧版单值 eggGroup 必须迁到 eggGroups —— 不迁的后果是**静默丢条件**:
+//    面板上没有一个蛋组显示为选中,而用户以为自己还筛着,列表却悄悄多出一堆。
+R.push(eq('旧 eggGroup 迁为数组', sanitizeFilter({ ...DEFAULT_FILTER, eggGroup: '巨灵' }, DEFAULT_FILTER).eggGroups, ['巨灵']))
+R.push(eq('旧 eggGroup 为空则不留键', 'eggGroup' in sanitizeFilter({ ...DEFAULT_FILTER, eggGroup: '' }, DEFAULT_FILTER), false))
+R.push(eq('已是数组则原样', sanitizeFilter({ ...DEFAULT_FILTER, eggGroups: ['巨灵'] }, DEFAULT_FILTER).eggGroups, ['巨灵']))
 
 let bad = 0
 for (const r of R) {

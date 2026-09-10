@@ -60,7 +60,19 @@ export const sanitizeView = (v) => (v === 'table' || v === 'gallery' ? v : DEFAU
 // 列表状态(筛选/排序/分页)持久化到 sessionStorage 的这个键,从详情返回时还原。
 export const FILTER_KEY = 'petListFilter'
 export const DEFAULT_FILTER = { page: 1, pageSize: 20, sort: 'boxpos', order: 'asc' }
-export const sanitizeFilter = (v, fallback) => (v && typeof v === 'object' ? v : fallback)
+
+// sanitizeFilter 规整持久化的筛选状态:非对象回落默认;顺带把旧版单值 eggGroup 迁到
+// eggGroups 数组(蛋组改多选前存的是字符串)。
+//
+// 迁移不是洁癖:不迁的话旧值会**静默留在 filter 里而不再生效** —— 面板上看不到任何
+// 蛋组被选中,但用户以为自己还筛着,列表却悄悄多出一堆。sessionStorage 里这份状态
+// 只在本次会话有效,迁移一次即可,不必在组件里常驻兼容分支。
+export const sanitizeFilter = (v, fallback) => {
+  if (!v || typeof v !== 'object') return fallback
+  if (typeof v.eggGroup !== 'string') return v
+  const { eggGroup, ...rest } = v
+  return eggGroup ? { ...rest, eggGroups: [eggGroup] } : rest
+}
 
 // —— 已选条件计数(侧栏顶部状态条与分组标题上的角标)——
 //
@@ -78,7 +90,8 @@ export function countPicked(f) {
   // 性格:单选 nature 与多选 natureIn 是同一条件的两种存法,算一条。
   const gift = b(f.nature || f.natureIn) + b(f.talentRank) + b(f.speciality)
   const body = b(f.medal) + b(f.medalBig) + b(f.medalSmall) + b(f.medalHigh) + b(f.medalLow)
-  const from = b(f.box) + b(f.catchRange) + b(f.eggGroup)
+  // 蛋组:多选按个数算(与系别同口径 —— 选 3 个组就是 3 条条件)
+  const from = b(f.box) + b(f.catchRange) + (f.eggGroups || []).length
   return { look, gift, body, from, total: look + gift + body + from }
 }
 

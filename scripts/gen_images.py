@@ -31,6 +31,8 @@ QUALITY = 90  # webp 有损质量;UI 图标够用且体积远小于 PNG
 
 # embed 选定的尺寸:索引字段 -> (源/目标子目录, 文件名前缀)。
 # 异色变体 sh/sb/sps 与普通版同目录(文件名形如 3010_1 / JL_emoding_yise),仅有专属异色图的宠物才有。
+# Pet256/Pet1024 的全身图混着两套命名:旧 `JL_<拼音>`(745 张)与新 `img_<...>_Res`(75 张,不带 JL_);
+# names.json 存的是剥掉 JL_ 的名字,故取源时要按实际文件回退(见下方 src 查找),不能无差别拼前缀。
 DIRS = {
     "h": ("HeadIcon", ""),
     "b": ("BigHeadIcon256", ""),
@@ -39,6 +41,9 @@ DIRS = {
     "sb": ("BigHeadIcon256", ""),
     "sps": ("Pet256", "JL_"),
 }
+
+# 子目录 -> 目标文件名前缀(同一子目录的各字段前缀一致),供取源时回退用。
+PREFIX = {sub: pre for sub, pre in DIRS.values()}
 
 
 def main():
@@ -64,6 +69,11 @@ def main():
             kept[sub] += 1
             continue
         src = os.path.join(SRC, sub, name + ".png")
+        pre = PREFIX[sub]
+        if pre and not os.path.exists(src):
+            # 目标名一律带 JL_ 前缀(Go 侧按 "Pet256/JL_"+ps 拼路径,见 pet.go),但源里
+            # 新体系资产本身就叫 img_<...>_Res、没有 JL_,故按剥掉前缀的名字回退取源。
+            src = os.path.join(SRC, sub, name[len(pre):] + ".png")
         if not os.path.exists(src):
             miss[sub] += 1
             continue

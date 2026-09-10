@@ -90,7 +90,7 @@
     "name": "耐活王"
   },
   {
-    "desc": "",
+    "desc": "完成可可果通行证获得",
     "icon": "medal/img_MedalIcon_Kekeguo.webp",
     "id": 1016,
     "name": "可可果絮语"
@@ -141,7 +141,7 @@
     "desc": "活动奖励",
     "icon": "medal/img_MedalIcon_FateCertificate.webp",
     "id": 1024,
-    "name": "契约之证"
+    "name": "耶耶击掌"
   },
   {
     "desc": "捕获本种群内，声音最低沉的精灵",
@@ -214,6 +214,18 @@
     "icon": "medal/img_MedalIcon_Xueyuan.webp",
     "id": 1036,
     "name": "魔法纹章"
+  },
+  {
+    "desc": "活动奖励",
+    "icon": "medal/img_MedalIcon_MaoXianChuFa.webp",
+    "id": 1037,
+    "name": "冒险出发"
+  },
+  {
+    "desc": "活动奖励",
+    "icon": "medal/img_MedalIcon_YiKouManZhu.webp",
+    "id": 1038,
+    "name": "一口满足"
   },
   {
     "desc": "「花开·卡洛西亚」活动获得",
@@ -328,6 +340,18 @@
     "icon": "medal/img_MedalIcon_S3BP_ThemeB.webp",
     "id": 5006,
     "name": "优雅尖尖"
+  },
+  {
+    "desc": "月涌通行证中，选择日之光主题",
+    "icon": "medal/img_MedalIcon_Sun.webp",
+    "id": 5007,
+    "name": "太阳暖暖"
+  },
+  {
+    "desc": "月涌通行证中，选择月之华主题",
+    "icon": "medal/img_MedalIcon_Moon.webp",
+    "id": 5008,
+    "name": "月亮鹭鹭"
   },
   {
     "desc": "完成「草系徽章试炼·进阶2」获得",

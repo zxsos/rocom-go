@@ -23,7 +23,6 @@ func (s *Server) parseFilter(q url.Values) store.Filter {
 		TalentRank:  q.Get("talentRank"),
 		MedalIDs:    s.medalIDs[q.Get("medal")],
 		Speciality:  q.Get("speciality"),
-		EggGroup:    q.Get("eggGroup"),
 		PartnerMark: q.Get("partnerMark"),
 		Shiny:       q.Get("shiny"),
 		Colorful:    q.Get("colorful"),
@@ -39,6 +38,10 @@ func (s *Server) parseFilter(q url.Values) store.Filter {
 	}
 	if t := q.Get("types"); t != "" {
 		f.Types = strings.Split(t, ",")
+	}
+	// 蛋组多选:宠物拥有其中任一即命中(见 store.Filter.EggGroups 的口径说明)。
+	if eg := q.Get("eggGroups"); eg != "" {
+		f.EggGroups = strings.Split(eg, ",")
 	}
 	if ne := q.Get("natureExclude"); ne != "" {
 		f.NatureExclude = strings.Split(ne, ",")

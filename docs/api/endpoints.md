@@ -32,7 +32,8 @@
 | `nature` / `natureExclude` | 性格（含/排除，逗号分隔） |
 | `gender` `talentRank` `speciality` `form` `partnerMark` | 等值筛选 |
 | `medal` | 奖牌**名**（后端解析为 id 列表，同名多枚全含） |
-| `eggGroup` `types` | 蛋组 / 系别（`types` 逗号分隔） |
+| `eggGroups` | 蛋组，逗号分隔；宠物拥有其中**任一**即命中（OR） |
+| `types` | 系别，逗号分隔；需**同时**拥有（AND） |
 | `shiny` `colorful` | 异色 / 炫彩 |
 | `medalBig` `medalSmall` `medalHigh` `medalLow` | 奖牌特征，`1` 启用（体重百分位 ≥98 / ≤2；嗓音 ≥96 / ≤-96） |
 | `box` | 盒子 |

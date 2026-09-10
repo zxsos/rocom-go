@@ -33,8 +33,16 @@ type Filter struct {
 	VoiceMin     int // 婉转声:嗓音下限(voice>=?)
 	VoiceMax     int // 粗嗓门:嗓音上限(voice<=?)
 	Speciality   string
-	EggGroup     string // 蛋组名(精确匹配组名,含该组即命中)
-	PartnerMark  string
+	// EggGroups 蛋组名多选:宠物拥有其中**任一**即命中(OR)。
+	//
+	// 为什么是 OR 而不是「同时拥有」(AND):一只宠物最多 2 个蛋组,AND 下选到第
+	// 三个就必然空结果,而面板并未禁止选三个 —— 用户只会以为筛选坏了。蛋组的实际
+	// 用法是「这两组里有哪些宠物」,OR 才对得上意图。
+	//
+	// 与 Types 刻意不同:系别是宠物的**并列**属性(双系宠物要靠 AND 收窄),
+	// 但两者在前端都是 chip 多选,故各自的口径都写进了 hint 文案。
+	EggGroups   []string
+	PartnerMark string
 	Shiny        string // "", "1", "0"
 	Colorful     string // "", "1", "0"
 	Form         string // 地区/季节形态名(精确匹配)
@@ -148,9 +156,14 @@ func buildWhere(f Filter, account string) (string, []any) {
 		where = append(where, "types LIKE ?")
 		args = append(args, "%\""+t+"\"%")
 	}
-	if f.EggGroup != "" { // egg_groups 亦为 JSON 组名数组,LIKE 匹配含该组的宠物
-		where = append(where, "egg_groups LIKE ?")
-		args = append(args, "%\""+f.EggGroup+"\"%")
+	// egg_groups 亦为 JSON 组名数组,LIKE 匹配含该组的宠物;多选取任一命中,故整组包成一个 OR 谓词。
+	if len(f.EggGroups) > 0 {
+		or := make([]string, len(f.EggGroups))
+		for i, g := range f.EggGroups {
+			or[i] = "egg_groups LIKE ?"
+			args = append(args, "%\""+g+"\"%")
+		}
+		where = append(where, "("+strings.Join(or, " OR ")+")")
 	}
 	if len(f.MedalIDs) > 0 { // 拥有任一目标奖牌即命中(关联 pet_medal,限本账号)
 		ph := make([]string, len(f.MedalIDs))

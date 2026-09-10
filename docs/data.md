@@ -1952,7 +1952,7 @@ s2c 0x1346 DATA 明文 body
   封面 webp 走 `scripts/gen_icons.py` 的 `badge` 组(`img/badge/…`,gen 时自动对账存在性);
 - 层结构与 `floors`(8 节点,node0 起点)与官方 `node_struct` **逐节点校验一致**;
 - 22 名首领(第 4 层 `node_event` 200001~200022 →「_草系徽章-首领形态」8101~8122)
-  与各章普通池(`chapter_event` 战斗事件 → 事件精灵名 → 我方 petbase);
+  与各章普通池(2026-09-10 版前为 `chapter_event` 战斗事件 → 事件精灵名 → 我方 petbase);
 - 活动周期 → `GRASS_TRIAL_PERIOD_CONF`(页面与接口顶部的 `source`/`activity`);
 - 第 7 层 NPC 阵容客户端**没有静态表**(仍是服务器下发),沿用 wiki 实测阵容透传;
   gen 时校验透传 id 与官方 `node_struct.node_event` 完全一致(如 300005 研究员)。
@@ -1960,6 +1960,11 @@ s2c 0x1346 DATA 明文 body
 普通池口径差异:`official 按 chapter_event 事件解析`,数量 160/234/132;wiki 是玩家
 把普通层实测+部分阵容成员**合并**的 188/295/177,比官方多。官方池外的实战照面
 由页面「其他遭遇(extra)」分组兜底,不会丢记录。
+
+**2026-09-10 版起**客户端 `GRASS_TRIAL_CHAPTER_CONF` 剥离了 `chapter_event`,普通池
+改由服务器在 `GrassTrialChallengeData.chapter_event_pool`(见 `ProtoMessage.lua`)运行时
+下发 —— 与第 7 层 NPC 阵容同性质,客户端静态表已无从得知。`gen_trial_official.py` 在该列
+缺失时**透传上一版官方池**(160/234/132)并告警,待抓到 `chapter_event_pool` 后再校准。
 
 原 wiki 抓取版(`scripts/fetch_trial_data.py` + `scripts/gen_trial.py`)保留作对照;
 下方记录的是 wiki 版时代的实测结论,凡标注经官方表验证的均已核过,仍有效。
