@@ -16,7 +16,11 @@
 原始解包数据**不进仓库**,仓库只提交精炼后的生成物(详见 docs/data.md):
 
 1. 从游戏目录原样复制 pak 到 `~/Downloads/rocom/Paks/`(或直接用安卓 .apk)。
-2. `scripts/unpack.sh` 用 CUE4Parse 全量解包到 `~/Downloads/rocom/parsed/`,按虚拟路径镜像
+2. ⚠️ **2026-09 起(安卓 1.111.0.112 及同期 PC)pak 加密换成「可配置加密」,必须用
+   LukeFZ/CUE4Parse fork,上游 FabianFG 解出来会「挂载成功但 0 个文件」。完整步骤与诊断见
+   [docs/unpack-2026-09.md](docs/unpack-2026-09.md)。**先跑 `uv run python scripts/pakinfo.py <Paks>`
+   再决定要不要全量解包。**
+   `scripts/unpack.sh` 用 CUE4Parse 全量解包到 `~/Downloads/rocom/parsed/`,按虚拟路径镜像
    (顶层 `NRC/Content/...`):uasset/umap → 属性 json(纹理另出 png),其余(.bytes/.non/.pb/
    .lua 等)原样字节。并行、增量,`--filter <前缀>` 选导、`--list` 预览;默认排除三维美术/
    视频/音频等纯客户端运行时资源(`--exclude` 追加、`--no-exclude` 全量,清单见 --help)。C# 实现在
@@ -73,14 +77,13 @@
   靠 HTML class 正则提取,改版后抓不到会报错退出)、`uv run python scripts/gen_skills.py`
   (skillIds.json + arkmeng.cn 的 skillGuideData.json → internal/gamedata/data/skills.json:
   技能 id→名 供试炼页、形态→天生技能 供宠物详情;**两份互补缺一不可,见 docs/data.md「技能名」**);
-  `uv run python scripts/fetch_rocoworld.py`(刮 roco.world 图鉴 594 页 →
-  `~/Downloads/rocom/rocoworld_raw.jsonl`:**petbase_id → 特性名+描述**,附带种族值/
-  身高体重/蛋组/技能表;页面内嵌 SSR 的 `<script type="application/json">`,
-  其 `page.data.petbase_id` **与我方 id 完全一致**,故可绕开名字匹配 ——
-  覆盖率 89%,远优于 wiki 那份的 74%(且后者有 8 处抄串);
-  URL 从 `sitemap-zh-hans-jini.xml` 取,不硬编码数量;4 并发约 6 分钟,增量续传。
-  `gen_features.py` 会把它并进 features.json 的 `petbase_feature`,**新代码一律用
-  按 id 建键的那份**,`pet_feature`(按名字)仅为兼容保留)。
+  `uv run python scripts/gen_features.py`(→ data/features.json:**特性词典 + 宠物→特性索引**;
+  ⚠️ 数据源已改为**官方客户端解包**,不再依赖爬取:`PETBASE_CONF.pet_feature` 指向
+  `SKILL_CONF` 里的被动技能(type=2)= 特性,按 id 直取 —— `petbase_feature` 954 条
+  (覆盖 84%)、特性词典 278 个(全带描述)。roco.world 那份 594 条被官方**完全覆盖**
+  (实测独有 0 条)、wiki 那份 74% 且有 8 处抄串,均已停用;`pet_feature`(按精灵页名)
+  仅作旧接口保留,**`petbase_feature` 不再回退到它**。`scripts/fetch_rocoworld.py`
+  已无生成脚本依赖(留作对拍),`scripts/fetch_features.py` 只为 `pet_feature` 供数、可选)、
   `uv run python scripts/fetch_trial_data.py`(草系试炼静态配置:wiki 的
   Module:GrassTrialData → ~/Downloads/rocom/grassTrialData.lua;页面由 Lua 渲染,
   数据在模块里不在正文)、`uv run python scripts/gen_trial.py`(→ data/trial.json:
