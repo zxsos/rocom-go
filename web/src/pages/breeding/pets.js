@@ -367,6 +367,28 @@ export function chainOf(key, chains) {
 //              那是升级前的唯一形态,玩家已经认熟了那种展示,不该因为升级就变样。
 export const genState = (g) => (g?.childGid ? 'claim' : g?.eggGid ? 'incubating' : 'legacy')
 
+// sameParents 这一代与上一条记录的双亲是否相同。
+//
+// 嗓音 = floor((母 + 父) / 2) 是**确定值**(见 docs/data.md 3.6),所以双亲相同意味着
+// 这一胎的嗓音与上一胎**必然一模一样** —— 再孵只是在掷体重与性格的随机,不是在推进。
+// 刷嗓音时这恰恰是最该看见的一句话:否则玩家会以为多孵几胎总能更高。
+//
+// 返回 'both'(母 + 父都相同) / 'mother'(母相同、父本未定或缺失) / ''(不同)。
+// 串窝时父本有多个候选、实际用了谁只有玩家自己知道,故不按「相同」处理 ——
+// 说错比不说更糟(他可能照着「嗓音一样」的提示放弃了一个其实不同的组合)。
+export function sameParents(g, prev) {
+  if (!g || !prev) return ''
+  const m = g.mother && g.mother.gid
+  const pm = prev.mother && prev.mother.gid
+  if (!m || m !== pm) return ''
+  const f = (g.father && g.father.gid) || 0
+  const pf = (prev.father && prev.father.gid) || 0
+  if (f && f === pf) return 'both'
+  // 父本都没定:串窝(多候选)说不准,只有候选不超过一个时才算「母本相同」
+  if (!f && !pf && (g.fathers || []).length <= 1 && (prev.fathers || []).length <= 1) return 'mother'
+  return ''
+}
+
 // pendCounts 把待处理的代按两态分开数。列表页与详情页顶部各用一次 ——
 // 「3 代待认领」这种笼统说法会让人以为都在等它认领,而其中多半只是蛋还没孵。
 export function pendCounts(list) {

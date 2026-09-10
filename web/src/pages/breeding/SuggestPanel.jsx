@@ -1,7 +1,7 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 import { pctHot, voiceHot } from '../../utils/format'
-import { fmtPct, goalNatureLabel, hasGoal, hasNatureGoal } from './pets'
+import { fmtPct, goalNatureLabel, hasGoal, hasNatureGoal, lineStats } from './pets'
 
 // SuggestPanel 选配建议:后端按这条线的目标算出的 top N 组合 + 回交对比。
 //
@@ -26,6 +26,7 @@ export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate
   // 后端下发的 natureP 对两种情况都是「落在集合里」的概率,故文案跟着这个标签走。
   const natLabel = goalNatureLabel(goal, matrix)
   const hasNat = hasNatureGoal(goal)
+  const bestVoice = lineStats(line).bestVoice
 
   if (!hasGoal(goal)) {
     return (
@@ -84,6 +85,7 @@ export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate
         <ul className="br-sugs">
           {list.map((s, i) => {
             const vt = voiceTag(goal, s)
+            const ng = noGain(s.exp && s.exp.voice, bestVoice, goal.voice)
             return (
             <li key={(s.mother && s.mother.gid) + '-' + (s.father && s.father.gid) + '-' + i} className="br-sug">
               <span className="br-sug-rank">{i + 1}</span>
@@ -109,6 +111,9 @@ export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate
                     与预期值同一行读着更顺。 */}
                 {s.ambiguous ? <span className="br-tag amb" title="这位母本有多个可配公:实际是谁等破壳后反推">串窝</span> : null}
                 {s.backcross ? <span className="br-tag bc" title="父本就是这条线自己的子代">回交</span> : null}
+                {ng ? (
+                  <span className="br-tag ng" title={`预期 V${s.exp.voice} 不比历代最佳 V${bestVoice} 更接近目标 —— 嗓音是双亲均值的向下取整,换掉较差的那只才推得动`}>嗓音无提升</span>
+                ) : null}
               </span>
               <span className="br-sug-score" title={`按你填的目标项归一化后的平均差距:${scoreText(s.score)}。0 = 完全命中,越小越好`}>
                 <span className="br-bar-t"><i className="br-bar-f s" style={{ width: scoreBar(s.score) }} /></span>
@@ -199,6 +204,19 @@ function SugPet({ p, side, onLocate }) {
       {p.nature ? <span className="br-sug-nat" title={`性格 ${p.nature}`}>{p.nature}</span> : null}
     </button>
   )
+}
+
+// noGain 这一组的预期嗓音是否**推不动**了:不比这条线历代最佳子代更接近目标。
+//
+// 嗓音 = 双亲均值向下取整,是确定值 —— 若这一组的预期还不如(或等于)手里最好的那只,
+// 再孵多少胎也不会更高:均值永远够不到较好的那个亲本以外的地方。想推进只能换掉较差
+// 的那只(拿子代回交,或引进一只更好的)。
+//
+// 与 voiceTag 一样是纯前端派生:契约快照不该为一句文案多长一个键。
+function noGain(voice, best, target) {
+  if (voice == null || best == null) return false
+  if (target != null) return Math.abs(voice - target) >= Math.abs(best - target)
+  return Math.abs(voice) <= Math.abs(best)
 }
 
 // voiceTag 这一组在嗓音上是否达标。纯前端判断,不往 Suggestion 里加字段 —— 契约快照

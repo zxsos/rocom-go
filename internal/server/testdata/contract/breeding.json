@@ -37,6 +37,15 @@
       "chainName": "火花（焰火/火神/烈火战神）",
       "confId": 3006,
       "createdAt": 1700000000,
+      "eggs": {
+        "9101": {
+          "gid": 9101,
+          "icon": "egg/egg_huohua.webp",
+          "name": "火花的蛋",
+          "voice": 10,
+          "weightKg": 4.2
+        }
+      },
       "evo": 3003,
       "gens": [
         {
@@ -104,6 +113,9 @@
         "weightPct": 98
       },
       "id": "contract-line",
+      "lostChildGens": [
+        4
+      ],
       "pending": [
         {
           "at": 1700000100,
@@ -140,6 +152,78 @@
             }
           ],
           "gen": 2,
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "source": "auto"
+        },
+        {
+          "at": 1700000050,
+          "eggGid": 9101,
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2002,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小公乙",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": -20,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "gen": 3,
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "source": "auto"
+        },
+        {
+          "at": 1700000200,
+          "childGid": 9999,
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2002,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小公乙",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": -20,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "gen": 4,
           "mother": {
             "confId": 2000672,
             "gender": "♀",

@@ -282,3 +282,94 @@ func TestLayHatchClaimAcrossSessions(t *testing.T) {
 		t.Errorf("子代嗓音 = %d, 期望 96(取自子代自己的 PetData)", line.Gens[0].Child.Voice)
 	}
 }
+
+// TestClaimPendingChildrenAfterFullSync 断网期间孵出的子代,靠全量对账后的补扫接上。
+//
+// 成因:认领挂在 applyNewPet(增量消息 + isNew)里,而这类子代是随**背包分页全量**
+// (applyPetPage)进库的 —— 那条路不调认领,于是那一代永远停在「待认领」。
+// 培育线是事件流产物,宠物与蛋有全量对账可以自愈、唯独它没有,故缺口只能在补扫里补。
+func TestClaimPendingChildrenAfterFullSync(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	login(t, p, 1)
+	sc := p.st.For(testAcc)
+	base, info := pickTestPet(t, p)
+	const eggGid, childGid = 4401, 9401
+	now := msg(gcp.S2C, pet.OpGoodsRewardNotify, nil).Time
+
+	ps := &pet.EggParents{
+		Mother: &pet.EggParent{Gid: 7001, Name: "母本", Species: info.Name, ConfID: base,
+			Gender: "♀", Voice: 40},
+		Fathers: []pet.EggParent{{Gid: 7002, Name: "父本", Gender: "♂", Voice: 60}},
+	}
+	if err := sc.UpsertEggs([]*pet.EggView{{
+		Gid: eggGid, ItemID: 310001, ConfID: base, Name: info.Name + "的蛋", Species: info.Name,
+	}}, now.Unix(), nil); err != nil {
+		t.Fatalf("蛋入库: %v", err)
+	}
+	p.recordLay(sc, testAcc, eggGid, ps, info.Name, now)
+	// 真实链路里 SetEggParents 紧跟 recordLay:破壳是靠蛋行上的 lineId/gen 认出那一代的
+	if err := sc.SetEggParents(eggGid, ps); err != nil {
+		t.Fatalf("记双亲: %v", err)
+	}
+	p.recordHatch(p.conn("other-session"), sc, testAcc, eggGid, childGid, now)
+
+	// 子代此刻还没进库:补扫不该有动作(更不该把它当成「已不在库」)
+	p.claimPendingChildren(sc, testAcc, now)
+	if line, _ := sc.GetBreedingLine(ps.LineID); len(line.Gens) != 0 {
+		t.Fatalf("子代还没进库就认领了: gens=%+v", line.Gens)
+	}
+
+	// 子代随**全量分页**进库(不经过 applyNewPet,故不会触发认领)
+	pp := &pet.Pet{Gid: childGid, ConfID: base, BaseConfID: base, Name: info.Name, Voice: 96}
+	if _, err := sc.UpsertPet(pp); err != nil {
+		t.Fatalf("子代入库: %v", err)
+	}
+	p.claimPendingChildren(sc, testAcc, now)
+	line, err := sc.GetBreedingLine(ps.LineID)
+	if err != nil {
+		t.Fatalf("读培育线: %v", err)
+	}
+	if len(line.Gens) != 1 || line.Gens[0].Child == nil || line.Gens[0].Child.Gid != childGid {
+		t.Fatalf("补扫认领失败: gens=%+v pending=%+v", line.Gens, line.Pending)
+	}
+	if len(line.Pending) != 0 {
+		t.Errorf("补扫后仍剩 %d 代待处理", len(line.Pending))
+	}
+}
+
+// TestClaimPendingChildrenKeepsMissingChild 子代不在库(放生/送人)时:不认领、也不丢弃 ——
+// 留着 childGid 让页面说清「孵出的 #gid 已不在库」,由玩家决定补录还是丢弃。
+func TestClaimPendingChildrenKeepsMissingChild(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	login(t, p, 1)
+	sc := p.st.For(testAcc)
+	base, info := pickTestPet(t, p)
+	const eggGid, childGid = 4501, 9501
+	now := msg(gcp.S2C, pet.OpGoodsRewardNotify, nil).Time
+
+	ps := &pet.EggParents{
+		Mother:  &pet.EggParent{Gid: 7001, Name: "母本", Species: info.Name, ConfID: base, Gender: "♀"},
+		Fathers: []pet.EggParent{{Gid: 7002, Name: "父本", Gender: "♂"}},
+	}
+	sc.UpsertEggs([]*pet.EggView{{
+		Gid: eggGid, ItemID: 310001, ConfID: base, Species: info.Name,
+	}}, now.Unix(), nil)
+	p.recordLay(sc, testAcc, eggGid, ps, info.Name, now)
+	if err := sc.SetEggParents(eggGid, ps); err != nil {
+		t.Fatalf("记双亲: %v", err)
+	}
+	p.recordHatch(p.conn("s"), sc, testAcc, eggGid, childGid, now)
+
+	// 那只宠始终没进库(断网期间孵了又放生,工具从没见过它)
+	p.claimPendingChildren(sc, testAcc, now)
+	line, err := sc.GetBreedingLine(ps.LineID)
+	if err != nil {
+		t.Fatalf("读培育线: %v", err)
+	}
+	if len(line.Gens) != 0 {
+		t.Errorf("不该认领: gens=%+v", line.Gens)
+	}
+	if len(line.Pending) != 1 || line.Pending[0].ChildGid != childGid {
+		t.Errorf("该代应留着 childGid 供页面提示,实为 %+v", line.Pending)
+	}
+}

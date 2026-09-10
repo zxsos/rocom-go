@@ -59,6 +59,15 @@
           "chainName": "str",
           "confId": "int",
           "createdAt": "int",
+          "eggs": {
+            "9101": {
+              "gid": "int",
+              "icon": "str",
+              "name": "str",
+              "voice": "int",
+              "weightKg": "float"
+            }
+          },
           "evo": "int",
           "gens": [
             {
@@ -122,9 +131,29 @@
             "weightPct": "int"
           },
           "id": "str",
+          "lostChildGens": [
+            {}
+          ],
           "pending": [
             {
               "at": "int",
+              "childGid": "int",
+              "eggGid": "int",
+              "father": {
+                "confId": "int",
+                "gender": "str",
+                "gid": "int",
+                "heightM": "float",
+                "heightPct": "int",
+                "img": "str",
+                "name": "str",
+                "nature": "str",
+                "species": "str",
+                "talentRank": "str",
+                "voice": "int",
+                "weightKg": "int",
+                "weightPct": "int"
+              },
               "fathers": [
                 {
                   "confId": "int",

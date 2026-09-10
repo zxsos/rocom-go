@@ -624,6 +624,20 @@ type BreedingLinePayload struct {
 	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = floor((母+父)/2),
 	// 目标为上限时必须双亲都到位,否则迭代再多次也到不了(见 pet.VoiceReach)。
 	Reach *pet.VoiceReach `json:"reach,omitempty"`
+	// Eggs 是本条线**待孵**的那几代对应的蛋(按蛋 gid 索引),只有待孵(有 eggGid、
+	// 无 childGid)的代才给 —— 破壳后子代快照已含同样的体重与嗓音,不必再补。
+	//
+	// 它**不落库**、是读取时回查蛋表得到的投影。这样既能随蛋表变化(蛋还在不在、
+	// 进度多少),又能顺带回答最要紧的那句:查不到 = 这颗蛋已经不在背包了
+	// (孵掉 / 送人 / 被对账清理),这一代不会再有子代 —— 而不是让玩家干等。
+	Eggs map[uint32]*pet.EggSnapshot `json:"eggs,omitempty"`
+	// LostChildGens 是「孵出的那只已经不在宠物库」的代数:这些代记着 childGid,却永远
+	// 等不到快照 —— 放生/送人,或断网期间入库又放生(工具从未见过它,补扫也查不到)。
+	//
+	// 由后端判而不是前端猜:判断依据是**本次请求取的全库宠物**,若在库则早早就被认领了,
+	// 故「有 childGid 无 Child 且库里没有」才是确定的结论。前端据此说实话 —— 让玩家
+	// 空等一句「待认领」比告诉他真相更糟。
+	LostChildGens []int `json:"lostChildGens,omitempty"`
 }
 
 // BreedingPoolPayload 是手动补录面板的候选池(GET /api/breeding/pool):某个品种的三类候选。

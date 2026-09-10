@@ -154,6 +154,8 @@
   font-size: 11px; line-height: 1; padding: 3px 6px; border-radius: 999px;
   border: 1px solid var(--accent); color: var(--accent); white-space: nowrap;
 }
+/* 奖牌小图:缺图(未 embed)时不占位,自然退成纯文字 chip */
+.egg-chip-img { width: 14px; height: 14px; object-fit: contain; }
 
 .egg-marks { display: flex; align-items: center; gap: 4px; flex: none; }
 .egg-type { width: 20px; height: 20px; object-fit: contain; }

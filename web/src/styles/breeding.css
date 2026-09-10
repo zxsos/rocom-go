@@ -215,6 +215,10 @@ button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-s
 /* 待认领(破壳已确认)与待孵(还在等蛋)用两种颜色分开:都是「还没完」,但一个在等
    游戏、一个在等玩家 —— 混成同色的话,那条可能永远停在原地的待孵代会被当成待办。 */
 .br-tag.claim { color: var(--c-form); border-color: color-mix(in srgb, var(--c-form) 50%, var(--line)); background: color-mix(in srgb, var(--c-form) 12%, transparent); }
+/* 同双亲:嗓音是双亲均值的向下取整,同双亲 = 这一胎嗓音必然与上一胎一样。 */
+.br-tag.same { color: var(--fg-dim); border-style: dashed; }
+/* 嗓音无提升:这组再孵也推不动,得换掉较差的那只亲本。 */
+.br-tag.ng { color: var(--c-earn); border-color: color-mix(in srgb, var(--c-earn) 45%, var(--line)); }
 
 .br-gen-body {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 6px;
@@ -228,6 +232,22 @@ button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-s
   margin-top: 5px; font-size: 11px; padding-left: 2px;
   overflow-wrap: anywhere;
 }
+/* 等不到的情形(蛋已不在背包 / 孵出的宠已不在库)用警示色:这类记录不会自己变好,
+   得玩家动手(丢弃或补录),挂在 muted 里会被当成"再等等就好了"。 */
+.br-gen-note.warn { color: var(--c-earn); }
+
+/* 待孵那一代的「这颗蛋什么样」:体重百分位与嗓音破壳后原样落到子代身上,故现在就能看。 */
+.br-gen-egg {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 11px;
+}
+.br-gen-egg-k { color: var(--fg-dim); }
+.br-gen-egg > span { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+/* 奖牌(确定能拿到的那几枚):带小图,缺图时自然只剩文字 */
+.br-medal { display: inline-flex; align-items: center; gap: 3px; color: var(--gold); }
+.br-medal-img { width: 14px; height: 14px; object-fit: contain; }
+/* 卡片底部的待孵计数与待认领区分开 */
+.br-pend.incubating { color: var(--gold); }
 /* 串窝的「其它候选」:比正式父本低一级(小一档字号 + 无边框底线),
    它是**参考信息**而不是这一代的实际记录,不该和父本那一行争视觉重量。 */
 .br-gen-cands {

@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from 'react'
-import { fmtShortTime } from '../../utils/format'
+import { fmtShortTime, pctHot, voiceHot } from '../../utils/format'
 import PetPicker from '../../components/PetPicker'
 import Dropdown from '../../components/Dropdown'
+import { imgURL } from '../../components/icons'
 import PetInline from './PetInline'
-import { flattenNatures, genState, natureOptions, petPickerOption, stepDelta, toParent } from './pets'
+import {
+  flattenNatures, fmtPct, genState, natureOptions, petPickerOption, sameParents, stepDelta, toParent,
+} from './pets'
 
 // 手填属性可以落到这一代的哪个角色上。亲本与子代都可能缺(收蛋那一刻它们还没进库),
 // 而补齐哪一只由玩家看着办 —— 工具不替他猜该改谁。
@@ -23,11 +26,16 @@ const FILL_ROLES = [
 // 认领必须走后端(见 api.claimBreedingChild):子代快照要按当前 gamedata 重新取,
 // 前端手里没有权威的那份;而「从待认领挪进正式代数」只该有一处实现。
 export default function GenerationRow({
-  g, pending, prevChild, line, fathers, kids, matrix,
+  g, pending, prev, prevChild, line, fathers, kids, matrix,
   onEdit, onClaim, onDelete, onPet, busy,
 }) {
   // 待处理的那一代究竟在等什么(见 pets.genState):等孵蛋,还是等子代进背包。
   const st = pending ? genState(g) : ''
+  // 这颗蛋的当前信息(后端读取时回查蛋表给的投影,见 api_breeding.eggSnapshots)。
+  // 查不到 = 蛋已不在背包;有它就能在破壳前看出这颗蛋值不值得孵。
+  const egg = pending ? (line.eggs || {})[g.eggGid] : null
+  // 孵出的那只已经不在宠物库(放生/送人,或断网期间孵的从没抓到过)—— 后端判的,不猜。
+  const lost = pending && (line.lostChildGens || []).includes(g.gen)
   // 记录里的那只也要在选项里(见 withCurrent):它是编辑表单的**当前值**,缺了它下拉会显示成
   // 占位文案,玩家会以为这一代没记着父本 / 子代,顺手一存就把原记录覆盖成空。
   const kidOpts = useMemo(() => withCurrent(kids.map(petPickerOption), g.child), [kids, g.child])
@@ -54,6 +62,9 @@ export default function GenerationRow({
   }
 
   const fatherList = g.father ? [g.father] : (g.fathers || [])
+  // 与**上一条**记录双亲相同 → 这一胎的嗓音必然与上一胎一样(见 pets.sameParents)。
+  // 待孵的代同样适用:它还没孵,但嗓音此刻已经定了。
+  const same = sameParents(g, prev)
   // 串窝:实际采用了其中一只时父本列只画那一只,其余候选退到下面一行小字里 ——
   // 既要看清「到底用了谁」,也不能把「当时还有谁能配」这个信息丢掉(这正是串窝要留档的原因)。
   const otherCandidates = g.father ? (g.fathers || []).filter((f) => f.gid !== g.father.gid) : []
@@ -90,6 +101,13 @@ export default function GenerationRow({
         {(g.fathers || []).length > 1
           ? <span className="br-tag amb" title="串窝:同一时刻有多个父本候选,实际是哪只无从确定">父本 {g.fathers.length} 选 1</span>
           : null}
+        {same ? (
+          <span className="br-tag same" title={same === 'both'
+            ? '与上一代同一对双亲 —— 嗓音是双亲均值的向下取整,故这一胎与上一胎必然一样,再孵只是在掷体重与性格'
+            : '与上一代同一只母本(父本未定)—— 嗓音至少不会因母本而变,想推进得换父本'}>
+            {same === 'both' ? '同双亲' : '同母本'}
+          </span>
+        ) : null}
         {/* 待处理的那一代**等的是哪一步**要写在脸上:等孵蛋与等子代进背包是两回事,
             前者可能永远等不到(蛋送人、不孵了),后者只要那只宠一进背包就自动补上。 */}
         {pending ? (
@@ -152,18 +170,47 @@ export default function GenerationRow({
         </div>
       )}
 
-      {/* 待孵/待认领各给一句「接下来会发生什么」。不说的话,玩家看到一条永远停在
-          「待认领」的代只会以为页面坏了 —— 而它其实只是在等一颗还没孵的蛋。 */}
-      {pending && st === 'incubating' ? (
-        <div className="br-gen-note muted">
-          这颗蛋还没孵(蛋 #{g.eggGid})—— 破壳后这里会自动补上孵出的那只。
-          不打算孵了就点右边「删除」丢掉这一代。
+      {/* 待孵/待认领各给一句「接下来会发生什么」;更要把**等不到**的情形说穿 ——
+          让玩家对着一条永远停着的记录空等,比告诉他真相糟得多。 */}
+      {pending && st === 'incubating' && egg ? (
+        <div className="br-gen-egg">
+          <span className="br-gen-egg-k">这颗蛋</span>
+          {/* 体重百分位与嗓音破壳后原样落到子代身上,故现在就能看 —— 不用等孵出来
+              才知道这颗蛋值不值得孵。 */}
+          {egg.weightPct != null
+            ? <span className={pctHot(egg.weightPct) || ''}>W{fmtPct(egg.weightPct)}%</span>
+            : null}
+          {egg.voice != null
+            ? <span className={voiceHot(egg.voice) || ''}>V{egg.voice}</span>
+            : null}
+          {(egg.medals || []).map((m) => (
+            <span key={m.dim} className="br-medal" title={`${m.name} —— 这颗蛋确定能拿到`}>
+              {m.icon ? <img className="br-medal-img" src={imgURL(m.icon)} alt="" /> : null}
+              {m.name}
+            </span>
+          ))}
+          <span className="muted">破壳后自动补上孵出的那只</span>
+        </div>
+      ) : null}
+      {pending && st === 'incubating' && !egg ? (
+        <div className="br-gen-note warn">
+          这颗蛋已经不在背包里了(孵掉 / 送人 / 被清理)—— 这一代不会再有子代,
+          可以点右边「删除」丢掉它。
         </div>
       ) : null}
       {pending && st === 'claim' ? (
-        <div className="br-gen-note muted">
-          已孵出 #{g.childGid},等它进背包就自动认领;等不及也可以手动指定一只。
-        </div>
+        lost
+          ? (
+            <div className="br-gen-note warn">
+              孵出的 #{g.childGid} 已经不在宠物库里了(放生 / 送人,或是断网期间孵的、
+              从没抓到过)—— 认领不了。记得它是谁就手动补录一只,否则丢掉这一代。
+            </div>
+          )
+          : (
+            <div className="br-gen-note muted">
+              已孵出 #{g.childGid},等它进背包就自动认领;等不及也可以手动指定一只。
+            </div>
+          )
       ) : null}
       {g.note ? <div className="br-gen-note muted" title={g.note}>{g.note}</div> : null}
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 import { pctHot, voiceHot, fmtShortTime } from '../../utils/format'
-import { fmtPct, goalBits, goalProgress, lineAvatar, lineStats } from './pets'
+import { fmtPct, goalBits, goalProgress, lineAvatar, lineStats, pendCounts } from './pets'
 
 // 状态文案与后端 pet.BreedingActive/Done/Archived 对应;未知状态原样显示,不吞掉。
 const STATUS = { active: '进行中', done: '已达成', archived: '归档' }
@@ -19,7 +19,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
   // 拿不到方阵时它退化成「N 种性格」,而不是显示一个错的维度名。
   const bits = goalBits(line.goal, matrix)
   const bars = goalProgress(line)
-  const pend = (line.pending || []).length
+  const pend = pendCounts(line.pending)
   // chains 只为「代数还是空的线」服务:那种没有亲本快照可拿,退回这个品种的蛋(见 pets.lineAvatar)。
   const avatar = lineAvatar(line, chains)
   const status = line.status || 'active'
@@ -30,7 +30,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
   return (
     <button
       type="button"
-      className={'br-card s-' + status + (pend ? ' has-pending' : '')}
+      className={'br-card s-' + status + (pend.incubating + pend.claim > 0 ? ' has-pending' : '')}
       onClick={() => onOpen(line.id)}
       title={`${kind} · 第 ${st.gens} 代 · 点击展开这条培育线`}
     >
@@ -68,9 +68,15 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
       )}
 
       <span className="br-card-foot">
-        {pend > 0
-          ? <span className="br-pend" title="破壳时记下了双亲、但子代还没认领:点进去指定是哪一只">待认领 {pend}</span>
-          : <span />}
+        {/* 待孵与待认领分开写:前者在等一颗蛋(可能永远等不到),后者在等子代进背包 ——
+            混成一句「待认领 N」会让人以为每一条都要他操作。 */}
+        {pend.incubating > 0 ? (
+          <span className="br-pend incubating" title="已收蛋、还没孵:破壳后会自动补上孵出的那只">待孵 {pend.incubating}</span>
+        ) : null}
+        {pend.claim > 0 ? (
+          <span className="br-pend" title="破壳已确认、子代还没认领:点进去指定是哪一只">待认领 {pend.claim}</span>
+        ) : null}
+        {pend.incubating === 0 && pend.claim === 0 ? <span /> : null}
         {st.gens > 0 ? (
           <span className="br-best">
             历代最佳
