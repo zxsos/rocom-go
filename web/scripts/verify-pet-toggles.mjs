@@ -50,7 +50,7 @@ const panelHTML = renderToStaticMarkup(
         box: [], talentRank: [], speciality: [], medal: [],
       },
       total: 983, collapsed: false, onClose: () => {},
-      set: () => {}, toggleType: () => {}, reset: () => {},
+      set: () => {}, toggleType: () => {}, toggleEggGroup: () => {}, reset: () => {},
     })),
 )
 await server.close()

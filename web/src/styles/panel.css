@@ -37,6 +37,12 @@
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 系别筛选按钮内的属性小图 */
 .chip-ic { width: 15px; height: 15px; object-fit: contain; }
+/* 蛋组 chip 的选中态取蛋组语义色(与宠物卡片上的 .egg-group 标签同色),而非系别
+   chip 的实心主色:同一侧栏里两组 chip 外形一样,而蛋组在卡片上一直是这个蓝灰色,
+   沿用它能让「面板里选的那组」与「卡片上标的那组」一眼对上;
+   边框提亮到字色,淡底才不至于和未选中态的灰底混淆。 */
+.chip-egg.on { background: var(--c-egggroup-d); border-color: var(--c-egggroup); color: var(--c-egggroup); }
+.chip-egg.on:hover { background: var(--c-egggroup-d); border-color: var(--c-egggroup); color: #fff; }
 /* 开关组(变异 / 性别 / 奖牌特征):gap 与 .chips 一致 —— 它们同属"一排可点的
    筛选按钮",间距不同会让人以为不是一类控件。 */
 .toggles { display: flex; flex-wrap: wrap; gap: 6px; }

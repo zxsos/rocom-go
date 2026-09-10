@@ -17,7 +17,7 @@ import Dropdown from '../../components/Dropdown'
 //   外观 → 资质 → 体型声音 → 来源
 // 原先 13 组平铺,扫视时每一组都要读标题才知道是不是自己要找的那项;
 // 分块后可以先定位到块、再在块内找,且块与块之间有明确的语义边界。
-export default function FilterPanel({ filter, options, total, collapsed, onClose, set, toggleType, reset, children }) {
+export default function FilterPanel({ filter, options, total, collapsed, onClose, set, toggleType, toggleEggGroup, reset, children }) {
   const icons = useContext(IconsContext)
   // 已选条件计数:分组级 + 全局(见 filters.js 的 countPicked)。
   const { look: nLook, gift: nGift, body: nBody, from: nFrom, total: picked } = countPicked(filter)
@@ -142,7 +142,21 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
               onChange={(v) => set({ catchRange: v })}
             />
           </div>
-          <Select label="蛋组" opts={ALL_EGG_GROUPS} value={filter.eggGroup} onChange={(v) => set({ eggGroup: v })} />
+          {/* 蛋组改 chip 多选(与系别同款控件):一只宠物最多两个蛋组,选多个的意图
+              是「这几组里有哪些」,下拉单选每次只能看一组,对比时要来回切。 */}
+          <div className="filter-group">
+            <label>蛋组</label>
+            <div className="chips">
+              {ALL_EGG_GROUPS.map((g) => (
+                <span
+                  key={g}
+                  className={'chip chip-egg' + ((filter.eggGroups || []).includes(g) ? ' on' : '')}
+                  onClick={() => toggleEggGroup(g)}
+                >{g}</span>
+              ))}
+            </div>
+            <div className="filter-hint">可多选，多选=拥有其中任一组即命中（一只宠物最多两个蛋组）</div>
+          </div>
         </fieldset>
 
         {/* 抽屉底部操作条(仅移动端显示):重置 + 查看结果并关闭 */}

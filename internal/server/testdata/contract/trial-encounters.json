@@ -3619,5 +3619,5 @@
   ],
   "source": "客户端官方配置:BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,EFFECT,PERIOD,LOG}_CONF(CUE4Parse 解包,普通池/首领/章节/周期/词条均来自官方);第 7 层 NPC 阵容为玩家实测(wiki)透传",
   "ts": 0,
-  "updated": "GRASS_TRIAL_* 官方配置,2026-09-03 生成;旧 wiki 池见 gen_trial.py"
+  "updated": "GRASS_TRIAL_* 官方配置,2026-09-10 生成;旧 wiki 池见 gen_trial.py"
 }

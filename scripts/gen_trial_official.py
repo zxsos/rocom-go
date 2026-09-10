@@ -8,8 +8,8 @@
     BinDataCompressed/GRASS_TRIAL_LOG_CONF.json     章节封面图与见闻录文案
 
 与 scripts/gen_trial.py(数据源为玩家 wiki)的关系:
-官方解包能**直接给出**层结构(node_struct)、各章普通战斗池(chapter_event→EVENT→精灵)、
-22 名首领(第 4 层 node_event)、章节名/场景与活动周期,因此这些字段换成官方来源;
+官方解包能**直接给出**层结构(node_struct)、22 名首领(第 4 层 node_event)、
+章节名/场景与活动周期,因此这些字段换成官方来源;
 **第 7 层 NPC 的具体阵容客户端没有静态表**(战斗时由服务器下发,见
 api_trial.go 关于 0x1316 的注释),仍沿用 gen_trial.py 从 wiki 收集的玩家实测阵容
 透传。实测 wiki 的 opponent id(300005 研究员/310005 易西/400001 罗兰…)与官方
@@ -18,6 +18,9 @@ node7 的 node_event id 完全对齐,本脚本会做一致性校验,不一致会
 普通池口径说明:官方池按「本章普通战斗事件 → 事件精灵名 → 我方 petbase」解析,
 每章 160/234/132 种;旧 wiki 池 188/295/177(玩家把 1/2/3/5 层与部分实测遭遇并表)。
 两套口径都标注在 _note 里,前端「其他遭遇」分组会兜住官方池外的实战照面。
+2026-09-10 版起 GRASS_TRIAL_CHAPTER_CONF 剥离了 chapter_event(普通池改为服务器在
+GrassTrialChallengeData.chapter_event_pool 运行时下发,客户端静态表已无此列),
+上述 160/234/132 作为透传值保留,待抓到 chapter_event_pool 后再校准。
 
 运行:
   uv run python scripts/gen_trial_official.py
@@ -43,7 +46,7 @@ if not os.path.exists(NAMES):
 if not os.path.exists(OLD_TRIAL):
     sys.exit(f"缺 {OLD_TRIAL} —— 首次生成需先跑 gen_trial.py(透传 NPC 阵容)")
 
-GEN_DATE = "2026-09-03"  # 生成日,手填以便对比;不重要时也可取文件 mtime
+GEN_DATE = "2026-09-10"  # 生成日,手填以便对比;不重要时也可取文件 mtime
 
 
 def rows(table: str) -> dict:
@@ -117,9 +120,16 @@ def chapter_of(mode_id: int, idx: int) -> int:
 
 
 def combat_events(chapter_conf_id: int):
-    """官方某章的普通战斗事件 id 列表(剔除起点/首领/NPC/商人/魔力等特殊段)。"""
+    """官方某章的普通战斗事件 id 列表(剔除起点/首领/NPC/商人/魔力等特殊段)。
+
+    2026-09-10 版起 GRASS_TRIAL_CHAPTER_CONF 不再下发 chapter_event —— 普通池改由
+    服务器在 GrassTrialChallengeData.chapter_event_pool 运行时下发(见 ProtoMessage.lua),
+    客户端静态表已无此列;缺失时返回空列表,调用方据此透传上一版官方池。"""
+    row = gtc[str(chapter_conf_id)]
+    if "chapter_event" not in row:
+        return []
     out = []
-    for x in (int(x) for x in gtc[str(chapter_conf_id)]["chapter_event"]):
+    for x in (int(x) for x in row["chapter_event"]):
         r = evt.get(str(x))
         # 战斗事件在 EVENT 表里 type 缺省;显式 type 5/6/7 是起点/商人/魔力等特殊层。
         # 段号本身也能判(20 首领 / 30-40 NPC / 50 起点 / 60-70 商人),这里两者都看。
@@ -145,6 +155,13 @@ for idx in (1, 2, 3):
             seen.add(b)
             bases.append(b)
     bases.sort()
+    if not bases:
+        # 新版剥离 chapter_event:透传上一版官方池,别把池清空(否则前端池/遭遇分组全空)。
+        bases = sorted(old.get("pools", {}).get(str(idx), []))
+        warnings.append(
+            f"第{idx}章: CHAPTER_CONF 已无 chapter_event,普通池透传上一版 {len(bases)} 只"
+            f"(2026-09-10 版起改为服务器 chapter_event_pool 运行时下发)"
+        )
     pools[str(idx)] = bases
     img = logs.get(str(99 + idx), {}).get("image", "")
     m = re.search(r"\.(img_maoxianrizhi_Photo\d+)\b", img)
@@ -314,7 +331,8 @@ out = {
     "_source": "客户端官方配置:BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,EFFECT,PERIOD,LOG}_CONF"
     "(CUE4Parse 解包,普通池/首领/章节/周期/词条均来自官方);第 7 层 NPC 阵容为玩家实测(wiki)透传",
     "_updated": f"GRASS_TRIAL_* 官方配置,{GEN_DATE} 生成;旧 wiki 池见 gen_trial.py",
-    "_note": "pools: 各章普通池的 petbase id —— 官方口径(按 chapter_event 战斗事件解析,"
+    "_note": "pools: 各章普通池的 petbase id —— 官方口径(2026-09-10 版前按 chapter_event "
+    "战斗事件解析;该版起客户端剥离此列,改由服务器 chapter_event_pool 运行时下发,此处透传上一版,"
     + diff_text + "),旧 wiki 口径 188/295/177;bosses: 22 名首领;npc: 难度 -> 章 -> 候选阵容"
     "(玩家实测,id 与官方 node7 event 对齐);floors: 按 node_index 索引的层类型。"
     "chapters.image/intro/outro 来自 GRASS_TRIAL_LOG_CONF(封面图与见闻录文案)。"

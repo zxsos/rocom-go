@@ -348,7 +348,10 @@ for v in rows("WORLD_MAP_BLOCK_CONF.json").values():
         "ox": int(cx - side / 2),
         "oy": int(cy - side / 2),
         "side": side,
-        "world": bool(v.get("is_world_map")),  # 大世界(底图出 4096²);家园场景小,出 2048²
+        # 2026-09 版起 is_world_map 被官方剥离(表里已无此列),改按 scene_res_id 段判断:
+        # 大世界在 10000 段(10003 卡洛西亚大陆、10018 魔法学院 → 底图出 4096²),
+        # 家园在 30000 段(30001 家园室内、30002 家园种植园 → 2048² 足够)。
+        "world": int(res) < 30000,
         **({"rooms": HOME_ROOM_LEVELS} if int(res) == HOME_INDOOR_RES else {}),
     }
 
@@ -470,16 +473,19 @@ STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_C
 # (48 个品种:向阳花/喵喵草/黑晶琉璃/可可果树…),每行给出品种名 genre 与图标 icon——图标列
 # 是 BagItem 编号(100211 可可果),与不咕钟零件同走 copy_texture(见 gen_icons.py 的
 # gather_icons),采集物图标因此就是它产出的那件物品的样子。
-# 品种 → NPC id 靠 MEGAMAP_GATHERING_CONF:它的 param_id 即采集物 NPC(50041 向阳花、
-# 50090 可可果树…,62 个),genre 与 MEGAMAP_CONF 的品种名逐字相同。点位与星星/零件同一条路
-# (NPC 白名单直取刷新行,refresh_type=1 → AREA_CONF 中心)。
-# 口径提醒:取到的是**候选刷新点**(3717 行,已排除 disable 与 refresh_rule==0 的 693 行),
+# 品种 → NPC id:2026-09 版起官方把 param_id 从发布数据剥离了(MEGAMAP_GATHERING_CONF 只剩
+# id/genre/description 三列),改按 **NPC_CONF 的名称**反查——采集物 NPC 的名字就是品种名
+# (实测 50041 的名字即「向阳花」、50090 即「可可果树」,与旧版 param_id 逐一吻合)。
+# 名称匹配会多收同名 NPC(如另有 NPC 也叫「星芒花」),无妨:下面取点仍要走「有启用刷新行
+# 且坐标可解析」那道闸,没有刷新行的同名 NPC 自然一个点也产不出。
+# 点位与星星/零件同一条路(NPC 白名单直取刷新行,refresh_type=1 → AREA_CONF 中心)。
+# 口径提醒:取到的是**候选刷新点**(旧版 3717 行,已排除 disable 与 refresh_rule==0 的),
 # 游戏按刷新规则从中刷出一部分,故图上标的是「哪儿会有」而非「此刻一定有」;同一品种常常
 # 有几十上百个候选点(黑晶琉璃 360、黄石榴石 284),不像星星那样是固定收齐的一批。
 GATHER_GENRES = {v["genre"]: str(v["icon"]) for v in rows("MEGAMAP_CONF.json").values()
                  if v.get("class") == 8 and v.get("genre") and v.get("icon")}
-GATHER_NPCS = {v["param_id"]: v["genre"] for v in rows("MEGAMAP_GATHERING_CONF.json").values()
-               if v.get("genre") in GATHER_GENRES}
+GATHER_NPCS = {int(v["id"]): v["name"] for v in rows("NPC_CONF.json").values()
+               if v.get("name") in GATHER_GENRES}
 
 # NPC_WHITELIST 是「按 npc id 白名单取点」图层的总表:星星在此之上另做奖励行/装饰石像排除。
 NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}, "gather": GATHER_NPCS}
@@ -667,7 +673,17 @@ def _egg_tables():
     """
     econf, eitems, etypes, nests = {}, {}, {}, {}
     for k, v in rows("PET_EGG_CONF.json").items():
-        e = {"n": v.get("name", ""), "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
+        # 2026-09 版起 PET_EGG_CONF 不再随包发布 name 列(只剩 pet_id/model_id/区间…),
+        # 物种名改从 species(MONSTER_CONF+PET_CONF 合并,键即 pet_id)反查 —— 实测覆盖率
+        # 1016/1016,无一落空。
+        # 异色蛋补回前缀:品类 precious_egg_type==2 即异色(见 docs/data.md 3.6)。旧版名字
+        # 自带这两个字(如「异色恶魔叮」),新版随 name 一起没了;页面虽有独立的异色标记,
+        # 但随机蛋候选这类**纯文字列表**会并列两个同名条目,故按品类补回。
+        _n = v.get("name") or species.get(str(v.get("pet_id") or ""), "")
+        if int(v.get("precious_egg_type") or 0) == 2:
+            _n = "异色" + _n
+        e = {"n": _n,
+             "hl": v.get("height_low", 0), "hh": v.get("height_high", 0),
              "wl": v.get("weight_low", 0), "wh": v.get("weight_high", 0), "t": v.get("hatch_data", 0),
              "p": v.get("precious_egg_type", 0)}
         # model_id 与 id 相同的条目(基础形态)占多数,不重复落盘。
@@ -736,15 +752,32 @@ def _size_medals():
             by_task[str(t)] = m
     out = []
     for k, v in rows("MEDAL_TASK_CONF.json").items():
-        if v.get("get_condition") != MEDAL_COND_PERCENTILE:
+        # 2026-09 版起 get_condition / condition_data* 被官方从发布数据剥离(表只剩
+        # id/desc/count 三列),改按 **desc 文本**识别这四枚:维度看「身高/嗓音」,
+        # 窗口看「前/最高」还是「末/最低」+ 百分数(维度口径不变:desc 写「身高」但
+        # 实测判的是体重,见本函数文档字符串)。
+        desc = v.get("desc") or ""
+        pct = re.search(r"(\d+)%", desc)
+        if not pct:
+            continue
+        if "身高" in desc:
+            dim = 2
+        elif "嗓音" in desc:
+            dim = 3
+        else:
+            continue
+        n = int(pct.group(1))
+        if "前" in desc or "最高" in desc:
+            lo, hi = 100 - n, 100
+        elif "末" in desc or "最低" in desc:
+            lo, hi = 0, n
+        else:
             continue
         m = by_task.get(k)
-        win = v.get("condition_data2") or []
-        dim = (v.get("condition_data1") or [0])[0]
-        if not m or len(win) != 2:
+        if not m:
             continue
         out.append({"id": int(m["id"]), "n": m.get("name", ""),
-                    "d": dim, "lo": win[0], "hi": win[1]})
+                    "d": dim, "lo": lo, "hi": hi})
     return sorted(out, key=lambda x: x["id"])
 
 

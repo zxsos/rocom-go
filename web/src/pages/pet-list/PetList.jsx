@@ -146,6 +146,12 @@ export default function PetList() {
       s.has(t) ? s.delete(t) : s.add(t)
       return { ...f, types: [...s], page: 1 }
     })
+  const toggleEggGroup = (g) =>
+    setFilter((f) => {
+      const s = new Set(f.eggGroups || [])
+      s.has(g) ? s.delete(g) : s.add(g)
+      return { ...f, eggGroups: [...s], page: 1 }
+    })
   const sortBy = (key) =>
     setFilter((f) => ({ ...f, sort: key, order: f.sort === key && f.order === 'asc' ? 'desc' : 'asc', page: 1 }))
   // 打开详情弹窗(不离开列表,保留当前操作状态);复制编号到剪贴板
@@ -232,7 +238,7 @@ export default function PetList() {
       <FilterPanel
         filter={filter} options={{ ...options, natureMatrix: nameOpts.nature }} total={data.total}
         collapsed={collapsed} onClose={() => setCollapsed(true)}
-        set={set} toggleType={toggleType} reset={reset}
+        set={set} toggleType={toggleType} toggleEggGroup={toggleEggGroup} reset={reset}
       >
         <BoxMap
           container={active} selected={selected} onCell={onCell}
