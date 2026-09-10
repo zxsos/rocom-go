@@ -26,6 +26,17 @@
 # 依赖:dotnet SDK 10+(pacman -S dotnet-sdk);CUE4Parse 仓库(默认 ~/Git/gh/CUE4Parse,
 # 环境变量 CUE4PARSE_DIR 覆盖);首次运行会往 ~/.cache/nrc-unpack 下载 oodle/zlib-ng 原生库。
 #
+# ⚠️ 2026-09 起(安卓 1.111.0.112 及同期 PC)加密换成「可配置加密」:pak trailer 末尾多
+# 1 字节 strategy id,由它选算法(AES/SM4/MLE/RC5/XTEA/Speck/Salsa20/Simon/ChaCha20)与
+# 密钥来源(主密钥 / 4 组 keyMaterial 派生 / 按 pak 文件名派生),详见 docs/unpack-2026-09.md。
+# 上游 FabianFG/CUE4Parse 只有旧版 permute+mutate 变体,拿它解新 pak 的表现是
+# 「10 个包全部挂载成功、但 0 个文件」——必须用带 FConfigurableCrypto 的 LukeFZ fork:
+#   git clone https://github.com/LukeFZ/CUE4Parse.git ~/Git/gh/CUE4Parse-LukeFZ
+#   git -C ~/Git/gh/CUE4Parse-LukeFZ fetch --depth 1 origin 2b09c12f558feb8c2e6db42fa4570d4c78481848
+#   git -C ~/Git/gh/CUE4Parse-LukeFZ checkout FETCH_HEAD
+#   CUE4PARSE_DIR=~/Git/gh/CUE4Parse-LukeFZ ./scripts/unpack.sh ...
+# 本脚本会检测该支持,缺失时告警(不阻断,旧版本 pak 不受影响)。
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,6 +55,14 @@ CUE4PARSE_DIR="${CUE4PARSE_DIR:-$HOME/Git/gh/CUE4Parse}"
     exit 1
 }
 export CUE4PARSE_DIR
+
+# 新加密检测:1.111.0.112 起需要 FConfigurableCrypto(LukeFZ fork)。只有上游旧 permute+mutate
+# 变体时,解新 pak 的表现是「挂 10 个包、0 个文件」,这里提前给出可执行的补救命令。
+if [[ ! -f "$CUE4PARSE_DIR/CUE4Parse/GameTypes/Tencent/RocoKingdomWorld/Encryption/FConfigurableCrypto.cs" ]]; then
+    echo "警告: $CUE4PARSE_DIR 不含 RocoKingdomWorld 可配置加密(FConfigurableCrypto)" >&2
+    echo "       2026-09 起(1.111.0.112+)的 pak 用它解会「挂载成功但 0 个文件」;解旧版本 pak 不受影响" >&2
+    echo "       换用 LukeFZ fork 见 docs/unpack-2026-09.md(或本文件头部注释)" >&2
+fi
 
 # CUE4Parse 的 NRCLua 只解无头 luac,漏了带 {0xFA,0xE5,0xC0}+len 头的那批(约占 9 成,
 # 导致其 AES 对整段解密 padding 失败)。补丁剥掉该头再解密;幂等:已应用(git apply --check
