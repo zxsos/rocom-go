@@ -181,6 +181,9 @@ func (p *Pipeline) applyNewPet(m capture.Message, sc *store.Scoped, acc string) 
 	}
 	p.srv.Hub().Broadcast("pet", acc, pp)
 	if isNew {
+		// 破过壳的新宠物:补进那次破壳记下的「待认领的一代」(见 breeding.go 的 claimHatchedChild)。
+		// 放这里而不是破壳那一步:子代此刻才入库,嗓音/体重百分位这些要进快照的属性才拿得到。
+		p.claimHatchedChild(p.conn(m.Session), sc, acc, pp, m.Time)
 		// 花种(稀兽)战斗内捕捉(catch_way=4,实测内嵌于 BATTLE_FINISH_NOTIFY 的 goods_reward 下发):
 		// 捕捉后该花种重生为新个体,清掉其 0x0338 详情,需玩家重新点击查看。
 		if pd.GetCatchWay() == 4 {

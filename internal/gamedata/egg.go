@@ -138,3 +138,51 @@ func (db *DB) EggIcon(itemID uint32) string {
 	}
 	return ""
 }
+
+// EggIconOfBase 返回某个宠物形态**对应哪种蛋**(蛋图的相对路径,前端拼 /img/);认不出返回空串。
+//
+// 反查路径:形态 → 它自己那个形态组的普通蛋配置 → 背包里的蛋物品 → 图标。
+// 按**形态组**查而不是按物种名查:同一只精灵的地区/季节形态各有各的蛋图(波波螺 3508 的
+// egg_boboluo / 3511 的 egg_bobolouar、地鼠 3020 的 egg_dishu / 3454 的 egg_dishu_2),
+// 按名字查会让两个品种指着同一张图 —— 而「这两种蛋不是一个品种」正是培育页要区分的东西。
+//
+// 与 EggIcon 的差别:这里**不回退通用蛋图**。通用蛋只说明「这是颗蛋」,而调用方问的是
+// 「这个品种的蛋长什么样」,给通用图等于给了一张错的图;认不出来就交空串,由调用方改用头像。
+//
+// 兜底:这个形态**没有自己的蛋 id** 时,退回**本来样子**那颗蛋(同名的另一个形态,见
+// eggByName)。依据就是「有没有蛋 id」—— 实测多形态物种里绝大多数每个形态各有各的蛋
+// (鸭吉吉 6 种形态就有 6 颗蛋、地鼠两支是 egg_dishu / egg_dishu_2、波波螺是
+// egg_boboluo / egg_bobolouar…),只有板板壳、石肤蜥、海盔虫这三支的第二形态没有自己的蛋
+// (官方设定是**后天**变成的样子,孵出来还是本来样子那颗蛋)。各自的蛋 id 正是它们的区别 ——
+// 有蛋 id 的一律用自己的,绝不互相借。
+func (db *DB) EggIconOfBase(petbaseID uint32) string {
+	icon := ""
+	if item, ok := db.eggByGroup[petbaseID]; ok {
+		icon = db.eggItems[item].Icon
+	} else if other, ok := db.eggByName[db.petbase[petbaseID].Name]; ok {
+		icon = db.eggItems[db.eggByGroup[other]].Icon
+	}
+	if icon == "" {
+		return ""
+	}
+	if p := "egg/" + icon + ".webp"; db.imgFiles[p] {
+		return p
+	}
+	return ""
+}
+
+// IsInfertile 报告这个形态**生不出蛋**:它的繁殖组(蛋组)是「未发现」。
+//
+// 蛋组 1 在 EGG_GROUP 里就叫「未发现」(name 与 desc 都是这四个字):迪莫、帕尔萨斯/圣羽翼王那一系、
+// 绒绒、犀角鸟、热团团、钨丝贝贝、诅咒狼灵、新月鹭、学院呱呱、睡铃雪影娃娃、果实立方人等 53 个形态
+// 都落在这一组 —— 正是游戏里「进不了小窝配种」的那批特殊精灵。实测**没有**形态是「含 1 又带别的组」,
+// 故这个判据没有歧义;反过来,**没有蛋组**的形态(超进化/分支形态,实测 64 个)只是没配,不等于
+// 不能生,一律按能生算 —— 宁多勿漏。
+//
+// 为什么不拿「有没有蛋图」(EggIconOfBase)当判据:蛋只配在**初始形态**上(孵出来的就是它),而且
+// 同一物种在 petbase 里可能有多个条目、蛋只挂在其中一个(板板壳 3055 有蛋、3516 没有)—— 查不到
+// 蛋图不等于孵不出来,照它过滤会误伤几十个正常品种。
+func (db *DB) IsInfertile(petbaseID uint32) bool {
+	gs := db.petbase[petbaseID].EggGroups
+	return len(gs) == 1 && gs[0] == 1
+}

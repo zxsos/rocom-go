@@ -331,6 +331,12 @@ type EggParent struct {
 	Gid       uint32   `json:"gid"`
 	Name      string   `json:"name"`
 	Species   string   `json:"species"`
+	// Evo 是该亲本**收蛋那一刻形态**所属的进化链(见 gamedata.ChainOf),0 = 无链。
+	//
+	// 为什么要存进快照:亲本可能被放生/进化,快照是这条培育史里唯一还在的凭据 ——
+	// 破壳自动建线时要由它认出「这是哪个品种」(见 pipeline.recordHatch),而快照里没有
+	// base_conf_id,离了 Evo 就只剩名字可比(名字正是不够用的那个,见 gamedata.ChainOf)。
+	Evo       uint32   `json:"evo,omitempty"`
 	ConfID    uint32   `json:"confId,omitempty"`
 	Img       string   `json:"img,omitempty"`
 	Gender    string   `json:"gender,omitempty"`
@@ -350,6 +356,17 @@ type EggParents struct {
 	Fathers    []EggParent `json:"fathers,omitempty"`
 	Ambiguous  bool        `json:"ambiguous,omitempty"` // 父本候选多于一个(串窝)
 	RecordedAt int64       `json:"recordedAt,omitempty"`
+	// LineID / Gen 是这颗蛋记到了**哪条培育线的第几代**(收蛋即记时回填,见
+	// pipeline.recordLay)。为空表示没记上(没抓到双亲、或记线失败)。
+	//
+	// 为什么存在蛋上而不是只留在内存里:收蛋与破壳之间隔着**整个孵化倒计时**
+	// (几小时到几天),期间进程重启、连接断开、换设备都可能发生。破壳那一刻要能
+	// 拿 egg_gid 反查回「该补哪条线的第几代」,内存里的配对早就没了。
+	//
+	// 它随双亲快照**同一次** SetEggParents 落库 —— 那条 SQL 带 `parents IS NULL
+	// OR parents=''` 只写一次,事后补不进去,故 recordLay 必须排在写蛋之前。
+	LineID string `json:"lineId,omitempty"`
+	Gen    int    `json:"gen,omitempty"`
 }
 
 // EggMedal 是这颗蛋**确定**能拿到的一枚百分位奖牌(拿不到、或还判不了的都不进这个列表)。

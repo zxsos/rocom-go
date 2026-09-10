@@ -196,6 +196,65 @@ func TestGathersTrackedAndPushed(t *testing.T) {
 	}
 }
 
+// TestGathersIconFallsBackToLayer 品种图标拼不出 webp 时,标记要退回**图层标记**而不是留空。
+//
+// 从前这条靠数据里现成的无图品种(结晶花/机械零件)走端到端来测;2026-09-10 给这批品种接上
+// 「BAG_ITEM_CONF 同名物品回退」后,出点品种全都有图,数据里再找不到这样的点位 —— 故改为拿
+// 一个真实点位、把图标名换成必然拼不出的(真名 + "9x"),只测兜底那一步。空图标在前端只会画
+// 成一个裸圆点:玩家看到个说不出是什么的点,与「附近真没有」无从分辨。
+//
+// 期望值**独立**从 poi_kinds 里取 gather 那行的图标,而不是调 GatherLayerIcon 自证 ——
+// 后者正是被测对象,拿它当期望的话,它返回任何一个非空图标都能过。
+func TestGathersIconFallsBackToLayer(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	var want string
+	for _, k := range p.db.POIKinds() {
+		if k.K == "gather" {
+			want = p.db.POIIcon(k)
+		}
+	}
+	if want == "" {
+		t.Fatal("采集物图层图标没 embed(img_MapIcon_PetPlant_png),兜底无从谈起")
+	}
+
+	s := gatherSamples(t, p.db)[0]
+	own := p.db.POIIconOf(s.I)
+	if own == "" {
+		t.Fatalf("样本「%s」本身就拼不出图(i=%q),兜底与「用品种自己的图」两条路分不开", s.N, s.I)
+	}
+	if got := p.gatherIcon(s.I, want); got != own {
+		t.Errorf("有图品种「%s」的标记图标 = %q, 期望 %q —— 有图就该用品种自己的图,不该退回", s.N, got, own)
+	}
+	if got := p.gatherIcon(s.I+"9x", want); got != want {
+		t.Errorf("图标名拼不出 webp 时 = %q, 期望退回图层标记 %q —— 空串会让前端画裸圆点", got, want)
+	}
+}
+
+// TestGathersPointsAllHaveIcon 数据契约:凡带 i 的采集物点位,那张 webp 必须真在 embed 里。
+//
+// 没有它,「点位写了图标名、图却没拷进 img/worldmap」这种漏配(生成脚本两处只改一处就会如此)
+// 会一路走到线上 —— 表现为图上退回图层标记,所有品种长一个样,看不出是漏了图还是本来就这样。
+func TestGathersPointsAllHaveIcon(t *testing.T) {
+	p, _ := newTestPipeline(t)
+	n := 0
+	for _, poi := range p.db.POIs(uint32(testRes)) {
+		if poi.K != "gather" {
+			continue
+		}
+		n++
+		if poi.I == "" {
+			t.Errorf("r=%d 品种「%s」的点位不带 i —— 没回退到同名物品的图标?", poi.R, poi.N)
+			continue
+		}
+		if p.db.POIIconOf(poi.I) == "" {
+			t.Errorf("r=%d 品种「%s」的 i=%q 在 img/worldmap 里没有对应 webp", poi.R, poi.N, poi.I)
+		}
+	}
+	if n == 0 {
+		t.Fatal("测试库 res=1001 里没有采集物点位,检查 names.json")
+	}
+}
+
 // TestGathersDroppedOnLeave 实体离开后标记必须当场撤掉,**不留灰点**。
 //
 // 这是本图层与野生宠最关键的差别:野生宠离开后要置灰保留 4 小时(刷得慢,走回去

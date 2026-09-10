@@ -49,3 +49,53 @@
 /* 小尺寸变体(分页条数等紧凑场景) */
 .dropdown.small .dropdown-trigger { padding: 4px 8px; font-size: 12px; border-radius: 8px; }
 .dropdown.small .dropdown-menu { font-size: 12px; }
+
+/* —— 带头像的可搜索下拉(PetPicker,见 components/PetPicker.jsx)—— */
+
+/* 头像:触发按钮与候选行共用。候选来自整个宠物库,同名个体极多(刷了一窝),
+   头像是最快区分「就是这只」的一条线索。 */
+.dropdown-av { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: var(--bg-3); }
+/* 触发按钮上的数值副文本(V/W/性格)。可收缩 + 省略号:窄屏时它先让位给名字,
+   而不是把名字挤出按钮(名字是唯一能确认「选对了没」的东西)。 */
+.dropdown-meta { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fg-dim); }
+
+/* 菜单里的数值列:固定不收缩,让它先于名字截断 —— 名字被截断就读不出选的是谁了。 */
+.dropdown-item-meta { flex: none; max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fg-dim); }
+.dropdown-item.cur .dropdown-item-meta { color: var(--accent); opacity: .8; }
+.dropdown-item.clear { color: var(--fg-dim); }
+.dropdown-empty { padding: 10px 8px; font-size: 13px; }
+
+/* 带搜索框的菜单变体:菜单本身不滚,只有候选列表滚 —— 搜索框要一直看得见(见 PetPicker)。
+   flex 布局下 .dropdown-list 会被菜单的 max-height 夹住,useDropdown 量 ul 高度做翻转判断时
+   拿到的也就是夹住后的实际高度,不会因为「库里 900 只」而误判成放不下。 */
+.pet-picker .dropdown-menu { display: flex; flex-direction: column; overflow: hidden; }
+.dropdown-search { flex: none; padding: 2px 2px 6px; }
+.dropdown-search .input { width: 100%; }
+.dropdown-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+
+/* —— 可输入的组合下拉(ComboSelect,见 components/ComboSelect.jsx)—— */
+
+/* 触发区是一个 <input>,套不了 .dropdown-trigger(那是给 button 的):把同样的外观复刻到
+   外框 + 输入框上。外框负责描边/底色/圆角,输入框自己透明无边 —— 这样「点哪儿都能输入」,
+   而聚焦环仍画在整块外框上(而不是套在 input 上的一圈小框)。 */
+.combo-box {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 0 10px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.combo-box:hover { border-color: var(--accent); }
+.combo.open .combo-box { border-color: var(--accent); background: var(--accent-soft); }
+.combo-box:focus-within { box-shadow: 0 0 0 3px var(--accent-soft); }
+.combo-input {
+  flex: 1 1 auto; min-width: 0; width: 100%;
+  appearance: none; background: transparent; border: 0; outline: none;
+  font: inherit; color: var(--fg); padding: 7px 0;
+}
+.combo-input::placeholder { color: var(--fg-dim); }
+.combo-input:disabled { opacity: .5; cursor: not-allowed; }
+.combo-caret {
+  flex: none; display: inline-flex; align-items: center; color: var(--fg-dim);
+  transition: transform .2s ease;
+}
+.combo.open .combo-caret { transform: rotate(180deg); }

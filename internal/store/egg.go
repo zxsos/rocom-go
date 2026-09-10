@@ -237,6 +237,37 @@ func (sc *Scoped) ReconcileHatching(gids []uint32, secs []int32, skip map[uint32
 		`UPDATE eggs SET hatching=?, data=?, updated_at=? WHERE account=? AND gid=?`, updates)
 }
 
+// EggBreedingInfo 是破壳那一刻培育模块要的蛋信息:物种与双亲快照。
+type EggBreedingInfo struct {
+	Species string          // 孵出物种(=母本品种);随机蛋可能为空
+	Parents *pet.EggParents // 收蛋那一刻记下的双亲,没抓到小窝交互时为 nil
+}
+
+// GetEggBreedingInfo 取一颗蛋的物种与双亲快照;这行不在库里(或已删)返回 nil。
+//
+// 必须在 DeleteEgg 之前取:双亲快照只存在于蛋这一行上,破壳回包一到就删(见 pipeline/eggs.go)。
+func (sc *Scoped) GetEggBreedingInfo(gid uint32) (*EggBreedingInfo, error) {
+	var species string
+	var parents sql.NullString
+	err := sc.rdb.QueryRow(
+		`SELECT species, parents FROM eggs WHERE account=? AND gid=?`, sc.account, gid).
+		Scan(&species, &parents)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := &EggBreedingInfo{Species: species}
+	if parents.Valid && parents.String != "" {
+		var ps pet.EggParents
+		if json.Unmarshal([]byte(parents.String), &ps) == nil {
+			out.Parents = &ps
+		}
+	}
+	return out, nil
+}
+
 // EggFilter 是精灵蛋列表的筛选条件(空值即不限)。
 // 排序不在这里:游戏内的「品质排序」是品类/品质/物品排序号的复合键,这些键取自名称库、
 // 读取时才重算(见 pet.RefreshEggView),故排序由调用方在重算之后用 pet.SortEggs 做。

@@ -271,6 +271,9 @@ func (p *Pipeline) pushGathers(conn, acc string, now time.Time) {
 		return
 	}
 	ts := cs.gathers
+	// 品种没有图标资产时的兜底(见 gamedata.GatherLayerIcon):图层图标与具体品种无关,
+	// 整份载荷共用一个,故在循环外取一次。
+	layerIcon := p.db.GatherLayerIcon()
 	marks := make([]server.GatherMark, 0, len(ts.marks))
 	for id, g := range ts.marks {
 		u, v, ok := p.db.Project(uint32(ts.res), g.pos.X, g.pos.Y)
@@ -285,7 +288,7 @@ func (p *Pipeline) pushGathers(conn, acc string, now time.Time) {
 		// 位置是真的,只是说不出它叫什么,前端按无名标记画。
 		if poi, ok := p.db.GatherByRefresh(g.refreshID); ok {
 			m.N = poi.N
-			m.Icon = p.db.POIIconOf(poi.I)
+			m.Icon = p.gatherIcon(poi.I, layerIcon)
 		}
 		marks = append(marks, m)
 	}
@@ -295,4 +298,16 @@ func (p *Pipeline) pushGathers(conn, acc string, now time.Time) {
 	payload := server.GatherPayload{Account: acc, SceneResID: ts.res, Gathers: marks}
 	p.srv.SetLastGathers(acc, &payload)
 	p.srv.Hub().Broadcast("gathers", acc, payload)
+}
+
+// gatherIcon 选采集物标记该用的图标:品种自己的图(点位表的 i)能拼出来就用它,拼不出就退回
+// 图层标记 —— 空图标在前端只画成一个裸圆点,玩家看不出那儿是什么(见 gamedata.GatherLayerIcon)。
+//
+// 抽成独立函数只为可测:这条兜底原先靠数据里现成的无图品种(结晶花/机械零件)来测,2026-09-10
+// 给它们接上「BAG_ITEM_CONF 同名物品回退」后,所有出点品种都有图,数据里再没有这样的点位。
+func (p *Pipeline) gatherIcon(icon string, layerIcon string) string {
+	if ic := p.db.POIIconOf(icon); ic != "" {
+		return ic
+	}
+	return layerIcon
 }

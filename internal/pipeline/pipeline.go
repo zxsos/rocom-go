@@ -86,6 +86,10 @@ type connState struct {
 	pendantRid int32                     // 最近一次挂件交互(0x0272)的刷新行 id,等回包(0x0273)确认
 	home       *homeState                // 家园小窝图层状态(仅在家园场景内非空,见 home.go)
 	crackEgg   uint32                    // 最近一次破壳请求(0x030b)的 egg_gid,回包确认后把这颗蛋删掉
+	// hatch:破壳回包确认下来的「这一代在等哪只子代入库」(见 breeding.go 的 hatchClaim)。
+	// 与 crackEgg 的时序有关:同一条 0x030c 先过 handleEgg(记下配对)再过 handlePet(子代入库),
+	// 子代入库时正是靠它认领,不必靠「窗口内新出现的同种宠物」去猜。
+	hatch *hatchClaim
 	// hatchGids 是登录数据(0x0102)给的孵蛋器占用列表,权威口径(见 pet.BackpackHatchSlots)。
 	// 记住它而非只用一次:登录包通常**先于**背包分页到达,此时库里还没有蛋,对账自然无效;
 	// 等随后蛋从 0x1344 入库时再拿这份列表逐颗判定,首次运行也能立刻判对。

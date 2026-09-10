@@ -149,6 +149,23 @@ func (db *DB) POIs(resID uint32) []POI { return db.pois[resID] }
 // gatherKind 是采集物图层的键(与 poi_kinds 的 k、POI.K 同源)。
 const gatherKind = "gather"
 
+// GatherLayerIcon 返回采集物图层自己的图标路径(poi_kinds 里 gather 那行的
+// img_MapIcon_PetPlant_png);给「品种没有图标资产」的点位兜底,未 embed 时空串。
+//
+// 为什么需要:56 个品种里有 5 个的 icon 列既不是图标编号、也没有同名物品可回退(创愈草/
+// 星芒花/美愿石/蝙蝠兰/迷幻菇;另 5 个如结晶花能从 BAG_ITEM_CONF 的同名物品拿到图标,见
+// scripts/gen_gamedata.py 的 _gather_icon),点位因而不带 i,POIIconOf 只能返回空串;前端拿到
+// 空图标就画一个裸圆点,说不出那是什么。退回图层标记至少与候选点图层口径一致
+// (那边的兜底是 usePois 的 p.i || iconOf[p.k])。
+func (db *DB) GatherLayerIcon() string {
+	for _, k := range db.poiKinds {
+		if k.K == gatherKind {
+			return db.POIIcon(k)
+		}
+	}
+	return ""
+}
+
 // GatherByRefresh 按刷新点 id 查采集物点位;不是采集物点位时返回 false。
 //
 // 判据是**刷新点 id 命中采集物点位表**,而非实体的 npc_cfg_id 落在某张 NPC 白名单里:
@@ -157,8 +174,9 @@ const gatherKind = "gather"
 // 前者的 id 与服务器下发的 npc_content_cfg_id 天然是同一个(2026-09 两份 pcap 实测:
 // 73 个采集物实体全部命中,且品种名与 docs/data.md 记的完全对上)。
 //
-// 代价:官方没配进点位表的品种(如实测发现的 50047)认不出来 —— 那是生成脚本的
-// 缺口(见 scripts/gen_gamedata.py 的 GATHER_GENRES),该修的是表,不是这里的判据。
+// 代价:官方没配进点位表的品种认不出来 —— 那是生成脚本的缺口(见 scripts/gen_gamedata.py
+// 的 GATHER_GENRES),该修的是表,不是这里的判据。曾以「实测 50047 认不出来」为缺口样例,
+// 实为误诊:NPC 50047 是「初级宝箱」,本就不是采集物品种,与采集物点位表无关。
 func (db *DB) GatherByRefresh(refreshID int32) (POI, bool) {
 	p, ok := db.gatherByR[refreshID]
 	return p, ok

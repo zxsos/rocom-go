@@ -4,6 +4,7 @@ import (
 	mathrand "math/rand"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // Medal 是奖牌的名称与描述。
@@ -24,10 +25,11 @@ type imageEntry struct {
 }
 
 // PetImage 是宠物各尺寸图片的相对路径(相对图片根,空串表示缺图)。
+// 四个字段都是「确实 embed 了才给」,故非空即保证能取到(见 imageOf)。
 type PetImage struct {
 	Head          string `json:"head"`          // 小头像 HeadIcon/<n>.webp
 	BigHead       string `json:"bigHead"`       // 大头像 BigHeadIcon256/<n>.webp
-	Portrait      string `json:"portrait"`      // 全身图 Pet1024/JL_<x>.webp
+	Portrait      string `json:"portrait"`      // 全身图 Pet1024/JL_<x>.webp;该尺寸暂未 embed,恒为空串
 	PortraitSmall string `json:"portraitSmall"` // 全身缩略 Pet256/JL_<x>.webp
 }
 
@@ -92,18 +94,18 @@ func (db *DB) imageOf(petbaseID string, shiny bool) PetImage {
 			ps = e.SPS
 		}
 	}
+	// 普通图同样要过 imgFiles 校验(iconPath 内部做),不能照索引直接拼路径:
+	// 索引是游戏侧的表、图片是解包导出的,两者会不一致 —— 未上线形态整体无美术,
+	// 部分形态只缺一项(3219 只有 Pet1024 大图、3731 索引声明了异色头像但客户端没这张图)。
+	// 漏校验就会下发 404 路径,而前端**不报错**:静默退占位图,只是白跑一次请求,极难察觉。
 	var img PetImage
-	if head != "" {
-		img.Head = "HeadIcon/" + head + ".webp"
-	}
-	if big != "" {
-		img.BigHead = "BigHeadIcon256/" + big + ".webp"
-	}
+	img.Head = db.iconPath("HeadIcon", head)
+	img.BigHead = db.iconPath("BigHeadIcon256", big)
 	if e.P != "" {
-		img.Portrait = "Pet1024/JL_" + e.P + ".webp"
+		img.Portrait = db.iconPath("Pet1024", "JL_"+e.P)
 	}
 	if ps != "" {
-		img.PortraitSmall = "Pet256/JL_" + ps + ".webp"
+		img.PortraitSmall = db.iconPath("Pet256", "JL_"+ps)
 	}
 	return img
 }
@@ -310,6 +312,42 @@ func (db *DB) PetByName(fullName string) (uint32, PetBaseInfo, bool) {
 	return id, info, ok
 }
 
+// ChainByName 按**裸形态名**(不带 PetFullName 的「（形态）」后缀)反查品种(进化链 id);
+// 查不到这个形态名、或同名的几个形态**并不并属一条链**时返回 0。
+//
+// 给「手里只有一个名字」的补全用:培育线的老记录(链口径之前建的)只存了 EggParent.Species
+// 这个裸名,读取时由它补出品种身份(见 pet.DeriveChain 与 pet.ChainRefOf)。
+//
+// 为什么有歧义就返回 0,而不是取最小 id 猜一个:这条路径补错的代价是不对称的 —— 一旦补成链,
+// 调用方那条「按名字匹配」的退路就没了,同名但不在链上的那只从此一只都配不出来;而返回 0
+// (继续按名字匹配)至少与升级前一样能配。实测 676 个有图鉴号的形态里,52 组名字同时有链形态
+// 与无链变体记录,其中 25 组的最小 id 落在链上、另一半落在无链的那条上,拿最小 id 去猜
+// 两边都会踩雷。
+//
+// 与 PetByName 的分工:那个按**全名**反查(展示场景),这个按裸名给**品种**。
+func (db *DB) ChainByName(name string) uint32 {
+	if name == "" {
+		return 0
+	}
+	evo, first := uint32(0), true
+	for _, info := range db.petbase {
+		if info.Name != name || info.Book == 0 {
+			continue
+		}
+		if first {
+			evo, first = info.Evo, false
+			continue
+		}
+		if evo != info.Evo {
+			return 0 // 同名形态不并属一条链:不猜
+		}
+	}
+	if first {
+		return 0 // 没有这个形态名(或都没有图鉴号)
+	}
+	return evo
+}
+
 // PetFormOption 是形态枚举里的一条(base/名字/图鉴号/头像)。
 type PetFormOption struct {
 	Base uint32 `json:"base"` // petbase 形态 id
@@ -416,14 +454,222 @@ func (db *DB) EvolutionChain(petbaseID uint32) []ChainStep {
 		pi := db.petbase[id]
 		steps = append(steps, ChainStep{Petbase: id, Name: pi.Name, Book: pi.Book, Stage: pi.Stage, Image: db.PetImageByBase(id, false)})
 	}
-	// 按阶段升序;同阶段(分支进化,如果冻→抹茶/椰浆/熔岩布丁)再按图鉴号,保证顺序稳定。
+	// 按阶段升序;同阶段(分支进化,如果冻→抹茶/椰浆/熔岩布丁)再按图鉴号,最后按 petbase id。
+	//
+	// 最后一档不能省:阶段与图鉴号**都会撞**(喵喵的两支终极形态 武斗酷猫 5061 / 叶冕魔力猫 5003
+	// 同为 stage 4、book 4),只比到图鉴号时剩下的一段顺序直接来自 evoIndex 的**map 迭代次序** ——
+	// 每次启动都可能不同。而这个顺序是**对外契约的一部分**:/api/evolution 按它下发,ChainLabel
+	// 也按它拼展示名(「喵喵（喵呜/魔力猫/武斗酷猫/叶冕魔力猫）」),不定序会让契约 golden 间歇性
+	// 报不一致,且页面上同一品种的括号里两个名字顺序会随重启跳。
 	sort.Slice(steps, func(i, j int) bool {
 		if steps[i].Stage != steps[j].Stage {
 			return steps[i].Stage < steps[j].Stage
 		}
-		return steps[i].Book < steps[j].Book
+		if steps[i].Book != steps[j].Book {
+			return steps[i].Book < steps[j].Book
+		}
+		return steps[i].Petbase < steps[j].Petbase
 	})
 	return steps
+}
+
+// ChainOf 返回某 petbase 形态所属的**培育品种**:进化链分组 id(同链共享);未知或无链返回 0。
+//
+// 培育页此前按「当前形态名」认品种,那是不成立的:
+//   - 一条链上的各阶段是**同一个**品种 —— 蛋的物种随母本(docs/data.md 3.6),链上任一阶段的 ♀
+//     都能当种母。按名字比会把链上的其它阶段全漏掉:记的是罗隐,而窝里是只阿米亚特就配不出来了。
+//   - 反过来,同一只精灵的**不同形态**各占一条链(嗜波螺「本来的样子」3508 / 「被污染的样子」
+//     3511),链 id 天然把它们分开,不必再给身份加「形态」这一维。
+//
+// 0 表示该形态**没有链**(实测 1147 条 petbase 里 526 条:首领/活动/内部占位形态),只能单条成链
+// —— 此时按**名字**认品种(见 pet.ChainRef),与升级前的行为一致。
+func (db *DB) ChainOf(petbaseID uint32) uint32 {
+	info, ok := db.petbase[petbaseID]
+	if !ok {
+		return 0
+	}
+	return info.Evo
+}
+
+// ChainMembers 返回某条进化链的全部 petbase 形态 id;evo==0 或未知返回 nil。
+//
+// 培育页拿它把「这条线认的品种」展开成可逐个比对的形态集合(见 pet.ChainRefOf):个体身上只有
+// base_conf_id(当前形态),要认它属不属于这条链,只能拿这个集合去撞。
+// 返回的是内部切片,**调用方不得修改**。
+func (db *DB) ChainMembers(evo uint32) []uint32 {
+	if evo == 0 {
+		return nil
+	}
+	return db.evoIndex[evo]
+}
+
+// ChainLabel 返回培育品种的展示名:初始形态在前,其余阶段列在全角括号里 ——
+// 「阿米亚特（阿米樱/罗隐/深渊罗隐）」「地鼠（枯水期的样子）（遁鼠/遁地鼠）」。
+//
+// 为什么要把链上**所有阶段**都写出来:这条线的种母可以是链上任一阶段的 ♀,只写「罗隐」会让
+// 「阿米亚特♀ 也能用」在界面上看不出来 —— 而那正是这个页面最容易踩的坑。
+//
+// 为什么**形态名**也必须写出来:同一只精灵的地区/季节形态各占一条链(地鼠 3020 枯水期 /
+// 3454 储水时、波波螺 3508 本来 / 3511 被污染),而它们的阶段名一模一样 —— 只写形态名之外的
+// 部分,下拉里就会并排出现两条**完全一样**的「地鼠（遁鼠/遁地鼠）」,玩家无从分辨,而选错品种
+// 直接决定了这条线能配哪些母本。形态名走 petFullName(与 wiki 键同口径的全角括号)。
+//
+// 形态在链内通常一致(实测地鼠/遁地鼠/波波螺/海盔虫等多形态物种的整条链都是同一个形态),
+// 故只在**与链首不同**的阶段重复标注 —— 否则「地鼠（枯水期的样子）（遁鼠（枯水期的样子）/
+// 遁地鼠（枯水期的样子））」会平白啰嗦一倍。链内形态确实不同的(化蝶 3136:平常/幽冥眼/
+// 喵喵/奇丽花四个样子同链)才逐个带出来。
+//
+// 例外:**无链**的形态不带形态名(只写名字)—— 那种品种是按名字认的,选项跨的就是同名的一整组
+// 形态,写上其中一个样子即错,理由见函数内。
+//
+// ⚠️ 这是**纯展示**字符串,不参与任何反查:身份与匹配一律走 ChainOf(链 id,见 pet.ChainRef)。
+// 故分隔符可以自由挑,与 PetFullName 那种「一个字符不对就静默查不到」的 wiki 键完全不同 ——
+// 但两条路都各自只有一个拼装点,别在别处再拼一份。
+func (db *DB) ChainLabel(petbaseID uint32) string {
+	steps := db.EvolutionChain(petbaseID)
+	if len(steps) == 0 {
+		return ""
+	}
+	// 无进化链的形态**只写名字**、不带形态:这种品种是按**名字**认的(见 ChainRef 的 evo==0 分支),
+	// 一个选项/一条线跨的是「同名的那一整组形态」—— 海枝枝的 4 个样子(碧蓝珊瑚/杏黄百合/洋红沙丁/
+	// 翠绿纶布)、首领变体与草系徽章变体,后端一律当同一只配。带上其中一个样子,等于把「这条线只认
+	// 这一个形状」说成事实,而那正是玩家选错品种的由来。与 ChainLabelOf 的 evo==0 分支同口径。
+	if db.petbase[petbaseID].Evo == 0 {
+		return steps[0].Name
+	}
+	formOf := func(id uint32) string { return db.petbase[id].Form }
+	head, headForm := steps[0], formOf(steps[0].Petbase)
+	var sb strings.Builder
+	sb.WriteString(petFullName(head.Name, headForm))
+	if len(steps) > 1 {
+		sb.WriteString("（")
+		for i, s := range steps[1:] {
+			if i > 0 {
+				sb.WriteString("/")
+			}
+			if f := formOf(s.Petbase); f == headForm {
+				sb.WriteString(s.Name)
+			} else {
+				sb.WriteString(petFullName(s.Name, f))
+			}
+		}
+		sb.WriteString("）")
+	}
+	return sb.String()
+}
+
+// ChainLabelOf 按**品种标识**(链 id + 名字,见 pet.BreedingLine)取展示名。
+//
+// 培育线存的不是 petbase id(那会随游戏版本改数据而失效),故不能直接调 ChainLabel:
+// 有链时从链上任一成员出发都能得到同一条链(EvolutionChain 按阶段排序,结果与起点无关),
+// 无链时就是这个形态自己 —— 名字,与 ChainLabel 的无链分支同口径。
+func (db *DB) ChainLabelOf(evo uint32, species string) string {
+	if evo != 0 {
+		if ids := db.evoIndex[evo]; len(ids) > 0 {
+			return db.ChainLabel(ids[0])
+		}
+	}
+	return species
+}
+
+// ChainOption 是培育页「品种」下拉的一项。
+//
+// 为什么给的是链而不是形态名:玩家要的是「培育阿米亚特这条线」,而库里那只可能早就进化成
+// 罗隐了 —— 选项必须按品种(链)列,选一次就覆盖链上全部阶段。链首(初始形态)放在 Base 上,
+// 下拉里拿它的图当图标:长名字(「阿米亚特（阿米樱/罗隐/深渊罗隐）」)靠文字认不出来,
+// 而同名多形态的两条链连文字都一样(「地鼠（枯水期的样子）（遁鼠/遁地鼠）」)。
+type ChainOption struct {
+	Evo     uint32 `json:"evo"`     // 进化链 id;0 = 无链形态(按名字认)
+	Species string `json:"species"` // 链首形态名;无链时即该形态名(按它匹配)
+	Base    uint32 `json:"base"`    // 链首(初始形态)的 petbase id
+	Label   string `json:"label"`
+	Img     string `json:"img,omitempty"` // 链首头像(品种的「证件照」,形态之间的差别在头上最明显)
+	// Egg 是这个品种的**蛋图**(见 EggIconOfBase):培育页要孵的就是它,「这条线对应哪种蛋」
+	// 在选品种这一刻就该看得见。
+	//
+	// 认不出时为空(同一物种在 petbase 里可能有多个条目、蛋只挂在其中一个上,如板板壳 3055 有蛋
+	// 而 3516 没有),此时由前端退回 Img。**它不是「能否生育」的判据** —— 那是 EggGroups 的事
+	// (见 ChainOptions 里的过滤:蛋组「未发现」的品种才不进候选)。
+	Egg string `json:"egg,omitempty"`
+	// Count 是库里这个品种有几只(入参逐只给,同形态出现几次即几只)。
+	Count int `json:"count"`
+}
+
+// ChainOptions 把一串 petbase 形态收敛成「品种」选项(去重,按图鉴号 → 链首 id 升序)。
+//
+// 入参是本账号宠物**当前形态**的 base_conf_id,逐只给(见 store.Scoped.PetBaseIDs)。
+// 只列库里确实有的品种:蛋的物种随母本,选了库里没有的品种就永远配不出任何组合。
+//
+// 去重键就是**匹配口径**(见 pet.ChainRef.Match):有链按链 id、无链按名字。按名字去重会把
+// 「阿米亚特」与「罗隐」拆成两个品种(它们是一条链)、把两种嗜波螺并成一个(它们是两条链),
+// 两边都错 —— 选项与匹配必须同一套口径,否则玩家选了也配不出来。
+//
+// 只列**生得出蛋**的品种(见下面对「未发现」蛋组的过滤):列一个生不出来的,玩家建完线才发现
+// 这条线永远不会有子代,而那时候他已经在填目标、在挑种母了。
+func (db *DB) ChainOptions(bases []uint32) []ChainOption {
+	type entry struct {
+		opt  ChainOption
+		head uint32
+		book uint32
+	}
+	idx := make(map[string]int, len(bases))
+	out := make([]entry, 0, len(bases))
+	for _, base := range bases {
+		id, ok := db.petbase[base]
+		if !ok {
+			continue
+		}
+		// 去重键 = 匹配口径(见上):有链按链 id,无链按名字。
+		key := "n:" + id.Name
+		if id.Evo != 0 {
+			key = "e:" + strconv.FormatUint(uint64(id.Evo), 10)
+		}
+		if i, ok := idx[key]; ok {
+			out[i].opt.Count++
+			continue
+		}
+		// 链首 = 阶段最小的那个形态(EvolutionChain 已按阶段排好;无链时就是自身)。
+		head, species := base, id.Name
+		if steps := db.EvolutionChain(base); len(steps) > 0 {
+			head, species = steps[0].Petbase, steps[0].Name
+		}
+		hi, ok := db.petbase[head]
+		if !ok {
+			continue
+		}
+		idx[key] = len(out)
+		out = append(out, entry{
+			opt: ChainOption{
+				Evo: id.Evo, Species: species, Base: head,
+				Label: db.ChainLabel(base), Img: db.PetImageByBase(head, false).Head,
+				Egg: db.EggIconOfBase(head), Count: 1,
+			},
+			head: head, book: hi.Book,
+		})
+	}
+	// 生不出蛋的品种不进候选:判据是**繁殖组(蛋组)**为「未发现」(见 IsInfertile),不是
+	// 「查不查得到蛋图」—— 后者会误伤几十个正常品种(理由见 IsInfertile 的注释)。
+	// 按**链首**判:整条链共享一个品种,链上任一阶段的 ♀ 都能当种母,而蛋组是按形态配的。
+	kept := out[:0]
+	for _, e := range out {
+		if db.IsInfertile(e.head) {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	out = kept
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].book != out[j].book {
+			return out[i].book < out[j].book
+		}
+		return out[i].head < out[j].head
+	})
+	res := make([]ChainOption, 0, len(out))
+	for _, e := range out {
+		res = append(res, e.opt)
+	}
+	return res
 }
 
 // NatureEffect 返回性格的 +10%/-10% 维度(六维编号 1-6;0 表示无)。

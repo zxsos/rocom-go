@@ -219,7 +219,7 @@ func (s *Server) GetLastGathers(account string) *GatherPayload {
 
 // handleGathers 返回当前账号此刻视野内的采集物(GET /api/gathers);无记录返回 null。
 //
-// 与 /api/pois 的「采集物」图层是两个东西且互补:那边是全部候选刷新点(3552 个,
+// 与 /api/pois 的「采集物」图层是两个东西且互补:那边是全部候选刷新点(3766 个,
 // 回答「哪儿会有」),这里只是服务器当下真下发的实体(回答「这会儿有」)。
 // 见 GatherPayload 的说明。
 func (s *Server) handleGathers(w http.ResponseWriter, r *http.Request) {

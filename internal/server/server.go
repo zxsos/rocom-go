@@ -253,6 +253,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/flowers/slots", s.handleDeleteFlowerSlot)
 	s.mux.HandleFunc("GET /api/eggs", s.handleEggs)
 	s.mux.HandleFunc("GET /api/eggs/query", s.handleEggQuery)
+	// 培育:记录逐代孵蛋结果(自动 + 手动补录),并按目标给出选种与回交建议。
+	// 建议跟着线一起下发,见 api_breeding.go / payload.go 的 BreedingLinePayload。
+	s.mux.HandleFunc("GET /api/breeding", s.handleBreeding)
+	// 补录候选池:按品种给全库候选。独立于 /api/breeding,因为它与目标无关、只与品种有关,
+	// 且不能按 200 条分页取(见 payload.go 的 BreedingPoolPayload)。
+	s.mux.HandleFunc("GET /api/breeding/pool", s.handleBreedingPool)
+	s.mux.HandleFunc("POST /api/breeding", s.handleBreedingSave)
+	s.mux.HandleFunc("DELETE /api/breeding", s.handleBreedingDelete)
+	s.mux.HandleFunc("POST /api/breeding/claim", s.handleBreedingClaim)
 	// 孵化倍率实测:玩家点「开始测速」→ 游戏内开两次孵蛋器 → 后端取差分
 	s.mux.HandleFunc("POST /api/hatch/speed", s.handleHatchSpeed)
 	s.mux.HandleFunc("GET /api/handbook-glasses", s.handleHandbookGlasses)

@@ -1,5 +1,7 @@
 package server
 
+import "github.com/whoisnian/rocom-capture/internal/pet"
+
 // 本文件定义实时推送(SSE)与快照接口的载荷类型。
 //
 // 背景:这些载荷原先一律是 map[string]any —— 键是字符串字面量,拼错一个
@@ -150,7 +152,7 @@ type WildAllMark struct {
 // GatherPayload 是实时采集物图层:此刻玩家周围**真正刷着**的采集物。
 //
 // 与 POI 图层的「采集物」是两回事,前端两层并存:
-//   - POI 图层(GET /api/pois):3552 个**候选刷新点**,回答「这儿会有」;
+//   - POI 图层(GET /api/pois):3766 个**候选刷新点**,回答「这儿会有」;
 //   - 本图层(GET /api/gathers):服务器当下下发的实体,回答「这会儿有」。
 //
 // 两者差得很远 —— 实测两份 pcap,玩家 87m 内平均 13~19 个候选点里只有 4~6 个
@@ -604,4 +606,41 @@ type TrialLogBook struct {
 	Discovered uint32 `json:"discovered"`
 	Total      uint32 `json:"total"`
 	Unlocked   bool   `json:"unlocked"`
+}
+
+// BreedingLinePayload 是培育页一条培育线的响应形状:线本体平铺(内嵌,JSON 里没有嵌套层)
+// + 服务端按当前宠物库算出的选种建议与回交建议。
+//
+// 建议与线一起下发,而不是另开一个 /api/breeding/suggest 接口:建议依赖线的目标,目标一改
+// 建议就变;分两个请求的话前端每次改目标都得记住再拉一次,还会出现「线已更新、建议是旧的」
+// 这种中间态。整包一次算完最省事 —— 候选池对全部线也只取一次(见 api_breeding.go)。
+type BreedingLinePayload struct {
+	*pet.BreedingLine
+	// ChainName 是这条线认的品种的展示名(进化链 + 各阶段,见 gamedata.ChainLabelOf)。
+	// 链口径下 Species 只是「建线时那个形态名」,单独显示会让人以为线只认那一个阶段。
+	ChainName string           `json:"chainName,omitempty"`
+	Suggest   []pet.Suggestion `json:"suggest,omitempty"`   // 种公/种母推荐(已排序,取前 N)
+	Backcross *pet.Backcross   `json:"backcross,omitempty"` // 回交 vs 换种的对比;还没子代时为 nil
+	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = floor((母+父)/2),
+	// 目标为上限时必须双亲都到位,否则迭代再多次也到不了(见 pet.VoiceReach)。
+	Reach *pet.VoiceReach `json:"reach,omitempty"`
+}
+
+// BreedingPoolPayload 是手动补录面板的候选池(GET /api/breeding/pool):某个品种的三类候选。
+//
+// 为什么独立于 /api/breeding:候选池只与**品种**有关、与目标无关,而 /api/breeding 是按线
+// 下发的 —— 塞进去等于每条线都重复一份几百只的清单。也正因为它与目标解耦,切换目标时
+// 不必重拉(前端按品种标识缓存,见 Evo/Species)。
+//
+// 为什么不能沿用 /api/pets 分页取:`store.ListPets` 的 clampPageSize 把页大小压在 200 内,
+// 而候选池漏掉一页就等于「库里还有更合适的种公/种母而玩家无从知道」—— 补录是照着记忆
+// 或截图找个体,漏掉的那些正是他可能要找的。见 store.ListAllPets 的注释。
+type BreedingPoolPayload struct {
+	// Evo/Species 是请求里的**品种标识**(见 pet.ChainRef),原样回显:它们正是前端缓存这份
+	// 候选池的键(切换品种时按它判要不要重拉),由服务端给回来,前端不必自己记请求参数。
+	Evo     uint32             `json:"evo,omitempty"`
+	Species string             `json:"species,omitempty"`
+	Mothers []pet.PetCandidate `json:"mothers"` // 同品种雌性(种母)
+	Fathers []pet.PetCandidate `json:"fathers"` // 雄性(种公;蛋组可判定时已按品种粗筛)
+	Kids    []pet.PetCandidate `json:"kids"`    // 同品种全部个体(子代候选)
 }

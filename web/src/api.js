@@ -140,7 +140,7 @@ export const getWildPets = () => getJSON('/api/wildpets?' + buildQuery(), null)
 // getGathers 返回当前账号**此刻视野内**的采集物(花/草/菌/矿/果树):
 //   {sceneResId, gathers:[{id,r,n,icon,u,v,x,y,z}]}
 //
-// 与 getPois 的「采集物」图层互补而非重复:那边是全部**候选刷新点**(3552 个,回答
+// 与 getPois 的「采集物」图层互补而非重复:那边是全部**候选刷新点**(3766 个,回答
 // 「哪儿会有」),这里只给服务器当下真下发的实体(回答「这会儿有」)。实测刷出率
 // 只有三到四成,故这层的价值正是替玩家滤掉那七成空的候选点。
 //
@@ -251,6 +251,82 @@ export async function setHatchSpeed(on) {
 export const queryEggMatch = async (height, weight, maxSecs) => {
   const r = await fetch('/api/eggs/query?' + buildQuery({ height, weight, maxSecs }))
   if (!r.ok) throw await httpError(r, '查询失败')
+  return r.json()
+}
+
+// —— 培育线(逐代记录孵蛋结果,并按目标给选种 / 回交建议)——
+//
+// 一条线 = 一个品种的迭代史:代数、目标、进度都在同一个对象里。整条读写、整条提交 ——
+// 代数通常不到 30,拆表要 JOIN、删线要级联,不如整体来(见 internal/pet/breeding.go)。
+
+// getBreeding 拉取本账号全部培育线:
+//   {lines:[{id,evo,species,chainName,confId,goal:{voice,weightPct,nature,natureIn},status,
+//            gens:[],pending:[],createdAt,updatedAt,
+//            suggest:[{mother,father,exp:{voice,weightPct,weightHi,natureP,natureFrom},
+//                      score,ambiguous,backcross}],
+//            backcross:{advised,reason,withParent,exp,alt,altExp}}]}
+//
+// evo 是这条线认的**品种**(进化链 id,0 = 无链形态,那时按 species 名字认);chainName 是它的
+// 展示名(「阿米亚特（阿米樱/罗隐/深渊罗隐）」),链上各阶段都列出来 —— 只显示 species 会让人
+// 以为这条线只认那一个阶段,而链上任一阶段的 ♀ 都能当种母(见 internal/pet/breeding.go)。
+//
+// goal 的性格有两种写法:`nature` 是一个确切性格名,`natureIn` 是**一组**可接受的性格名
+// (「性格正面加某维」= 该维 +10% 的 5 个,前端按 /api/name-options 的方阵整行展开);
+// 两个同时填按并集算。natureP 是子代性格落在该集合里的概率(口径见 docs/api/schemas.md)。
+//
+// 建议(含回交对比)**不单独开接口**:它依赖这条线的目标,目标一改建议就变;分开请求的话
+// 前端每次改目标都得记住再拉一次,还会出现「线已更新、建议是旧的」的中间态(见 api_breeding.go)。
+export const getBreeding = () => getJSON('/api/breeding?' + buildQuery(), { lines: [] })
+
+// getBreedingPool 拉某个品种的补录候选池:
+//   {evo, species, mothers:[], fathers:[], kids:[]},每项是精简候选
+//   {gid,name,species,confId,img,gender,heightM,weightKg,heightPct,weightPct,voice,nature,
+//    talentRank,eggGroups:["龙"]}(img 是直接可用的头像路径,不是 /api/pets 的 image.head 嵌套;
+//   eggGroups 只有名字,没有官方描述)。
+//
+// 参数是**品种标识**(见 pet.ChainRef):evo = 进化链 id(线认的品种),species = 形态名
+// (只有无链形态用得上,那时 evo 为 0)。只传形态名的话,链上其它阶段的个体(罗隐线上的阿米亚特♀)
+// 会被判成别的品种 —— 而那正是补录面板最常要找的种母 / 种公。响应把这两个原样回显,前端据此缓存。
+//
+// 为什么不复用 getPets:/api/pets 的 pageSize 被 clampPageSize 压在 200 内,而候选池按只下发
+// 才有意义 —— 漏掉一页就等于「库里还有更合适的种母 / 种公 / 子代,玩家却无从知道」,而补录正是
+// 照着记忆去找某一只有没有。三个队列的过滤规则(同品种 ♀ / 与母本同蛋组的 ♂ / 同品种)只跟
+// 品种有关、与这条线的目标无关,故前端按品种缓存,改目标不必重拉(见 api_breeding.go)。
+export const getBreedingPool = (evo, species) =>
+  getJSON('/api/breeding/pool?' + buildQuery({ evo, species }),
+    { evo, species, mothers: [], fathers: [], kids: [] })
+
+// saveBreeding 新建或整条更新一条线:目标、状态、全部代数都在 body 里。
+// 「改目标」「补录一代」「删掉某一代」共用一个入口,前端不做字段级合并。
+export async function saveBreeding(line) {
+  const r = await fetch('/api/breeding?' + buildQuery(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(line),
+  })
+  if (!r.ok) throw await httpError(r, '保存失败')
+  return r.json()
+}
+
+// deleteBreeding 删一条培育线(只删线本身,不动任何宠物 —— 线上记的都只是快照)。
+export async function deleteBreeding(id) {
+  const r = await fetch('/api/breeding?' + buildQuery({ id }), { method: 'DELETE' })
+  if (!r.ok) throw await httpError(r, '删除失败')
+  return r.json().catch(() => true) // 204 无正文
+}
+
+// claimBreedingChild 把库里的某只宠认领为第 gen 代的子代。
+//
+// 为什么认领要交后端做:子代快照(名字/嗓音/体重百分位/性格)得按当前 gamedata 从 pets 里取,
+// 前端拿不到权威的那份;且「从待认领挪进正式代数」只该有一处实现 ——
+// 管线里的自动认领与这里的手动认领共用 pet.ClaimGeneration。
+export async function claimBreedingChild(id, gen, childGid) {
+  const r = await fetch('/api/breeding/claim?' + buildQuery(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, gen, childGid }),
+  })
+  if (!r.ok) throw await httpError(r, '认领失败')
   return r.json()
 }
 

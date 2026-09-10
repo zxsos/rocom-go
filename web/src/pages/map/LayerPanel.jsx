@@ -4,7 +4,7 @@ import { confirmDialog } from '../../components/confirm'
 import { WILD_LAYERS } from './wildConfig'
 import RangeRules from '../../components/RangeRules'
 import ZonePanel from './ZonePanel'
-import { IconBell, IconCheck, IconChevronDown, IconClose, IconRefresh, IconSliders, IconSparkle } from '../../components/svg'
+import { IconBell, IconCheck, IconChevronDown, IconClose, IconRefresh, IconSliders, IconSparkle, IconTrash } from '../../components/svg'
 
 // LayerPanel 图层侧栏:POI 图层开关;可收集图层(眠枭之星/不咕钟零件)行右侧另有收集模式小开关
 // (开 = 隐藏该图层已收集的点,判定来源见 usePois.js)。另有「野生宠物」一组:不是固定点位,
@@ -87,6 +87,9 @@ export default function LayerPanel({ pois, wilds, gathers, paint, routes, collap
             // 计数含灰点(与图上标记一致),悬浮再拆开说明其中多少已离开视野。
             const num = wilds.num[k] || 0
             const gone = wilds.numStale[k] || 0
+            // 隐藏灰点时计数要跟着减:面板上的数必须与图上画的数一致,
+            // 否则显示 73 而图上只有 30,只会让人以为标记出错了。
+            const shown = wilds.hideStale ? num - gone : num
             return (
               <div className="map-layer-row" key={k}>
                 <button className={'map-layer-btn map-wild-btn' + (wilds.on.has(k) ? ' on' : '')}
@@ -94,11 +97,39 @@ export default function LayerPanel({ pois, wilds, gathers, paint, routes, collap
                   title={gone ? `视野内 ${num - gone} · 已离开视野 ${gone}` : undefined}>
                   <span className="map-wild-swatch" style={{ borderColor: color }} />
                   <span className="map-layer-name">{n}</span>
-                  <span className="muted">{num}</span>
+                  <span className="muted">{shown}</span>
                 </button>
               </div>
             )
           })}
+          {/* 「画多少」的两道闸,紧贴图层开关摆:
+                不画灰点 —— 已离开视野的「最后所见」照样占一个标记,而它们回答不了「此刻
+                  有什么」,只是「这一带见过什么」的备忘,4 小时才过期,常是数量的大头(治本);
+                清空 —— 把当前这一批整份抹掉(后端状态不动,走动后新的会再推来),卡顿得
+                  受不了时的一键急救。
+              两道都在「显示」这一层,故排在下面「判定(规则/双牌)→ 提醒」之前。 */}
+          <div className="map-medal-row"
+            title="不画已离开视野的灰点:它们只是「这一带见过什么」的备忘,4 小时后才过期">
+            <button className={'map-collect-btn' + (wilds.hideStale ? ' on' : '')}
+              onClick={wilds.toggleHideStale}
+              aria-label="不画已离开视野的灰点" aria-pressed={wilds.hideStale}><IconCheck size={13} /></button>
+            <span className="map-layer-name">不画已离开视野的</span>
+            <span className="muted">{wilds.staleTotal}</span>
+          </div>
+          <div className="map-layer-row">
+            <button className="map-layer-btn" onClick={async () => {
+              // 误点代价不大(走动后自己回来),但一次清掉几十个标记还是确认一下:
+              // 与涂地重置同款 confirmDialog(见下),样式跟主题、移动端可用。
+              if (await confirmDialog({
+                message: '清空当前这批野生宠标记?后端状态不动,走动后新的会再出现。',
+                okText: '清空', danger: true,
+              })) wilds.clear()
+            }} title="只清当前显示的标记,不动后端数据;玩家一走动、有实体进出时后端会再推一批过来">
+              <IconTrash size={15} className="map-notify-ic" />
+              <span className="map-layer-name">清空当前标记</span>
+              <span className="muted">{wilds.marks.length}</span>
+            </button>
+          </div>
           {/* 体重/声音:区间规则,**与事件页共用同一套**(见 utils/rules.js)。
               规则编辑器就是 RangeRules 组件,两个页面长得一样、改哪边都一样。
               整体收在折叠按钮下:侧栏地方有限,而这几条多数时候配好就不动了。 */}

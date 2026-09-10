@@ -187,7 +187,16 @@ func (s *Server) handleClearEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleFilterOptions(w http.ResponseWriter, r *http.Request) {
 	sc := s.store.For(s.acct(r))
-	opts := sc.FilterOptions()
+	opts := sc.FilterOptions() // 五维「列 → 值集合」
+	// chains 与 medal 是另外合成的两项,类型与那五维不同,故整体走 map[string]any。
+	out := make(map[string]any, len(opts)+2)
+	for k, v := range opts {
+		out[k] = v
+	}
+	// 培育页「品种」下拉:按**进化链**归并本账号宠物现有形态(见 gamedata.ChainOptions)。
+	// 不能沿用 species 那一列的原因见 store.filterCols:链口径下「阿米亚特」与「罗隐」是一个品种,
+	// 而两种嗜波螺是两个 —— 按形态名归并两边都错。
+	out["chains"] = s.db.ChainOptions(sc.PetBaseIDs())
 	// 奖牌下拉:按「拥有」筛选,列出本账号宠物拥有过的奖牌名(id→名,去重,保持 id 升序)。
 	var names []string
 	seen := map[string]bool{}
@@ -197,8 +206,8 @@ func (s *Server) handleFilterOptions(w http.ResponseWriter, r *http.Request) {
 			names = append(names, m.Name)
 		}
 	}
-	opts["medal"] = names
-	writeJSON(w, opts)
+	out["medal"] = names
+	writeJSON(w, out)
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {

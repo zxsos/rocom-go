@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -764,6 +765,116 @@ func TestContractFlowersHiddenFields(t *testing.T) {
 			t.Errorf("/api/flowers 泄漏内部字段 %q", hidden)
 		}
 	}
+}
+
+// TestContractBreeding 锁定 /api/breeding 的 JSON 形状。
+//
+// 这条接口比别的更需要 golden:响应里一半是**算出来的**(每条线的 suggest / backcross),
+// 而它们的字段名只写在 pet.Suggestion / pet.Backcross 上 —— 改错了前端就读到 undefined,
+// 页面上表现为「建议面板整块空白」,而 Go 编译与别的接口的测试都照样全绿。
+//
+// 样本刻意造出「父本候选不止一只」(串窝 → ambiguous)与「子代优于双亲」(触发回交对比),
+// 让 suggest 与 backcross 两块都进 golden,而不是被 omitempty 悄悄省掉 —— 省掉的那部分
+// 正是最容易写错的部分。
+func TestContractBreeding(t *testing.T) {
+	s := newTestServer(t)
+	seedContract(t, s)
+	seedBreeding(t, s)
+	checkGolden(t, "breeding", get(t, s, "/api/breeding?account="+contractAcc), nil)
+}
+
+// TestContractBreedingPool 锁定 /api/breeding/pool 的候选池形状。
+//
+// 与 breeding 同理:候选池的字段名写在 pet.PetCandidate **内嵌**的 pet.EggParent 上,
+// 内嵌一旦改成具名字段(或某个 json tag 被删),JSON 就多出一层或换个键名,前端读到
+// undefined、补录面板三个下拉全空,而 Go 编译与别的接口的测试都照样绿。
+//
+// 样本复用 seedBreeding 的候选宠(同品种 ♀/♂ 且蛋组齐备),不另造:那批人正是补录面板
+// 要选的对象,而蛋组缺失会让种公队列整体退化(见 pet.BreedCandidates),golden 就锁不住粗筛。
+//
+// 参数用**品种标识** evo + species(前端就是这么发的,见 pet.ChainRef):只给 species 时服务端
+// 也会按名字补出链,但那条路不在这里锁 —— 这里要锁的是「链口径下候选池按链收人」。
+func TestContractBreedingPool(t *testing.T) {
+	s := newTestServer(t)
+	seedContract(t, s)
+	seedBreeding(t, s)
+	evo := s.db.ChainOf(3006) // 火神所在的那条链;种子宠的 base_conf_id 都是 3006
+	if evo == 0 {
+		t.Fatal("火神没有进化链,候选池样本失去意义")
+	}
+	url := fmt.Sprintf("/api/breeding/pool?evo=%d&species=火神&account=%s", evo, contractAcc)
+	checkGolden(t, "breeding-pool", get(t, s, url), nil)
+}
+
+// seedBreeding 造一条培育线及它需要的候选宠。
+//
+// 候选宠写在这个用例里、不写进 seedContract:后者是别的 golden 的公共底料,
+// 往里加宠会连带改掉 pets / stats / boxes 一串快照(见 TestContractPets)。
+func seedBreeding(t *testing.T, s *Server) {
+	t.Helper()
+	sc := s.store.For(contractAcc)
+
+	// 2001 种母、2002 与 2003 两只 ♂ 同品种同蛋组 —— 与 seedContract 的 1001(火神 ♂)一起,
+	// 这条线就有 3 位父本候选,正对应「串窝」那种情形。
+	mk := func(gid uint32, name, gender string, voice int32) *pet.Pet {
+		p := &pet.Pet{
+			Gid: gid, ConfID: 2000672, BaseConfID: 3006,
+			Species: "火神", Name: name, Level: 30, Gender: gender,
+			Nature: "固执", HeightM: 1.5, WeightKg: 88, Voice: voice, TalentRank: "A",
+		}
+		p.Image = s.db.PetImageByBase(p.BaseConfID, false)
+		pet.FillSizePercentile(s.db, p) // 百分位按当前 gamedata 现算,不落库(同 handleBreeding)
+		// 蛋组必须在这里补上:管线抓到的宠是经 pet.FromProto 转换来的,那里会注入蛋组
+		// (model.go 的 db.PetEggGroups(base));手搓的宠少了它,BreedPool 就一只都配不出,
+		// golden 里的 suggest 会被 omitempty 静默省掉 —— 那样这条契约就白锁了。
+		p.EggGroups = s.db.PetEggGroups(p.BaseConfID)
+		return p
+	}
+	mother, father, child := mk(2001, "小母", "♀", 40), mk(2002, "小公乙", "♂", -20), mk(2003, "小子", "♂", 88)
+	// 2004 是「换种」要用的备选:没有它的话回交建议会走进「没有别的候选可比」那条捷径,
+	// 而两栏对比(回交 vs 换种)才是这块 UI 的主体 —— 那部分字段必须进 golden。
+	extra := mk(2004, "小公丙", "♂", 60)
+	for _, p := range []*pet.Pet{mother, father, child, extra} {
+		if _, err := sc.UpsertPet(p); err != nil {
+			t.Fatalf("写入宠物 gid=%d: %v", p.Gid, err)
+		}
+	}
+
+	// 目标定成「越高越好」,而子代(88)已优于双亲均值 → 回交建议会给出对比,而不是空壳。
+	//
+	// 性格目标两种写法都给上:`nature` 精确一个,`natureIn` 是「性格正面加物攻」那一整行
+	// (该维 +10% 的 5 个名字,前端按 6×6 方阵的整行展开,见 pet.BreedingGoal)。**两种都要出现在
+	// golden 里** —— docs/api/fields.json 是从 golden 样本生成的,只给 nature 的话新字段会整条消失。
+	voice, wpct := int32(96), 98.0
+	natureRow := []string{"逞强", "固执", "大胆", "调皮", "勇敢"}
+	line := &pet.BreedingLine{
+		ID: "contract-line", Species: "火神", ConfID: 3006,
+		Goal:   pet.BreedingGoal{Voice: &voice, WeightPct: &wpct, Nature: "固执", NatureIn: natureRow},
+		Status: pet.BreedingActive,
+		// 第 1 代是已认领的完整记录(手动补录);第 2 代是**待认领**的一代 ——
+		// 破壳时只知道双亲、子代还没认领,这一支的字段(pending / fathers 多候选 / 无 child)
+		// 与已认领那支完全不同,故两者都要有。
+		Gens: []pet.Generation{{
+			Gen: 1, Mother: parent(mother), Father: parent(father), Child: parent(child),
+			Source: pet.GenSourceManual, At: 1700000000, Note: "手动补录样本",
+		}},
+		Pending: []pet.Generation{{
+			Gen: 2, Mother: parent(mother),
+			Fathers: []pet.EggParent{*parent(father), *parent(extra)},
+			Source:  pet.GenSourceAuto, At: 1700000100,
+		}},
+		CreatedAt: 1700000000, UpdatedAt: 1700000100,
+	}
+	if err := sc.UpsertBreedingLine(line); err != nil {
+		t.Fatalf("写培育线: %v", err)
+	}
+}
+
+// parent 取一份亲本快照。走 pet.ParentSnapshot 而不是手搓字段:线上记的双亲就是它产生的,
+// 手搓一份的话这里通过、线上仍可能少字段。
+func parent(p *pet.Pet) *pet.EggParent {
+	snap := pet.ParentSnapshot(p)
+	return &snap
 }
 
 // testAdminToken 设好管理员密码并返回令牌,供需要鉴权的测试用例使用。

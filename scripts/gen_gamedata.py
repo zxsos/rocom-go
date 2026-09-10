@@ -434,8 +434,9 @@ POI_KINDS = [
     {"k": "star_yellow", "n": "黄色眠枭之星",   "icon": "img_mianxiaozhixing_huang_png",        "collect": True},
     {"k": "star_purple", "n": "紫色眠枭之星",   "icon": "img_miaoxianzhixing_zi_png",           "collect": True},
     {"k": "part_bugu",   "n": "不咕钟零件",     "icon": "100946",                               "collect": True},
-    # 采集物(花/草/菌/矿/果树):一个图层收 48 个品种,每个点自带品种图标(见 GATHER_GENRES),
-    # 故此处的 icon 只在某品种缺图时兜底。点位三千余,默认关。
+    # 采集物(花/草/菌/矿/果树):一个图层收 56 个品种,每个点自带品种图标(见 GATHER_GENRES),
+    # 故此处的 icon 只在某品种缺图时兜底(10 个品种客户端没出图标,由 GatherLayerIcon 取这个
+    # 值退回图层标记)。点位三千余,默认关。
     {"k": "gather",      "n": "采集物",         "icon": "img_MapIcon_PetPlant_png"},
 ]
 
@@ -470,22 +471,79 @@ STAR_STATUE = {58308, 58318, 55632}      # 石像(行 id 必须在 NPC_PENDANT_C
 # pcap 实测),但**不在 WORLD_EXPLORING_STATISTIC_CONF 里**——服务器不给分区进度,
 # 收集模式只走逐点判定,故点位不带候选区域(zone)。
 # 采集物(花/草/菌/矿/果树):官方的「大地图采集物」就是 MEGAMAP_CONF 里 class==8 的那批
-# (48 个品种:向阳花/喵喵草/黑晶琉璃/可可果树…),每行给出品种名 genre 与图标 icon——图标列
+# (56 个品种:向阳花/喵喵草/黑晶琉璃/可可果树…),每行给出品种名 genre 与图标 icon。icon 多数
 # 是 BagItem 编号(100211 可可果),与不咕钟零件同走 copy_texture(见 gen_icons.py 的
-# gather_icons),采集物图标因此就是它产出的那件物品的样子。
+# gather_icons),采集物图标因此就是它产出的那件物品的样子;另有 10 个品种的 icon 为空或写着
+# 模型/蓝图名(BP_NPC_EnvComInte_<拼音>,icon 列只存拼音:结晶花 jiejinghua/机械零件…),
+# 客户端**没有**以此命名的图标。其中 5 个在 BAG_ITEM_CONF 里有同名物品(采集物采出的本就是
+# 那件物品),图标回退取物品的 icon 字段(结晶花 -> BagItem/101005);另 5 个连物品都没有
+# (创愈草/星芒花/美愿石/蝙蝠兰/迷幻菇),点位不带 i,由实时层退回图层标记
+# (见 internal/gamedata 的 GatherLayerIcon)。
 # 品种 → NPC id:2026-09 版起官方把 param_id 从发布数据剥离了(MEGAMAP_GATHERING_CONF 只剩
 # id/genre/description 三列),改按 **NPC_CONF 的名称**反查——采集物 NPC 的名字就是品种名
 # (实测 50041 的名字即「向阳花」、50090 即「可可果树」,与旧版 param_id 逐一吻合)。
+# 但**只认精确同名会整批漏掉带变体名的品种**,而变体往往才是持有全部刷新行的那个:黑晶琉璃的
+# 5 个精确同名 NPC(50333-50337)一行刷新都没有,点位全在 小型/中型/大型黑晶琉璃(50330-50332)
+# 身上 —— 2026-09-10 的 e3a84a8(适配新版本、param_id 换成名称匹配)因此让 5 个品种
+# (黑晶琉璃/黄石榴石/紫莲刚玉/蓝晶碧玺/风卷草)在点位表里整体消失、共丢 731 个点,另有 3 个
+# 果树品种(可可/无花/魔力)丢掉季节版点位;点位表一空,实时层的 GatherByRefresh 就查不到,
+# 实体被当无名物丢弃 —— 用户实测「以前能显示的花矿现在不显示」。
+# 故取**并集**:①精确同名(不限 type,保持原口径)②traverse_data_type==2 且名字含品种名。
+# type==2 是游戏自己的「可采集」标记(101 个 NPC,含尺寸/季节变体);不认它就会把
+# 「不可采集-喵喵草」「睡铃雪影娃娃」「天使草幼苗」「风卷草采集风场」「魔力果树1-挂少果」
+# 这类同名/近名 NPC 一并收进来(实测这些的 traverse_data_type 全为空)。名字含两个品种名时
+# 取最长命中(实测 56 个品种名互不为子串,无歧义)。
 # 名称匹配会多收同名 NPC(如另有 NPC 也叫「星芒花」),无妨:下面取点仍要走「有启用刷新行
 # 且坐标可解析」那道闸,没有刷新行的同名 NPC 自然一个点也产不出。
 # 点位与星星/零件同一条路(NPC 白名单直取刷新行,refresh_type=1 → AREA_CONF 中心)。
 # 口径提醒:取到的是**候选刷新点**(旧版 3717 行,已排除 disable 与 refresh_rule==0 的),
 # 游戏按刷新规则从中刷出一部分,故图上标的是「哪儿会有」而非「此刻一定有」;同一品种常常
 # 有几十上百个候选点(黑晶琉璃 360、黄石榴石 284),不像星星那样是固定收齐的一批。
-GATHER_GENRES = {v["genre"]: str(v["icon"]) for v in rows("MEGAMAP_CONF.json").values()
-                 if v.get("class") == 8 and v.get("genre") and v.get("icon")}
-GATHER_NPCS = {int(v["id"]): v["name"] for v in rows("NPC_CONF.json").values()
-               if v.get("name") in GATHER_GENRES}
+GATHER_TRAVERSE_TYPE = 2  # NPC_CONF.traverse_data_type:游戏自己的「可采集」标记
+
+def _item_icon_by_name():
+    """BAG_ITEM_CONF 里 物品名 -> 背包图标资产名(texkey,如 结晶花 -> 101005)。"""
+    out = {}
+    for r in rows("BAG_ITEM_CONF.json").values():
+        n, ic = r.get("name"), r.get("icon")
+        if n and isinstance(ic, str) and ic and texkey(ic):
+            out.setdefault(n, texkey(ic))
+    return out
+
+
+_ITEM_ICON = _item_icon_by_name()
+
+
+def _gather_icon(raw, genre):
+    """采集物品种的图标资产名:MEGAMAP_CONF.icon 是 BagItem 编号(100211 可可果)时原样用 ——
+    那个编号同时就是图标资产的文件名。10 个品种这里写的却是模型/蓝图名(结晶花 jiejinghua),
+    客户端没有以此命名的图标;但这批品种在 BAG_ITEM_CONF 里有**同名物品**(采集物采出的本就是
+    那件物品),物品的 icon 字段指向正确的图标资产(结晶花 -> BagItem/101005)。故非数字时按
+    品种名回退查同名物品。另有 5 个品种连同名物品都没有,维持空串由图层标记兜底。
+
+    与 gen_icons.py 的 gather_icon_fallback **必须同源**:这里把图标名写进点位 i,那边负责把
+    同名 webp 拷进 img/worldmap —— 只改一处会得到「有 i 无图」,前端就是一片白。
+    """
+    raw = str(raw or "")
+    return raw if raw.isdigit() else _ITEM_ICON.get(genre, "")
+
+
+GATHER_GENRES = {v["genre"]: _gather_icon(v.get("icon"), v["genre"])
+                 for v in rows("MEGAMAP_CONF.json").values()
+                 if v.get("class") == 8 and v.get("genre")}
+
+
+def gather_genre_of(name, traverse_type):
+    """采集物 NPC 名 → 品种名(规则见上方注释);认不出返回 None。"""
+    if name in GATHER_GENRES:
+        return name
+    if traverse_type != GATHER_TRAVERSE_TYPE:
+        return None
+    return max((g for g in GATHER_GENRES if g in name), key=len, default=None)
+
+
+GATHER_NPCS = {int(v["id"]): g for v in rows("NPC_CONF.json").values()
+               if (g := gather_genre_of(v.get("name") or "", v.get("traverse_data_type")))}
 
 # NPC_WHITELIST 是「按 npc id 白名单取点」图层的总表:星星在此之上另做奖励行/装饰石像排除。
 NPC_WHITELIST = {**STAR_NPCS, "part_bugu": {55901: "不咕钟零件"}, "gather": GATHER_NPCS}
@@ -643,7 +701,7 @@ for kind in POI_KINDS:
         # zone=候选区域营地 id 列表(仅眠枭之星;语义见上方区域注释)。
         e = {"k": kind["k"], "r": rid, "x": x, "y": y, "z": z, "n": name}
         if kind["k"] == "gather" and owner.get("icon"):
-            e["i"] = owner["icon"]  # 逐点品种图标(48 种花/草/菌/矿),图层图标只作缺图兜底
+            e["i"] = owner["icon"]  # 逐点品种图标(56 种里带图标的那 46 种),缺图的品种由实时层退回图层标记
         if kind["k"].startswith("star"):
             if zz := zones_of(x, y):
                 e["zone"] = zz

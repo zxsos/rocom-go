@@ -185,6 +185,24 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / .25);
 }
 .trial-opt-petname { font-size: 13px; font-weight: 600; text-align: center; }
+
+/* —— 图鉴未解锁 ——
+   本章「遇见记录」里还没遇到过的精灵:选它打一场就能点亮图鉴,故单独描边 + 角标提醒。
+   金色沿用金币/角标的强调色(--gold),与常态卡片一眼可分;只在**未解锁**时加 ——
+   反过来给已解锁的加金边会让整页都在发光,等于没有提醒。 */
+.trial-opt-box.is-locked {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold), var(--shadow-sm);
+}
+.trial-locked {
+  display: inline-block; margin-left: 4px; padding: 0 5px;
+  border-radius: 999px; border: 1px solid var(--gold);
+  background: rgb(245 185 66 / .12); color: var(--gold);
+  font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap;
+  vertical-align: 1px;
+}
+.trial-opp-pet.is-locked { color: var(--gold); }
+.trial-opp-pet.is-locked .trial-opp-img { filter: drop-shadow(0 0 3px rgb(245 185 66 / .55)); }
 .trial-opt-reward { display: flex; align-items: baseline; gap: 6px; justify-content: center; }
 .trial-opt-kind { font-size: 12px; }
 .trial-opt-name { font-size: 15px; font-variant-numeric: tabular-nums; }

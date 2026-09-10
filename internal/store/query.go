@@ -385,6 +385,11 @@ func (sc *Scoped) OwnedMedalIDs() []uint32 {
 }
 
 // filterCols 是筛选下拉的各维度:前端键 → pets 列名。顺序即 SELECT 的列顺序。
+//
+// 这里**没有 species**:宠物列表的筛选面板不用它,而培育页要的「品种」是按**进化链**归并的
+// (见 gamedata.ChainOptions)——不是原始形态名。那个维度由服务层在 handleFilterOptions 里
+// 另外合成(chains):它给的不是一列字符串而是一串结构化选项(链 id / 链首 / 头像 / 只数),
+// 塞不进这张「列 → 值集合」的表。
 var filterCols = []struct{ key, col string }{
 	{"nature", "nature"},
 	{"talentRank", "talent_rank"},
@@ -393,9 +398,34 @@ var filterCols = []struct{ key, col string }{
 	{"form", "form"},
 }
 
+// PetBaseIDs 返回本账号全部宠物**当前形态**的 base_conf_id,逐只给出(同一形态出现几次即几只)。
+//
+// 给培育页的「品种」下拉用(见 gamedata.ChainOptions):只列库里确实有的品种 —— 蛋的物种随
+// 母本,选了库里没有的品种就永远配不出任何组合。与 ListAllPets 的差别是不解 data JSON:
+// 几百只里多数只贡献一个 id,而品种由 gamedata 按 id 归并,不必知道每只的其它字段。
+//
+// 必须 ORDER BY:归并「同名多形态」时(无链形态只能按名字认),链首 = **先遇到**的那个形态,
+// 而它的头像与蛋图就是这个选项的图。不定序的话同一份数据每次查询都可能归到另一个形态上,
+// 页面上「这个品种长什么样」会随刷新跳变(实测海枝枝 4 个形态、公平鸽 2 个)。
+func (sc *Scoped) PetBaseIDs() []uint32 {
+	rows, err := sc.rdb.Query(`SELECT base_conf_id FROM pets WHERE account=? ORDER BY base_conf_id`, sc.account)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []uint32
+	for rows.Next() {
+		var id uint32
+		if rows.Scan(&id) == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // FilterOptions 返回本账号各维度的可选值(用于前端筛选下拉)。
 //
-// 五个维度合到一次扫描里,去重与排序放到 Go 侧做:原先每维一条 SELECT DISTINCT,五条各扫一遍
+// 各维度合到一次扫描里,去重与排序放到 Go 侧做:原先每维一条 SELECT DISTINCT,几条各扫一遍
 // 全表(这几列除 form 外都没有索引),同一批页就白读了五遍(本机 5.1ms → 1.3ms)。
 // SQLite 默认 BINARY 排序与 Go 的字符串比较都是按 UTF-8 字节序,换到 Go 侧排结果不变。
 func (sc *Scoped) FilterOptions() map[string][]string {

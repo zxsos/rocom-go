@@ -1,0 +1,297 @@
+{
+  "lines": [
+    {
+      "backcross": {
+        "advised": true,
+        "altExp": {
+          "natureFrom": "",
+          "natureP": 0,
+          "voice": 0,
+          "weightHi": 0,
+          "weightPct": 0
+        },
+        "exp": {
+          "natureFrom": "parent",
+          "natureP": 0.6666666666666666,
+          "voice": 64,
+          "weightHi": 2,
+          "weightPct": 0
+        },
+        "reason": "没有别的候选可比,继续用子代回交亲本",
+        "withParent": {
+          "confId": 2000672,
+          "gender": "♀",
+          "gid": 2001,
+          "heightM": 1.5,
+          "heightPct": 0,
+          "img": "HeadIcon/3006.webp",
+          "name": "小母",
+          "nature": "固执",
+          "species": "火神",
+          "talentRank": "A",
+          "voice": 40,
+          "weightKg": 88,
+          "weightPct": 0
+        }
+      },
+      "chainName": "火花（焰火/火神/烈火战神）",
+      "confId": 3006,
+      "createdAt": 1700000000,
+      "evo": 3003,
+      "gens": [
+        {
+          "at": 1700000000,
+          "child": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2003,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小子",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 88,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2002,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小公乙",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": -20,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "gen": 1,
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "note": "手动补录样本",
+          "source": "manual"
+        }
+      ],
+      "goal": {
+        "nature": "固执",
+        "natureIn": [
+          "逞强",
+          "固执",
+          "大胆",
+          "调皮",
+          "勇敢"
+        ],
+        "voice": 96,
+        "weightPct": 98
+      },
+      "id": "contract-line",
+      "pending": [
+        {
+          "at": 1700000100,
+          "fathers": [
+            {
+              "confId": 2000672,
+              "gender": "♂",
+              "gid": 2002,
+              "heightM": 1.5,
+              "heightPct": 0,
+              "img": "HeadIcon/3006.webp",
+              "name": "小公乙",
+              "nature": "固执",
+              "species": "火神",
+              "talentRank": "A",
+              "voice": -20,
+              "weightKg": 88,
+              "weightPct": 0
+            },
+            {
+              "confId": 2000672,
+              "gender": "♂",
+              "gid": 2004,
+              "heightM": 1.5,
+              "heightPct": 0,
+              "img": "HeadIcon/3006.webp",
+              "name": "小公丙",
+              "nature": "固执",
+              "species": "火神",
+              "talentRank": "A",
+              "voice": 60,
+              "weightKg": 88,
+              "weightPct": 0
+            }
+          ],
+          "gen": 2,
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "source": "auto"
+        }
+      ],
+      "reach": {
+        "best": 64,
+        "hit": false,
+        "target": 96
+      },
+      "species": "火神",
+      "status": "active",
+      "suggest": [
+        {
+          "ambiguous": true,
+          "backcross": true,
+          "exp": {
+            "natureFrom": "parent",
+            "natureP": 0.6666666666666666,
+            "voice": 64,
+            "weightHi": 2,
+            "weightPct": 0
+          },
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2003,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小子",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 88,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "score": 0.49111111111111105
+        },
+        {
+          "ambiguous": true,
+          "exp": {
+            "natureFrom": "parent",
+            "natureP": 0.6666666666666666,
+            "voice": 50,
+            "weightHi": 2,
+            "weightPct": 0
+          },
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2004,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小公丙",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 60,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "score": 0.5144444444444445
+        },
+        {
+          "ambiguous": true,
+          "exp": {
+            "natureFrom": "parent",
+            "natureP": 0.6666666666666666,
+            "voice": 10,
+            "weightHi": 2,
+            "weightPct": 0
+          },
+          "father": {
+            "confId": 2000672,
+            "gender": "♂",
+            "gid": 2002,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小公乙",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": -20,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "mother": {
+            "confId": 2000672,
+            "gender": "♀",
+            "gid": 2001,
+            "heightM": 1.5,
+            "heightPct": 0,
+            "img": "HeadIcon/3006.webp",
+            "name": "小母",
+            "nature": "固执",
+            "species": "火神",
+            "talentRank": "A",
+            "voice": 40,
+            "weightKg": 88,
+            "weightPct": 0
+          },
+          "score": 0.581111111111111
+        }
+      ],
+      "updatedAt": 1700000100
+    }
+  ]
+}

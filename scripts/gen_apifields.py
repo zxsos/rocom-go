@@ -32,6 +32,13 @@ ENDPOINTS = {
     "medals": ("GET /api/medals", "全部奖牌(不随账号)"),
     "evolution": ("GET /api/evolution", "某 petbase 的进化链"),
     "eggs": ("GET /api/eggs", "背包精灵蛋"),
+    # 培育线:响应里一半是**算出来的**(每条线的 suggest / backcross / reach)。这几块的字段名
+    # 只写在 pet.Suggestion / pet.Backcross / pet.VoiceReach 上,改错了 go 编译与别的接口
+    # 测试都照样绿 —— 故必须落盘锁定。
+    "breeding": ("GET /api/breeding", "培育线列表(含选种建议、回交对比与嗓音可达性)"),
+    # 补录候选池:字段名写在 pet.PetCandidate **内嵌**的 pet.EggParent 上 —— 内嵌改成
+    # 具名字段就会多出一层 JSON,前端读到 undefined 而 Go 编译照样绿,故一并落盘。
+    "breeding-pool": ("GET /api/breeding/pool", "补录候选池(按品种给种母/种公/子代)"),
     "handbook-glasses": ("GET /api/handbook-glasses", "图鉴炫彩收集"),
     "position-fresh": ("GET /api/position", "最近位置(未过期,含速度与轨迹)"),
     "position-stale": ("GET /api/position", "最近位置(已过期,抹掉 vu/vv/path)"),

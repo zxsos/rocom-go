@@ -51,3 +51,47 @@ func TestNatureMatrixNoDuplicate(t *testing.T) {
 		}
 	}
 }
+
+// TestNatureUniqueNames 锁住**去重后**的性格种类数 == 30,且它必须等于方阵填的格数。
+//
+// 为什么值得单测:`internal/pet` 的 natureCount(性格重掷槽的分母)按这个数硬编码,而
+// names.json 的 nature 表是**行数** 31 —— 里面 id 28 与 id 31 同为「平和」(+生命 −魔攻),
+// 且实测 7545 只宠物的性格 id 分布里 **31 一次都没出现过**(它是配置残留,永远不会落到
+// 宠物身上)。拿行数当种类数会把重掷那一份算小(1/31 而非 1/30),而这种偏差**不报错**:
+// 页面只是显示 61.29% 而不是 61.33%,谁也看不出来 —— 与上面那两条一样,属于「结构错了
+// 而界面完全正常」的那类失败。
+//
+// 第二条断言(种类数 == 方阵格数)防的是另一种漂移:多出一个在方阵里没有位置的性格
+// (如无增减的中性性格),它进不了前端的目标性格下拉,却被算进重掷分母 —— 两边同口径才对。
+//
+// 游戏改了性格表时会红,届时要连带改 internal/pet/breeding.go 的 natureCount、
+// docs/data.md 里那三档概率,以及前端 SuggestPanel 的性格条数文案。
+func TestNatureUniqueNames(t *testing.T) {
+	db, err := Load()
+	if err != nil {
+		t.Fatalf("加载名称库: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, name := range db.nature {
+		if name != "" {
+			seen[name] = true
+		}
+	}
+	if len(seen) != 30 {
+		t.Errorf("去重后的性格种类数 = %d, 期望 30(nature 表有 %d 行,其中包含重复项)",
+			len(seen), len(db.nature))
+	}
+	m := db.NatureMatrix()
+	filled := 0
+	for i := 0; i < 6; i++ {
+		for j := 0; j < 6; j++ {
+			if m[i][j] != "" {
+				filled++
+			}
+		}
+	}
+	if filled != len(seen) {
+		t.Errorf("方阵填充 %d 格 != 去重性格数 %d:有性格在方阵里没有位置(前端的目标性格下拉选不到它)",
+			filled, len(seen))
+	}
+}

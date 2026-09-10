@@ -69,9 +69,13 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpCrackEggRsp:
 		// 破壳成功(回包带孵出的宠物 gid):这颗蛋没了,当场删行,不必等下次开背包对账。
-		if egg := p.conn(m.Session).crackEgg; egg != 0 && pet.ParseCrackEggRsp(m.AppBody) != 0 {
+		cs := p.conn(m.Session)
+		child := pet.ParseCrackEggRsp(m.AppBody)
+		if egg := cs.crackEgg; egg != 0 && child != 0 {
+			// 先记培育线再删蛋:双亲快照只存在蛋这一行上(见 breeding.go 的 recordHatch)。
+			p.recordHatch(cs, sc, acc, egg, child, m.Time)
 			sc.DeleteEgg(egg)
-			p.conn(m.Session).crackEgg = 0
+			cs.crackEgg = 0
 			p.srv.Hub().Broadcast("eggs", acc, map[string]any{"account": acc})
 		}
 
@@ -96,7 +100,7 @@ func (p *Pipeline) handleEgg(m capture.Message, acc string) {
 		}
 		p.upsertEggs(sc, acc, eggs, m.Time, nil)
 		if m.Opcode == pet.OpGoodsRewardNotify && pet.ParseFlowReason(m.AppBody) == pet.FlowReasonHomeLay {
-			p.recordEggParents(m.Session, sc, eggs, m.Time)
+			p.recordEggParents(m.Session, sc, acc, eggs, m.Time)
 		}
 
 	case m.Direction == gcp.S2C && m.Opcode == pet.OpGetAllHatchStatusRsp:
@@ -273,12 +277,16 @@ func (p *Pipeline) upsertEggs(sc *store.Scoped, acc string, eggs []pet.Egg, now 
 	}
 }
 
-// recordEggParents 给刚从小窝收上来的蛋记双亲快照。
+// recordEggParents 给刚从小窝收上来的蛋记双亲快照,并把它记进培育线(收蛋即记)。
 //
 // 认领靠「刚点的那颗蛋 NPC」(c2s 0x0137 记下的 pendingEgg):它挂在母本的窝上,母本由
 // furniture_guid 定位,父本取服务器下发的配对候选。窝里有好几颗同种蛋、或没抓到那次交互时,
 // 退一步按**蛋物品 id** 在当前家园里找唯一匹配的窝;仍不唯一就不记(宁缺毋错)。
-func (p *Pipeline) recordEggParents(conn string, sc *store.Scoped, eggs []pet.Egg, now time.Time) {
+//
+// 双亲到手后紧接着记培育线(见 recordLay)—— 收蛋这一刻双亲最全、玩家也正盯着小窝,
+// 培育页随即就能看到一条「待孵」代。记线必须在 SetEggParents **之前**(lineId/gen 要搭
+// 双亲快照同一趟车落库),且记线失败绝不影响蛋本身入库。
+func (p *Pipeline) recordEggParents(conn string, sc *store.Scoped, acc string, eggs []pet.Egg, now time.Time) {
 	cs := p.conns[conn]
 	if cs == nil || cs.home == nil {
 		return
@@ -296,6 +304,10 @@ func (p *Pipeline) recordEggParents(conn string, sc *store.Scoped, eggs []pet.Eg
 			continue
 		}
 		if ps := p.parentsOf(sc, h, src.furniture, now); ps != nil {
+			// 记线在前:lineId/gen 要随双亲同一次写入(该 SQL 只写一次)。
+			// 母本快照里没有物种时(她还没进宠物库)拿蛋自己的物种兜底 —— 蛋的物种随母本,
+			// 这兜底成立。
+			p.recordLay(sc, acc, e.Gid, ps, p.db.Species(e.ConfID), now)
 			sc.SetEggParents(e.Gid, ps)
 		}
 		if h.pendingEgg == src {
@@ -351,6 +363,9 @@ func (p *Pipeline) parentSnap(sc *store.Scoped, gid uint32, name string) *pet.Eg
 		s.Name = pp.Name
 	}
 	s.Species, s.ConfID, s.Img = pp.Species, pp.ConfID, pp.Image.Head
+	// Evo 供破壳自动建线时认品种(见 pet.NewAutoLine):快照里没有 base_conf_id,离了它
+	// 就只剩名字可比,而名字正是「阿米亚特 / 罗隐」这种同品种不同阶段对不上的那个。
+	s.Evo = p.db.ChainOf(pp.BaseConfID)
 	s.Gender, s.HeightM, s.WeightKg = pp.Gender, pp.HeightM, pp.WeightKg
 	s.HeightPct, s.WeightPct = pp.HeightPct, pp.WeightPct
 	s.Voice, s.Nature, s.Talent = pp.Voice, pp.Nature, pp.TalentRank
