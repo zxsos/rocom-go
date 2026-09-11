@@ -277,7 +277,7 @@ func contractPos(tsMs int64) *PositionPayload {
 	u, v, vu, vv := 0.5, 0.5, 0.0001, -0.0002
 	return &PositionPayload{
 		Account: contractAcc, SceneResID: 10003, SceneCfgID: 1001,
-		SceneName: "卡洛西亚大陆", Img: "bigmap/10003.webp",
+		SceneName: "卡洛西亚大陆", Img: "bigmap/10003.webp", ImgHd: "bigmap/10003_hd.webp",
 		X: 510000, Y: 612000, Z: 1200,
 		U: &u, V: &v, VU: &vu, VV: &vv,
 		Heading: 123.5, Stop: false, Paintable: true,

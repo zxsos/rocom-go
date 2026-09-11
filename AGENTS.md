@@ -71,7 +71,10 @@
   (1/2/3 赛季、1000 黑白);普通炫彩 value=(粒子id<<20)|配色id 由前端按素材 alpha 蒙版
   CSS mask 三层填色合成(Bg 填 ui_color_2 → Bg2 填 ui_color_1 顶部对齐 → 粒子染白最上层),
   隐藏炫彩直接引用整图;渲染组件 web/src/components/badges.jsx 的 GlassChip)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
-  行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2);
+  行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2)、
+  `uv run python scripts/fetch_bigmap_hd.py`(可选:抓第三方「洛克助手」的 4x4 张 2048² 瓦片 →
+  img/bigmap/<res>_hd.webp 8192² 高清底图,供地图页「高清」开关叠加显示。⚠️ **不是解包数据**、
+  且远海透明+色调偏深,只能当叠加层;差异与合规说明见脚本头与 docs/data.md 3.1);
   `uv run python scripts/fetch_skill_ids.py`(刮 aismile.dev 技能图鉴 26 页 →
   `~/Downloads/rocom/skillIds.json`:**skill_id → 技能中文名** 604 条;站点无 JSON 接口,
   靠 HTML class 正则提取,改版后抓不到会报错退出)、`uv run python scripts/gen_skills.py`
@@ -137,10 +140,10 @@
   改动应改生成脚本而非手改。
 - 相关工具与开源项目清单见 [docs/reference.md](docs/reference.md)。
 - **版本号(契约)**:唯一真源是仓库根的 [`VERSION`](VERSION) 文件,格式 `赛季.大更新.小更新`
-  (当前 `5.0.0`,即 S5)。**任何更新都必须递增它**:
-  - **版本(赛季)更新**:主号 +1 并**归 0** —— S5 就是 `5.0.0` 起,下一个赛季直接 `6.0.0`;
-  - **大更新**:中间位 +1 且末位归 0(`5.0.0` → `5.1.0`);
-  - **小更新**:末位 +1(`5.0.0` → `5.0.1`)。
+  (当前 `4.0.0`,即 S4)。**任何更新都必须递增它**:
+  - **版本(赛季)更新**:主号 +1 并**归 0** —— 当前 S4 是 `4.0.0`,下一个赛季 S5 就是 `5.0.0`;
+  - **大更新**:中间位 +1 且末位归 0(`4.0.0` → `4.1.0`);
+  - **小更新**:末位 +1(`4.0.0` → `4.0.1`)。
 
-  前端由 `web/vite.config.js` 构建时读入并注入(顶栏显示 `v5.0.0`),
+  前端由 `web/vite.config.js` 构建时读入并注入(顶栏显示 `v4.0.0`),
   故只改这一个文件,改完 `cd web && npm run build` 让 embed 产物带上新版本。

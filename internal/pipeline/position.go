@@ -387,7 +387,8 @@ func (p *Pipeline) buildPos(cs *connState, acc string, res, room int32, mr scene
 		SceneResID: res,
 		SceneCfgID: mr.SceneCfgID,
 		SceneName:  p.sceneDisplayName(res, mr.SceneCfgID),
-		Img:        p.db.MapImage(uint32(res), room), // 底图文件名(家园按等级 <res>_<lv>);无底图为空
+		Img:        p.db.MapImage(uint32(res), room),   // 底图文件名(家园按等级 <res>_<lv>);无底图为空
+		ImgHd:      p.db.MapImageHD(uint32(res), room), // 高清底图(叠加层);无高清版为空
 		X:          mr.Pos.X,
 		Y:          mr.Pos.Y,
 		Z:          mr.Pos.Z,

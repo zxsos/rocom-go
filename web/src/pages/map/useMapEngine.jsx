@@ -32,12 +32,25 @@ export function wildTitle(p, rangeRules = []) {
   return s
 }
 
+// 高清底图开关存 localStorage:这是「我习惯怎么看」而不是「这次会话的临时状态」,
+// 与图层开关同性质(同 useGathers / ZonePanel 的做法)。
+const HD_LS_KEY = 'map.hdBase'
+const loadHD = () => {
+  try { return localStorage.getItem(HD_LS_KEY) === '1' } catch { return false }
+}
+
 // useMapEngine 抽离自 MapPage:地图引擎内核——位置/外推/RAF/视图状态 + 图层数据订阅。
 // 浮窗与主页面共用此 hook,各自渲染外壳(MapViz),省一份逻辑拷贝。
 export function useMapEngine(account) {
   const [pos, setPos] = useState(null)
   const [imgError, setImgError] = useState(false)
   const [layerError, setLayerError] = useState(false)
+  // 高清底图开关:只控制**叠加层**的显隐,标准底图始终在底下打底 —— 高清素材只覆盖
+  // 大陆与近海(远海透明),替换而非叠加会让海洋部分露空(见 gamedata.MapImageHD)。
+  const [hd, setHd] = useState(loadHD)
+  useEffect(() => {
+    try { localStorage.setItem(HD_LS_KEY, hd ? '1' : '0') } catch { /* 隐私模式忽略 */ }
+  }, [hd])
   const sceneRef = useRef(null)
   const layerRef = useRef(null)
 
@@ -253,6 +266,7 @@ export function useMapEngine(account) {
 
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
+    hd, setHd,
     view, worldRef, arrowRef, battleRef, applyFrame,
     pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap, clearUiState,
@@ -273,6 +287,7 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
   // 本函数与 useMapEngine **不是同一个作用域**,漏传就只在运行时炸 ReferenceError
   // (vite build 不做 no-undef 检查,构建照样过)—— 曾因此地图整页白屏。
   const { pos, hasMap, layerError, setImgError, setLayerError,
+    hd, setHd,
     view, worldRef, arrowRef, battleRef, pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, wildDist,
     draggingRef, pokeFrame } = engine
@@ -299,6 +314,16 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
     <div className="map-ctrl">
       <button className={'map-btn map-layers-toggle' + (layersActive ? ' on' : '')} title="图层栏"
         onClick={onToggleLayers}><IconMenu size={16} /></button>
+      {/* 高清底图开关:只在**后端告知该场景有高清版**时出现(pos.imgHd 由
+          gamedata.MapImageHD 决定,没抓过高清素材的场景没有这个字段)。
+          注意它是「叠一层」不是「换一张」—— 高清素材只覆盖大陆与近海、远海透明,
+          替换掉标准底图会让海洋露空,故两层同时存在(见下面的 map-base-hd)。 */}
+      {pos && pos.imgHd && (
+        <button className={'map-btn map-btn-hd' + (hd ? ' on' : '')}
+          title={hd ? '高清底图:已开启(大陆为高清素材,远海仍为标准图)'
+            : '高清底图:把大陆部分换成大分辨率素材'}
+          onClick={() => setHd((v) => !v)}>高清</button>
+      )}
       <button className="map-btn" title="放大" disabled={!zoomReady}
         onClick={() => view.zoomAround(1.4, view.vp.w / 2, view.vp.h / 2)}>＋</button>
       <button className="map-btn" title="缩小" disabled={!zoomReady}
@@ -329,6 +354,14 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
           <div className="map-world" ref={worldRef} style={{ width: mapPx, height: mapPx }}>
             <img className="map-base" src={imgURL(`bigmap/${pos.img}.webp`)} alt={pos.sceneName}
               draggable={false} onError={() => setImgError(true)} />
+            {/* 高清叠加层:透明处透出上面那张标准底图,故两层同用一张地图的投影、
+                天然对齐(见 internal/gamedata/map.go 的 MapImageHD)。
+                压在层图/涂地/各标记之下 —— 它们都该盖在地形之上。
+                切换只是挂载/卸载这个节点,标准底图始终在,故不会有空窗或闪烁。 */}
+            {hd && pos.imgHd && (
+              <img className="map-base map-base-hd" src={imgURL(`bigmap/${pos.imgHd}.webp`)}
+                alt="" draggable={false} />
+            )}
             {pos.layer && !layerError && (
               <img className="map-layer" src={imgURL(`bigmap/${pos.layer.img}.webp`)} alt="" draggable={false}
                 onError={() => setLayerError(true)}

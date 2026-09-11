@@ -99,6 +99,23 @@ func (db *DB) MapImage(resID uint32, room int32) string {
 	return strconv.FormatInt(int64(resID), 10)
 }
 
+// MapImageHD 返回某场景底图的高清版本文件名(不含扩展名,前端拼 /img/bigmap/<名>.webp);
+// 该场景没有高清版时返回 ""。
+//
+// 命名约定是 <底图名>_hd(如 10003_hd),数据由 scripts/fetch_bigmap_hd.py 抓取第三方
+// 「洛克助手」的 8192² 素材产出 —— **不是自行解包的**,来源与差异见该脚本头部说明。
+// 它只覆盖大陆与近海(远海透明),故前端是「原底图打底 + 高清层叠加」而非替换,见
+// web/src/pages/map/useMapEngine.jsx 的 map-base-hd。
+//
+// 是否有高清版由 embed 的文件清单决定(见 Load 的 hdMaps):没抓过的场景查不到,前端不显示开关。
+func (db *DB) MapImageHD(resID uint32, room int32) string {
+	name := db.MapImage(resID, room)
+	if name == "" || !db.hdMaps[name] {
+		return ""
+	}
+	return name + "_hd"
+}
+
 // Project 把场景世界坐标(厘米)投影为底图归一化坐标 u,v∈[0,1](复刻客户端
 // BigMapUtils.ScenePosToImagePosF)。该 scene_res 无底图时 ok=false。u,v 可能越界
 // [0,1](角色在底图覆盖范围外,如迷雾区),调用方自行决定是否裁剪。
