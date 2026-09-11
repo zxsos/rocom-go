@@ -21,6 +21,9 @@
 //   7. 版本号(.topbar-ver)在任何视口都**可见**、在顶栏内、且不与账号触发条重叠 ——
 //      2026-09 起手机端不再隐藏它(排障第一句要问的就是「你跑的是哪一版」,
 //      原先 760px 以下 display:none,手机上根本没有)。
+//   8. 当日榜称号(.rank-title)**只在桌面端显示**:手机端不渲染它(腾出 ~40px 给
+//      「品牌名 rocom-go + 版本号」,见 shell.css 的 .account-trigger .rank-title),
+//      账号 sheet 每一行里仍然写着,信息不丢。
 //
 // 四个坑,都踩过:
 //   1. 5 字基准要落在**昵称**(.acct-name)上,不能落在 .account-trigger-name 上。
@@ -116,6 +119,12 @@ for (const vp of [
               gap: acct ? Math.round(acct.getBoundingClientRect().left - r.right) : null,
             }
           })(),
+          // 称号:offsetParent 为空 = 被 display:none 藏了(手机端的行为);
+          // null = 这一行压根没有称号元素(该账号今天没戴称号),不算失败。
+          titleShown: (() => {
+            const el = q('.account-trigger .rank-title')
+            return el ? !!el.offsetParent : null
+          })(),
         }
       }, name))
     }
@@ -134,6 +143,9 @@ for (const vp of [
       check(`${vp.n} 触发条渲染 UID(唯一的文本标识)`,
         rows.every((r) => r.ordered && r.ordered.hasUid),
         rows[0].ordered?.hasUid ? '' : 'UID 没渲染')
+      check(`${vp.n} 触发条不显示当日榜称号(腾给品牌名与版本号)`,
+        rows.every((r) => r.titleShown !== true),
+        rows[0].titleShown === true ? '称号仍显示' : '')
       const heights = new Set(rows.map((r) => r.triggerH))
       const barHeights = new Set(rows.map((r) => r.barH))
       check(`${vp.n} 顶栏高度不随内容长度变化`,
@@ -154,6 +166,10 @@ for (const vp of [
       check(`${vp.n} 昵称与 UID 同排(桌面端都保留)`,
         rows.every((r) => r.ordered?.hasName && r.ordered?.hasUid),
         `hasName=${rows[0].ordered?.hasName} hasUid=${rows[0].ordered?.hasUid}`)
+
+      check(`${vp.n} 触发条保留当日榜称号`,
+        rows.every((r) => r.titleShown !== false),
+        rows[0].titleShown === false ? '称号被藏了' : '')
     }
 
     check(`${vp.n} 版本号可见、不越出顶栏、不与账号触发条重叠`,

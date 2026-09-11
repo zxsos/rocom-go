@@ -16,7 +16,7 @@
 /* 槽名里的 UID:等宽字体,让各条的星号段宽度一致、下拉里对得齐
    (普通比例字体的数字与星号宽度不同,不同槽名之间会跳位)。
    .privacy 由 SlotUid 组件挂上,复用全局截图防泄(见 shell.css 的 html[data-privacy]),
-   默认模糊,点顶栏品牌名「妙妙屋」解除 —— 与账号下拉里的 UID 同一种处理。 */
+   默认模糊,点顶栏品牌名「rocom-go」解除 —— 与账号下拉里的 UID 同一种处理。 */
 .slot-uid { font-family: ui-monospace, monospace; }
 
 .flowers-group { display: flex; flex-direction: column; gap: 8px; }
