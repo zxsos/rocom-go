@@ -31,6 +31,23 @@ export default function App() {
     useAccounts(onPinRequired)
   const { theme, cycle: cycleTheme } = useTheme()
   const { on: privacyOn, toggle: togglePrivacy, setOff: setPrivacyOff, setOn: setPrivacyOn } = usePrivacy()
+  // 品牌扫光:每次点击遮罩开关都把 .brand-spark 重新挂载(key 变)→ CSS 动画必然重跑。
+  // 为什么不用纯 CSS 触发(:hover 或属性选择器):鼠标停在品牌上时 :hover 持续命中,
+  // 动画播完后仍是「同一条、已播完」—— 再点只是切遮罩,animation-name 没变过,
+  // 浏览器不会重播,于是「一直点只有开关有反应、扫光没反应」(实测确认)。
+  // ⚠️ 这两段必须放在 usePrivacy() **之后**:依赖数组里的 togglePrivacy/privacyOn 是 const,
+  // 写在前面会命中 TDZ,整页白屏(ReferenceError: Cannot access before initialization)。
+  const [sweep, setSweep] = useState(0)
+  const onBrandClick = useCallback(() => {
+    setSweep((n) => n + 1)
+    togglePrivacy()
+  }, [togglePrivacy])
+  // 悬停也给一次(鼠标用户知道这块能点)。**只在名字清晰时**给:遮罩开着时名字是糊的,
+  // 那时掠一下等于在糊块上闪一道,没有信息量。触摸端的 mouseenter 会跟着首次 tap 一起触发,
+  // 与随后的 click 各挂载一次 —— 后一次会顶掉前一次(key 变),表现为一次干净的扫光。
+  const onBrandHover = useCallback(() => {
+    if (!privacyOn) setSweep((n) => n + 1)
+  }, [privacyOn])
   const fullscreen = useFullscreen() // 网页全屏:全局入口,各页面都能用(原先只在宠物列表)
   const [icons, setIcons] = useState({ stat: {} })
 
@@ -69,13 +86,21 @@ export default function App() {
                   这块的价值就在于「看起来不像开关」,做显著了就失去意义。
                   开启时整块变暗(见 shell.css 的 html[data-privacy] .brand),是它唯一的提示。 */}
               <button type="button" className={'brand' + (privacyOn ? ' privacy-on' : '')}
-                onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
+                onClick={onBrandClick} onMouseEnter={onBrandHover}
+                title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
                 <img className="brand-logo" src="/logo.svg" alt="" draggable={false} />
                 {/* 铭牌式站名:「-go」切强调色、名字下面一道淡出的尾迹。
                     字体换掉是本轮的重点 —— 原先走 --font-display(=思源黑体,中文标题用),
                     拿它排拉丁小写笔画均匀、字面没有收放,8 个字符平得像打印体,这才是
                     「死板」的来源;改走 --font-num(Bricolage Grotesque 700,ASCII 子集)。 */}
-                <span className="brand-name privacy">rocom<span className="brand-go">-go</span></span>
+                <span className="brand-name privacy">
+                  <span className="brand-word">rocom<span className="brand-go">-go</span></span>
+                  {/* 扫光:key 一变即重新挂载,动画必然重跑(见上面 sweep 的注释)。
+                      方向跟着动作走:解除遮罩向右(揭开),开启遮罩向左(合上)。 */}
+                  {sweep > 0 && (
+                    <span key={sweep} className={'brand-spark' + (privacyOn ? ' back' : '')} aria-hidden="true" />
+                  )}
+                </span>
               </button>
               {/* 应用版本号:唯一真源是仓库根 VERSION,构建时注入(见 vite.config.js)。
                   既是给玩家看的「跑的是哪一版」,也是排障时第一句要问的信息。 */}

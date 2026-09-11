@@ -30,21 +30,58 @@
    没有按钮外观(与上面那条约束不冲突:静止时它就是一张头像)。 */
 .brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; transition: transform .2s cubic-bezier(.34, 1.4, .64, 1); }
 .brand:hover .brand-logo { transform: rotate(-7deg) scale(1.08); }
-/* 铭牌本体:西文显示字体、略收紧的字距(-.02em 让它与其他元素同一密度,也压宽度)。
+/* 铭牌本体:西文显示字体、轻微收字距(压宽度用)。
    nowrap 是必须的:名字里有个连字符,顶栏一挤浏览器就会在连字符处折成两行,
    于是品牌块变高、顶栏跟着变高(实测过 54 → 63px)。 */
-.brand-name { position: relative; font-family: var(--font-num); font-size: 10.5px; letter-spacing: -.02em; white-space: nowrap; }
-/* 「-go」切强调色:一块铭牌两个色阶,这块才有重心 —— 通体同一个白就是「死板」本身。
-   用 var(--accent) 而不是写死蓝色:亮色主题下会自动换成深一档的那支。 */
+.brand-name { position: relative; font-family: var(--font-num); font-size: 10.5px; letter-spacing: -.005em; white-space: nowrap; }
+/* 文字整体前倾 6° —— 这条是为了「不方正」:Bricolage 的小写本身偏方正,字身等高、
+   字距又紧,摞起来像一块小方碑;倾斜 6° 之后读起来是「向前跑」,与尾迹的方向一致。
+   倾斜只加在内层 .brand-word(文字)上,尾迹与扫光保持水平 —— **文字歪、底线正**
+   才有对比;整块一起歪会像被斜切了一刀。顺带一提:这里不用 font-style: italic,
+   子集里没有斜体,浏览器会做伪斜体(更假)。 */
+.brand-word { display: inline-block; transform: skewX(-6deg); color: var(--brand-warm); }
+/* 「-go」切强调色:一块铭牌两个色阶,这块才有重心 —— 通体同一个色就是「死板」本身。
+   暖色取自 logo 上那只精灵的粉,与 -go 的蓝并置,正是 logo 那对配色;
+   两者都走主题变量(亮色主题下各自换深一档),故亮底上也不会糊成一片浅色。 */
 .brand-go { color: var(--accent); }
-/* 尾迹:名字下面一道 1.5px 渐变,从强调色淡出 —— 呼应「go」,也把「一段文字」
-   变成「一个记号」。贴 bottom:-1px 而不用 padding:不占高度(手机端顶栏本来就紧)。 */
+/* 尾迹:名字下面一道 2px 圆头渐变 —— 暖色 → 强调色 → 透明。
+   圆头 + 两端内收 1.5px 是为了不再像「一条压边的矩形下框」。
+   贴 bottom:-1px 而不用 padding:不占高度(手机端顶栏本来就紧)。
+   opacity 上过渡是为了遮罩开启时随整块一起变弱(见 html[data-privacy] 那条)。 */
 .brand-name::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1.5px;
-  border-radius: 1px; background: linear-gradient(90deg, var(--accent), transparent);
-  transition: right .2s ease;
+  content: ''; position: absolute; left: 1.5px; right: 1.5px; bottom: -1px; height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-warm), var(--accent) 55%, transparent);
+  transition: opacity var(--dur-base) var(--ease-out);
 }
-.brand:hover .brand-name::after { right: -3px; }
+/* —— 扫光(这块唯一的主动效)——
+   尾迹上有一小段更亮的短线,点击遮罩开关时掠过一次(桌面端悬停、且名字清晰时也掠)。
+   由 App **重新挂载** .brand-spark(key 变)触发,而不是用 :hover / 属性选择器触发 ——
+   这是踩过的坑:鼠标停在品牌上时 :hover 持续命中,动画播完仍「挂着且已播完」,
+   再点只是切遮罩,animation-name 没变过,浏览器不会重播 —— 表现为「一直点只有遮罩有反应」。
+   方向跟着动作:解除遮罩向右(揭开),开启遮罩向左(合上,animation-direction: reverse)。
+   两条实现上的讲究:
+     · 只动 left/opacity,left 用百分比 —— 改文案/字号后数值不用同步改;
+     · 不做 fill-mode:静止态(opacity:0 / left:-8%)就是动画首帧,收尾自然消失。 */
+.brand-spark {
+  position: absolute; left: -8%; bottom: -1px; width: 7px; height: 2px;
+  border-radius: 999px; background: var(--fg); opacity: 0;
+  animation: brand-sweep var(--dur-slow) var(--ease-out);
+}
+/* 合上遮罩那次用**镜像的关键帧**,而不是 animation-direction: reverse ——
+   后者把「渐亮」也一起反过来:动画前 150ms 正好落在原关键帧的收尾(opacity≈0)上,
+   看着像「点了没反应」,再忽然从右边冒出来。镜像关键帧把「先亮起来再走」保留下来。 */
+.brand-spark.back { animation-name: brand-sweep-back; }
+@keyframes brand-sweep {
+  0%   { left: -8%;  opacity: 0; }
+  25%  { opacity: .95; }
+  100% { left: 100%; opacity: 0; }
+}
+@keyframes brand-sweep-back {
+  0%   { left: 100%; opacity: 0; }
+  25%  { opacity: .95; }
+  100% { left: -8%;  opacity: 0; }
+}
 /* 应用版本号:紧挨品牌的弱化小字,真源是仓库根 VERSION(web/vite.config.js 注入)。
    **窄屏也显示**(原为 760px 以下 display:none):排障第一句要问的就是「你跑的是哪一版」,
    而手机恰恰是玩家最常看的端。实测(web/scripts/verify-account-width.mjs):
@@ -378,6 +415,9 @@
   }
   .account-caret, .account-item-check { transition: none; }
   .brand-logo, .brand-name::after { transition: none; }
+  /* 扫光是纯装饰,这里直接去掉而不是缩短到 .01ms —— 缩短后仍会有一帧亮线闪过。
+     基础态 opacity:0,所以关掉动画即彻底不可见。 */
+  .brand-spark { animation: none; }
   /* 二级菜单:去掉淡入与位移,显隐仍要瞬时可用。
      注意 visibility 的过渡同时承担了「鼠标斜穿时的宽限」(见 .navgroup-pop 的注释),
      关掉后菜单会在鼠标掠过空隙的瞬间就收 —— 这是减少动效模式下应当接受的行为:
@@ -404,7 +444,7 @@ html[data-privacy] .privacy {
 html[data-privacy] .brand { color: var(--fg-dim); }
 /* 铭牌是两段配色 + 一道尾迹,父级的 color 压不住子级显式声明的颜色:
    遮罩开启时要「整块一起变弱」(那是「当前处于遮罩」唯一的提示),故逐个收。 */
-html[data-privacy] .brand-go { color: inherit; }
+html[data-privacy] .brand-word { color: inherit; }
 html[data-privacy] .brand-name::after { opacity: .3; }
 
 /* ---- 底部 tab(移动) ---- */
