@@ -70,7 +70,12 @@ export default function App() {
                   开启时整块变暗(见 shell.css 的 html[data-privacy] .brand),是它唯一的提示。 */}
               <button type="button" className={'brand' + (privacyOn ? ' privacy-on' : '')}
                 onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
-                <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">妙妙屋</span>
+                <img className="brand-logo" src="/logo.svg" alt="" draggable={false} />
+                {/* 铭牌式站名:「-go」切强调色、名字下面一道淡出的尾迹。
+                    字体换掉是本轮的重点 —— 原先走 --font-display(=思源黑体,中文标题用),
+                    拿它排拉丁小写笔画均匀、字面没有收放,8 个字符平得像打印体,这才是
+                    「死板」的来源;改走 --font-num(Bricolage Grotesque 700,ASCII 子集)。 */}
+                <span className="brand-name privacy">rocom<span className="brand-go">-go</span></span>
               </button>
               {/* 应用版本号:唯一真源是仓库根 VERSION,构建时注入(见 vite.config.js)。
                   既是给玩家看的「跑的是哪一版」,也是排障时第一句要问的信息。 */}

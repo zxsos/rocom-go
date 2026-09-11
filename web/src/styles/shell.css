@@ -11,13 +11,40 @@
   padding: 10px 16px; background: var(--bar-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-/* 品牌区:logo 作「头像」在上,「妙妙屋」缩小放在头像下面(垂直排列)。
+/* 品牌区:logo 作「头像」在上,站名缩小放在头像下面(垂直排列)。
    它同时是截图遮罩的开关(见 App.jsx)—— 刻意**不做成按钮的样子**:
    无边框/底色/图标,站名还带 .privacy 与昵称/UID 一起被糊掉。
    曾拆成过独立的盾牌图标按钮 + 顶栏金色状态条,已按原设计退回;
-   这块的价值就在于「看起来不像开关」,做显著了反而失去意义。 */
+   这块的价值就在于「看起来不像开关」,做显著了反而失去意义。
+
+   站名按**铭牌**来排,而不是把名字塞进标题字体 —— 这是「死板」的根因:
+   原先用 var(--font-display),那是思源黑体(中文标题字体),拿它排拉丁小写
+   笔画粗细均匀、字面没有收放,八个字符平得像打印体。改用 RocoNum
+   (Bricolage Grotesque 700 的 ASCII 子集)—— 本仓库给西文数字准备的显示字体,
+   小写有字面变化与一点怪味。三条约束:
+     · 只排西文:中文标题继续走 --font-display,别把这条规则套到中文上(会变混排);
+     · 宽度要盯着:顶栏 320px 已经零余量(见下方 .brand-name 的 letter-spacing);
+     · 结构上仍必须「不像可点的东西」—— 所以没有底色/描边/图标,只有字与一道尾迹。 */
 .brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; font-family: var(--font-display); cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
-.brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+/* logo:悬停时歪一下 —— 这块是遮罩开关,得有一点「摸得到」的手感,但只有动作、
+   没有按钮外观(与上面那条约束不冲突:静止时它就是一张头像)。 */
+.brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; transition: transform .2s cubic-bezier(.34, 1.4, .64, 1); }
+.brand:hover .brand-logo { transform: rotate(-7deg) scale(1.08); }
+/* 铭牌本体:西文显示字体、略收紧的字距(-.02em 让它与其他元素同一密度,也压宽度)。
+   nowrap 是必须的:名字里有个连字符,顶栏一挤浏览器就会在连字符处折成两行,
+   于是品牌块变高、顶栏跟着变高(实测过 54 → 63px)。 */
+.brand-name { position: relative; font-family: var(--font-num); font-size: 10.5px; letter-spacing: -.02em; white-space: nowrap; }
+/* 「-go」切强调色:一块铭牌两个色阶,这块才有重心 —— 通体同一个白就是「死板」本身。
+   用 var(--accent) 而不是写死蓝色:亮色主题下会自动换成深一档的那支。 */
+.brand-go { color: var(--accent); }
+/* 尾迹:名字下面一道 1.5px 渐变,从强调色淡出 —— 呼应「go」,也把「一段文字」
+   变成「一个记号」。贴 bottom:-1px 而不用 padding:不占高度(手机端顶栏本来就紧)。 */
+.brand-name::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1.5px;
+  border-radius: 1px; background: linear-gradient(90deg, var(--accent), transparent);
+  transition: right .2s ease;
+}
+.brand:hover .brand-name::after { right: -3px; }
 /* 应用版本号:紧挨品牌的弱化小字,真源是仓库根 VERSION(web/vite.config.js 注入)。
    **窄屏也显示**(原为 760px 以下 display:none):排障第一句要问的就是「你跑的是哪一版」,
    而手机恰恰是玩家最常看的端。实测(web/scripts/verify-account-width.mjs):
@@ -350,6 +377,7 @@
     animation-duration: .01ms;
   }
   .account-caret, .account-item-check { transition: none; }
+  .brand-logo, .brand-name::after { transition: none; }
   /* 二级菜单:去掉淡入与位移,显隐仍要瞬时可用。
      注意 visibility 的过渡同时承担了「鼠标斜穿时的宽限」(见 .navgroup-pop 的注释),
      关掉后菜单会在鼠标掠过空隙的瞬间就收 —— 这是减少动效模式下应当接受的行为:
@@ -359,7 +387,7 @@
 }
 
 /* ---- 截图防泄(全局开关)----
-   点击顶栏品牌名「妙妙屋」切换:默认开启(html 有 data-privacy 属性),
+   点击顶栏品牌名「rocom-go」切换:默认开启(html 有 data-privacy 属性),
    敏感文字(.privacy:昵称/UID/站名)常驻模糊;点击品牌名解除全部,再点恢复。
    不依赖任何窗口焦点/鼠标/触屏事件——截图/录屏/投屏不触发 DOM 事件,默认即保护最可靠。
    品牌名遮罩开启时变暗,作为当前模式的视觉提示(它是这块唯一的「可点」暗示,
@@ -374,6 +402,10 @@ html[data-privacy] .privacy {
   user-select: none;
 }
 html[data-privacy] .brand { color: var(--fg-dim); }
+/* 铭牌是两段配色 + 一道尾迹,父级的 color 压不住子级显式声明的颜色:
+   遮罩开启时要「整块一起变弱」(那是「当前处于遮罩」唯一的提示),故逐个收。 */
+html[data-privacy] .brand-go { color: inherit; }
+html[data-privacy] .brand-name::after { opacity: .3; }
 
 /* ---- 底部 tab(移动) ---- */
 .bottomnav { display: none; }
@@ -433,6 +465,12 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   /* UID 在手机端是**唯一的文本标识**了(昵称已不显示),故给回正常字号 ——
      之前压到 9px 是为了给昵称让位,现在没有让位的对象了,太小反而看不清。 */
   .account-trigger .acct-uid { display: inline; font-size: 11px; margin-right: 2px; }
+  /* 当日榜称号(大富翁/赚钱王/败家子)在手机端不渲染:它在账号 sheet 的每一行里都写着,
+     顶栏这一格该留给身份本身(徽章 + UID)。腾出来的 ~40px 是给「品牌名 + 版本号」的 ——
+     品牌名由三个汉字改成 rocom-go(8 字符)后宽了约 17px,360px 顶栏正好卡在临界:
+     不腾出这 40px,360/390 的品牌名会折成两行、320px 溢出从 2px 涨到 14px(实测)。
+     桌面端照旧渲染。 */
+  .account-trigger .rank-title { display: none; }
   /* 同 .topbar:backdrop-filter 创建层叠上下文,故本栏层级须高于内容区全部浮层。 */
   .bottomnav {
     display: flex; position: sticky; bottom: 0; z-index: var(--z-shell);
