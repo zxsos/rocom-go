@@ -105,10 +105,10 @@ func (p *Pipeline) onTeleport(m capture.Message, acc string) {
 	p.resetAreas(m.Session)
 	cs.wildSeen = nil // 同上:涂地跟踪的实体也作废
 	cs.pos = tp.Pos   // 落点即当前位置:落地快照里的宠物就从这儿起画走廊
-	// 传送落地后 AOI 全换:跨场景的旧标记作废,同场景内(大地图传送点之间)的只置灰留着。
+	// 传送落地后 AOI 全换:旧标记一律作废(同场景内传送也不再留灰点,见 resetWilds)。
 	p.resetWilds(m.Session, acc, tp.ResID, m.Time)
-	// 采集物与野生宠不同:它是「此刻有」的实时态,同场景传送也整份作废
-	// (留着就是一屏指向别处的假标记,见 resetGathers)。
+	// 采集物同理整份作废(它是「此刻有」的实时态,留着就是一屏指向别处的假标记,
+	// 见 resetGathers)。
 	p.resetGathers(m.Session, acc, tp.ResID, m.Time)
 	pos := p.buildPos(cs, acc, tp.ResID, tp.Room, scene.MoveReq{
 		Pos: tp.Pos, Yaw: tp.Yaw, StopMove: true, SceneCfgID: tp.CfgID,

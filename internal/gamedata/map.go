@@ -99,13 +99,16 @@ func (db *DB) MapImage(resID uint32, room int32) string {
 	return strconv.FormatInt(int64(resID), 10)
 }
 
-// MapImageHD 返回某场景底图的高清版本文件名(不含扩展名,前端拼 /img/bigmap/<名>.webp);
+// MapImageHD 返回某场景底图的高清**瓦片目录名**(不含扩展名,前端拼 /img/bigmap/<名>/<NN>.webp);
 // 该场景没有高清版时返回 ""。
 //
-// 命名约定是 <底图名>_hd(如 10003_hd),数据由 scripts/fetch_bigmap_hd.py 抓取第三方
-// 「洛克助手」的 8192² 素材产出 —— **不是自行解包的**,来源与差异见该脚本头部说明。
-// 它只覆盖大陆与近海(远海透明),故前端是「原底图打底 + 高清层叠加」而非替换,见
-// web/src/pages/map/useMapEngine.jsx 的 map-base-hd。
+// 命名约定是 <底图名>_hd(如 10003_hd),目录内是 4×4 张 2048² 瓦片(行主序 NN=01..16),
+// 数据由 scripts/fetch_bigmap_hd.py 抓取第三方「洛克助手」的素材产出 —— **不是自行解包的**,
+// 来源与差异见该脚本头部说明。
+//
+// 为什么是瓦片而不是一张 8192² 整图:整图解码后 268MB,一次性呈现会把主线程卡住数秒;
+// 切块后前端只按视口取需要的几张(见 web/src/pages/map/useMapEngine.jsx 的 hdTiles)。
+// 它只覆盖大陆与近海(远海透明),故前端是「原底图打底 + 高清瓦片叠加」而非替换。
 //
 // 是否有高清版由 embed 的文件清单决定(见 Load 的 hdMaps):没抓过的场景查不到,前端不显示开关。
 func (db *DB) MapImageHD(resID uint32, room int32) string {

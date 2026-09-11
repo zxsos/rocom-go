@@ -73,7 +73,7 @@
   隐藏炫彩直接引用整图;渲染组件 web/src/components/badges.jsx 的 GlassChip)、`uv run python scripts/gen_bigmap.py`(大地图瓦片 → img/bigmap 整图 webp,4x4
   行主序拼合;另转分层地图切片 LayerMap → img/bigmap/layer;坐标单位/投影见 docs/data.md 3.1/3.2)、
   `uv run python scripts/fetch_bigmap_hd.py`(可选:抓第三方「洛克助手」的 4x4 张 2048² 瓦片 →
-  img/bigmap/<res>_hd.webp 8192² 高清底图,供地图页「高清」开关叠加显示。⚠️ **不是解包数据**、
+  img/bigmap/<res>_hd/<NN>.webp,供地图页「高清」开关**按视口**只加载可见的那几张。⚠️ **不是解包数据**、
   且远海透明+色调偏深,只能当叠加层;差异与合规说明见脚本头与 docs/data.md 3.1);
   `uv run python scripts/fetch_skill_ids.py`(刮 aismile.dev 技能图鉴 26 页 →
   `~/Downloads/rocom/skillIds.json`:**skill_id → 技能中文名** 604 条;站点无 JSON 接口,
