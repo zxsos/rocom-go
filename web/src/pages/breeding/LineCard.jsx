@@ -18,7 +18,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
   // 性格那一枚徽标要靠方阵才能把一组名字还原成「加物攻」(见 pets.goalNatureLabel)——
   // 拿不到方阵时它退化成「N 种性格」,而不是显示一个错的维度名。
   const bits = goalBits(line.goal, matrix)
-  const bars = goalProgress(line, matrix)
+  const { bars, flags } = goalProgress(line)
   const pend = pendCounts(line.pending)
   // chains 只为「代数还是空的线」服务:那种没有亲本快照可拿,退回这个品种的蛋(见 pets.lineAvatar)。
   const avatar = lineAvatar(line, chains)
@@ -32,7 +32,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
       type="button"
       className={'br-card s-' + status + (pend.incubating + pend.claim > 0 ? ' has-pending' : '')}
       onClick={() => onOpen(line.id)}
-      title={`${kind}${line.mother ? ` · 种母 ${line.mother.name}` : ''} · 第 ${st.gens} 代 · 点击展开这条培育线`}
+      title={`${kind}${line.mother ? ` · 种母 ${line.mother.name}` : line.motherReleased ? ' · 种母已放生' : ''} · 第 ${st.gens} 代 · 点击展开这条培育线`}
     >
       <span className="br-card-top">
         {avatar
@@ -44,7 +44,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
               那几条卡片一模一样。线的身份就是种母,故把她的名字写在这里 —— 这是唯一
               能把它们区分开的信息。没固定种母的线(老线还没接过蛋)明说,不留空。 */}
           <span className="br-card-sub muted">
-            {line.mother ? `种母 ${line.mother.name}` : '未定种母'}
+            {line.mother ? `种母 ${line.mother.name}` : line.motherReleased ? '种母已放生' : '未定种母'}
             {' · '}{st.gens} 代 · 最近 {fmtShortTime(line.updatedAt)}
           </span>
         </span>
@@ -59,16 +59,30 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
         ))}
       </span>
 
-      {bars.length > 0 ? (
-        <span className="br-bars">
-          {bars.map((b) => (
-            <span key={b.k} className="br-bar" title={b.title}>
-              <span className="br-bar-k">{b.k}</span>
-              <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
-              <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
+      {bars.length > 0 || flags.length > 0 ? (
+        <>
+          {bars.length > 0 ? (
+            <span className="br-bars">
+              {bars.map((b) => (
+                <span key={b.k} className="br-bar" title={b.title}>
+                  <span className="br-bar-k">{b.k}</span>
+                  <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
+                  <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
+                </span>
+              ))}
             </span>
-          ))}
-        </span>
+          ) : null}
+          {/* 性格 / 性别只有命中与未命中,不给进度条 —— 并排一行旗标(见 .br-flag)。 */}
+          {flags.length > 0 ? (
+            <span className="br-flags">
+              {flags.map((f) => (
+                <span key={f.k} className={'br-flag' + (f.hit ? ' hit' : '')} title={f.title}>
+                  <em>{f.k}</em><b>{f.text}</b><i>{f.hit ? '达标' : '未命中'}</i>
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </>
       ) : (
         <span className="br-card-hint muted">还没定目标 —— 打开这条线填上要刷的属性,底下的选种建议才有意义</span>
       )}

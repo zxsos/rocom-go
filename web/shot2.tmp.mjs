@@ -1,0 +1,11 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 })
+await p.goto('http://127.0.0.1:8801/mock.html', { waitUntil: 'networkidle' })
+await p.waitForTimeout(800)
+const side = p.locator('.br-side').first()
+await side.screenshot({ path: '/tmp/side.png' })
+const rows = p.locator('.br-gen').first()
+await rows.screenshot({ path: '/tmp/row.png' })
+console.log('ok')
+await b.close()

@@ -627,8 +627,8 @@ type BreedingLinePayload struct {
 	Mother    *pet.EggParent   `json:"mother,omitempty"`
 	Suggest   []pet.Suggestion `json:"suggest,omitempty"`   // 种公/种母推荐(已排序,取前 N)
 	Backcross *pet.Backcross   `json:"backcross,omitempty"` // 回交 vs 换种的对比;还没子代时为 nil
-	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = floor((母+父)/2),
-	// 目标为上限时必须双亲都到位,否则迭代再多次也到不了(见 pet.VoiceReach)。
+	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = 双亲均值的向零取整,
+	// 往高刷时目标要双亲都到位才够得着,否则迭代再多次也到不了(见 pet.VoiceReach)。
 	Reach *pet.VoiceReach `json:"reach,omitempty"`
 	// Eggs 是本条线**待孵**的那几代对应的蛋(按蛋 gid 索引),只有待孵(有 eggGid、
 	// 无 childGid)的代才给 —— 破壳后子代快照已含同样的体重与嗓音,不必再补。
@@ -644,6 +644,12 @@ type BreedingLinePayload struct {
 	// 故「有 childGid 无 Child 且库里没有」才是确定的结论。前端据此说实话 —— 让玩家
 	// 空等一句「待认领」比告诉他真相更糟。
 	LostChildGens []int `json:"lostChildGens,omitempty"`
+	// MotherReleased 这条线**固定过种母**、但她已不在宠物库(放生 / 送人)。
+	//
+	// 与「未定种母」(MotherGidOf == 0,从没固定过)必须分开:手动建线时种母只能从库里选,
+	// 故一条记过代的线若查不到种母,基本只可能是她被放生了 —— 页面据此写「已放生」,
+	// 而不是诱导玩家去等一个永远不会再来的「未定种母」(见 web 的 LineDetail / LineCard)。
+	MotherReleased bool `json:"motherReleased,omitempty"`
 }
 
 // BreedingPoolPayload 是手动补录面板的候选池(GET /api/breeding/pool):某个品种的三类候选。

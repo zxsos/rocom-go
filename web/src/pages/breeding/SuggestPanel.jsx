@@ -15,7 +15,7 @@ import { fmtPct, goalNatureLabel, goalReached, hasGoal, hasNatureGoal, lineStats
 // 下界去判断够不够,结果每次都不够。理论单值 + 一句「实测有波动」才是它真实的可信度
 // (后端仍在下发 weightHi:建议排序与回交对比要用它比「哪组更有戏」)。
 //
-// 嗓音另有一条硬规则要显式(见下面的可达性警示):子代 = 双亲均值**向下取整**,
+// 嗓音另有一条硬规则要显式(见下面的可达性警示):子代 = 双亲均值**向零取整**,
 // 目标落在上限时差一点就是永远差一点 —— 只按「差距」排序会把这种到不了的组合排进前几名。
 export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate }) {
   const goal = line.goal || {}
@@ -64,13 +64,13 @@ export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate
           (最接近的几组仍有参考价值),只是带着这句前提看。 */}
       {reach && list.length > 0 ? (
         reach.hit ? (
-          <p className="br-reach ok" title="嗓音 = 双亲均值向下取整,现有候选里有正好命中的组合">
+          <p className="br-reach ok" title="嗓音 = 双亲均值向零取整,现有候选里有正好命中的组合">
             嗓音目标 V{reach.target} <b>可达</b>:现有候选里已有能孵出它的组合。
           </p>
         ) : (
-          <p className="br-reach warn" title="子代嗓音 = 双亲均值向下取整,任一方不到位就永远到不了">
+          <p className="br-reach warn" title="子代嗓音 = 双亲均值向零取整,任一方不到位就永远到不了">
             <b>V{reach.target} 够不着</b>:按现在这批候选,下一代{reach.best < reach.target ? '最高' : '最低'}只能到
-            <b> V{reach.best}</b>。嗓音取双亲均值的向下取整,差一点也不行 ——
+            <b> V{reach.best}</b>。嗓音取双亲均值的向零取整,差一点也不行 ——
             先补一只 V{reach.target} 的候选再来配。
           </p>
         )
@@ -112,7 +112,7 @@ export default function SuggestPanel({ line, matrix, suggesting, onPet, onLocate
                 {s.ambiguous ? <span className="br-tag amb" title="这位母本有多个可配公:实际是谁等破壳后反推">串窝</span> : null}
                 {s.backcross ? <span className="br-tag bc" title="父本就是这条线自己的子代">回交</span> : null}
                 {ng ? (
-                  <span className="br-tag ng" title={`预期 V${s.exp.voice} 不比历代最佳 V${bestVoice} 更接近目标 —— 嗓音是双亲均值的向下取整,换掉较差的那只才推得动`}>嗓音无提升</span>
+                  <span className="br-tag ng" title={`预期 V${s.exp.voice} 不比历代最佳 V${bestVoice} 更接近目标 —— 嗓音是双亲均值的向零取整,换掉较差的那只才推得动`}>嗓音无提升</span>
                 ) : null}
               </span>
               <span className="br-sug-score" title={`按你填的目标项归一化后的平均差距:${scoreText(s.score)}。0 = 完全命中,越小越好`}>
@@ -212,7 +212,7 @@ function SugPet({ p, side, onLocate }) {
 // 预期相对未达标的最佳就是「有提升」,哪怕两者离目标一样远。都没达标时才比距离。
 // 没填目标时退化为「不比最极端的那只更极端」。
 //
-// 嗓音 = 双亲均值向下取整,是确定值 —— 若这一组推不动手里最好的那只,再孵多少胎也不会更高,
+// 嗓音 = 双亲均值向零取整,是确定值 —— 若这一组推不动手里最好的那只,再孵多少胎也不会更高,
 // 想推进只能换掉较差的那只(拿子代回交,或引进一只更好的)。
 //
 // 与 voiceTag 一样是纯前端派生:契约快照不该为一句文案多长一个键。
@@ -229,7 +229,7 @@ function noGain(voice, best, target) {
 
 // voiceTag 这一组在嗓音上是否达标。纯前端判断,不往 Suggestion 里加字段 —— 契约快照
 // 不该为一句文案多长两个键,而这些量(双亲嗓音、预期值)本来就在下发的那几个字段里。
-//   both: 双亲嗓音**都已达标**。由「子代 = 双亲均值向下取整」可证此时子代必然也达标
+//   both: 双亲嗓音**都已达标**。由「子代 = 双亲均值向零取整」可证此时子代必然也达标
 //         (高目标:两数都不小于目标 → 均值也不小于;低目标:两数都不大于目标 → 均值也不大于)。
 //   exp : 预期值达标(可能只有一个亲本达标,也可能两个都没达标但均值到位)。
 // 方向见 pets.goalReached(高目标 ≥、低目标 ≤),不是「正好等于目标」。
@@ -239,7 +239,7 @@ function voiceTag(goal, s) {
   const mv = s.mother ? s.mother.voice : null
   const fv = s.father ? s.father.voice : null
   if (mv != null && fv != null && goalReached(mv, hi, 'voice') && goalReached(fv, hi, 'voice')) {
-    return { k: 'both', t: '双亲达标', title: `双亲嗓音都已达标(目标 V${hi})—— 子代取双亲均值的向下取整,双亲都到位时子代必然也达标` }
+    return { k: 'both', t: '双亲达标', title: `双亲嗓音都已达标(目标 V${hi})—— 子代取双亲均值的向零取整,双亲都到位时子代必然也达标` }
   }
   if (goalReached(s.exp.voice, hi, 'voice')) {
     return { k: 'exp', t: '预计达标', title: `按双亲均值推算,预期 V${s.exp.voice} 已达标(目标 V${hi})` }
@@ -281,7 +281,7 @@ function natureTitle(exp) {
 
 // EXP_TITLE 理论值那一行的口径说明。挂在整行上而不是每个数字各一条 title:玩家要判断的是
 // 「这排数字可不可信」,拆成三条只会逼他一个个去悬停,还容易只看其中一条就下结论。
-const EXP_TITLE = '理论值:按双亲均值推算的确定值 —— 嗓音取均值向下取整,'
+const EXP_TITLE = '理论值:按双亲均值推算的确定值 —— 嗓音取均值向零取整,'
   + '体重取均值(实测约有 ±2pp 波动)。不是孵出来必然如此。'
 
 // scoreText 归一化差距:百分比只留一位(它是各项目标的平均距离,不是属性值)。

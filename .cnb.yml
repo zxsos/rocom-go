@@ -1,9 +1,9 @@
 # 云原生开发(沙盒)环境:直接拉取预构建镜像,开环境即秒开,不再每次重建。
 #
 # 镜像内容见 .ide/Dockerfile(Go 1.26.4 + cgo 依赖 + Node + Playwright Chromium),
-# 由下方 main.push 流水线构建并推送到 CNB Docker 制品库:
-#   改 .ide/Dockerfile → 推送到 main → 流水线自动重建并覆盖 dev-env:latest
-#   → 之后再开环境就是新镜像。分支上改 Dockerfile 不会触发,合回 main 才会。
+# 由下方 master.push 流水线构建并推送到 CNB Docker 制品库:
+#   改 .ide/Dockerfile → 推送到 master → 流水线自动重建并覆盖 dev-env:latest
+#   → 之后再开环境就是新镜像。分支上改 Dockerfile 不会触发,合回 master 才会。
 #
 # ⚠️ 沙盒容器没有 CAP_NET_RAW/NET_ADMIN,**无法实时抓包**(-iface 会报
 # operation not permitted)。在沙盒里请用 -pcap <文件> 离线回放调试。
@@ -29,7 +29,11 @@ $: # 兜底匹配所有分支
         - name: 浏览器
           script: cd web && (npx playwright install chromium || echo "跳过:浏览器已内置或当前离线")
 
-main:
+# 重建镜像的流水线:挂在**本仓库的默认分支 master** 上。
+# ⚠️ CNB 的顶层键就是分支名(glob),`main` 只是"名字叫 main 的分支"、并非默认分支别名 ——
+# 本仓库默认分支是 master,若写成 main 这条流水线永不触发,开发环境镜像也就永远建不出来。
+# 见 CNB 文档 build/trigger-rule.md(分支匹配)。
+master:
   push:
     - name: 重建并推送开发环境镜像
       services:
