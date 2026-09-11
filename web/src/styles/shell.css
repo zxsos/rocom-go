@@ -19,7 +19,10 @@
 .brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; font-family: var(--font-display); cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
 .brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; }
 /* 应用版本号:紧挨品牌的弱化小字,真源是仓库根 VERSION(web/vite.config.js 注入)。
-   窄屏隐藏(见下方 760px 媒体查询):顶栏要留给账号选择器与操作按钮。 */
+   **窄屏也显示**(原为 760px 以下 display:none):排障第一句要问的就是「你跑的是哪一版」,
+   而手机恰恰是玩家最常看的端。实测(web/scripts/verify-account-width.mjs):
+   360px 余量 101px、390px 余量 131px、760px 余量 501px —— 只有 ≤359px 的极窄屏放不下,
+   那种机型在文件末尾单独隐藏(见 @media (max-width: 359px))。 */
 .topbar-ver { font-size: 10px; font-weight: 600; color: var(--fg-dim); font-variant-numeric: tabular-nums; user-select: none; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
@@ -390,7 +393,10 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/主题按钮缩成纯图标(隐藏文字) */
   .topbar { gap: 8px; padding: 8px 12px; }
   .brand { font-size: 10px; max-width: none; }
-  .topbar-ver { display: none; }
+  /* 版本号**特意不在这里隐藏** —— 原先有一行 `.topbar-ver { display: none; }`,
+     现在顶栏靠上面的收紧间距 + 藏掉导航文字来腾地方,版本号(10px)留着。
+     要再收紧的话别先删它:窄屏验证在 web/scripts/verify-account-width.mjs 的手机分支;
+     极窄屏(≤359px)确实放不下的那条规则在文件末尾。 */
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
   /* 手机端触发条**整体靠右**:
@@ -461,4 +467,16 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   /* 地图页占满高度:底部导航为 sticky(在流内),content 的 flex:1 已停在其上方,
      故去掉为滚动页预留的额外 70px 底距,只留与两侧一致的 12px。 */
   .content:has(.map-page) { padding-bottom: 12px; }
+}
+
+/* 极窄屏(≤359px,如 iPhone SE 一代 320、折叠屏外屏 280)放不下版本号,单独隐藏。
+   实测(web/scripts 里的临时多宽度探测,2026-09):
+     300px → 顶栏溢出 34px;320px → 溢出 16px 且账号触发条被挤成两行(顶栏 53→63px);
+     344px → 不溢出但触发条已在换行边缘;360px → 余量 101px,410px → 155px。
+   为什么按「整机宽度」分档而不是「再挤一挤」:顶栏内边距(12→8)与 gap(8→6)全加起来
+   只能挪出 16px,而账号触发条的宽度随 UID/称号长度变(实测 169px 起),挪出来的那点
+   会被吃回去 —— 320px 刚好卡在 0 余量,换个长 UID 又溢出。故对占绝大多数的 ≥360px
+   (安卓基准 360、iPhone 375/390/414)一律显示,只在这档极老机型上隐藏。 */
+@media (max-width: 359px) {
+  .topbar-ver { display: none; }
 }

@@ -17,7 +17,10 @@
 //      显示昵称、把 UID 藏了;那版 UID 换行会把 sticky 顶栏撑高,各页高度不一致);
 //   4. 手机端触发条高度**不随内容长度变化**(顶栏高度稳定);
 //   5. 超长昵称(桌面端)要截断出省略号,而不是把顶栏撑破;
-//   6. 徽章头像渲染出来了,且带 .privacy(截图防泄)而在线小点不带。
+//   6. 徽章头像渲染出来了,且带 .privacy(截图防泄)而在线小点不带;
+//   7. 版本号(.topbar-ver)在任何视口都**可见**、在顶栏内、且不与账号触发条重叠 ——
+//      2026-09 起手机端不再隐藏它(排障第一句要问的就是「你跑的是哪一版」,
+//      原先 760px 以下 display:none,手机上根本没有)。
 //
 // 四个坑,都踩过:
 //   1. 5 字基准要落在**昵称**(.acct-name)上,不能落在 .account-trigger-name 上。
@@ -97,6 +100,22 @@ for (const vp of [
           truncated: nameEl ? nameEl.scrollWidth > nameEl.clientWidth + 1 : null,
           overflow: bar.scrollWidth > bar.clientWidth + 1,
           brand: Math.round(q('.brand').getBoundingClientRect().width),
+          // 版本号:offetsetParent 为空 = 被 display:none 藏了(曾经的手机端行为)。
+          // 间距取「账号触发条左缘 − 版本号右缘」——窄屏最紧的就是这一处。
+          ver: (() => {
+            const el = q('.topbar-ver')
+            if (!el) return null
+            const r = el.getBoundingClientRect()
+            const barR = bar.getBoundingClientRect()
+            const acct = q('.account-trigger')
+            return {
+              text: el.textContent.trim(),
+              w: Math.round(r.width),
+              visible: !!el.offsetParent && r.width > 0,
+              inBar: r.right <= barR.right + 0.5 && r.left >= barR.left - 0.5,
+              gap: acct ? Math.round(acct.getBoundingClientRect().left - r.right) : null,
+            }
+          })(),
         }
       }, name))
     }
@@ -136,6 +155,13 @@ for (const vp of [
         rows.every((r) => r.ordered?.hasName && r.ordered?.hasUid),
         `hasName=${rows[0].ordered?.hasName} hasUid=${rows[0].ordered?.hasUid}`)
     }
+
+    check(`${vp.n} 版本号可见、不越出顶栏、不与账号触发条重叠`,
+      rows.every((r) => r.ver && r.ver.visible && r.ver.inBar &&
+        (r.ver.gap === null || r.ver.gap >= 1) && /^v\d+\.\d+\.\d+$/.test(r.ver.text)),
+      rows[0].ver
+        ? `${rows[0].ver.text} · 宽 ${rows[0].ver.w}px · 与触发条间距 ${rows[0].ver.gap}px`
+        : '未渲染')
 
     check(`${vp.n} 顶栏不溢出 / brand 未被挤`,
       rows.every((r) => !r.overflow) && new Set(rows.map((r) => r.brand)).size === 1,
