@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // 卡洛西亚大陆:ox=306000 oy=408000 side=408000(见 names.json 的 maps)。取地块正中的一点当玩家位置。

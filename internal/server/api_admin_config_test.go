@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/whoisnian/rocom-capture/internal/envfile"
+	"github.com/zxsos/roco-go/internal/envfile"
 )
 
 // 本文件守管理面板改配置这条链路的三条不变量:

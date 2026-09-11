@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/gamedata"
 )
 
 // brI32 / brF64 取地址的小工具:目标字段都是指针(nil = 玩家没填这一项)。

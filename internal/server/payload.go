@@ -1,6 +1,6 @@
 package server
 
-import "github.com/whoisnian/rocom-capture/internal/pet"
+import "github.com/zxsos/roco-go/internal/pet"
 
 // 本文件定义实时推送(SSE)与快照接口的载荷类型。
 //

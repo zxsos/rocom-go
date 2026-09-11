@@ -245,7 +245,7 @@ audio.playbackRate   = 2 ** (cents / 1200);
 即等价实现,无需为每个音调预生成音频。上面那两个 FX 插件复刻不了(bnk 不存插件名字符串),
 两端听感会有音色差异。
 
-实际用法见 [rocom-petvo](https://github.com/whoisnian/rocom-petvo)——本文这条链路的落地站点。
+实际用法见 rocom-petvo——本文这条链路的落地站点。
 
 ## 10. 校验对应关系是否正确
 
@@ -260,5 +260,5 @@ audio.playbackRate   = 2 ** (cents / 1200);
 ## 11. 相关文档
 
 - 解包流程与其它数据源:[data.md](data.md)
-- 本文链路的落地站点:[rocom-petvo](https://github.com/whoisnian/rocom-petvo)
+- 本文链路的落地站点:rocom-petvo
 - 工具与开源项目清单:[reference.md](reference.md)

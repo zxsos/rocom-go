@@ -4,8 +4,8 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/whoisnian/rocom-capture/internal/pb"
-	"github.com/whoisnian/rocom-capture/internal/wire"
+	"github.com/zxsos/roco-go/internal/pb"
+	"github.com/zxsos/roco-go/internal/wire"
 )
 
 // hasCJK 判断字节串是否含中日韩统一表意文字(宠物名为中文)。

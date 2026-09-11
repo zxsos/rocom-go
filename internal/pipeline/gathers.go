@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/server"
-	"github.com/whoisnian/rocom-capture/internal/wire"
+	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/roco-go/internal/wire"
 )
 
 // ---- 实时地图的采集物图层(花/草/菌/矿/果树)----

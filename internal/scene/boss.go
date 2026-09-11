@@ -3,7 +3,7 @@ package scene
 import (
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/whoisnian/rocom-capture/internal/wire"
+	"github.com/zxsos/roco-go/internal/wire"
 )
 
 // 花种(花灵)活动 BOSS 信息(见 docs/data.md 花种页)。

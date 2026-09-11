@@ -13,7 +13,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/gamedata"
 )
 
 // Store 封装 SQLite 连接。跨账号操作(建表/accounts/sessions/star 表)挂在此。

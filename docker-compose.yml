@@ -5,8 +5,8 @@
 #   docker compose logs -f        # 看日志
 #   docker compose down           # 停止(数据卷保留)
 #
-# 首次启动前**务必**把 command 里的 eth0 改成实际网卡(手机流量的必经之路),
-# 查网卡名:ip link
+# 首次启动即可用:command 里的 -iface 是 auto,程序会自己选默认路由那张网卡。
+# 想固定成某张时再改成实际名字(查网卡名:ip link)
 
 services:
   rocom:
@@ -31,9 +31,9 @@ services:
       - NET_RAW
 
     # —— 网络:抓包场景用 host ——
-    # 桥接模式下容器有独立网络命名空间,**看不见宿主机的物理网卡**,
-    # 于是 -iface eth0 会报「网卡不存在」。host 模式共享宿主机网络栈,
-    # 容器里 ip link 与宿主机一致,抓包才成立。
+    # 桥接模式下容器有独立网络命名空间,**看不见宿主机的物理网卡**:容器里只剩自己的
+    # eth0,-iface auto 会选中它(并给出明确的桥接警告,不会像老版本那样只报「网卡不存在」)。
+    # host 模式共享宿主机网络栈,容器里 ip link 与宿主机一致,抓包才成立。
     # 代价:容器端口直接占用宿主机端口,故下面 ports 在 host 模式下不生效,
     #       Web 端口由 command 里的 -addr 决定。
     network_mode: host
@@ -52,18 +52,18 @@ services:
       TZ: Asia/Shanghai
 
     # 启动参数与二进制完全一致,可整段替换。几个常用项:
-    #   -iface <网卡>      实时抓包(必填其一)
+    #   -iface <网卡|auto> 实时抓包(必填其一)。auto = 自动选默认路由那张,推荐
     #   -pcap <文件>       离线回放(必填其一)
     #   -db /data/rocom.db 放挂载卷里,更新镜像不丢数据
     #   -tls               启用 HTTPS(手机经局域网访问时「屏幕常亮」需要 secure context);
     #                      自签证书自动生成在 /data 下,信任一次后重建容器仍复用
     #   -socks5-addr :1080 内置代理,供手机把游戏流量代理到本机(云部署)
-    #                      此时还需 -skip-self-ip=false,否则本机 IP 出站的流量被去重丢弃
+    #                      启用时会自动改用 -skip-self-ip=false,不必手写
     #   -socks5-allow <IP> 客户端白名单。带公网 IP 时**必填**:无认证代理几分钟内
     #                      会被全网扫描器找上,耗尽 fd 把同进程的 Web 服务拖垮
     command:
       [
-        "-iface", "eth0",
+        "-iface", "auto",
         "-addr", ":4939",
         "-db", "/data/rocom.db",
       ]

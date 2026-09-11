@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/envfile"
+	"github.com/zxsos/roco-go/internal/envfile"
 )
 
 // 本文件守「管理面板改 Web 监听地址」这条链路的四条不变量。

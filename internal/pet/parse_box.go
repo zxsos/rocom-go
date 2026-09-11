@@ -3,8 +3,8 @@ package pet
 import (
 	"google.golang.org/protobuf/proto"
 
-	"github.com/whoisnian/rocom-capture/internal/pb"
-	"github.com/whoisnian/rocom-capture/internal/wire"
+	"github.com/zxsos/roco-go/internal/pb"
+	"github.com/zxsos/roco-go/internal/wire"
 )
 
 // warehouseMark 是 WarehouseMarkType(盒子分类标记)枚举值 -> 中文。

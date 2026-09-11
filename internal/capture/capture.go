@@ -8,13 +8,14 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/google/gopacket/reassembly"
-	"github.com/whoisnian/rocom-capture/internal/gcp"
+	"github.com/zxsos/roco-go/internal/gcp"
 )
 
 // Message 是一条解密后的应用层消息。
@@ -90,6 +91,13 @@ type Engine struct {
 	// SNAT 后从同一网卡再发一次,该副本的客户端侧地址是网关本机 IP;忽略本机 IP 即只
 	// 保留 NAT 前的真实客户端会话,避免同一游戏流被解析两次(见 RunLive 自动填充)。
 	skipIPs map[netip.Addr]bool
+
+	// skipDropped 是因「本机 IP」被丢弃的包数,emitted 是已产出的业务消息数。
+	// 两者只服务于一个运行期自检:包在进来、却全被本机 IP 挡掉、且一条消息都没解析出来
+	// —— 那正是 -skip-self-ip 设错的指纹(见 pollStats 的警告)。
+	// 用 atomic 而非 e.mu:per-packet 路径上加锁不值当,这两个计数只需最终一致。
+	skipDropped atomic.Int64
+	emitted     atomic.Int64
 }
 
 // NewEngine 创建引擎，port 为游戏服务器端口(8195)。
@@ -106,11 +114,33 @@ func NewEngine(port int) *Engine {
 // AddSkipIP 登记一个需忽略的 IP(见 skipIPs)。非并发安全,须在 Run* 前调用。
 func (e *Engine) AddSkipIP(ip netip.Addr) { e.skipIPs[ip.Unmap()] = true }
 
+// droppedBySelfIP 报告该流是否命中「本机 IP」忽略集(src 或 dst 任一命中即丢,见 skipIPs),
+// 并**顺带记账** —— 运行期自检(见 pollStats)靠的就是这个计数,而设错 -skip-self-ip 时
+// 除了这个计数以外没有任何症状(包数在涨、日志无异常、只是永远没有数据)。
+func (e *Engine) droppedBySelfIP(nf gopacket.Flow) bool {
+	if len(e.skipIPs) == 0 {
+		return false
+	}
+	for _, ep := range []gopacket.Endpoint{nf.Src(), nf.Dst()} {
+		if ip, ok := netip.AddrFromSlice(ep.Raw()); ok && e.skipIPs[ip.Unmap()] {
+			e.skipDropped.Add(1)
+			return true
+		}
+	}
+	return false
+}
+
 // NoKeyDropped 返回因尚无会话密钥而丢弃的 DATA 包数。
 func (e *Engine) NoKeyDropped() int { e.mu.Lock(); defer e.mu.Unlock(); return e.noKey }
 
 // BadKeyDropped 返回因密钥错误(明文校验不通过,多为缓存密钥失效)而丢弃的 DATA 包数。
 func (e *Engine) BadKeyDropped() int { e.mu.Lock(); defer e.mu.Unlock(); return e.badKey }
+
+// SkipDropped 返回因「本机 IP」被丢弃的包数(见 skipIPs 与 pollStats 的运行期自检)。
+func (e *Engine) SkipDropped() int64 { return e.skipDropped.Load() }
+
+// Emitted 返回已产出的业务消息数(见 skipDropped 的说明)。
+func (e *Engine) Emitted() int64 { return e.emitted.Load() }
 
 func (e *Engine) incNoKey()  { e.mu.Lock(); e.noKey++; e.mu.Unlock() }
 func (e *Engine) incBadKey() { e.mu.Lock(); e.badKey++; e.mu.Unlock() }
@@ -132,7 +162,7 @@ func (e *Engine) getSession(id string) *session {
 	return s
 }
 
-func (e *Engine) emit(m Message) { e.Out <- m }
+func (e *Engine) emit(m Message) { e.emitted.Add(1); e.Out <- m }
 
 // RunOffline 离线回放 pcap 文件，处理完毕后关闭 Out。
 func (e *Engine) RunOffline(pcapPath string) error {
@@ -154,9 +184,9 @@ func (e *Engine) RunOffline(pcapPath string) error {
 // flush 参数:阈值一律用抓包时钟(最新包时间戳)而非墙钟——实时流里墙钟永远追不上
 // "活跃连接"的数据时间,会导致中段接入时被缓冲等待缺失分段的起始数据一直不下推。
 const (
-	flushEvery = 64              // 每处理这么多包尝试一次 flush(从 200 调低:更早下推待 flush 数据)
+	flushEvery = 64                     // 每处理这么多包尝试一次 flush(从 200 调低:更早下推待 flush 数据)
 	flushLag   = 300 * time.Millisecond // 跨间隙滞留数据超过此时长即下推(从 1s 调低:稀有宠提醒更近实时)
-	closeIdle  = 2 * time.Minute // 连接空闲超过此时长才关闭,不误关活跃连接
+	closeIdle  = 2 * time.Minute        // 连接空闲超过此时长才关闭,不误关活跃连接
 )
 
 // process 是抓包/离线共用的处理循环。
@@ -176,14 +206,8 @@ func (e *Engine) process(src *gopacket.PacketSource) {
 		if int(tcp.SrcPort) != e.Port && int(tcp.DstPort) != e.Port {
 			continue
 		}
-		if len(e.skipIPs) > 0 {
-			nf := netLayer.NetworkFlow()
-			if ip, ok := netip.AddrFromSlice(nf.Src().Raw()); ok && e.skipIPs[ip.Unmap()] {
-				continue // SNAT 后的重复副本(源为本机/网关 IP)
-			}
-			if ip, ok := netip.AddrFromSlice(nf.Dst().Raw()); ok && e.skipIPs[ip.Unmap()] {
-				continue
-			}
+		if e.droppedBySelfIP(netLayer.NetworkFlow()) {
+			continue // SNAT 后的重复副本(源/目的为本机或网关 IP)
 		}
 		ci := pkt.Metadata().CaptureInfo
 		if ci.Timestamp.After(lastTS) {

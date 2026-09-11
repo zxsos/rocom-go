@@ -95,7 +95,7 @@
   抓包脚本 `scripts/capture.sh`(bash)。`.bytes` 配置解码用 `uv run python scripts/bin2json.py`
   (unpack.sh 已自动调):全树 RocoBinData `.bytes` → 紧邻 `.json`(增量,秒级),既供 grep/jq
   查数据、也是 gen_gamedata/gen_icons 的输入(它们直接读这些 JSON,不再自行解 .bytes)。
-- **shader 逆向与 3D 渲染的工具链已迁到 [rocom-pets](https://github.com/whoisnian/rocom-pets)**
+- **shader 逆向与 3D 渲染的工具链已迁出本仓库(rocom-pets)**
   (`scripts/shaderdump.py` / `dxbcdis.c` / `dxbcsig.py` / `matshader.py` / `uniexpr.py` /
   `matparams.py` / `glsldump.py`,文档 `docs/shader.md` 与 `docs/android-glsl.md`)。
   它们只服务于宠物材质还原,与本仓库的抓包/统计/生成流程零耦合;`unpack.sh` 仍在本仓库

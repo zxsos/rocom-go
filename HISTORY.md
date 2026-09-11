@@ -534,7 +534,6 @@ decode_bin.py 虽然被 gen 脚本调用，但在统一解 .bytes 后应该不�
 ```
 
 ### 2026-07-20-unpack-petvo
-https://petvo.whoisnian.com
 ```md
 从解包数据 ~/Downloads/rocom/parsed 中能否找到宠物叫声相关音频
 已安装 vgmstream，不需要考虑集成进当前项目，后续会作为独立网页展示
@@ -561,7 +560,6 @@ https://petvo.whoisnian.com
 ```
 
 ### 2026-07-25-unpack-3d-pets
-https://github.com/whoisnian/rocom-pets
 ```md
 能否从解包数据中复原宠物3D模型，实现桌面宠物效果
 
@@ -635,7 +633,6 @@ GPU 抓帧的实现方式是什么样的
 ```
 
 ### 2026-07-31-optimize-3d-pets
-https://github.com/whoisnian/rocom-pets
 ```md
 整理项目当前状态及后续计划
 安卓安装包在 ~/Downloads/rocom/com.tencent.nrc.apk，根据另一调研记录 ~/Downloads/android-shaders.md，可以利用 adb root 从安卓手机提取应用私有数据，分析这些私有数据是否有助于还原 3D 渲染效果
@@ -651,7 +648,7 @@ https://github.com/whoisnian/rocom-pets
 * 活跃宠物管理，支持添加/删除宠物，修改宠物选项，如性格/表情/形态/大小等
 
 claude design:
-> https://github.com/whoisnian/rocom-pets 是一个桌面宠物应用，需要设计托盘菜单和配置弹窗，尽量模拟系统原生样式，系统仅考虑 Linux KDE Wayland 和 Windows 11
+> rocom-pets 是一个桌面宠物应用，需要设计托盘菜单和配置弹窗，尽量模拟系统原生样式，系统仅考虑 Linux KDE Wayland 和 Windows 11
 
 托盘菜单去掉第一行的在场数量统计，开关顺序调整为 点击穿透/静音叫声/召回宠物 | 常用配置/完整配置/重新载入 | 退出
 托盘菜单中的常用配置包含 帧率设置：20/30/60，大小倍率：50%/100%/150%/自定义，叫声音量：静音/30%/60%/100%
@@ -687,7 +684,6 @@ claude design:
 ```
 
 ### 2026-08-05-optimize-3d-pets
-https://github.com/whoisnian/rocom-pets
 ```md
 整理仓库所有代码/脚本/文档，清理过时及重复内容，优化构建/打包流程及说明
 不需要 ./packaging，构建指构建 linux 和 windows 可执行文件，打包指宠物包 rkpet
@@ -752,7 +748,6 @@ wayland 尚未支持的话，保持跨平台一致，完全删除文件拖放功
 ```
 
 ### 2026-08-08-cloudflare-download-page
-https://rkpet.whoisnian.com
 ```md
 能否使用 cloudflare pages 托管下载页面，R2 托管宠物包，page function 结合 KV 记录下载次数/异常标记次数
 使用常用前端技术栈和现代化的 UI 组件库，创建一个应用本体+宠物包下载页面：
@@ -780,7 +775,6 @@ cd web && npm run dev 后能否在本地浏览器进行预览
 ```
 
 ### 2026-08-11-optimize-models-loading
-https://rkpet.whoisnian.com
 ```md
 web 端预览功能下载资源是否有必要直接请求 R2 而不经 workers 中转
 先给出完整的 CORS 规则，我在控制台手动加上，你在本地 curl 进行验证

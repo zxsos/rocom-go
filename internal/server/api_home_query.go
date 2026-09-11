@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -204,6 +205,36 @@ func (s *Server) handleHomeQuery(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	s.homeCacheSet(uid, body)
 	s.writeHomeQuery(w, body, now, false)
+}
+
+// PrefetchHomeQuery 在账号**登录后**预热它的家园快照缓存,供家园查询页秒开。
+//
+// 为什么要在登录时做:那一页默认查当前账号,而回源要两步请求(先领身份、再查询),
+// 上游又是免费站,偶尔要几秒 —— 等玩家点进页面才开始查,那几秒就是白等的。
+// 登录时先填进 homeCache(15 分钟 TTL),进页面即命中(cached=true)。
+//
+// 三条纪律,缺一不可:
+//   - **异步**:回源最长 20s(homeQueryTimeout),绝不能阻塞抓包管线;
+//   - **静默失败**:上游挂了只记一条日志,不牵连登录与其它流程(本接口只作增强,见文件头);
+//   - **缓存还新鲜就不回源**:15 分钟内重复登录、或多台设备同时在线,都只算一次。
+func (s *Server) PrefetchHomeQuery(uid string) {
+	if !homeUIDOK(uid) {
+		return
+	}
+	if it, ok := s.homeCacheGet(uid); ok && time.Since(it.at) < homeQueryTTL {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), homeQueryTimeout)
+		defer cancel()
+		body, err := homeQueryFetch(ctx, uid)
+		if err != nil {
+			log.Printf("家园快照预热失败 [UID:%s]: %v", uid, err)
+			return
+		}
+		s.homeCacheSet(uid, body)
+		log.Printf("家园快照预热完成 [UID:%s]", uid)
+	}()
 }
 
 // writeHomeQuery 把上游原始响应翻译成对外契约并写出。

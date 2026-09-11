@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/pet"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // 本文件是前后端契约的护栏:锁定对外 JSON 的**字段名与结构**。

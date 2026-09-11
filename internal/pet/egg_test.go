@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/gamedata"
 )
 
 // eggBagItem 拼一件带 egg_data 的 BagItem:gid(1)/id(2)/update_time(4)/type(14)/egg_data(15)。

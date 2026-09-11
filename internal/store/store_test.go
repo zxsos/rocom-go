@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/pet"
 )
 
 const testAcc = "UID:1"
