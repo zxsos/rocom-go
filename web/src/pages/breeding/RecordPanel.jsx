@@ -12,8 +12,14 @@ import { fatherCandidates, nextGen, petPickerOption, toParent } from './pets'
 // 不该影响这条历史 —— 与 store 侧「双亲/子代都存快照」的取舍是同一件事。
 export default function RecordPanel({ line, mothers, fathers, kids, onAdd, busy }) {
   const [open, setOpen] = useState(false)
-  const [motherGid, setMotherGid] = useState('')
-  const [fatherGid, setFatherGid] = useState('')
+  // 默认就是这条线定的那对亲本(见 pet.BreedingLine 的 MotherGid / FatherGid):补录最常见的情形
+  // 正是「这对生下的下一代」,预置好之后玩家只需要填子代。清掉或换掉都随他。
+  // gid 优先取快照里的,没有快照(那位已不在库)时退回线上存的 gid —— 不在候选里时 PetPicker
+  // 自然显示为空,不必为它特判。
+  const defMother = String((line.mother && line.mother.gid) || line.motherGid || '')
+  const defFather = String((line.father && line.father.gid) || line.fatherGid || '')
+  const [motherGid, setMotherGid] = useState(defMother)
+  const [fatherGid, setFatherGid] = useState(defFather)
   const [childGid, setChildGid] = useState('')
   const [backcross, setBackcross] = useState(false)
   const [note, setNote] = useState('')
@@ -31,8 +37,10 @@ export default function RecordPanel({ line, mothers, fathers, kids, onAdd, busy 
   const fatherOpts = useMemo(() => fCands.map(petPickerOption), [fCands])
   const kidOpts = useMemo(() => kids.map(petPickerOption), [kids])
 
+  // reset 回到**这对默认亲本**而不是清空:清空的话「默认选中」只管到第一次提交,补录第二、三代时
+  // 又得重新挑一次母本 —— 而这是同一条线上的同一对。
   const reset = () => {
-    setMotherGid(''); setFatherGid(''); setChildGid('')
+    setMotherGid(defMother); setFatherGid(defFather); setChildGid('')
     setBackcross(false); setNote(''); setErr('')
   }
 

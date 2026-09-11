@@ -88,7 +88,6 @@ async function renderMenu(pet) {
     onBreed: (p) => breeds.push(p),
   }))
   await tick()
-  const doc = win.document
   const items = [...host.querySelectorAll('.ctx-item')].map((el) => (el.textContent || '').trim())
   const click = (label) => {
     const el = [...host.querySelectorAll('.ctx-item')].find((x) => (x.textContent || '').trim() === label)

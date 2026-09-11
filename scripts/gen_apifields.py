@@ -40,6 +40,10 @@ ENDPOINTS = {
     # 具名字段就会多出一层 JSON,前端读到 undefined 而 Go 编译照样绿,故一并落盘。
     "breeding-pool": ("GET /api/breeding/pool", "补录候选池(按品种给种母/种公/子代)"),
     "handbook-glasses": ("GET /api/handbook-glasses", "图鉴炫彩收集"),
+    # 学院小窝:全库唯一一只,它参与孵蛋时子代性格 100% 随它(见 store/academy.go)。
+    # 三个键里 name/nature 是读取时按 gid 现查宠物库补的 —— 空窝那份只有 gid,故样本用
+    # **有主**的那一窝,否则这两个键在清单里等于不存在(见 contract_test.go 的 TestContractNest)。
+    "nest": ("GET /api/nest", "学院小窝里现在是哪只(全库唯一;gid=0 = 空着)"),
     "position-fresh": ("GET /api/position", "最近位置(未过期,含速度与轨迹)"),
     "position-stale": ("GET /api/position", "最近位置(已过期,抹掉 vu/vv/path)"),
     "wildpets": ("GET /api/wildpets", "最近一次野生宠物标记"),

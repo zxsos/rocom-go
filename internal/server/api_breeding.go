@@ -45,14 +45,19 @@ func (s *Server) handleBreeding(w http.ResponseWriter, r *http.Request) {
 		// 蛋只在这一刻回查:有待孵代的线才需要,没有就完全不碰蛋表。
 		eggs: s.eggSnapshots(sc, lines),
 		// 雄性快照与蛋组掩码只按性别筛,每条线都一样(见 pet.PoolSource)。
-		src:  pet.NewPoolSource(pets),
-		refs: make(map[chainKey]pet.ChainRef, len(lines)),
+		src: pet.NewPoolSource(pets),
+		// 学院小窝(全库唯一一只):整份响应只读一次库,逐组合传同一个 gid
+		// (见 pet.Suggest 的 nestGid)。
+		nestGid: s.store.AcademyGid(),
+		refs:    make(map[chainKey]pet.ChainRef, len(lines)),
 	}
 	out := make([]BreedingLinePayload, 0, len(lines))
 	for _, l := range lines {
 		out = append(out, s.breedingView(l, c))
 	}
-	writeJSON(w, map[string]any{"lines": out})
+	// nest 与小窝接口(GET /api/nest)同一份视图:页面顶部的「小窝里是谁」与亲本卡上的勾选
+	// 都靠它,顺手带在培育响应里就不必为它多拉一次(见 handleNest)。
+	writeJSON(w, map[string]any{"lines": out, "nest": s.nestView(sc, c.nestGid)})
 }
 
 // breedingCtx 一次 GET /api/breeding 里**跨培育线共用**的素材。
@@ -65,7 +70,10 @@ type breedingCtx struct {
 	byGid map[uint32]*pet.Pet
 	eggs  map[uint32]*pet.EggSnapshot
 	src   pet.PoolSource
-	refs  map[chainKey]pet.ChainRef
+	// nestGid 学院小窝里那只的 gid(0 = 空着):它在某组亲本里时,那组的性格按 100% 随它算
+	// (见 pet.Suggest / pet.nestNature)。
+	nestGid uint32
+	refs    map[chainKey]pet.ChainRef
 }
 
 // chainKey 品种引用(见 pet.ChainRefOf)的缓存键:建一次要展开整条链的形态集合。
@@ -96,17 +104,15 @@ func (c breedingCtx) chainRefOf(l *pet.BreedingLine) pet.ChainRef {
 func (s *Server) handleBreedingPool(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	evo, _ := strconv.ParseUint(q.Get("evo"), 10, 32)
+	// 品种可以**不给**:建线表单允许先挑种母/种公,再由种母把品种(蛋)带出来(见 web 的 Breeding),
+	// 那一刻还没有品种可传。空引用走「全库雌雄」那一支(见 pet.BreedCandidates)。
 	ref := pet.ChainRefOf(s.db, uint32(evo), q.Get("species"))
-	if ref.Empty() {
-		http.Error(w, "缺少 evo 或 species", http.StatusBadRequest)
-		return
-	}
 	pets, err := s.store.For(s.acct(r)).ListBreedingPets()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	mothers, fathers, kids := pet.BreedCandidates(ref, pets)
+	mothers, fathers, kids := pet.BreedCandidates(s.db, ref, pets)
 	// nil 切片会序列化成 null,前端得为每个队列写一次 `|| []`;这里统一给空数组 ——
 	// 「这个品种一只候选都没有」是常态(新建的空品种),不该让前端到处防 null。
 	if mothers == nil {
@@ -157,8 +163,31 @@ func (s *Server) breedingView(l *pet.BreedingLine, c breedingCtx) BreedingLinePa
 			v.MotherReleased = true
 		}
 	}
+	// 指定种公快照:与种母成对展示(见 payload 的 Father)。**不派生、不参与任何计算** ——
+	// 只认线上显式指定的那个 gid,查不到就是他已不在库,照种母的样子标记出来(见 FatherReleased)。
+	if fg := l.FatherGid; fg != 0 {
+		if p, ok := c.byGid[fg]; ok {
+			snap := pet.ParentSnapshot(p)
+			v.Father = &snap
+		} else {
+			v.FatherReleased = true
+		}
+	}
+	// 学院小窝的**生效值**:这条线设了计划就按计划算(那是玩家在「打算怎么放」时主动要的
+	// 试算),否则按游戏真值算(由家园管线自动维护,见 pipeline.syncAcademyNest)。
+	// 两个来源都在响应里下发(顶层 nest + 本线的 nestPlan),页面同时显示、不一致时说清楚。
+	nestGid := c.nestGid
+	if l.NestPlanGid != 0 {
+		nestGid = l.NestPlanGid
+		if p, ok := c.byGid[l.NestPlanGid]; ok {
+			snap := pet.ParentSnapshot(p)
+			v.NestPlan = &snap
+		} else {
+			v.NestPlanReleased = true
+		}
+	}
 	pool := c.src.BreedPool(c.chainRefOf(l))
-	v.Suggest = pet.Suggest(pool, l.Goal, breedingSuggestN, pet.DescendantGids(l))
+	v.Suggest = pet.Suggest(pool, l.Goal, breedingSuggestN, pet.DescendantGids(l), nestGid)
 	// 嗓音目标是**向下取整的均值**,任一方不到目标值就永远到不了(见 pet.VoiceReach)。
 	// 只在填了嗓音目标时算:体重的预期是浮点均值、且实测可高于双亲均值,没有这种
 	// 「必须双亲都到位」的性质,不该跟着给结论;性格本就是概率。
@@ -169,7 +198,7 @@ func (s *Server) breedingView(l *pet.BreedingLine, c breedingCtx) BreedingLinePa
 	// 回交只在已经有子代之后才谈得上(没有可回交的对象)。没子代时留 nil,
 	// 前端据此整块不显示,而不是显示一个空壳。
 	if child, m, f, ok := pet.LatestChild(l); ok {
-		bc := pet.BackcrossAdvice(child, m, f, breedMates(pool, child), l.Goal)
+		bc := pet.BackcrossAdvice(child, m, f, breedMates(pool, child), l.Goal, nestGid)
 		v.Backcross = &bc
 	}
 	return v
@@ -307,6 +336,74 @@ func fillGeneration(g *pet.Generation, byGid map[uint32]*pet.Pet) {
 	}
 }
 
+// —— 学院小窝(全库唯一一只)——
+
+// handleNest 读 / 写学院小窝「真值」(GET/POST /api/nest)。
+//
+// 玩法:小窝里那只参与孵蛋时,子代性格 **100% 随它**(见 pet.nestNature)。它在游戏里只有
+// 一个,故这里存的是**全库唯一**的一个 gid(单行表,见 store.AcademyGid)—— 换一只即覆盖,
+// 不是「每个账号各有一只」。
+//
+// ⚠️ **正常不需要用它**:真值由家园管线自动维护(自己家园里学院小窝的住户,见
+// pipeline.syncAcademyNest),玩家在游戏里换一只,这边就跟着变。它保留下来是给**抓不到**的
+// 场合兜底(没进过家园、包里没抓到、或想手工纠正),以及供页面上的「把计划记为真值」一键调用。
+//
+// 玩家自己「打算怎么放」是另一件事,存在**培育线**里(pet.BreedingLine.NestPlanGid,走
+// POST /api/breeding 整条覆盖写),预测口径是「计划 ?? 真值」—— 详见 api_breeding.go 的 breedingView。
+//
+// 请求体 {gid}:0 = 把小窝空出来;其余必须是**本账号库里确实有**的宠物。为什么要校验:小窝里
+// 那只参与孵蛋才有加成,库里没有的 gid 只会静默失效 —— 页面上勾了、百分比却不变,比报错难查
+// 得多。切账号后旧 gid 不在这个账号的库里,也走这条(不给勾)。
+func (s *Server) handleNest(w http.ResponseWriter, r *http.Request) {
+	acc := s.acct(r)
+	sc := s.store.For(acc)
+	if r.Method == http.MethodGet {
+		writeJSON(w, s.nestView(sc, s.store.AcademyGid()))
+		return
+	}
+	var body struct {
+		Gid uint32 `json:"gid"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "请求体不是合法 JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.Gid != 0 {
+		p, err := sc.GetPet(body.Gid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if p == nil {
+			http.Error(w, "宠物库里没有这只(可能已放生 / 送人),不能放进学院小窝", http.StatusBadRequest)
+			return
+		}
+	}
+	if err := s.store.SetAcademyGid(body.Gid); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.hub.Broadcast("breeding", acc, map[string]any{"account": acc})
+	writeJSON(w, s.nestView(sc, body.Gid))
+}
+
+// nestView 学院小窝的当前状态:{gid, name, nature}。
+//
+// name/nature 按 gid **现查**宠物库补上,不落库:页面据此写出「小窝里是小火(固执)· 子代性格
+// 100% 随它」,而宠物被放生后这一行查不到、只给空 —— 由页面写「已不在库」,与亲本卡对 released
+// 的处理同一口径(见 web 的 ParentSlot)。gid=0(小窝空着)时只有 gid 一个键。
+func (s *Server) nestView(sc *store.Scoped, gid uint32) map[string]any {
+	out := map[string]any{"gid": gid}
+	if gid == 0 {
+		return out
+	}
+	if p, err := sc.GetPet(gid); err == nil && p != nil {
+		out["name"] = p.Name
+		out["nature"] = p.Nature
+	}
+	return out
+}
+
 // handleBreedingSave 建线或整条更新(POST /api/breeding)。
 //
 // body 就是整条 BreedingLine:目标、状态、全部代数都在里面。一条线序列化后不过几 KB,
@@ -341,6 +438,10 @@ func (s *Server) handleBreedingSave(w http.ResponseWriter, r *http.Request) {
 	if body.MotherGid == 0 {
 		body.MotherGid = pet.MotherGidOf(&body)
 	}
+	// 指定种公(FatherGid)**故意不做任何兜底**:它是个计划值,没有可派生的来源(见
+	// pet.BreedingLine.FatherGid 的三点差别)。客户端给什么就是什么 —— 给一只已经放生的宠
+	// 也照样落库,读取时按「已不在库」标记(见 payload.FatherReleased),这与 Gens 里允许
+	// 存已放生亲本的快照是同一口径:线上存的是玩家当时的意图,不为它做校验或清洗。
 	acc := s.acct(r)
 	sc := s.store.For(acc)
 	// 手动补录也走这条整条覆盖写,故达成判定同样挂在这里。读旧线**只为**取改动前的达成结果:

@@ -628,7 +628,12 @@ type BreedingLinePayload struct {
 	// 为什么要单独下发:线的身份是种母,同一个品种可以有好几条线 —— 卡片上若只有品种名,
 	// 那几条看起来一模一样,玩家分不出哪条是哪只母本的。头像 + 名字才能一眼认出来。
 	// 空线(一代都没有)也能显示,正是靠它:那种线里没有 mother 快照可翻。
-	Mother    *pet.EggParent   `json:"mother,omitempty"`
+	Mother *pet.EggParent `json:"mother,omitempty"`
+	// Father 这条线**指定**的种公的快照(按 FatherGid 定位,库里查不到时为空)。
+	//
+	// 与 Mother 成对下发,但性质是**计划值**而不是身份:线上可以有指定种公,也可以没有
+	// (0 = 没指定);每代实际用的父本各记在各代里(gens[].father),两者不要混着看。
+	Father    *pet.EggParent   `json:"father,omitempty"`
 	Suggest   []pet.Suggestion `json:"suggest,omitempty"`   // 种公/种母推荐(已排序,取前 N)
 	Backcross *pet.Backcross   `json:"backcross,omitempty"` // 回交 vs 换种的对比;还没子代时为 nil
 	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = 双亲均值的向零取整,
@@ -654,6 +659,19 @@ type BreedingLinePayload struct {
 	// 故一条记过代的线若查不到种母,基本只可能是她被放生了 —— 页面据此写「已放生」,
 	// 而不是诱导玩家去等一个永远不会再来的「未定种母」(见 web 的 LineDetail / LineCard)。
 	MotherReleased bool `json:"motherReleased,omitempty"`
+	// FatherReleased 这条线**指定过种公**、但他已不在宠物库(放生 / 送人)。
+	// 与 MotherReleased 同构:指定过却查不到 = 他不在了,而不是「没指定」——
+	// 页面据此写「已不在库」,免得玩家以为这条线上压根没配过公。
+	FatherReleased bool `json:"fatherReleased,omitempty"`
+	// NestPlan 这条线**打算**把学院小窝给谁的快照(见 pet.BreedingLine.NestPlanGid)。
+	//
+	// 它是**计划值**:没打算时缺失(预测按游戏真值算);指定了则预测按它算 —— 页面据此写
+	// 「按计划试算」,并把游戏真值(响应顶层的 nest)并列显示,让玩家看出两者是否一致。
+	NestPlan *pet.EggParent `json:"nestPlan,omitempty"`
+	// NestPlanReleased 计划的那只已不在宠物库(放生 / 送人),口径同 MotherReleased:
+	// 「指定过、但查不到」与「没指定」是两回事,页面要分开显示。与 Mother/Father 一样
+	// **不做写入校验** —— 线上存的是意图,随时可改。
+	NestPlanReleased bool `json:"nestPlanReleased,omitempty"`
 }
 
 // BreedingPoolPayload 是手动补录面板的候选池(GET /api/breeding/pool):某个品种的三类候选。

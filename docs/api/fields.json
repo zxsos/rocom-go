@@ -69,6 +69,22 @@
             }
           },
           "evo": "int",
+          "father": {
+            "confId": "int",
+            "gender": "str",
+            "gid": "int",
+            "heightM": "float",
+            "heightPct": "int",
+            "img": "str",
+            "name": "str",
+            "nature": "str",
+            "species": "str",
+            "talentRank": "str",
+            "voice": "int",
+            "weightKg": "int",
+            "weightPct": "int"
+          },
+          "fatherGid": "int",
           "gens": [
             {
               "at": "int",
@@ -149,6 +165,22 @@
             "weightKg": "int",
             "weightPct": "int"
           },
+          "nestPlan": {
+            "confId": "int",
+            "gender": "str",
+            "gid": "int",
+            "heightM": "int",
+            "heightPct": "int",
+            "img": "str",
+            "name": "str",
+            "nature": "str",
+            "species": "str",
+            "talentRank": "str",
+            "voice": "int",
+            "weightKg": "int",
+            "weightPct": "int"
+          },
+          "nestPlanGid": "int",
           "pending": [
             {
               "at": "int",
@@ -258,7 +290,10 @@
           ],
           "updatedAt": "int"
         }
-      ]
+      ],
+      "nest": {
+        "gid": "int"
+      }
     }
   },
   "breeding-pool": {
@@ -273,6 +308,7 @@
           "eggGroups": [
             {}
           ],
+          "evo": "int",
           "gender": "str",
           "gid": "int",
           "heightM": "float",
@@ -293,6 +329,7 @@
           "eggGroups": [
             {}
           ],
+          "evo": "int",
           "gender": "str",
           "gid": "int",
           "heightM": "float",
@@ -313,6 +350,7 @@
           "eggGroups": [
             {}
           ],
+          "evo": "int",
           "gender": "str",
           "gid": "int",
           "heightM": "float",
@@ -764,6 +802,16 @@
       "speciality": [
         {}
       ]
+    }
+  },
+  "nest": {
+    "desc": "学院小窝里现在是哪只(全库唯一;gid=0 = 空着)",
+    "endpoint": "GET /api/nest",
+    "sample": "internal/server/testdata/contract/nest.json",
+    "shape": {
+      "gid": "int",
+      "name": "str",
+      "nature": "str"
     }
   },
   "pet-detail": {

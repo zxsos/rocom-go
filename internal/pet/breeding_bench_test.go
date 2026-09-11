@@ -70,7 +70,7 @@ func BenchmarkSuggest(b *testing.B) {
 		b.Run(fmt.Sprint("pets=", n), func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				Suggest(pool, goal, 5, nil)
+				Suggest(pool, goal, 5, nil, 0)
 			}
 		})
 	}
@@ -82,7 +82,7 @@ func BenchmarkPredict(b *testing.B) {
 	m, f := ParentSnapshot(benchPets(1)[0]), ParentSnapshot(benchPets(1)[0])
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		Predict(m, f, goal)
+		Predict(m, f, goal, 0)
 	}
 }
 

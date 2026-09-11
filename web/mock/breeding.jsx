@@ -16,7 +16,11 @@ import '../src/styles/dropdown.css'
 import '../src/styles/motion.css'
 import LineDetail from '../src/pages/breeding/LineDetail'
 import LineCard from '../src/pages/breeding/LineCard'
+import ParentSlot, { NestHint, parentCard } from '../src/pages/breeding/ParentSlot'
 
+// 头像由 Go 服务出(/img/...),mock 页只是静态页 —— 看学院小窝那格(草环要围着头像)时先
+// 把标的头像拷进去,否则头像是破图,而那方块看着像「草环没同心」:
+//   mkdir -p mock-dist/img/HeadIcon && cp ../internal/gamedata/data/img/HeadIcon/3006.webp mock-dist/img/HeadIcon/
 const HEAD = 'HeadIcon/3006.webp'
 const snap = (gid, name, voice, weight, gender) => ({
   gid, name, species: '火神', confId: 2000672, gender, img: HEAD,
@@ -161,7 +165,23 @@ window.fetch = async (url, init) => {
 
 function Mock() {
   const [id, setId] = React.useState(line.id)
+  const [demoPlan, setDemoPlan] = React.useState(0)
   const cur = id === line.id ? line : childLine
+  // 学院小窝:真值 = 种母小母(2001,游戏里就在小窝里);详情那条线的计划也给她,于是详情里
+  // 种母卡上会挂着草环 —— 这一处是「真布局下的样子」,与上面那格四态栏互为对照。
+  const NEST = { gid: 2001, name: '小母', nature: '固执' }
+  const planLine = id === line.id
+    ? { ...cur, nestPlanGid: 2001, nestPlan: snap(2001, '小母', 90, 80, '♀') }
+    : cur
+  // options 要给一条**当下选中的**候选:PetPicker 靠它把头像与名字渲染出来,而草环正是挂在
+  // 头像容器上的 —— 不给候选,画面上只剩一圈悬空的草,看不出包围效果。
+  const nestSlot = (role, card, o) => (
+    <ParentSlot role={role} card={card} value={String(card.gid)} onNest={() => {}} {...o}
+      options={[{ value: String(card.gid), name: card.name, img: card.img, sub: 'V90 W80%' }]} onChange={() => {}} />
+  )
+  const cardOf = (gid, name) => ({
+    ...parentCard(snap(gid, name, 90, 80, gid === 2001 ? '♀' : '♂'), ['龙']), img: DEMO_AV,
+  })
   return (
     <MemoryRouter>
       <AccountContext.Provider value="mock">
@@ -169,9 +189,39 @@ function Mock() {
           <div className="toolbar">
             <button className="btn small">← 全部培育线</button>
           </div>
+          {/* 学院小窝四种样子:未选 / 按计划试算 / 游戏实况(勾被禁用)、以及只读位上的实况 ——
+              这块纯看视觉,故直接喂 ParentSlot 的入参,不走真数据。 */}
+          <h3 style={{ margin: '8px 0' }}>学院小窝:草编按钮与草环</h3>
+          <div className="br-grid">
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>① 未选、也没计划(点它看草长出来)</div>
+              {nestSlot('mother', cardOf(2001, '小母'), {
+                nestGid: demoPlan, nestTruth: 0, nestPlanGid: demoPlan, onNest: setDemoPlan,
+              })}
+              <NestHint truth={{ gid: 0 }} planGid={demoPlan} plan={demoPlan ? snap(2001, '小母', 90, 80, '♀') : null}
+                onClearPlan={() => setDemoPlan(0)} onCommitTruth={() => {}} />
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>② 按计划试算(真值是别人)</div>
+              {nestSlot('father', cardOf(2120, '甲公'), { nestGid: 2120, nestTruth: 2001, nestPlanGid: 2120 })}
+              <NestHint truth={NEST} planGid={2120} plan={snap(2120, '甲公', 100, 98.6, '♂')}
+                onClearPlan={() => {}} onCommitTruth={() => {}} />
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>③ 游戏实况(勾不可取消)</div>
+              {nestSlot('mother', cardOf(2001, '小母'), { nestGid: 2001, nestTruth: 2001, nestPlanGid: 0 })}
+              <NestHint truth={NEST} planGid={0} onClearPlan={() => {}} onCommitTruth={() => {}} />
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>④ 只读位(详情里的种母)+ 实况</div>
+              {nestSlot('mother', cardOf(2001, '小母'), { disabled: true, nestGid: 2001, nestTruth: 2001, nestPlanGid: 0 })}
+              <NestHint truth={NEST} planGid={0} onClearPlan={() => {}} onCommitTruth={() => {}} />
+            </div>
+          </div>
           <LineDetail
-            line={cur} lines={[line, childLine]} chains={[]} chainItems={[]}
+            line={planLine} lines={[line, childLine]} chains={[]} chainItems={[]}
             natureMatrix={MATRIX} loading={false} busy={false}
+            nest={NEST} onNestTruth={() => {}}
             onSave={() => {}} onClaim={() => Promise.resolve(false)}
             onRemove={() => {}} onPet={() => {}} onLocate={() => {}}
             onOpenLine={setId} onMerge={() => Promise.resolve(false)}

@@ -55,6 +55,10 @@
 /* 头像:触发按钮与候选行共用。候选来自整个宠物库,同名个体极多(刷了一窝),
    头像是最快区分「就是这只」的一条线索。 */
 .dropdown-av { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: var(--bg-3); }
+/* 头像外套的一层:给「头像框」留位置(学院小窝那圈绿草,见 breeding/NestGrass.jsx)。
+   尺寸与内部 img 一致(inline-flex、内容居中),故不挂框时布局与从前逐像素相同;
+   挂框时框按 position: absolute 挂在它身上 —— 这才是框能对准头像的原因。 */
+.dropdown-av-wrap { position: relative; flex: none; display: inline-flex; }
 /* 触发按钮上的数值副文本(V/W/性格)。可收缩 + 省略号:窄屏时它先让位给名字,
    而不是把名字挤出按钮(名字是唯一能确认「选对了没」的东西)。 */
 .dropdown-meta { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fg-dim); }
