@@ -1,10 +1,11 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  claimBreedingChild, deleteBreeding, getBreeding, getFilterOptions, getNameOptions, mergeBreeding,
-  saveBreeding, subscribe,
+  claimBreedingChild, deleteBreeding, getBreeding, getEvolution, getFilterOptions, getNameOptions,
+  getPet, mergeBreeding, saveBreeding, subscribe,
 } from '../../api'
 import { AccountContext } from '../../context'
+import { breedableEggGroups } from '../../constants'
 import { useAsyncData } from '../../hooks/useAsyncData'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import PetLocateModal from '../../components/PetLocateModal'
@@ -14,7 +15,7 @@ import { IconBreeding, IconRefresh } from '../../components/svg'
 import LineCard from './LineCard'
 import LineDetail from './LineDetail'
 import { GoalFields } from './GoalEditor'
-import { chainKey, chainOf, lineStats, parseGoal, pendCounts } from './pets'
+import { chainKey, chainOf, chainOfPet, lineStats, narrowChainsByEggGroups, parseGoal, pendCounts } from './pets'
 
 const EMPTY_GOAL = { voice: '', weightPct: '', nature: '', natureIn: [] }
 
@@ -44,6 +45,9 @@ export default function Breeding() {
   const account = useContext(AccountContext)
   const [params, setParams] = useSearchParams()
   const lineId = params.get('line') || ''
+  // 长按「孵蛋配种」带来的宠物(见 PetList.breedFrom):URL 里只有 gid,性别/蛋组/品种一律
+  // 以库为准 —— 分享出去的链接在宠物进化/送人后仍会如实反映,而不是按过期快照配种。
+  const breedGid = Number(params.get('new')) || 0
 
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
@@ -54,6 +58,30 @@ export default function Breeding() {
   const [creating, setCreating] = useState(false)
   const [newChain, setNewChain] = useState('') // 选中品种的取值键(见 pets.chainKey)
   const [newGoal, setNewGoal] = useState(EMPTY_GOAL)
+  // 长按「孵蛋配种」带过来的宠物本身与它那条进化链(后者用于认品种,见 pets.chainOfPet)
+  const [breedPet, setBreedPet] = useState(null)
+  const [breedSteps, setBreedSteps] = useState(null)
+
+  // 「孵蛋配种」的落地:拉这只宠物的权威数据 → 打开新建表单,并按它的蛋组收窄品种候选。
+  // 宠物已经不在库里(放生/送人/换了账号)时提示一句并退回普通列表 —— 不能让玩家对着一张
+  // 永远配不出候选的表单去填目标。
+  useEffect(() => {
+    if (!breedGid) { setBreedPet(null); setBreedSteps(null); return }
+    let alive = true
+    getPet(breedGid).then(
+      (p) => {
+        if (!alive) return
+        setBreedPet(p)
+        setCreating(true)
+        // 认品种要的是**链首**形态(候选里的 base),已进化的宠物只带当前形态,故再查一次它那条
+        // 进化链(见 pets.chainOfPet)。查不到就不预选 —— 预选只是省一步,不预选也是正常流程。
+        getEvolution(p.baseConfId).then((steps) => { if (alive) setBreedSteps(steps || []) }, () => {})
+      },
+      () => { if (alive) { toast('这只宠物已经不在库里了'); setParams({}) } },
+    )
+    return () => { alive = false }
+    // 只在 breedGid 变化时重跑(含点「不限蛋组」把参数清空那一次)。
+  }, [breedGid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data, loading, error, refresh } = useAsyncData(
     useCallback(() => getBreeding(), []), { fallback: { lines: [] }, reloadKey: account },
@@ -86,9 +114,21 @@ export default function Breeding() {
   // 真正生不出蛋的品种**不在候选里** —— 后端按**繁殖组(蛋组)**滤掉了(见 gamedata.IsInfertile):
   // 蛋组「未发现」的那一批(迪莫、帕尔萨斯/圣羽翼王那一系等)进不了小窝配种。判据不能用
   // 「有没有蛋图」,那样会误伤几十个正常品种。
+  // 长按「孵蛋配种」带来的蛋组条件:候选只列与它至少共一个蛋组的品种(见 pets.narrowChainsByEggGroups),
+  // 并按 ♀ 的品种预选好(蛋随母本;♂ 不预选 —— 他是种公,得由玩家决定要哪条链的蛋)。
+  // 限制只是**筛选候选**,不写进线里:建完线的品种仍是玩家在下拉里确认过的那一个。
+  const breedEggGroups = useMemo(() => breedableEggGroups(breedPet && breedPet.eggGroups), [breedPet])
+  const pickChains = useMemo(() => narrowChainsByEggGroups(chains, breedEggGroups), [chains, breedEggGroups])
+
+  useEffect(() => {
+    if (!breedPet || breedPet.gender !== '♀' || !breedSteps) return
+    const c = chainOfPet(pickChains, breedSteps)
+    if (c) setNewChain(chainKey(c))
+  }, [breedPet, breedSteps, pickChains])
+
   const chainItems = useMemo(
-    () => chains.map((c) => ({ value: chainKey(c), label: c.label, sub: `${c.count} 只`, img: c.egg || c.img })),
-    [chains],
+    () => pickChains.map((c) => ({ value: chainKey(c), label: c.label, sub: `${c.count} 只`, img: c.egg || c.img })),
+    [pickChains],
   )
 
   // 服务端推送「培育数据变了」→ 重拉整份。onOpen 也补拉一次:断线期间的消息不会重放。
@@ -241,6 +281,16 @@ export default function Breeding() {
             <ComboSelect value={newChain} options={chainItems} onChange={setNewChain}
               placeholder="输入品种名搜索…" emptyText="品种" disabled={!chainItems.length} />
           </label>
+          {/* 长按「孵蛋配种」进来的蛋组条件:候选被收窄了,这里必须**明说**是哪只宠物、哪几个
+              蛋组、剩多少个品种,并给一键解除 —— 否则玩家只会觉得「品种列表怎么少了一大半」
+              (下拉里既看不出被筛过,也没有痕迹说明是按什么筛的)。 */}
+          {breedEggGroups.length ? (
+            <p className="br-hint muted">
+              已按蛋组收窄：只列与 <b>{breedPet.name || breedPet.species}</b> 共蛋组（{breedEggGroups.join(' / ')}）的品种，
+              共 {pickChains.length} 个{breedPet.gender === '♀' ? '；已把她这条进化链填进下拉' : ''}。
+              <button className="btn small" onClick={() => setParams({})}>不限蛋组</button>
+            </p>
+          ) : null}
           <p className="br-hint muted">
             一个选项就是一条进化链(括号里是它的各阶段),左边的图是这条线要孵的蛋 ——
             链上任一阶段的 ♀ 都能当这条线的种母,而同一只精灵的两种样子各有各的链(也各有各的蛋)。

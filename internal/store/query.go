@@ -41,19 +41,28 @@ type Filter struct {
 	//
 	// 与 Types 刻意不同:系别是宠物的**并列**属性(双系宠物要靠 AND 收窄),
 	// 但两者在前端都是 chip 多选,故各自的口径都写进了 hint 文案。
-	EggGroups   []string
-	PartnerMark string
-	Shiny        string // "", "1", "0"
-	Colorful     string // "", "1", "0"
-	Form         string // 地区/季节形态名(精确匹配)
-	Box          string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
-	CatchAfter   int64  // 捕捉时间下限(unix 秒;>0 时筛 catch_time>=该值,由前端按所选区间算)
-	LevelMin     int
-	LevelMax     int
-	Sort         string
-	Order        string
-	Page         int
-	PageSize     int
+	EggGroups []string
+	// EggGroupsExact 蛋组**集合相等**:候选的蛋组必须与目标一模一样(顺序无关)。
+	//
+	// 与上面 EggGroups 是**两种口径**,服务于两种意图:上面那套是筛选面板的「这几组里
+	// 有哪些」,这里的来自列表长按的「跟我这一套蛋组相同的还有谁」—— 配种要的是同蛋组,
+	// 多一组少一组都不是同一个组合。故这里是 AND + 个数相等,不是 OR。
+	//
+	// 两者同时给出时以**本字段为准**(与 Nature/NatureIn 同法):前端只会给一个,而
+	// 叠加生效会让用户看到「筛选面板上选中的组没生效」这种查不出来的怪结果。
+	EggGroupsExact []string
+	PartnerMark    string
+	Shiny          string // "", "1", "0"
+	Colorful       string // "", "1", "0"
+	Form           string // 地区/季节形态名(精确匹配)
+	Box            string // 宠物盒,形如 "13-性格1"(取前导整数为 box_id 过滤)
+	CatchAfter     int64  // 捕捉时间下限(unix 秒;>0 时筛 catch_time>=该值,由前端按所选区间算)
+	LevelMin       int
+	LevelMax       int
+	Sort           string
+	Order          string
+	Page           int
+	PageSize       int
 }
 
 var sortColumns = map[string]string{
@@ -156,8 +165,23 @@ func buildWhere(f Filter, account string) (string, []any) {
 		where = append(where, "types LIKE ?")
 		args = append(args, "%\""+t+"\"%")
 	}
-	// egg_groups 亦为 JSON 组名数组,LIKE 匹配含该组的宠物;多选取任一命中,故整组包成一个 OR 谓词。
-	if len(f.EggGroups) > 0 {
+	// egg_groups 是 JSON 组名数组:两种口径都用 LIKE 匹配带引号的元素(口径差异见 Filter 的字段注释)。
+	if len(f.EggGroupsExact) > 0 {
+		// 精确口径:先用 json_array_length 把「组数不同」的排除掉,再逐组 AND 命中。
+		// 两段缺一不可 —— 只写 LIKE(AND) 会放进「多带一组」的宠物,只写长度会把
+		// 任意一个组数相同的都放进来。
+		//
+		// json_array_length 对 NULL/非 JSON 返回 NULL、对空数组返回 0:空蛋组的宠物
+		// (超进化/分支形态,见 gamedata.IsInfertile 的注释)在两者下都不命中 —— 正是
+		// 想要的,「没有蛋组」不该被当成「一套叫无蛋组的蛋组」。
+		and := []string{"json_array_length(egg_groups)=?"}
+		args = append(args, len(f.EggGroupsExact))
+		for _, g := range f.EggGroupsExact {
+			and = append(and, "egg_groups LIKE ?")
+			args = append(args, "%\""+g+"\"%")
+		}
+		where = append(where, "("+strings.Join(and, " AND ")+")")
+	} else if len(f.EggGroups) > 0 {
 		or := make([]string, len(f.EggGroups))
 		for i, g := range f.EggGroups {
 			or[i] = "egg_groups LIKE ?"

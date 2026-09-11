@@ -8,6 +8,7 @@ import { Portrait } from './avatar'
 import { toast } from './toast'
 import { useDialog } from '../hooks/useDialog'
 import { StatRadar, StatRange } from './stats'
+import { EGG_GROUP_NONE_LABEL } from '../constants'
 import { fmtTime, voiceHot, pctHot } from '../utils/format'
 import { IconMedal } from './svg'
 import LocTag from './LocTag'
@@ -126,7 +127,9 @@ export function PetDetailModal({ gid, onClose }) {
           <div className="kv">
             <Item k="性格" v={pet.nature} />
             <Item k="特长" v={pet.speciality || '无'} />
-            <Item k="蛋组" v={pet.eggGroups?.length ? <EggGroups groups={pet.eggGroups} /> : '未知'} />
+            {/* 无蛋组时原来写「未知」,与游戏里那个不可繁殖组的显示名「无蛋组」是两个口径的同一件事
+                (见 constants.js)—— 统一成一个词,免得玩家以为是「数据没抓到」和「配不了种」两种情况。 */}
+            <Item k="蛋组" v={pet.eggGroups?.length ? <EggGroups groups={pet.eggGroups} /> : EGG_GROUP_NONE_LABEL} />
             <Item k="身高" v={<StatRange value={pet.heightM} min={pet.heightMin} max={pet.heightMax} pct={pet.heightPct} unit=" m" />} />
             <Item k="体重" v={<span className={pctHot(pet.weightPct)}><StatRange value={pet.weightKg} min={pet.weightMin} max={pet.weightMax} pct={pet.weightPct} unit=" kg" /></span>} />
             <Item k="声音" v={<span className={voiceHot(pet.voice)}>{pet.voice}</span>} />

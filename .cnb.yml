@@ -29,6 +29,47 @@ $: # 兜底匹配所有分支
         - name: 浏览器
           script: cd web && (npx playwright install chromium || echo "跳过:浏览器已内置或当前离线")
 
+  # 应用镜像(抓包服务,根目录 Dockerfile):**只在页面手动触发**,不随推送自动构建。
+  #   docker.cnb.cool/<组>/<仓库>:latest  ← README「Docker 部署」里 docker pull 的那个
+  #
+  # 为什么不挂 push(2026-09-11 改):这条流水线要跑一整轮 docker build + push(数十秒到数分钟,
+  # 还占一个 docker 服务),而它的产物只是「给外部 docker pull 的那份镜像」——**日常改代码推上来
+  # 并不需要重打一次**。原先挂在 push 上(还带一大串 ifModify)的实际后果是几乎每次提交都重建,
+  # 甚至要靠 lock 互相取消同一批构建。改成手动触发后:要发镜像时点一下,平时一次都不跑。
+  #
+  # 触发入口:仓库页 → 流水线/构建 → 手动触发里选这条(名字见下)。
+  # 想让它出现在自定义按钮里,可另加 .cnb/web_trigger.yml(见 CNB 文档 build/web-trigger.html);
+  # 想用命令行触发则把 web_trigger 换成 api_trigger。
+  #
+  # 手动触发**不做 ifModify 过滤**:既然是人点的,就是要重打一次 ——「代码没变也想重打」
+  # 不再需要随便碰一个文件提交(那正是之前唯一的办法)。
+  web_trigger:
+    - name: 构建并推送应用镜像
+      services:
+        - docker
+      # 两次构建并发时会**互相覆盖 latest**:慢的那次后推送,把旧镜像顶回 latest
+      # (2026-09-11 实际踩到:一次构建卡在慢速 apk 源上,若不停掉它,新版本推完 latest
+      #  还会被它覆盖)。故同 key 只保留最新一次:正在跑的取消、排队中的取消。
+      lock:
+        key: rocom-go-image
+        cancel-in-progress: true
+        cancel-in-wait: true
+      stages:
+        - name: docker build
+          script: |
+            set -e
+            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
+            VER="$(tr -d '[:space:]' < VERSION)"
+            # 除了 latest 再打一个 VERSION 标签(v4.0.6):只留 latest 没法回滚到具体版本
+            docker build -t "${IMAGE}:latest" -t "${IMAGE}:v${VER}" -f Dockerfile .
+        - name: docker push
+          script: |
+            set -e
+            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
+            VER="$(tr -d '[:space:]' < VERSION)"
+            docker push "${IMAGE}:latest"
+            docker push "${IMAGE}:v${VER}"
+
 # 重建镜像的流水线:挂在**本仓库的默认分支 master** 上。
 # ⚠️ CNB 的顶层键就是分支名(glob),`main` 只是"名字叫 main 的分支"、并非默认分支别名 ——
 # 本仓库默认分支是 master,若写成 main 这条流水线永不触发,开发环境镜像也就永远建不出来。
@@ -46,48 +87,3 @@ master:
           script: docker build -f .ide/Dockerfile -t ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/dev-env:latest .
         - name: docker push
           script: docker push ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/dev-env:latest
-
-    # 应用镜像(抓包服务,根目录 Dockerfile):推送到 master 后自动构建并推送
-    #   docker.cnb.cool/<组>/<仓库>:latest  ← README「Docker 部署」里 docker pull 的那个
-    # 与上面的 dev-env 是**两条独立流水线**(同一次 push 并发跑),互不影响。
-    # 想手动重打一次而代码无改动:随便碰一下下面 ifModify 里的任一文件提交即可
-    # (改本文件也行 —— .cnb.yml 自己就在清单里)。
-    - name: 构建并推送应用镜像
-      services:
-        - docker
-      # 两次构建并发时会**互相覆盖 latest**:慢的那次后推送,把旧镜像顶回 latest
-      # (2026-09-11 实际踩到:一次构建卡在慢速 apk 源上,若不停掉它,新版本推完 latest
-      #  还会被它覆盖)。故同 key 只保留最新一次:正在跑的取消、排队中的取消。
-      lock:
-        key: rocom-go-image
-        cancel-in-progress: true
-        cancel-in-wait: true
-      ifModify:
-        # ⚠️ 别删 .cnb.yml 这行:这条流水线靠它自触发,否则改了本文件反而不重建
-        - .cnb.yml
-        - Dockerfile
-        - .dockerignore
-        - docker-entrypoint.sh
-        - go.mod
-        - go.sum
-        - VERSION
-        - cmd/**
-        # internal/server/web(前端产物)与 internal/gamedata/data 是**编译期 embed 进二进制**的,
-        # 故整个 internal/** 都要在内;只改 web/ 源码而产物没重新 build 时不会触发(符合预期,
-        # 因为镜像里进的是产物,见 AGENTS.md)。
-        - internal/**
-      stages:
-        - name: docker build
-          script: |
-            set -e
-            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
-            VER="$(tr -d '[:space:]' < VERSION)"
-            # 除了 latest 再打一个 VERSION 标签(v4.0.6):只留 latest 没法回滚到具体版本
-            docker build -t "${IMAGE}:latest" -t "${IMAGE}:v${VER}" -f Dockerfile .
-        - name: docker push
-          script: |
-            set -e
-            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
-            VER="$(tr -d '[:space:]' < VERSION)"
-            docker push "${IMAGE}:latest"
-            docker push "${IMAGE}:v${VER}"

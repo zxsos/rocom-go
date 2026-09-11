@@ -43,6 +43,10 @@ func (s *Server) parseFilter(q url.Values) store.Filter {
 	if eg := q.Get("eggGroups"); eg != "" {
 		f.EggGroups = strings.Split(eg, ",")
 	}
+	// 蛋组精确:集合相等,由列表长按的「筛选相同蛋组」写入(见 store.Filter.EggGroupsExact)。
+	if ege := q.Get("eggGroupsExact"); ege != "" {
+		f.EggGroupsExact = strings.Split(ege, ",")
+	}
 	if ne := q.Get("natureExclude"); ne != "" {
 		f.NatureExclude = strings.Split(ne, ",")
 	}

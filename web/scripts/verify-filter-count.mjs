@@ -16,6 +16,8 @@
 //    - 把 sort/page 也计入            → 断言 2 红
 //    - 性格 nature 与 natureIn 各算一条 → 断言 3 红
 //    - 去掉 types 的 length(只算 0/1)  → 断言 3 红
+//    - eggGroupsExact 也按个数算        → 断言 4c 红
+//    - 两种蛋组口径相加而不是取其一      → 断言 4d 红
 import { createServer } from 'vite'
 
 const server = await createServer({
@@ -55,6 +57,18 @@ R.push(eq('系别多选按个数', countPicked({ types: ['火', '龙', '萌'] })
 //     选 3 组只会显示「已选 +1」,用户看不到自己设了几条)
 R.push(eq('蛋组多选按个数', countPicked({ eggGroups: ['巨灵', '天空'] }).from, 2))
 R.push(eq('蛋组单选', countPicked({ eggGroups: ['巨灵'] }).from, 1))
+
+// 4c. 长按「筛选相同蛋组」写的是 eggGroupsExact:它与 OR 多选**口径不同**,不论几组都只算
+//     **一条** —— 它问的是「跟这一套一模一样」,拆成两条会把同一个条件数两遍(状态条说「已选 3 项」,
+//     实际只收窄了一件事)。
+R.push(eq('蛋组完全相同算一条', countPicked({ eggGroupsExact: ['天空', '龙'] }).from, 1))
+R.push(eq('蛋组完全相同(单组)也算一条', countPicked({ eggGroupsExact: ['天空'] }).from, 1))
+R.push(eq('蛋组完全相同为空不算', countPicked({ eggGroupsExact: [] }).from, 0))
+
+// 4d. 两种口径共存时只算**一条**(后端也以精确为准,见 store.Filter.EggGroupsExact):相加会让
+//     计数凭空多出几条用户根本没在生效的条件。
+R.push(eq('两种蛋组口径共存只算一条',
+  countPicked({ eggGroups: ['巨灵', '天空'], eggGroupsExact: ['天空'] }).from, 1))
 
 // 5. 性格:单选 nature 与多选 natureIn 是同一条件的两种存法,只算一条
 R.push(eq('性格单选', countPicked({ nature: '固执' }).gift, 1))

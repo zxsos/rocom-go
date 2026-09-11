@@ -632,6 +632,37 @@ export function chainOf(key, chains) {
   return (chains || []).find((c) => chainKey(c) === key) || null
 }
 
+// chainOfPet 由这只宠物的**进化链阶段表**与候选项选出它所属的品种;找不到返回 null。
+//
+// 为什么不能拿宠物自己直接比:候选里的 base 是**链首**形态的 petbase(见 gamedata.ChainOption),
+// 而宠物只带当前形态的 base_conf_id —— 已进化的宠(罗隐)对不上链首(阿米亚特),按它比会把
+// 进化过的宠物当成「库里没有这个品种」而白放弃预选。
+// 链首 = 阶段最小的那一项(EvolutionChain 已按阶段排好,与 ChainOptions 取链首同源)。
+export function chainOfPet(chains, steps) {
+  const head = (steps || [])[0]
+  if (!head) return null
+  return (chains || []).find((c) => c.base === head.petbase) || null
+}
+
+// narrowChainsByEggGroups 把品种候选收窄到「与这组蛋组**至少共一个**」的品种。
+//
+// 这是列表长按「孵蛋配种」的蛋组条件:配种要求母本与种公同蛋组,列一个蛋组完全不搭的品种,
+// 玩家建完线才会发现永远配不出候选。
+//
+// 两种候选项都**保留**:
+//   - 蛋组条件为空(长按的宠没有可繁殖蛋组 —— 菜单里本就不会出现这一项,这里是兜底):不筛;
+//   - 候选项自己没带蛋组(链首没配蛋组的形态,实测 255 个品种里 35 个):不能据此滤掉,
+//     「没配蛋组」不等于「配不上」(与 gamedata.IsInfertile 同一条判据,宁多勿漏)。
+export function narrowChainsByEggGroups(chains, groups) {
+  const want = (groups || []).filter(Boolean)
+  if (!want.length) return chains || []
+  return (chains || []).filter((c) => {
+    const have = c.eggGroups || []
+    if (!have.length) return true
+    return have.some((g) => want.includes(g))
+  })
+}
+
 // —— 一代的生命周期(与后端 pet.Generation 的 eggGid / childGid 同口径)——
 //
 // 收蛋即记之后,「待认领」这一格其实装着两种完全不同的处境,得分开说清楚:

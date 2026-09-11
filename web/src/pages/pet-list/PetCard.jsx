@@ -3,6 +3,7 @@ import { imgURL, useImgFallback, useImgReady, InlineIcon } from '../../component
 import { Types, Marks, Gender, Blood, PetMark } from '../../components/badges'
 import { SixGrid, Measure } from './metrics'
 import { voiceHot, fmtShortTime } from '../../utils/format'
+import { eggGroupLabel } from '../../constants'
 import LocTag from '../../components/LocTag'
 
 // PetCard 陈列视图里的一张宠物卡。与旧版移动卡片(PetCards.jsx)的区别不是"换个皮":
@@ -111,8 +112,10 @@ export default function PetCard({ p, selected, itemProps }) {
             </span>
           )}
           {p.eggGroups?.length > 0 && (
-            <span className="pt-meta-i muted" title={'蛋组：' + p.eggGroups.map((g) => (g.desc ? `${g.name}(${g.desc})` : g.name)).join(' / ')}>
-              蛋组 {p.eggGroups.map((g) => g.name).join('/')}
+            /* 名字走 eggGroupLabel:官方组名「未发现」在界面上读作「无蛋组」(见 constants.js)。
+               hover 的 desc 仍是官方原话,故「无蛋组(未发现)」正好把两个口径都摊开。 */
+            <span className="pt-meta-i muted" title={'蛋组：' + p.eggGroups.map((g) => (g.desc ? `${eggGroupLabel(g.name)}(${g.desc})` : eggGroupLabel(g.name))).join(' / ')}>
+              蛋组 {p.eggGroups.map((g) => eggGroupLabel(g.name)).join('/')}
             </span>
           )}
         </div>

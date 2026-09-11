@@ -33,6 +33,7 @@
 | `gender` `talentRank` `speciality` `form` `partnerMark` | 等值筛选 |
 | `medal` | 奖牌**名**（后端解析为 id 列表，同名多枚全含） |
 | `eggGroups` | 蛋组，逗号分隔；宠物拥有其中**任一**即命中（OR） |
+| `eggGroupsExact` | 蛋组，逗号分隔；要求蛋组**完全一致**（个数相等且每组都命中，顺序无关；空蛋组永不命中）。列表长按的「筛选相同蛋组」用它。与 `eggGroups` 同时给出时以本参数为准 |
 | `types` | 系别，逗号分隔；需**同时**拥有（AND） |
 | `shiny` `colorful` | 异色 / 炫彩 |
 | `medalBig` `medalSmall` `medalHigh` `medalLow` | 奖牌特征，`1` 启用（体重百分位 ≥98 / ≤2；嗓音 ≥96 / ≤-96） |

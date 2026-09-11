@@ -535,6 +535,25 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
    它是「用之前看一眼」的注解,不该与开关争视觉权重。 */
 .filter-hint { font-size: 11px; line-height: 1.5; color: var(--fg-dim); opacity: .75; }
 
+/* ---- 长按设下的「蛋组完全相同」条件(见 FilterPanel.jsx 蛋组那一组)----
+   它**不做成 chip**:与上面那排蛋组 chip 是两种口径(完全相同 vs 任一组命中),同形的 chip
+   会被读成「多选中的一项」——而它其实与那排互斥。故用一条独立条件行:条件名 + 命中的组 + 清除。
+   配色沿用蛋组语义色(与 .chip-egg.on / .egg-group 同源):一眼看出它也是蛋组条件。 */
+.filter-exact {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 6px;
+  background: var(--c-egggroup-d); border: 1px solid var(--c-egggroup);
+  color: var(--c-egggroup); font-size: 11px;
+}
+.filter-exact .fe-k { flex: none; opacity: .85; }
+.filter-exact .fe-v { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-exact .fe-clear {
+  margin-left: auto; flex: none;
+  background: none; border: 0; padding: 2px; cursor: pointer;
+  color: inherit; font-size: 11px; text-decoration: underline;
+}
+.filter-exact .fe-clear:hover { color: #fff; }
+
 /* ---- 性格罗盘:6×6 方阵筛选(见 pages/pet-list/NatureMatrix.jsx)----
  *
  * 两轴用**语义色**定性:左列=增益(绿)、顶行=减益(红)。这不是装饰 ——

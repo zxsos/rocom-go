@@ -430,6 +430,19 @@ func (db *DB) PetEggGroups(petbaseID uint32) []EggGroup {
 	return out
 }
 
+// eggGroupNames 取蛋组的名字。只下发名字:收窄候选与筛选都是按名字比(见 store.Filter 的蛋组
+// 谓词),描述是 hover 用的展示信息,只有宠物详情那种要解释「这组是什么」的地方才需要。
+func eggGroupNames(gs []EggGroup) []string {
+	if len(gs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(gs))
+	for _, g := range gs {
+		out = append(out, g.Name)
+	}
+	return out
+}
+
 // ChainStep 是进化链上的一个形态(按阶段升序)。
 type ChainStep struct {
 	Petbase uint32   `json:"petbase"`
@@ -591,6 +604,15 @@ type ChainOption struct {
 	// 而 3516 没有),此时由前端退回 Img。**它不是「能否生育」的判据** —— 那是 EggGroups 的事
 	// (见 ChainOptions 里的过滤:蛋组「未发现」的品种才不进候选)。
 	Egg string `json:"egg,omitempty"`
+	// EggGroups 是**链首形态**的蛋组名(取自 PetEggGroups,与 IsInfertile 同一份数据)。
+	//
+	// 培育页用它把品种候选收窄到「与某只宠物至少共一个蛋组」的那批:配种要求母本与种公同蛋组,
+	// 列一个配不上的品种等于让玩家白建一条线。繁殖组为「未发现」的品种本来就不在候选里
+	// (见 ChainOptions 的过滤),故这里不会下发「未发现」。
+	//
+	// 取不到蛋组的形态留空(超进化/分支形态,实测 64 个)。前端遇到空值时**不能**据此滤掉这个
+	// 品种 —— 「没配蛋组」不等于「配不上」(见 IsInfertile 的注释),宁多勿漏。
+	EggGroups []string `json:"eggGroups,omitempty"`
 	// Count 是库里这个品种有几只(入参逐只给,同形态出现几次即几只)。
 	Count int `json:"count"`
 }
@@ -642,7 +664,8 @@ func (db *DB) ChainOptions(bases []uint32) []ChainOption {
 			opt: ChainOption{
 				Evo: id.Evo, Species: species, Base: head,
 				Label: db.ChainLabel(base), Img: db.PetImageByBase(head, false).Head,
-				Egg: db.EggIconOfBase(head), Count: 1,
+				Egg: db.EggIconOfBase(head), EggGroups: eggGroupNames(db.PetEggGroups(head)),
+				Count: 1,
 			},
 			head: head, book: hi.Book,
 		})

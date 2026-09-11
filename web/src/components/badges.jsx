@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { IconsContext } from '../context'
 import { imgURL, useImgFallback, InlineIcon } from './icons'
 import { GLASS_BG, GLASS_BG2, GLASS_PARTICLES, GLASS_COLORS, GLASS_HIDDEN } from '../data/glassConf'
+import { eggGroupLabel } from '../constants'
 import { IconClose } from './svg'
 
 // 宠物名称行内的各种小徽标(性别/异色炫彩/血脉/形态/蛋组/系别/搭档标记)。
@@ -179,12 +180,17 @@ export function Blood({ p, iconOnly }) {
 }
 
 // EggGroups 展示宠物蛋组(繁殖组)标签,每个组名 hover 显示官方描述;无蛋组返回 null。
+//
+// 组名一律走 eggGroupLabel:库里的官方名「未发现」在界面上读作「无蛋组」(见 constants.js 的
+// 说明)—— 这里与宠物卡片、筛选面板必须同一套口径,否则同一只宠物在两处显示成不同的组。
 export function EggGroups({ groups }) {
   if (!groups || !groups.length) return null
   return (
     <span className="egg-groups">
       {groups.map((g) => (
-        <span key={g.id} className="egg-group" title={g.desc ? `蛋组 · ${g.desc}` : '蛋组'}>{g.name}</span>
+        <span key={g.id} className="egg-group" title={g.desc ? `蛋组 · ${g.desc}` : '蛋组'}>
+          {eggGroupLabel(g.name)}
+        </span>
       ))}
     </span>
   )
