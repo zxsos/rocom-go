@@ -12,6 +12,11 @@
   --accent: #4c8dff;
   --accent-soft: rgba(76, 141, 255, .14);
   --accent-hi: #5c9aff; /* --accent 亮一档,primary 按钮 hover 用(原硬编码 #5c9aff) */
+  /* 站名铭牌里「rocom」那半段的暖色(取自 logo 上那只精灵的粉)。
+     **随主题换**而不是固定语义色:10.5px 的小字在暗底要够亮、在亮底要够深,
+     否则就是一团糊 —— 实测暗色 #ff7a9c 对比 7.8:1、亮色 #c8395c 4.6:1,两档都过 AA。
+     与 --accent(另半段「-go」)并置,正是 logo 那对配色。见 shell.css 的 .brand-word。 */
+  --brand-warm: #ff7a9c;
   --gold: #f5b942;
   --green: #3fb950;
   --red: #f85149;
@@ -227,6 +232,7 @@
   --accent: #2f6fdb;
   --accent-soft: rgba(47, 111, 219, .12);
   --accent-hi: #2559b8; /* 亮色下 hover 用略深的一档(白底上再亮会看不清,同 --red-hi 口径) */
+  --brand-warm: #c8395c; /* 站名暖色的亮色档(白底上要压深,见暗色处注释) */
   --gold: #b88200;
   --green: #1a7f37;
   --red: #cf222e;
