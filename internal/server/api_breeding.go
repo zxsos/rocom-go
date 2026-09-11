@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 	"github.com/whoisnian/rocom-capture/internal/store"
 )
@@ -27,24 +28,61 @@ func (s *Server) handleBreeding(w http.ResponseWriter, r *http.Request) {
 	}
 	// 候选池整个宠物库只取一次:所有线共用同一份快照。线通常个位数,而宠物库几百上千只 ——
 	// 逐线重查等于把同一次 JSON 解析做 N 遍。
-	pets, err := sc.ListAllPets()
+	pets, err := sc.ListBreedingPets()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	pet.FillSizePercentile(s.db, pets...) // 百分位按当前 gamedata 注入,不落库
 	// 按 gid 索引一次,供全部线做属性补全(见 fillSnapshots):逐线各建一遍是白花钱。
 	byGid := make(map[uint32]*pet.Pet, len(pets))
 	for _, p := range pets {
 		byGid[p.Gid] = p
 	}
-	// 蛋只在这一刻回查:有待孵代的线才需要,没有就完全不碰蛋表。
-	eggs := s.eggSnapshots(sc, lines)
+	c := breedingCtx{
+		db:    s.db,
+		pets:  pets,
+		byGid: byGid,
+		// 蛋只在这一刻回查:有待孵代的线才需要,没有就完全不碰蛋表。
+		eggs: s.eggSnapshots(sc, lines),
+		// 雄性快照与蛋组掩码只按性别筛,每条线都一样(见 pet.PoolSource)。
+		src:  pet.NewPoolSource(pets),
+		refs: make(map[chainKey]pet.ChainRef, len(lines)),
+	}
 	out := make([]BreedingLinePayload, 0, len(lines))
 	for _, l := range lines {
-		out = append(out, s.breedingView(l, pets, byGid, eggs))
+		out = append(out, s.breedingView(l, c))
 	}
 	writeJSON(w, map[string]any{"lines": out})
+}
+
+// breedingCtx 一次 GET /api/breeding 里**跨培育线共用**的素材。
+//
+// 线通常个位数、宠物库上千只,逐线各查一遍库 / 各建一次候选素材等于把同一件事做 N 遍。
+// pets 与 byGid 早就这么做了,这里把候选素材与品种引用也一并收进来。
+type breedingCtx struct {
+	db    *gamedata.DB
+	pets  []*pet.Pet
+	byGid map[uint32]*pet.Pet
+	eggs  map[uint32]*pet.EggSnapshot
+	src   pet.PoolSource
+	refs  map[chainKey]pet.ChainRef
+}
+
+// chainKey 品种引用(见 pet.ChainRefOf)的缓存键:建一次要展开整条链的形态集合。
+type chainKey struct {
+	evo     uint32
+	species string
+}
+
+// chainRefOf 取这条线认的品种引用,同品种的线只建一次。
+func (c breedingCtx) chainRefOf(l *pet.BreedingLine) pet.ChainRef {
+	k := chainKey{l.Evo, l.Species}
+	if r, ok := c.refs[k]; ok {
+		return r
+	}
+	r := pet.ChainRefOf(c.db, l.Evo, l.Species)
+	c.refs[k] = r
+	return r
 }
 
 // handleBreedingPool 返回某品种的补录候选池(GET /api/breeding/pool?evo=&species=)。
@@ -63,12 +101,11 @@ func (s *Server) handleBreedingPool(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "缺少 evo 或 species", http.StatusBadRequest)
 		return
 	}
-	pets, err := s.store.For(s.acct(r)).ListAllPets()
+	pets, err := s.store.For(s.acct(r)).ListBreedingPets()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	pet.FillSizePercentile(s.db, pets...) // 百分位按当前 gamedata 注入,不落库
 	mothers, fathers, kids := pet.BreedCandidates(ref, pets)
 	// nil 切片会序列化成 null,前端得为每个队列写一次 `|| []`;这里统一给空数组 ——
 	// 「这个品种一只候选都没有」是常态(新建的空品种),不该让前端到处防 null。
@@ -94,23 +131,30 @@ func (s *Server) handleBreedingPool(w http.ResponseWriter, r *http.Request) {
 // (见 fillSnapshots)—— 补出来的值只进这一次响应,不落库。
 //
 // eggs 是本账号全部蛋按 gid 索引的投影(见 eggSnapshots);本线只挑用得上的那几颗。
-func (s *Server) breedingView(l *pet.BreedingLine, pets []*pet.Pet, byGid map[uint32]*pet.Pet, eggs map[uint32]*pet.EggSnapshot) BreedingLinePayload {
-	fillSnapshots(l, byGid)
+func (s *Server) breedingView(l *pet.BreedingLine, c breedingCtx) BreedingLinePayload {
+	fillSnapshots(l, c.byGid)
 	v := BreedingLinePayload{BreedingLine: l}
 	// 只带本线待孵代要用的蛋:别把全账号的蛋都下发下去。
-	v.Eggs = eggsForLine(l, eggs)
+	v.Eggs = eggsForLine(l, c.eggs)
 	// 「孵出的那只已不在库」的代:依据本次取的全库宠物 —— 在库的话早被认领了,
 	// 故这里只会列出真正等不到的那些(见 LostChildGens 的注释)。
 	for _, g := range l.Pending {
-		if g.ChildGid != 0 && g.Child == nil && byGid[g.ChildGid] == nil {
+		if g.ChildGid != 0 && g.Child == nil && c.byGid[g.ChildGid] == nil {
 			v.LostChildGens = append(v.LostChildGens, g.Gen)
 		}
 	}
 	// 品种的展示名(链上各阶段都列出来,见 gamedata.ChainLabelOf):只显示 Species 会让人以为
 	// 这条线只认那一个形态,而链上其它阶段的 ♀ 同样能用 —— 那正是这个页面最容易踩的坑。
-	v.ChainName = s.db.ChainLabelOf(l.Evo, l.Species)
-	pool := pet.BreedPool(pet.ChainRefOf(s.db, l.Evo, l.Species), pets)
-	v.Suggest = pet.Suggest(pool, l.Goal, breedingSuggestN, descendantGids(l))
+	v.ChainName = c.db.ChainLabelOf(l.Evo, l.Species)
+	// 种母快照:同品种几条线靠它区分(见 payload 的 Mother)。库里已没有她(放生/送人)时留空。
+	if mg := pet.MotherGidOf(l); mg != 0 {
+		if p, ok := c.byGid[mg]; ok {
+			snap := pet.ParentSnapshot(p)
+			v.Mother = &snap
+		}
+	}
+	pool := c.src.BreedPool(c.chainRefOf(l))
+	v.Suggest = pet.Suggest(pool, l.Goal, breedingSuggestN, pet.DescendantGids(l))
 	// 嗓音目标是**向下取整的均值**,任一方不到目标值就永远到不了(见 pet.VoiceReach)。
 	// 只在填了嗓音目标时算:体重的预期是浮点均值、且实测可高于双亲均值,没有这种
 	// 「必须双亲都到位」的性质,不该跟着给结论;性格本就是概率。
@@ -135,7 +179,7 @@ func (s *Server) breedingView(l *pet.BreedingLine, pets []*pet.Pet, byGid map[ui
 //     的品种,这条线也就断了)。
 //
 // 升级前一律给 ♂ 池,雄性子代的回交/换种建议因此整个是反的。
-func breedMates(pool []pet.Candidate, child pet.EggParent) []pet.EggParent {
+func breedMates(pool pet.Pool, child pet.EggParent) []pet.EggParent {
 	if child.Gender == "♂" {
 		return breedMothers(pool)
 	}
@@ -146,11 +190,12 @@ func breedMates(pool []pet.Candidate, child pet.EggParent) []pet.EggParent {
 //
 // 去重是必要的:同一位种公能给多位母本配对,逐母本摊平会让它重复出现,而 BackcrossAdvice
 // 是逐个比出最接近目标的那只 —— 重复项不会改变结论,却让这次比较白做几遍。
-func breedFathers(pool []pet.Candidate) []pet.EggParent {
+func breedFathers(pool pet.Pool) []pet.EggParent {
 	seen := make(map[uint32]bool)
 	var out []pet.EggParent
-	for _, c := range pool {
-		for _, f := range c.Fathers {
+	for _, c := range pool.Cands {
+		for _, idx := range c.FatherIdx {
+			f := pool.Fathers[idx]
 			if seen[f.Gid] {
 				continue
 			}
@@ -163,10 +208,10 @@ func breedFathers(pool []pet.Candidate) []pet.EggParent {
 
 // breedMothers 摊平候选池里的母本(按 gid 去重),给**雄性**子代当回交/换种的对象
 // (见 breedMates)。候选池的母本本就是这条线品种的 ♀,正是唯一合法的那批。
-func breedMothers(pool []pet.Candidate) []pet.EggParent {
+func breedMothers(pool pet.Pool) []pet.EggParent {
 	seen := make(map[uint32]bool)
 	var out []pet.EggParent
-	for _, c := range pool {
+	for _, c := range pool.Cands {
 		if seen[c.Mother.Gid] {
 			continue
 		}
@@ -223,18 +268,6 @@ func eggsForLine(l *pet.BreedingLine, all map[uint32]*pet.EggSnapshot) map[uint3
 				out = make(map[uint32]*pet.EggSnapshot, 1)
 			}
 			out[g.EggGid] = snap
-		}
-	}
-	return out
-}
-
-// descendantGids 这条线历代子代的 gid 集合:建议里若父本就在其中,那便是回交
-// (拿自己的子代往上倒着配),见 pet.Suggest 的 Backcross。
-func descendantGids(l *pet.BreedingLine) map[uint32]bool {
-	out := make(map[uint32]bool)
-	for _, g := range l.Gens {
-		if g.Child != nil && g.Child.Gid != 0 {
-			out[g.Child.Gid] = true
 		}
 	}
 	return out
@@ -298,6 +331,12 @@ func (s *Server) handleBreedingSave(w http.ResponseWriter, r *http.Request) {
 	// species 反查补上,否则这条线会退化成按名字认品种 —— 能跑,但正是这个改动要修掉的那种
 	// 「库里明明有候选却一只都配不出来」。
 	pet.DeriveChain(s.db, &body)
+	// 种母身份也补一次并**落库**(与 DeriveChain 同一套路子):老线没有 MotherGid 字段,
+	// 读取时是靠末代派生的(见 pet.MotherGidOf);这里补上之后这条线就固定在这只种母身上,
+	// 不必每次读都派生一遍。补录/改目标都会经这里,故老线在下一次保存时自然收敛。
+	if body.MotherGid == 0 {
+		body.MotherGid = pet.MotherGidOf(&body)
+	}
 	acc := s.acct(r)
 	sc := s.store.For(acc)
 	// 手动补录也走这条整条覆盖写,故达成判定同样挂在这里。读旧线**只为**取改动前的达成结果:
@@ -334,6 +373,74 @@ func (s *Server) handleBreedingDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.hub.Broadcast("breeding", acc, map[string]any{"account": acc})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleBreedingMerge 把一条子线**并入**它的母线(POST /api/breeding/merge)。
+//
+// body: {"child":"<子线 id>"} —— 母线由子线的 ParentLineID 决定,不另传:传两个 id 就可能
+// 指定一对并不存在父子关系的线,而「谁是谁的子线」是数据里已经定了的事。
+//
+// 为什么放后端、而不是让前端「改母线 + 删子线」两次调用:那是两次写,中间失败就留下半截
+// (母线多了几代、子线还在 / 母线没改成、子线已删);合并这种**不可逆**的操作更不该有中间态。
+// 与认领同理(见 handleBreedingClaim):搬动逻辑只该有一处。
+//
+// 二次确认由前端做(confirmDialog)—— 合并会删掉子线,而培育史删了就回不来。
+func (s *Server) handleBreedingMerge(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Child string `json:"child"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "请求体无法解析: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.Child == "" {
+		http.Error(w, "缺少 child(要并入母线的那条子线 id)", http.StatusBadRequest)
+		return
+	}
+	acc := s.acct(r)
+	sc := s.store.For(acc)
+	child, err := sc.GetBreedingLine(body.Child)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if child == nil {
+		http.Error(w, "这条培育线不存在", http.StatusNotFound)
+		return
+	}
+	if child.ParentLineID == "" {
+		http.Error(w, "这条线不是任何线的子线(没换过种母),无从并入", http.StatusBadRequest)
+		return
+	}
+	parent, err := sc.GetBreedingLine(child.ParentLineID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if parent == nil {
+		http.Error(w, "母线已被删除:先把子线的 parentLineId 清掉再试", http.StatusBadRequest)
+		return
+	}
+	if !pet.MergeChildLine(parent, child) {
+		http.Error(w, "这条子线没有可并入的代数", http.StatusBadRequest)
+		return
+	}
+	parent.UpdatedAt = time.Now().Unix()
+	if err := sc.UpsertBreedingLine(parent); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// 孙辈改挂到母线上:否则它们会指向一条马上要删掉的线,谱系视图上从这一代断掉。
+	if err := sc.ReparentLines(child.ID, parent.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := sc.DeleteBreedingLine(child.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.hub.Broadcast("breeding", acc, map[string]any{"account": acc})
+	writeJSON(w, parent)
 }
 
 // handleBreedingClaim 把库里的某只宠认领为某一代的子代(POST /api/breeding/claim)。

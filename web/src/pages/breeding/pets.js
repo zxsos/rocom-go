@@ -6,6 +6,29 @@
 // 嗓音的取值范围(与 pet.VoiceLow/VoiceHigh 同):差距归一化时当分母。
 export const VOICE_SPAN = 200
 
+// 目标所在的轴:嗓音 -100~100(中心 0)、体重百分位 0~100(中心 50)。
+// 必须与后端一致(嗓音抄 pet.VoiceLow/VoiceHigh,体重就是百分位本身)。
+export const GOAL_AXES = {
+  voice: { lo: -100, hi: 100 },
+  weight: { lo: 0, hi: 100 },
+}
+
+// goalReached 某一维是否达标:方向由目标偏向轴的哪一端决定 —— 目标偏高(> 中心)时「≥ 目标」
+// 算到、偏低(< 中心)时「≤ 目标」算到、正好在中心时精确相等。
+//
+// ⚠️ 必须与后端 internal/pet/breeding.go 的 reached **逐字一致**:页面上的「达标」用的就是
+// 后端置 done 的同一判定,两处不等会冒出「页面写着达标、状态还停在进行中」。
+// 按方向而不是一律 ≥,是为了不毁掉「极限嗓音 -100 / 极限体重 0%」这种往低刷的目标 ——
+// 一律 ≥ 会让它们对任何个体都成立(等于目标失效)。
+export function goalReached(cur, goal, kind) {
+  if (cur == null || goal == null) return false
+  const { lo, hi } = GOAL_AXES[kind] || GOAL_AXES.voice
+  const center = (lo + hi) / 2
+  if (goal > center) return cur >= goal
+  if (goal < center) return cur <= goal
+  return cur === goal
+}
+
 // toParent 把库里的个体转成亲本 / 子代快照。字段口径对齐 pet.ParentSnapshot。
 export function toParent(p) {
   if (!p) return null
@@ -74,15 +97,26 @@ export function petPickerOption(p) {
 
 // —— 进度汇总(与 pet.LineStats 同口径,后端只下发线本体,这里按需现算)—— 
 
-// closerVoice 这一代的嗓音是否比已记录的最佳值更值得留下:填了目标取离目标更近的,
+// closerVoice 这一代的嗓音是否比已记录的最佳值更值得留下:**达标优先,其次离目标更近**
+// (方向化后一个已达标的 97 不该被一个没达标的 96 挤掉,那正是「只取离目标最近」会露出的错);
 // 没填目标取绝对值更大的(收集向玩法要的就是极端个体)。
 function closerVoice(cur, best, target) {
-  if (target != null) return Math.abs(cur - target) < Math.abs(best - target)
+  if (target != null) {
+    const ch = goalReached(cur, target, 'voice')
+    const bh = goalReached(best, target, 'voice')
+    if (ch !== bh) return ch
+    return Math.abs(cur - target) < Math.abs(best - target)
+  }
   return Math.abs(cur) > Math.abs(best)
 }
 
 function closerWeight(cur, best, target) {
-  if (target != null) return Math.abs(cur - target) < Math.abs(best - target)
+  if (target != null) {
+    const ch = goalReached(cur, target, 'weight')
+    const bh = goalReached(best, target, 'weight')
+    if (ch !== bh) return ch
+    return Math.abs(cur - target) < Math.abs(best - target)
+  }
   return cur > best
 }
 
@@ -124,32 +158,221 @@ export function hasGoal(goal) {
   return g.voice != null || g.weightPct != null || hasNatureGoal(g)
 }
 
+// —— 谱系:子线链 ——
+//
+// 换种母会开一条**子线**(见 internal/pet.NewChildLine):线的身份是种母,换了就是另一条线,
+// 但她是上一线孵出来的,故用 parentLineId 挂上去,代数也接着数(子线第一代 = 母线末代 + 1)。
+// 于是「一条培育史」在库里其实是**一串线**,显示时必须沿链把它们拼回来 —— 否则玩家看到
+// 的是几段互不相干的碎片,而那正是换种母最频繁发生的时候(孵出更好的子代拿它接着配)。
+//
+// 只做**展示**,不改数据:物理合并(把子线并进母线)是另一个带确认的独立操作。
+
+// lineageOf 取这条线所在的整条谱系,按代次从早到晚排好(母线在前、子线在后)。
+//
+// 只沿 parentLineId 单向往上找祖先、再往下找子孙,两条都是**链**,不存在分叉(一次换种母
+// 只产生一条子线);万一数据里出现环(parentLineId 指回来),seen 兜住不死循环。
+export function lineageOf(lines, id) {
+  const byId = new Map((lines || []).map((l) => [l.id, l]))
+  const self = byId.get(id)
+  if (!self) return []
+
+  const ups = []
+  const seen = new Set([id])
+  for (let cur = self; cur && cur.parentLineId; cur = byId.get(cur.parentLineId)) {
+    if (seen.has(cur.parentLineId)) break
+    seen.add(cur.parentLineId)
+    ups.unshift(byId.get(cur.parentLineId))
+  }
+  const kidsOf = new Map()
+  for (const l of lines || []) {
+    if (!l.parentLineId) continue
+    if (!kidsOf.has(l.parentLineId)) kidsOf.set(l.parentLineId, [])
+    kidsOf.get(l.parentLineId).push(l)
+  }
+  const downs = []
+  const walk = (l) => {
+    for (const k of kidsOf.get(l.id) || []) {
+      if (seen.has(k.id)) continue
+      seen.add(k.id)
+      downs.push(k)
+      walk(k)
+    }
+  }
+  seen.add(id)
+  walk(self)
+  return [...ups.filter(Boolean), self, ...downs]
+}
+
+// chainStats 整条谱系的累计统计:代数相加、历代最佳跨链取最优。
+//
+// 口径与后端 pet.LineStats 一致(「最佳」按目标算:**达标优先,其次离目标最近**),故这里对
+// 每段各算一次再比 —— 不自己重算,免得两处口径分叉。
+export function chainStats(lines, id) {
+  const chain = lineageOf(lines, id)
+  if (!chain.length) return { gens: 0, bestVoice: null, bestWeight: null, extra: 0 }
+  let gens = 0
+  let bestVoice = null
+  let bestWeight = null
+  for (const l of chain) {
+    const st = lineStats(l)
+    gens += st.gens
+    bestVoice = pickBest(bestVoice, st.bestVoice, l.goal && l.goal.voice, 'voice')
+    bestWeight = pickBest(bestWeight, st.bestWeight, l.goal && l.goal.weightPct, 'weight')
+  }
+  return { gens, bestVoice, bestWeight, extra: chain.length - 1 }
+}
+
+// pickBest 跨段挑最优:填了目标就「达标优先,其次离目标最近」(玩家要的是达标),没填则取
+// 绝对值最大的。null 表示这一整段还没有子代记录,不参与比较 —— 拿 0 去比会把「没记录」当成「最差」。
+// kind 决定方向(见 goalReached);同一条线里两段用的是同一套目标,故 kind 一致。
+function pickBest(cur, next, goal, kind) {
+  if (next == null) return cur
+  if (cur == null) return next
+  if (goal != null) {
+    const nh = goalReached(next, goal, kind)
+    const ch = goalReached(cur, goal, kind)
+    if (nh !== ch) return nh ? next : cur
+    return Math.abs(next - goal) < Math.abs(cur - goal) ? next : cur
+  }
+  return Math.abs(next) > Math.abs(cur) ? next : cur
+}
+
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
-// goalProgress 卡片上的「离目标还有多远」进度条:只对**填了的**目标项出条
-// (没填的维度不该参与,否则只想刷嗓音的线会被没填的体重项拖着走,与后端打分同口径)。
-// pct = 1 - 归一化差距,越接近 100% 越达标。
-export function goalProgress(line) {
+// goalItem 某一维「离目标还差多少」的统一口径:够到就是「达标」,没够到才说差多少。
+//
+// 判据与后端 pet.goalHit 完全一致(方向化,见 goalReached;性格那一路见 natureHit / childHits):
+// 页面上的「达标」正是后端把这条线置为 done 用的那一个判定,两处不一致会让人以为状态没刷新。
+//
+// **不区分「超出 / 不足」**:培育只问够没够到,而「超出 1.6pp」与「差 1.6pp」是同一个距离 ——
+// 分开说既多一档状态,又会让「重了 1.6」被读成「还差 1.6」(这正是此前那句文案的误导来源)。
+//
+// 返回 null 表示这一维没填目标或该值未知,不参与展示(与后端「只对填了的项计分」同口径)。
+export function goalItem(cur, goal, kind) {
+  if (cur == null || goal == null) return null
+  const hit = goalReached(cur, goal, kind)
+  const diff = Math.abs(cur - goal)
+  let text
+  if (kind === 'weight') {
+    text = hit ? `${fmtPct(cur)}% · 达标` : `${fmtPct(cur)}% · 差 ${fmtPct(diff)}pp`
+  } else {
+    text = hit ? `${cur} · 达标` : `${cur} · 差 ${diff}`
+  }
+  return { hit, diff, text }
+}
+
+// natureHit 是否已有子代命中目标性格(镜像后端 goalHit 的性格那一项)。
+// 单独拎出来:性格是「达成」最常卡住的一项,而它此前在页面上完全没有进度表示 —— 玩家看着
+// V/W 都差不多了,却不知道为什么状态还是「进行中」。
+export function natureHit(line, goal) {
+  const names = goalNatures(goal)
+  if (!names.length) return false
+  for (const g of (line && line.gens) || []) {
+    if (g.child && names.includes(g.child.nature)) return true
+  }
+  return false
+}
+
+// goalProgress 卡片/详情页的「离目标还有多远」进度条:**三项都出**(没填的维度不参与,
+// 否则只想刷嗓音的线会被没填的体重项拖着走,与后端打分同口径)。
+// pct = 1 - 归一化差距,达标项直接满格;text 里写的才是「达标 / 差多少」。
+//
+// matrix 只用于把目标性格显示成「加物攻」这种维度名(见 goalNatureLabel),缺失时退化成
+// 名字或「N 种性格」。
+export function goalProgress(line, matrix) {
   const goal = (line && line.goal) || {}
   const st = lineStats(line)
   const out = []
-  if (goal.voice != null && st.bestVoice != null) {
-    const diff = Math.abs(st.bestVoice - goal.voice)
+  const v = goal.voice != null ? goalItem(st.bestVoice, goal.voice, 'voice') : null
+  if (v) {
     out.push({
-      k: 'V', cls: 'v', pct: clamp01(1 - diff / VOICE_SPAN) * 100,
-      text: `${st.bestVoice} · 差 ${diff}`,
+      k: 'V', cls: 'v', pct: v.hit ? 100 : clamp01(1 - v.diff / VOICE_SPAN) * 100,
+      text: v.text, hit: v.hit,
       title: `历代最佳嗓音 ${st.bestVoice},目标 ${goal.voice}`,
     })
   }
-  if (goal.weightPct != null && st.bestWeight != null) {
-    const diff = Math.abs(st.bestWeight - goal.weightPct)
+  const w = goal.weightPct != null ? goalItem(st.bestWeight, goal.weightPct, 'weight') : null
+  if (w) {
     out.push({
-      k: 'W', cls: 'w', pct: clamp01(1 - diff / 100) * 100,
-      text: `${fmtPct(st.bestWeight)}% · 差 ${fmtPct(diff)}pp`,
+      k: 'W', cls: 'w', pct: w.hit ? 100 : clamp01(1 - w.diff / 100) * 100,
+      text: w.text, hit: w.hit,
       title: `历代最佳体重百分位 ${fmtPct(st.bestWeight)}%,目标 ${fmtPct(goal.weightPct)}%`,
     })
   }
+  if (hasNatureGoal(goal)) {
+    const hit = natureHit(line, goal)
+    out.push({
+      k: '性', cls: 'n', pct: hit ? 100 : 0,
+      text: hit ? `${goalNatureLabel(goal, matrix)} · 达标` : '未命中',
+      hit,
+      title: hit ? '已有子代命中目标性格' : '还没有子代命中目标性格 —— 这是「未达成」最常见的原因',
+    })
+  }
   return out
+}
+
+// —— 同一只达标(与「各维最佳」是两个问题)——
+//
+// lineStats 回答的是「每一维分别推到多远了」,那两列的最优**可能来自不同代**(这一代嗓音好、
+// 那一代体重好),它适合收集向玩法;而培育向要问的是「有没有一只同时满足我的全部目标」。
+// 此前页面只把前者画在目标旁边,于是「各维都差不多了」被读成「同一只快达标了」。下面这几个
+// 函数补上后一个问题,让页面能直接说出「还差哪一项」。
+
+// childHits 某只子代对三项已填目标的逐项命中情况(镜像后端 pet.goalHit,只列填了的维度)。
+export function childHits(child, goal) {
+  const g = goal || {}
+  const hits = {}
+  if (g.voice != null) hits.voice = goalReached(child.voice, g.voice, 'voice')
+  if (g.weightPct != null) {
+    hits.weight = child.weightPct != null && goalReached(child.weightPct, g.weightPct, 'weight')
+  }
+  if (hasNatureGoal(g)) hits.nature = goalNatures(g).includes(child.nature)
+  return hits
+}
+
+// bestChild 最接近同时达标的那一只子代:先比未命中项数(越少越好),再比归一化距离(越小越好)。
+// 只排序、不改判定 —— 「是否已达成」始终以后端 ReachGoal 为准(它要求同一只全项命中)。
+// 没有已认领子代、或目标为空时返回 null(没有可比的对象)。
+export function bestChild(line) {
+  const goal = (line && line.goal) || {}
+  if (!hasGoal(goal)) return null
+  let best = null
+  for (const g of (line && line.gens) || []) {
+    const c = g.child
+    if (!c) continue
+    const hits = childHits(c, goal)
+    const miss = Object.keys(hits).filter((k) => !hits[k]).length
+    const dist = goalDistance(c, goal)
+    if (!best || miss < best.miss || (miss === best.miss && dist < best.dist)) {
+      best = { gen: g.gen, child: c, hits, miss, dist }
+    }
+  }
+  return best
+}
+
+// goalDistance 一只子代离全部已填目标的归一化距离(0 最好):接近后端 Score 的分子,只用于排序。
+// 口径:嗓音 / VOICE_SPAN、体重 / 100、性格按命中与否记 0/1;**已达标的那一维记 0**(达标即满分,
+// 与后端 Score 一致 —— 否则一个已达标的 100 会因为「离目标远」把更好的组合排到后面)。
+// 值缺失按最差(1)算,免得「没测出来」反而排到前面。
+function goalDistance(child, goal) {
+  const g = goal || {}
+  let sum = 0
+  let n = 0
+  if (g.voice != null) {
+    n++
+    const v = child.voice ?? 0
+    if (!goalReached(v, g.voice, 'voice')) sum += Math.abs(v - g.voice) / VOICE_SPAN
+  }
+  if (g.weightPct != null) {
+    n++
+    if (child.weightPct == null) sum += 1
+    else if (!goalReached(child.weightPct, g.weightPct, 'weight')) sum += Math.abs(child.weightPct - g.weightPct) / 100
+  }
+  if (hasNatureGoal(g)) {
+    n++
+    sum += goalNatures(g).includes(child.nature) ? 0 : 1
+  }
+  return n === 0 ? 0 : sum / n
 }
 
 // lineAvatar 卡片头像:这条线里第一张能用的头像(母本优先,其次子代)。
@@ -163,6 +386,10 @@ export function goalProgress(line) {
 // 品种按 chainKey 找(有链用链 id):线的 species 是建线那一刻的形态名,选举时可能进化成
 // 链上另一个阶段(先记成阿米亚特、后记成罗隐),拿名字比对不上,拿链 id 才对得上。
 export function lineAvatar(line, chains) {
+  // 后端下发的 mother 是这条线**当前**的种母(见 payload 的 Mother):线的身份就是她,
+  // 同一个品种可以同时有几条线(几个窝、几只母本各孵各的),卡片全靠她区分 —— 故优先用
+  // 她的头像,而不是 gens[0] 那位可能已经是好几代之前的母本。
+  if (line && line.mother && line.mother.img) return line.mother.img
   for (const g of (line && line.gens) || []) {
     if (g.mother && g.mother.img) return g.mother.img
     if (g.child && g.child.img) return g.child.img
@@ -324,13 +551,25 @@ export function sameGoal(a, b) {
 }
 
 // stepDelta 与上一代的**同一个维度**比,是否更接近目标(返回 'up' / 'down' / '')。
-// 判据用距离而不是大小:嗓音是双向的(目标 -100 时,数值变小才是改善),
-// 只有拿「离目标多远」比才在两种目标下都成立。没定目标时按「更极端」算。
-export function stepDelta(cur, prev, target) {
+//
+// 判据是「**达标优先,其次离目标更近**」(与 lineStats / Score 同一套口径):一个已达标的 97
+// 相对一个未达标的 96 就是 up,哪怕两者离目标一样远。方向由目标落在轴的哪半边决定(见
+// goalReached),故 kind 必须传对。没定目标时按「更极端」算。
+export function stepDelta(cur, prev, target, kind) {
   if (prev == null || cur == null) return ''
-  const dis = (v) => (target != null ? Math.abs(v - target) : -Math.abs(v))
-  if (dis(cur) === dis(prev)) return ''
-  return dis(cur) < dis(prev) ? 'up' : 'down'
+  if (target != null) {
+    const ch = goalReached(cur, target, kind)
+    const ph = goalReached(prev, target, kind)
+    if (ch !== ph) return ch ? 'up' : 'down'
+    const dc = Math.abs(cur - target)
+    const dp = Math.abs(prev - target)
+    if (dc === dp) return ''
+    return dc < dp ? 'up' : 'down'
+  }
+  const ac = Math.abs(cur)
+  const ap = Math.abs(prev)
+  if (ac === ap) return ''
+  return ac > ap ? 'up' : 'down'
 }
 
 // —— 品种(进化链,与后端 pet.ChainRef 同口径)——

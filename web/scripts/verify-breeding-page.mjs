@@ -122,10 +122,32 @@ check('目标性格显示成「加物攻」', (doc.body.textContent || '').inclu
 check('后端没有把一组名字散在页面上', !doc.querySelector('.br-sug-nature')?.textContent.includes('勇敢'),
   textOf(doc.querySelector('.br-sug-nature')))
 
+// —— 目标差距:性格维度也要有一行,且达标项写明「达标」——
+// 契约样本:目标 V96 / W98 / 加物攻,第 1 代子代 V88 / W0 / 固执 → 性格命中,V/W 未达标。
+// 此前只画 V/W,性格没有进度条,「为什么还停在进行中」在页面上完全看不见。
+const progBars = [...doc.querySelectorAll('.br-progress .br-bar')]
+check('进度概览三项都出(含性格)', progBars.length === 3,
+  progBars.map((el) => textOf(el.querySelector('.br-bar-k'))).join('/'))
+const natProg = progBars.find((el) => textOf(el.querySelector('.br-bar-k')) === '性')
+check('性格达标时写明「达标」', !!natProg && textOf(natProg.querySelector('.br-bar-v')).includes('达标'),
+  natProg ? textOf(natProg.querySelector('.br-bar-v')) : '没有性格进度行')
+const wProg = progBars.find((el) => textOf(el.querySelector('.br-bar-k')) === 'W')
+check('体重未达标时说「差」而不是「达标」', !!wProg && textOf(wProg.querySelector('.br-bar-v')).includes('差'),
+  wProg ? textOf(wProg.querySelector('.br-bar-v')) : '没有体重进度行')
+// 「最接近达标的一代」:同一只子代的逐项命中 —— V/W 未达标时须指出还差几项
+const bestgen = doc.querySelector('.br-bestgen')
+check('详情页给出「最接近达标的一代」', !!bestgen && textOf(bestgen).includes('最接近达标的一代'),
+  bestgen ? textOf(bestgen) : '没有这一块')
+check('未全项达标时说明还差 2 项', !!bestgen && textOf(bestgen).includes('还差 2 项'),
+  bestgen ? textOf(bestgen) : '')
+
 // —— 1. 品种是可输入的组合下拉(在**列表页**的新建表单里)——
 // 详情页的工具栏只有「← 全部培育线」,「新建培育线」在列表页 —— 换个路由重挂一次。
 root.unmount()
-createRoot(win.document.getElementById('root')).render(
+// 记下当前活着的 root:后面还要再换一次挂载(「已达标但状态没跟上」那一屏),换之前得把这一份
+// unmount 掉,否则 React 会警告「同一容器被 createRoot 了两次」。
+let liveRoot = createRoot(win.document.getElementById('root'))
+liveRoot.render(
   React.createElement(AccountContext.Provider, { value: 'UID:1' },
     React.createElement(MemoryRouter, { initialEntries: ['/'] },
       React.createElement(Routes, null,
@@ -185,6 +207,31 @@ check('代数为空的线,卡片头像用这个品种的蛋',
 const momLine = { evo: 0, species: '无此品种', gens: [{ mother: { img: 'HeadIcon/1.webp' } }] }
 check('有母本快照的线仍用母本头像', lineAvatar(momLine, gChains) === 'HeadIcon/1.webp',
   String(lineAvatar(momLine, gChains)))
+
+// —— 5. 已达标但状态没跟上:进度概览要给「标为已达成」入口 ——
+// 判定放宽成方向化后,老线会露出这种状态(AutoDoneOnReach 只在「未达成→达成」的转变时动手,
+// 老线在放宽前那次写入时 before 就已经是 true)。契约样本本身差 2 项,故这里把它那只子代改成
+// 满足全部目标、状态仍为 active,再看页面有没有给出口。
+liveRoot.unmount()
+const staleData = golden('breeding')
+staleData.lines[0].status = 'active'
+staleData.lines[0].gens[0].child.voice = 96
+staleData.lines[0].gens[0].child.weightPct = 99
+staleData.lines[0].gens[0].child.nature = '固执'
+RESPONSES['/api/breeding'] = staleData
+liveRoot = createRoot(win.document.getElementById('root'))
+liveRoot.render(
+  React.createElement(AccountContext.Provider, { value: 'UID:1' },
+    React.createElement(MemoryRouter, { initialEntries: ['/?line=contract-line'] },
+      React.createElement(Routes, null,
+        React.createElement(Route, { path: '/', element: React.createElement(Breeding) })))),
+)
+await new Promise((r) => setTimeout(r, 800))
+const staleEl = doc.querySelector('.br-stale')
+check('已达标但状态未跟上时给出提示', !!staleEl && textOf(staleEl).includes('全部'),
+  staleEl ? textOf(staleEl) : '没有 .br-stale')
+check('提示里带「标为已达成」按钮', !!staleEl && textOf(staleEl).includes('标为已达成'),
+  staleEl ? textOf(staleEl) : '')
 
 check('渲染过程没有 React 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 

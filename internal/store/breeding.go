@@ -19,6 +19,10 @@ import (
 //
 // 投影列(代数、最佳嗓音、最佳体重)由 pet.LineStats 从代数里算出来写进去,列表页据此排序,
 // 不必把每条线的 JSON 都解开;created_at 只在首次写入时给,更新不动它。
+//
+// ⚠️ 「最佳」的口径随 pet.LineStats 走(达标优先,其次离目标最近,见其注释)。它是**写入时**
+// 算下的快照,语义变了老行不会自动重算 —— 与 DeriveChain / MotherGidOf 的「读取时补、不迁移」
+// 一致,下次保存这条线时自然收敛(它只影响列表排序,短暂不一致无碍)。
 func (sc *Scoped) UpsertBreedingLine(l *pet.BreedingLine) error {
 	if l == nil || l.ID == "" {
 		return nil
@@ -114,26 +118,67 @@ func (sc *Scoped) GetBreedingLine(id string) (*pet.BreedingLine, error) {
 	return &l, nil
 }
 
-// FindActiveBreedingLine 按**品种**取一条进行中的培育线(最近更新的那条);没有返回 nil。
+// ReparentLines 把以 oldParent 为母线的线改挂到 newParent 上(合并子线时用,见
+// pet.MergeChildLine)。
 //
-// 破壳自动记一代时用它定位该记到哪条线上(见 pipeline/breeding.go)。同一品种可能有多条线
-// (目标不同,如一只刷嗓音、一只刷体重),取最近更新的那条 —— 玩家刚动过的那条就是他此刻在推的。
+// 为什么必须有:并入母线之后子线就被删掉了,孙辈若还指着它,谱系视图就从那一代**断掉** ——
+// 而它们本该接着母线的历史往下走。
 //
-// 为什么不在 SQL 里按 species/evo 筛:品种的口径是「进化链」(见 pet.ChainRef),一条链有
-// 好几个形态名,老线还只存着名字 —— 这段推导必须与匹配共用同一份实现(ChainRef.Match),
-// SQL 里再写一套 WHERE 早晚分叉,而分叉的表现是「破壳后又另开一条新线」,玩家得自己发现。
-// 一个账号的线通常个位数,整份读进来逐条比的开销可忽略(每条新蛋孵出时才走一次)。
-func (sc *Scoped) FindActiveBreedingLine(ref pet.ChainRef) (*pet.BreedingLine, error) {
-	if ref.Empty() {
-		return nil, nil
+// 只能读出整条再写回:parentLineId 在 data 这块 JSON 里,没有单独的列可 UPDATE(按约定
+// 表结构不动)。合并不常发生,且要改的通常只有一两条,这点开销无所谓。
+func (sc *Scoped) ReparentLines(oldParent, newParent string) error {
+	if oldParent == "" || newParent == "" || oldParent == newParent {
+		return nil
+	}
+	lines, err := sc.ListBreedingLines()
+	if err != nil {
+		return err
+	}
+	for _, l := range lines {
+		if l == nil || l.ParentLineID != oldParent {
+			continue
+		}
+		l.ParentLineID = newParent
+		if err := sc.UpsertBreedingLine(l); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// FindLineForMother 收蛋时定位这颗蛋该记到哪条线,**一次扫描同时回答两件事**:
+//
+//   - hit:当前固定在这只种母身上的进行中的线;nil = 没有,调用方据此开新线。
+//   - parent:这只种母是**谁孵出来的**(某条线的历代子代里有它);nil = 不是任何线孵的。
+//
+// 为什么按种母而不是按品种:蛋趴在谁的窝上是**确定的事实**,而「同品种最近更新的那条线」
+// 是猜的 —— 同一个品种同时开几个窝、几只母本各孵各的时,那几颗蛋会被全记进一条线,而且
+// 记到哪条还会随 updated_at 漂移(玩家在另一条上改一下目标,归宿就变了)。
+//
+// parent 决定新线是「子线」还是「独立线」:
+//   - parent != nil → 本线子代接班当种母(选育的典型操作),开**子线**接在 parent 之后;
+//   - parent == nil → 野外抓来的、与任何线都没有血缘,开**独立新线**。
+//     这种不能去猜挂谁 —— 5 条同品种的线里挑一条就是猜,猜错是把一颗蛋记进别人的培育史。
+//
+// 老线没有 MotherGid 字段,由 pet.MotherGidOf 从末代派生(见它),故老数据无需迁移。
+// 连派生都派生不出的(手工建的、一代都没有的线)才按品种兜底 —— 那种线还没接过蛋,
+// 归谁都谈不上历史,取最近更新过的一条即可。
+//
+// 为什么不在 SQL 里筛:种母的口径含「老线按末代派生」这段推导,必须与别处共用同一份实现
+// (pet.MotherGidOf),SQL 里再写一套 WHERE 早晚分叉。一个账号的线通常个位数,整份读进来
+// 逐条比的开销可忽略(每颗蛋收进窝时才走一次)。
+func (sc *Scoped) FindLineForMother(motherGid uint32, ref pet.ChainRef) (hit, parent *pet.BreedingLine, err error) {
+	if ref.Empty() || motherGid == 0 {
+		return nil, nil, nil
 	}
 	rows, err := sc.rdb.Query(
 		`SELECT data FROM breeding_line WHERE account=? AND status=? ORDER BY updated_at DESC, id`,
 		sc.account, pet.BreedingActive)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
+	var fallback *pet.BreedingLine // 派生不出种母的空线,按品种兜底
 	for rows.Next() {
 		var data string
 		if rows.Scan(&data) != nil {
@@ -144,11 +189,22 @@ func (sc *Scoped) FindActiveBreedingLine(ref pet.ChainRef) (*pet.BreedingLine, e
 			continue
 		}
 		sc.fillLineChain(&l) // 老线按名字补出品种身份(见 fillLineChain)
-		if pet.ChainRefOf(sc.gd, l.Evo, l.Species).Same(ref) {
-			return &l, nil
+		if mg := pet.MotherGidOf(&l); mg != 0 {
+			if mg == motherGid {
+				// ① 精确命中:这条线就固定在她身上,parent 不必再找
+				return &l, nil, nil
+			}
+		} else if fallback == nil && pet.ChainRefOf(sc.gd, l.Evo, l.Species).Same(ref) {
+			fallback = &l
+		}
+		if parent == nil && pet.DescendantGids(&l)[motherGid] {
+			parent = &l
 		}
 	}
-	return nil, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	return fallback, parent, nil
 }
 
 // FindLineClaimingChild 找**正在等这只宠**的培育线:它的待认领里有一代记着这个子代 gid。

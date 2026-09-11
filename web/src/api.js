@@ -298,6 +298,22 @@ export const getBreedingPool = (evo, species) =>
 
 // saveBreeding 新建或整条更新一条线:目标、状态、全部代数都在 body 里。
 // 「改目标」「补录一代」「删掉某一代」共用一个入口,前端不做字段级合并。
+// mergeBreeding 把一条子线并入它的母线({child} 一个 id 够:母线由子线的 parentLineId 定)。
+// 不可逆 —— 子线会被删掉,故调用前必须二次确认(见 LineDetail 的 mergeIntoParent)。
+export async function mergeBreeding(child) {
+  const r = await fetch('/api/breeding/merge?' + buildQuery(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ child }),
+  })
+  if (!r.ok) {
+    let msg = '合并失败(' + r.status + ')'
+    try { msg = (await r.json()).error || msg } catch { /* 后端没给 JSON:用状态码兜底 */ }
+    throw new Error(msg)
+  }
+  return r.json()
+}
+
 export async function saveBreeding(line) {
   const r = await fetch('/api/breeding?' + buildQuery(), {
     method: 'POST',

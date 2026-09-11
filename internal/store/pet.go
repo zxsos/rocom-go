@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/whoisnian/rocom-capture/internal/gamedata"
 	"github.com/whoisnian/rocom-capture/internal/pet"
 )
 
@@ -236,6 +237,10 @@ func (sc *Scoped) GetPet(gid uint32) (*pet.Pet, error) {
 // 只解 data、不 attachLocations:选种不看盒子/队伍位置,省两次 IN 查询;百分位由调用方按
 // 当前 gamedata 注入(与 /api/pets 同法,见 server/api_pets.go)。上游实测 983 只共约 1.2MB
 // JSON,解析一次几十毫秒、单机自用可接受。
+// ListAllPets 取本账号全部宠物的**完整**模型(整条 data JSON 反序列化)。
+//
+// 只要其中一部分字段的场景请改用 ListBreedingPets —— 整只反序列化要付的代价与用到的
+// 字段数无关(六维、奖牌、系别、特长、捕捉时间都会解析),培育页为此实测要 100ms/次。
 func (sc *Scoped) ListAllPets() ([]*pet.Pet, error) {
 	rows, err := sc.rdb.Query(`SELECT data FROM pets WHERE account=?`, sc.account)
 	if err != nil {
@@ -254,4 +259,87 @@ func (sc *Scoped) ListAllPets() ([]*pet.Pet, error) {
 		}
 	}
 	return out, rows.Err()
+}
+
+// breedingPetSQL 培育页用的**窄投影**:只取选种与补录要用到的列,不碰 data。
+//
+// 列口径与 petArgs 的写入一一对应,故不读 data 也能还原出培育要的那几项:
+//   - height / weight 就是 HeightM / WeightKg(米、千克,petArgs 直接存的是 p.HeightM);
+//   - nature / talent_rank 存的是**映射后的中文名**,与 data 里的 Pet.Nature / TalentRank 同源;
+//   - shiny 是 0/1(petArgs 的 b2i)。
+//
+// 不在列里的一项按 gamedata 重算,与 ToPet 同一套来源:
+//   - Image ← pet.FillPetImage(conf_id, base_conf_id, shiny)。
+//
+// 全部用 COALESCE 兜底:列理论上不该为 NULL(petArgs 一律写具体值),但扫不进来的行会被
+// 下面那个 continue 悄悄丢掉 —— 丢一只种母在页面上就是「明明有却不推荐」,且无从查起。
+// 宁可拿零值也不能把整行丢了(与 location.go 的 petHeads 同一套防法)。
+//
+// egg_groups 列存的是**组名 JSON 数组**(见 petArgs),不是完整的 EggGroup。
+const breedingPetSQL = `SELECT gid,
+  COALESCE(conf_id,0), COALESCE(base_conf_id,0),
+  COALESCE(species,''), COALESCE(name,''), COALESCE(gender,''),
+  COALESCE(height,0), COALESCE(weight,0), COALESCE(voice,0),
+  COALESCE(nature,''), COALESCE(talent_rank,''), COALESCE(shiny,0),
+  COALESCE(egg_groups,'')
+FROM pets WHERE account=?`
+
+// ListBreedingPets 取本账号全部宠物的**培育用投影**。
+//
+// 返回的 *pet.Pet 是**半填充**的:只有下面这些字段有值,其余为零值。拿它去干别的事会
+// 静默读到零值而不报错,故别复用 —— 需要完整模型请用 ListAllPets。
+//
+// 已填:Gid ConfID BaseConfID Species Name Gender HeightM WeightKg Voice Nature TalentRank Shiny、
+// Image(按 gamedata 重算)与 EggGroups(取自 egg_groups 列)、
+// 以及 FillSizePercentile 注入的那六项取值范围与百分位。
+//
+// 与 ListAllPets 是否一致由 TestListBreedingPetsParity 守着:同一批数据走两条路,
+// 上面这些字段逐只比对 —— 这正是「两边各写一套迟早分叉」的对策。
+func (sc *Scoped) ListBreedingPets() ([]*pet.Pet, error) {
+	rows, err := sc.rdb.Query(breedingPetSQL, sc.account)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*pet.Pet
+	for rows.Next() {
+		var p pet.Pet
+		var shiny int
+		var eggGroups string
+		if rows.Scan(&p.Gid, &p.ConfID, &p.BaseConfID, &p.Species, &p.Name, &p.Gender,
+			&p.HeightM, &p.WeightKg, &p.Voice, &p.Nature, &p.TalentRank, &shiny, &eggGroups) != nil {
+			continue
+		}
+		p.Shiny = shiny != 0
+		p.EggGroups = eggGroupsFromNames(eggGroups)
+		out = append(out, &p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	pet.FillPetImage(sc.gd, out...)
+	pet.FillSizePercentile(sc.gd, out...)
+	return out, nil
+}
+
+// eggGroupsFromNames 把 egg_groups 列(组名 JSON 数组)还原成 EggGroup 切片。
+//
+// 列里**只有组名**(petArgs 存它是为了 `LIKE '%名%'` 过滤),而 EggGroup 另有两个字段:
+// ID 与官方描述 desc。这两项培育页用不上 —— EggGroupsMatch 比的是名字,下发给前端的
+// eggGroupNames 也只取名 —— 故留空,不必为它们把完整的 EggGroup 再存一份进列里。
+//
+// 解不出来(列被手改成别的形状)按「蛋组未知」处理,与读不到是同一回事:
+// EggGroupsMatch 见空即不匹配,这只宠物只是不参与推荐,不会被配给错误的伴。
+func eggGroupsFromNames(col string) []gamedata.EggGroup {
+	var names []string
+	if col == "" || json.Unmarshal([]byte(col), &names) != nil {
+		return nil
+	}
+	out := make([]gamedata.EggGroup, 0, len(names))
+	for _, n := range names {
+		if n != "" {
+			out = append(out, gamedata.EggGroup{Name: n})
+		}
+	}
+	return out
 }

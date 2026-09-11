@@ -6,10 +6,11 @@ import { confirmDialog } from '../../components/confirm'
 import ComboSelect from '../../components/ComboSelect'
 import { fmtShortTime } from '../../utils/format'
 import GoalEditor from './GoalEditor'
+import { chainStats, lineageOf } from './pets'
 import GenerationRow from './GenerationRow'
 import RecordPanel from './RecordPanel'
 import SuggestPanel from './SuggestPanel'
-import { chainKey, chainOf, fmtPct, goalProgress, lineStats, pendCounts } from './pets'
+import { bestChild, chainKey, chainOf, fmtPct, goalProgress, lineStats, pendCounts } from './pets'
 
 const STATUS = [
   { k: 'active', label: '进行中', title: '继续推进这条线(破壳的自动记录只会记到「进行中」的线上)' },
@@ -23,11 +24,23 @@ const STATUS = [
 // 桌面两栏(时间线在左、决策用的建议在右);窄屏上下堆叠 —— 时间线是纵向长列表,
 // 与建议挤在一行只会两边都读不清。
 export default function LineDetail({
-  line, chains, chainItems, natureMatrix, loading, onSave, onClaim, onRemove, onPet, onLocate, busy,
+  line, lines, chains, chainItems, natureMatrix, loading,
+  onSave, onClaim, onRemove, onPet, onLocate, onOpenLine, onMerge, busy,
 }) {
   const pets = useLinePets(line)
   const st = lineStats(line)
-  const bars = goalProgress(line)
+  // 谱系:换种母会开子线(见 internal/pet.NewChildLine),故一条培育史在库里是一串线。
+  // 只有一段时(没有换过种母)不显示这一条 —— 凭空冒出「谱系」两个字只会让人困惑。
+  const chain = useMemo(() => lineageOf(lines, line.id), [lines, line.id])
+  const cs = useMemo(() => chainStats(lines, line.id), [lines, line.id])
+  const bars = goalProgress(line, natureMatrix)
+  // 最接近同时达标的那一只子代(见 pets.bestChild):它与上面的「各维最佳」是两个问题 ——
+  // 后者可能来自不同代,而「为什么还没达成」只有前者能回答。
+  const bc = bestChild(line)
+  // 全部目标项都达标、状态却还停在进行中:判定放宽后老数据会露出这种状态 ——
+  // AutoDoneOnReach 只在「未达成→达成」的转变时动手,而老线在放宽前的那次写入时 before 就已经
+  // 是 true,之后任何写入都不会再翻。不静默改写玩家的状态,给一个显式入口。
+  const allHit = !!bc && bc.miss === 0
   const pend = pendCounts(line.pending)
 
   const rows = useMemo(() => {
@@ -60,6 +73,21 @@ export default function LineDetail({
   // 线认的是**品种**(进化链):chainName 把链上各阶段都列出来 —— 只显示 species 会让人以为
   // 这条线只认那一个形态名(见 api.js 的 getBreeding 注释)。
   const kind = line.chainName || line.species || '未定品种'
+
+  // mergeIntoParent 把**当前这条子线**并入它的母线。
+  //
+  // 为什么默认不合并、要玩家点:合并会删掉这条线(代数合进母线后就不需要它了),而培育史
+  // 删了回不来。谱系视图已经把它们**展示**成一条连续的史了,合并只是把它在库里也合成一条 ——
+  // 是整理,不是必需。故放在这里当成一个显式的、带确认的动作。
+  const mergeIntoParent = async () => {
+    if (!line.parentLineId) return
+    const ok = await confirmDialog({
+      message: `把这条线并入它的母线?${(line.gens || []).length} 代会合进去,这条线随后删掉 —— 不可逆。`,
+      okText: '并入母线', danger: true,
+    })
+    if (!ok) return
+    await onMerge(line.id)
+  }
 
   const removeLine = async () => {
     const ok = await confirmDialog({
@@ -105,6 +133,14 @@ export default function LineDetail({
               onClick={() => onSave({ ...line, status: s.k })}>{s.label}</button>
           ))}
         </div>
+        {/* 种母:这条线的身份就是她(见 internal/pet.BreedingLine.MotherGid)。放在标题旁边
+            而不是埋在元信息里 —— 同一个品种可以同时有几条线,只有品种名分不出是哪一条。
+            换种母不在这里改:换了种母就是另一条线,收蛋时后端会自动开子线或独立新线。 */}
+        <span className="br-detail-mother" title={line.mother
+          ? `这条线固定在种母「${line.mother.name}」身上:她孵的蛋自动记到这里。换种母时后端会另开一条线`
+          : '这条线还没固定种母:第一次收蛋时会按当时的母本固定下来'}>
+          {line.mother ? `种母 ${line.mother.name}` : '未定种母'}
+        </span>
         <span className="muted br-detail-meta">
           {st.gens} 代已记录
           {/* 待孵与待认领分开写:前者是在等一颗蛋,后者是在等子代进背包 ——
@@ -116,6 +152,42 @@ export default function LineDetail({
         <div className="spacer" />
         <button className="btn ghost danger small" disabled={busy} onClick={removeLine}>删除这条线</button>
       </div>
+
+      {/* 谱系:换种母会开子线(子代接班当种母是选育的典型操作),故一条培育史在库里是
+          一串线。不拼回来的话,玩家看到的是几段互不相干的碎片 —— 而那正好发生在他最想
+          看「一路是怎么过来的」的时候。点任一段跳过去。 */}
+      {chain.length > 1 ? (
+        <div className="br-lineage">
+          <span className="br-lineage-k muted">谱系</span>
+          {chain.map((l, i) => (
+            <React.Fragment key={l.id}>
+              {i > 0 ? <span className="br-lineage-arrow muted">→</span> : null}
+              <button type="button"
+                className={'br-lineage-seg' + (l.id === line.id ? ' on' : '')}
+                disabled={l.id === line.id || busy}
+                onClick={() => onOpenLine && onOpenLine(l.id)}
+                title={`${l.mother ? `种母 ${l.mother.name}` : '未定种母'} · ${lineStats(l).gens} 代`}>
+                {l.mother ? l.mother.name : (l.species || '未定')}
+                <em>{lineStats(l).gens} 代</em>
+              </button>
+            </React.Fragment>
+          ))}
+          {/* 累计:代数跨段相加(子线的代数是接着母线数的,故直接相加就是整条史的代数) */}
+          <span className="br-lineage-sum muted">
+            共 {cs.gens} 代
+            {cs.bestVoice != null ? ` · 最佳 V${cs.bestVoice}` : ''}
+            {cs.bestWeight != null ? ` · 最佳 W${fmtPct(cs.bestWeight)}%` : ''}
+          </span>
+          {/* 只有**当前这条是子线**时才给「并入母线」:合并的方向是子线并入母线,
+              站在母线上时没有可并的(它的子线要各自进去)。 */}
+          {line.parentLineId ? (
+            <button className="btn ghost small" disabled={busy} onClick={mergeIntoParent}
+              title="把这条线的代数合进母线,然后删掉这条线 —— 谱系视图本来就把它们连着看,合并只是把库里也合成一条(不可逆)">
+              并入母线
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="br-cols">
         <div className="br-main">
@@ -154,25 +226,58 @@ export default function LineDetail({
           <section className="br-panel br-progress">
             <div className="br-sec-head">
               <h3>进度概览</h3>
-              <span className="muted">历代最佳 vs 目标</span>
+              <span className="muted">历代各维最佳 vs 目标</span>
             </div>
             {st.gens === 0 ? (
               <p className="br-hint muted">还没有已认领的子代,先把某一代的子代认领了这里才有数。</p>
             ) : (
               <>
                 <div className="br-stat-row">
-                  <span className="br-stat-k">历代最佳嗓音</span>
+                  <span className="br-stat-k">历代嗓音最佳</span>
                   <b className="br-stat-v">{st.bestVoice == null ? '—' : st.bestVoice}</b>
-                  <span className="br-stat-k">最佳体重百分位</span>
+                  <span className="br-stat-k">历代体重最佳</span>
                   <b className="br-stat-v">{st.bestWeight == null ? '—' : fmtPct(st.bestWeight) + '%'}</b>
                 </div>
+                {/* 「各维最佳」可能来自不同代,上面那两行因此不能读成「同一只快达标了」。
+                    下面这一行给同一只子代的逐项命中 —— 它就是「为什么还停在进行中」的答案。 */}
+                {bc ? (
+                  <div className="br-bestgen">
+                    <span className="br-bestgen-k">最接近达标的一代</span>
+                    <button type="button" className="br-bestgen-gen"
+                      disabled={!onPet || !bc.child.gid}
+                      onClick={() => onPet && bc.child.gid && onPet(bc.child.gid)}
+                      title={bc.miss === 0 ? '这一代已同时满足全部目标' : `这一代还差 ${bc.miss} 项未达标`}>
+                      第 {bc.gen} 代
+                    </button>
+                    {bc.hits.voice !== undefined
+                      ? <span className={'br-hit' + (bc.hits.voice ? ' on' : '')} title={bc.hits.voice ? '嗓音已达标' : '嗓音未达标'}>V{bc.child.voice}</span>
+                      : null}
+                    {bc.hits.weight !== undefined
+                      ? <span className={'br-hit' + (bc.hits.weight ? ' on' : '')} title={bc.hits.weight ? '体重已达标' : '体重未达标'}>W{fmtPct(bc.child.weightPct)}%</span>
+                      : null}
+                    {bc.hits.nature !== undefined
+                      ? <span className={'br-hit' + (bc.hits.nature ? ' on' : '')} title={bc.hits.nature ? '性格已达标' : '性格未达标'}>{bc.child.nature || '性格未知'}</span>
+                      : null}
+                    <span className="muted">{bc.miss === 0 ? '全部达标' : `还差 ${bc.miss} 项`}</span>
+                  </div>
+                ) : null}
+                {allHit && line.status !== 'done' ? (
+                  <div className="br-stale">
+                    <span>
+                      这一代的子代已满足<b>全部</b>填了的目标,但这条线还是「进行中」——
+                      放宽判定后自动标记不会再触发(它只在「由未达成变达成」时动手)。
+                    </span>
+                    <button type="button" className="btn ghost small" disabled={busy}
+                      onClick={() => onSave({ ...line, status: 'done' })}>标为已达成</button>
+                  </div>
+                ) : null}
                 {bars.length === 0 ? (
                   <p className="br-hint muted">目标还是空的 —— 填上以后这里会显示每一代离目标还有多远。</p>
                 ) : bars.map((b) => (
                   <div key={b.k} className="br-bar" title={b.title}>
                     <span className="br-bar-k">{b.k}</span>
-                    <span className="br-bar-t"><i className={'br-bar-f ' + b.cls} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
-                    <span className="br-bar-v">{b.text}</span>
+                    <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
+                    <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
                   </div>
                 ))}
               </>

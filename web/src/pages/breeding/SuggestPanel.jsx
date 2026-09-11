@@ -1,7 +1,7 @@
 import React from 'react'
 import { imgURL } from '../../components/icons'
 import { pctHot, voiceHot } from '../../utils/format'
-import { fmtPct, goalNatureLabel, hasGoal, hasNatureGoal, lineStats } from './pets'
+import { fmtPct, goalNatureLabel, goalReached, hasGoal, hasNatureGoal, lineStats } from './pets'
 
 // SuggestPanel 选配建议:后端按这条线的目标算出的 top N 组合 + 回交对比。
 //
@@ -206,35 +206,43 @@ function SugPet({ p, side, onLocate }) {
   )
 }
 
-// noGain 这一组的预期嗓音是否**推不动**了:不比这条线历代最佳子代更接近目标。
+// noGain 这一组的预期嗓音是否**推不动**了:不比这条线历代最佳子代更好。
 //
-// 嗓音 = 双亲均值向下取整,是确定值 —— 若这一组的预期还不如(或等于)手里最好的那只,
-// 再孵多少胎也不会更高:均值永远够不到较好的那个亲本以外的地方。想推进只能换掉较差
-// 的那只(拿子代回交,或引进一只更好的)。
+// 判据与页面其它地方同源(**达标优先,其次离目标更近**,见 pets.goalReached):一个已达标的
+// 预期相对未达标的最佳就是「有提升」,哪怕两者离目标一样远。都没达标时才比距离。
+// 没填目标时退化为「不比最极端的那只更极端」。
+//
+// 嗓音 = 双亲均值向下取整,是确定值 —— 若这一组推不动手里最好的那只,再孵多少胎也不会更高,
+// 想推进只能换掉较差的那只(拿子代回交,或引进一只更好的)。
 //
 // 与 voiceTag 一样是纯前端派生:契约快照不该为一句文案多长一个键。
 function noGain(voice, best, target) {
   if (voice == null || best == null) return false
-  if (target != null) return Math.abs(voice - target) >= Math.abs(best - target)
+  if (target != null) {
+    const vh = goalReached(voice, target, 'voice')
+    const bh = goalReached(best, target, 'voice')
+    if (vh !== bh) return !vh
+    return Math.abs(voice - target) >= Math.abs(best - target)
+  }
   return Math.abs(voice) <= Math.abs(best)
 }
 
 // voiceTag 这一组在嗓音上是否达标。纯前端判断,不往 Suggestion 里加字段 —— 契约快照
 // 不该为一句文案多长两个键,而这些量(双亲嗓音、预期值)本来就在下发的那几个字段里。
-//   both: 双亲嗓音都已到目标值。由「子代 = 双亲均值向下取整」可证,目标是上限时**只有**
-//         这种组合能孵出目标值(见后端 pet.VoiceReach)。
-//   exp : 预期值正好命中目标。中段 / 负向目标时,双亲之一不在目标上也可能命中
-//         (如目标 -100 时的 -100 × -99 → -100),故与上一种是两回事,分开标。
+//   both: 双亲嗓音**都已达标**。由「子代 = 双亲均值向下取整」可证此时子代必然也达标
+//         (高目标:两数都不小于目标 → 均值也不小于;低目标:两数都不大于目标 → 均值也不大于)。
+//   exp : 预期值达标(可能只有一个亲本达标,也可能两个都没达标但均值到位)。
+// 方向见 pets.goalReached(高目标 ≥、低目标 ≤),不是「正好等于目标」。
 function voiceTag(goal, s) {
   if (goal.voice == null || !s.exp) return null
   const hi = goal.voice
   const mv = s.mother ? s.mother.voice : null
   const fv = s.father ? s.father.voice : null
-  if (mv === hi && fv === hi) {
-    return { k: 'both', t: '双亲达标', title: `双亲嗓音都已在目标 V${hi} 上 —— 子代取双亲均值的向下取整,目标是上限时只有这样才能孵出 V${hi}` }
+  if (mv != null && fv != null && goalReached(mv, hi, 'voice') && goalReached(fv, hi, 'voice')) {
+    return { k: 'both', t: '双亲达标', title: `双亲嗓音都已达标(目标 V${hi})—— 子代取双亲均值的向下取整,双亲都到位时子代必然也达标` }
   }
-  if (s.exp.voice === hi) {
-    return { k: 'exp', t: '预计达标', title: `按双亲均值推算,预期 V${hi} 正好命中目标` }
+  if (goalReached(s.exp.voice, hi, 'voice')) {
+    return { k: 'exp', t: '预计达标', title: `按双亲均值推算,预期 V${s.exp.voice} 已达标(目标 V${hi})` }
   }
   return null
 }
