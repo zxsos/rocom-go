@@ -6,10 +6,10 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/pb"
-	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/pb"
+	"github.com/zxsos/rocom-go/internal/pet"
 )
 
 // 培育线的自动记录链路(见 breeding.go)。

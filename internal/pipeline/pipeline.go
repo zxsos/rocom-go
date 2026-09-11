@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/pb"
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/scene"
-	"github.com/zxsos/roco-go/internal/server"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/pb"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // grace 是「初始快照」的判定余量(秒):add_time 早于服务启动前 grace 的宠物视为存量仓库,

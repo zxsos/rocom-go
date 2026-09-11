@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/pet"
 )
 
 // 培育线的持久化(培育页,见 internal/pet/breeding.go)。按 account 隔离,主键 (account, id)。

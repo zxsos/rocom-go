@@ -7,10 +7,10 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/scene"
-	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/server"
 )
 
 // 本文件锁住 resetWilds 的语义:**换场景与传送一律整份作废**。

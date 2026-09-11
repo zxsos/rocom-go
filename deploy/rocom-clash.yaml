@@ -1,10 +1,10 @@
-# rocom-capture 客户端代理配置
-# 服务端:103.236.77.188:11443 (hysteria2)
+# rocom-go 客户端代理配置
+# 服务端:203.0.113.10:11443 (hysteria2)
 #
 # 使用前必看:
 #   1. 需开启 TUN/增强模式,否则抓不到游戏流量(iOS 小火箭本身即 VPN,无需设置)
 #   2. 防火墙放行 UDP 11443(不是 TCP)
-#   3. 服务端 rocom-capture 必须加 -skip-self-ip=false,否则抓不到包
+#   3. 服务端 rocom-go 必须加 -skip-self-ip=false,否则抓不到包
 #   4. PACKAGE-NAME / PROCESS-NAME 仅 Android + PC 有效;
 #      iOS 沙盒限制拿不到包名,小火箭导入时会自动降级为只用 DST-PORT,属正常
 
@@ -39,7 +39,7 @@ dns:
 proxies:
   - name: "ROCOM hy2"
     type: hysteria2
-    server: "103.236.77.188"
+    server: "203.0.113.10"
     port: 11443
     password: "改成你的密码"
     udp: false
@@ -47,7 +47,7 @@ proxies:
 
   - name: "SOCKS5 通道"
     type: socks5
-    server: "103.236.77.188"
+    server: "203.0.113.10"
     port: 10809
     udp: false          # 服务端支持 UDP associate 时可改 true(QUIC/DNS 需要)
     username: "改成你的用户名"

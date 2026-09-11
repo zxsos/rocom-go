@@ -1,4 +1,4 @@
-# rocom-capture 容器镜像:多阶段构建,运行镜像只留二进制与最小依赖。
+# rocom-go 容器镜像:多阶段构建,运行镜像只留二进制与最小依赖。
 #
 # ⚠️ **cgo 无法关闭**:抓包用 gopacket/afpacket(mmap 的 AF_PACKET 原始套接字),
 # 它必须经 cgo 编译,故 CGO_ENABLED=1 与 gcc 都是硬要求 —— 这也是构建阶段要装
@@ -6,11 +6,11 @@
 # 那样会编出不能抓包的二进制(编译能过,运行时 afpacket.NewTPacket 才报错)。
 #
 # 构建(builder 与运行镜像都用 alpine → 同为 musl,二进制可直接跑):
-#   docker build -t rocom-capture .
+#   docker build -t rocom-go .
 #
 # 运行(抓包需要两项 capability,见 docker-compose.yml 的注释):
 #   docker run --cap-add=NET_ADMIN --cap-add=NET_RAW \
-#     -v rocom-data:/data -p 4939:4939 rocom-capture -iface eth0 -db /data/rocom.db
+#     -v rocom-data:/data -p 4939:4939 rocom-go -iface eth0 -db /data/rocom.db
 #
 # 已在容器内实测通过:镜像构建、离线回放(743 只宠物解析)、Web API、数据落卷。
 # 实时抓包**收包**未验证 —— 开发环境是嵌套容器且外层无 CAP_NET_RAW,
@@ -36,7 +36,7 @@ RUN go mod download
 COPY . .
 
 # -trimpath 去掉构建机路径(便于复现构建),-ldflags "-s -w" 去符号表与调试信息
-RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/rocom-capture ./cmd/rocom-capture
+RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/rocom-go ./cmd/rocom-go
 
 # ---- 运行阶段 ----
 FROM alpine:3.22
@@ -47,7 +47,7 @@ FROM alpine:3.22
 #             故它只影响可读性,不影响孵化倍率的正确性)
 RUN apk add --no-cache ca-certificates tzdata
 
-COPY --from=builder /out/rocom-capture /usr/local/bin/rocom-capture
+COPY --from=builder /out/rocom-go /usr/local/bin/rocom-go
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

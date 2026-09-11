@@ -13,7 +13,7 @@ import (
 //   2. 原子写 —— 写崩了会让 systemd 起不来,等于把面板改崩
 
 // sampleEnv 是 deploy.sh 生成的 /etc/rocom.env 的简化版,保留它的注释与空行结构。
-const sampleEnv = `# rocom-capture 运行参数(改后执行: systemctl restart rocom)
+const sampleEnv = `# rocom-go 运行参数(改后执行: systemctl restart rocom-go)
 # 抓包网卡(默认 eth0)
 ROCOM_IFACE=eth0
 # Web 监听地址(默认 :4939)
@@ -69,7 +69,7 @@ func TestSetExistingKeepsComments(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"# rocom-capture 运行参数(改后执行: systemctl restart rocom)",
+		"# rocom-go 运行参数(改后执行: systemctl restart rocom-go)",
 		"# 抓包网卡(默认 eth0)",
 		"ROCOM_IFACE=eth0",
 		"# SOCKS5 代理(云端部署时用;留空=不启用)",

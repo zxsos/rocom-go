@@ -6,7 +6,7 @@
 # 比如「只配了部分项」时 [ -n "$v" ] && ... 会返回非零,在 set -e 下直接退出,
 # 表现是容器起不来而日志里什么都没有。这些只有真跑一遍才会暴露。
 #
-# 手法:不真跑 rocom-capture,而是放一个把收到的参数原样打印的 stub 到 PATH,
+# 手法:不真跑 rocom-go,而是放一个把收到的参数原样打印的 stub 到 PATH,
 # 断言的就是「最终交给二进制的那条命令行」。
 #
 # 断言方式:**比较 flag 集合而非参数顺序**。参数顺序是实现细节(取决于脚本里
@@ -29,11 +29,11 @@ setup() {
     STUB_DIR="$WORK/bin"
     mkdir -p "$STUB_DIR"
     # stub:每个参数单独一行,便于解析
-    cat > "$STUB_DIR/rocom-capture" <<'EOF'
+    cat > "$STUB_DIR/rocom-go" <<'EOF'
 #!/bin/sh
 for a in "$@"; do printf '%s\n' "$a"; done
 EOF
-    chmod +x "$STUB_DIR/rocom-capture"
+    chmod +x "$STUB_DIR/rocom-go"
     export PATH="$STUB_DIR:$PATH"
     export ROCOM_ENV_FILE="$WORK/rocom.env"
 }

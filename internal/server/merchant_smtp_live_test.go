@@ -42,7 +42,7 @@ func TestMerchantSMTPLive(t *testing.T) {
 
 	body := "这是一封 SMTP 冒烟测试邮件,用于验证发信链路与授权码是否有效。\n\n" +
 		"- 发送时间:" + time.Now().Format("2006-01-02 15:04:05") + "\n" +
-		"- 收件:" + to + "\n\n——rocom-capture merchant_smtp_live_test"
+		"- 收件:" + to + "\n\n——rocom-go merchant_smtp_live_test"
 
 	start := time.Now()
 	err := sender.sendMerchantMail(to, "【测试】rocom SMTP 冒烟", body)

@@ -4,7 +4,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gamedata"
 )
 
 // —— 培育线(breeding line):一次「选种 → 孵蛋 → 看结果」的迭代过程 ——

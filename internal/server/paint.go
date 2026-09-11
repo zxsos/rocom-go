@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // ---- 涂地(实时地图页的「已扫过」覆盖图层,见 docs/data.md 3.8)----

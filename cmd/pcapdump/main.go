@@ -27,9 +27,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/pbdesc"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/pbdesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

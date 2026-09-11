@@ -5,8 +5,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/trial"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/trial"
 )
 
 // 本文件锁住「节点事件卡片」的内容,而 golden 契约测试锁不住:

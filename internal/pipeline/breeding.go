@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // 培育线的自动记录(培育页,见 internal/pet/breeding.go 与 docs/data.md 3.6)。

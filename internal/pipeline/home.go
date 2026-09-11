@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/scene"
-	"github.com/zxsos/roco-go/internal/server"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // ---- 实时地图的家园小窝图层(见 docs/data.md 3.6)----

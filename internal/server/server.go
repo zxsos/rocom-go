@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/socks5"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/socks5"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 //go:embed all:web
@@ -180,7 +180,7 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 func (s *Server) Hub() *Hub { return s.hub }
 
 // SetWebServer 注入 Web 监听托管,使管理面板能在运行期改监听地址。
-// main 在开始监听之前调用(见 cmd/rocom-capture/main.go)。
+// main 在开始监听之前调用(见 cmd/rocom-go/main.go)。
 func (s *Server) SetWebServer(w *webServer) { s.web = w }
 
 // OpcodeName 返回 opcode 的可读名称。

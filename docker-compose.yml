@@ -1,4 +1,4 @@
-# rocom-capture 编排示例。
+# rocom-go 编排示例。
 #
 # 用法:
 #   docker compose up -d          # 构建并启动
@@ -9,10 +9,10 @@
 # 想固定成某张时再改成实际名字(查网卡名:ip link)
 
 services:
-  rocom:
+  rocom-go:
     build: .
-    image: rocom-capture:latest
-    container_name: rocom
+    image: rocom-go:latest
+    container_name: rocom-go
     restart: unless-stopped
 
     # —— 抓包权限:两项 capability 是最小集 ——

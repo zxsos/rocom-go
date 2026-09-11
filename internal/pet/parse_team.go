@@ -3,8 +3,8 @@ package pet
 import (
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zxsos/roco-go/internal/pb"
-	"github.com/zxsos/roco-go/internal/wire"
+	"github.com/zxsos/rocom-go/internal/pb"
+	"github.com/zxsos/rocom-go/internal/wire"
 )
 
 // PTTBigWorld 是 PlayerTeamType.PTT_BIG_WORLD(大世界队伍 team_type)。

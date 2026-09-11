@@ -116,7 +116,7 @@ wheels = [
 ]
 
 [[package]]
-name = "rocom-capture-scripts"
+name = "rocom-go-scripts"
 version = "0"
 source = { virtual = "." }
 dependencies = [

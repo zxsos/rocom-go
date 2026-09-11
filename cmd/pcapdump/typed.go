@@ -15,7 +15,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/zxsos/roco-go/internal/pbdesc"
+	"github.com/zxsos/rocom-go/internal/pbdesc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

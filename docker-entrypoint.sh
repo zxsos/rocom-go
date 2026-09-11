@@ -3,7 +3,7 @@
 #
 # 为什么需要它 —— 两件事,缺一不可:
 #
-#   1. 缺 -iface / -pcap 时,rocom-capture 只打印一行用法就退出。容器里那行孤零零的
+#   1. 缺 -iface / -pcap 时,rocom-go 只打印一行用法就退出。容器里那行孤零零的
 #      日志极易被当成「镜像坏了」。这里把「必须二选一」说清楚,并给可复制的命令。
 #
 #   2. **管理面板要靠配置文件才能改设置**。systemd 部署下那份文件是 /etc/rocom.env
@@ -34,8 +34,8 @@ export ROCOM_ENV_FILE
 if [ ! -f "$ROCOM_ENV_FILE" ]; then
     if mkdir -p "$(dirname "$ROCOM_ENV_FILE")" 2>/dev/null &&
         cat > "$ROCOM_ENV_FILE" <<'ENVTEMPLATE'
-# rocom-capture 运行参数(Docker 部署)
-# 改完执行: docker restart rocom
+# rocom-go 运行参数(Docker 部署)
+# 改完执行: docker restart rocom-go
 #
 # 多数项可在管理面板(#/admin)里改并立即生效;
 # 抓包网卡、游戏端口、HTTPS 属启动项,须重启容器。
@@ -45,7 +45,7 @@ ENVTEMPLATE
     then
         chmod 600 "$ROCOM_ENV_FILE" 2>/dev/null || true
     else
-        echo "rocom-capture: 提示: 无法创建 $ROCOM_ENV_FILE,管理面板将为只读" >&2
+        echo "rocom-go: 提示: 无法创建 $ROCOM_ENV_FILE,管理面板将为只读" >&2
     fi
 fi
 
@@ -200,7 +200,7 @@ for a in "$@"; do
 done
 
 if [ "$have_mode" -eq 0 ]; then
-    echo "rocom-capture: 必须指定 -iface 或 -pcap 之一" >&2
+    echo "rocom-go: 必须指定 -iface 或 -pcap 之一" >&2
     echo "" >&2
     echo "  实时抓包: -iface <网卡名>       (需 --cap-add=NET_ADMIN --cap-add=NET_RAW)" >&2
     echo "  离线回放: -pcap <pcap文件>" >&2
@@ -211,8 +211,8 @@ if [ "$have_mode" -eq 0 ]; then
     echo "例:" >&2
     echo "  docker run --cap-add=NET_ADMIN --cap-add=NET_RAW \\" >&2
     echo "    --network host -v rocom-data:/data \\" >&2
-    echo "    rocom-capture -iface eth0" >&2
+    echo "    rocom-go -iface eth0" >&2
     exit 1
 fi
 
-exec rocom-capture "$@"
+exec rocom-go "$@"

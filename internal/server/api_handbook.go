@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gamedata"
 )
 
 // glassBookItem 是炫彩图鉴页按品种聚合的一条记录:该品种抓到过的全部炫彩变体

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/pet"
 )
 
 // handleAdminWildPetOptions 列出可投放的野生宠物形态(管理员面板下拉用)。

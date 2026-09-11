@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // parseFilter 从查询参数构造 store.Filter(handlePets/handlePetPage 共用)。
