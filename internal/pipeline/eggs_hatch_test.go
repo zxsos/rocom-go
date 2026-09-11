@@ -7,9 +7,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/whoisnian/rocom-capture/internal/gcp"
-	"github.com/whoisnian/rocom-capture/internal/pet"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/gcp"
+	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 

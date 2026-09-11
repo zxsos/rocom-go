@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/socks5"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/socks5"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 //go:embed all:web

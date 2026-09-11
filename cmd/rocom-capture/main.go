@@ -8,19 +8,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/capture"
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/pipeline"
-	"github.com/whoisnian/rocom-capture/internal/server"
-	"github.com/whoisnian/rocom-capture/internal/socks5"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/capture"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/pipeline"
+	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/roco-go/internal/socks5"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 func main() {
 	pcapPath := flag.String("pcap", "", "离线 pcap 文件路径(回放模式)")
-	iface := flag.String("iface", "", "实时抓包网卡名")
+	iface := flag.String("iface", "", "实时抓包网卡名;填 auto 则自动选默认路由所在的那张(容器里也能算,推荐)")
 	ignoreIPs := flag.String("ignore-ip", "", "额外忽略的 IP(逗号分隔;两端命中即丢包)。实时抓包已自动忽略网卡自身 IP,此项用于离线回放或多网关等场景")
-	skipSelf := flag.Bool("skip-self-ip", true, "忽略网卡自身 IP(单臂网关去重)。socks5/云代理模式下本机进程出站的游戏流量以本机 IP 为源,须设 false 才抓得到")
+	skipSelf := flag.Bool("skip-self-ip", true, "忽略网卡自身 IP(单臂网关去重)。socks5/云代理模式下本机进程出站的游戏流量以本机 IP 为源,须设 false 才抓得到(启用 -socks5-addr 且未显式指定本项时会自动用 false)")
 	port := flag.Int("port", 8195, "游戏服务器端口")
 	addr := flag.String("addr", ":4939", "Web 服务监听地址")
 	dbPath := flag.String("db", "rocom.db", "SQLite 数据库路径")
@@ -37,6 +37,15 @@ func main() {
 	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
 	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
 	flag.Parse()
+
+	// -skip-self-ip 是否被**显式**指定过:flag.Visit 只遍历命令行里真正出现过的 flag。
+	// 用于下面的「socks5 自动置 false」—— 显式传了就尊重用户的选择,不再自作主张。
+	skipSelfSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "skip-self-ip" {
+			skipSelfSet = true
+		}
+	})
 
 	db, err := gamedata.Load()
 	if err != nil {
@@ -85,8 +94,13 @@ func main() {
 		log.Fatalf("Web 服务失败: %v", err)
 	}
 	if *socks5Addr != "" {
-		if *skipSelf && *iface != "" {
-			log.Printf("提示: -socks5-addr 已启用但未设 -skip-self-ip=false,代理进程以本机 IP 出站的游戏流量会被丢弃")
+		if !skipSelfSet && *skipSelf {
+			// 启用 socks5 却留着 skip-self-ip=true:代理进程以本机 IP 出站的流量会**两个
+			// 方向全被丢**,表现是手机能玩、包数在涨,却一条数据都解析不出来(极难自查)。
+			// 这种组合几乎必然是配置疏忽,故在用户没显式指定时直接替他改掉并说明。
+			log.Printf("已启用 socks5 代理,自动改用 -skip-self-ip=false(代理以本机 IP 出站,设 true 会一个包都抓不到);" +
+				"如确要保留请显式传 -skip-self-ip=true")
+			*skipSelf = false
 		}
 		if err := socks5Mgr.Start(socks5.Config{
 			Addr:     *socks5Addr,
@@ -123,7 +137,16 @@ func main() {
 		}
 		select {}
 	case *iface != "":
-		log.Printf("实时抓包: 网卡=%s 端口=%d", *iface, *port)
+		// 网卡名解析(自动选 / 候选提示 / 桥接检测)必须赶在 RunLive 之前做完:它既决定
+		// 横幅里显示什么,也决定失败时给出的错误信息 —— 容器部署下用户只有 docker logs 可看。
+		info, err := capture.ResolveIface(*iface)
+		if err != nil {
+			log.Fatalf("抓包失败: %v", err)
+		}
+		if info.Warn != "" {
+			log.Printf("警告: %s", info.Warn)
+		}
+		printBanner(*port, *addr, *dbPath, *socks5Addr, *skipSelf, *useTLS, info)
 		// 定期摘要:RunLive 阻塞,故在它之前起。丢包由 capture 包在采样到增量时
 		// 立即告警,这里只做周期性汇总 —— 让人不查日志也知道当前是否在丢。
 		go func() {
@@ -135,12 +158,46 @@ func main() {
 					eng.NoKeyDropped(), eng.BadKeyDropped())
 			}
 		}()
-		if err := eng.RunLive(*iface, *skipSelf); err != nil {
+		if err := eng.RunLive(info.Name, *skipSelf); err != nil {
 			log.Fatalf("抓包失败(需 root): %v", err)
 		}
 	default:
-		log.Println("用法: -pcap <文件> 或 -iface <网卡>")
+		log.Println("用法: -pcap <文件> 或 -iface <网卡|auto>(不确定网卡名就填 auto,会自动选默认路由那张)")
 	}
+}
+
+// printBanner 在开始抓包前打一段固定的配置摘要。
+//
+// 为什么要它:容器部署下用户只看 `docker logs`,而「网卡选错」与「skip-self-ip 设错」
+// 这两类问题的表现都很安静(前者容器反复重启、后者数据永远为空),不看 README 就不知道该
+// 核对什么。把决定行为的几项一次打全,`docker logs | tail` 一眼就能确认。
+func printBanner(port int, addr, dbPath, socks5Addr string, skipSelf, useTLS bool, en capture.IfaceInfo) {
+	mode := "单臂网关 / 旁路镜像"
+	if socks5Addr != "" {
+		mode = "socks5 代理(监听 " + socks5Addr + ")"
+	}
+	via := "显式指定"
+	if en.Auto {
+		via = "自动选中(默认路由)"
+	}
+	ips := "(该网卡无 IP)"
+	if len(en.IPs) > 0 {
+		ss := make([]string, len(en.IPs))
+		for i, ip := range en.IPs {
+			ss[i] = ip.String()
+		}
+		ips = strings.Join(ss, ", ")
+	}
+	scheme := "http"
+	if useTLS {
+		scheme = "https"
+	}
+	log.Printf("==================== 抓包配置 ====================")
+	log.Printf("网卡      %s (%s)  %s", en.Name, ips, via)
+	log.Printf("模式      %s   -skip-self-ip=%v", mode, skipSelf)
+	log.Printf("端口      游戏 %d    Web %s://<本机IP>%s", port, scheme, addr)
+	log.Printf("数据库    %s", dbPath)
+	log.Printf("=================================================")
 }
 
 // 内置 SOCKS5 代理(仅 TCP CONNECT)供手机把游戏流量代理到本机,整网卡抓包即可看到

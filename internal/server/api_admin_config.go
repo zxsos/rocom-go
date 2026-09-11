@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/whoisnian/rocom-capture/internal/envfile"
-	"github.com/whoisnian/rocom-capture/internal/socks5"
+	"github.com/zxsos/roco-go/internal/envfile"
+	"github.com/zxsos/roco-go/internal/socks5"
 )
 
 // 管理面板的运行期配置:改邮箱 SMTP / 图鉴令牌 / 内置 SOCKS5 代理,不必重启服务。

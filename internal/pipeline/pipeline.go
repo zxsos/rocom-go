@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/capture"
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/gcp"
-	"github.com/whoisnian/rocom-capture/internal/pb"
-	"github.com/whoisnian/rocom-capture/internal/pet"
-	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/server"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/capture"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/gcp"
+	"github.com/zxsos/roco-go/internal/pb"
+	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // grace 是「初始快照」的判定余量(秒):add_time 早于服务启动前 grace 的宠物视为存量仓库,
@@ -50,6 +50,11 @@ type Pipeline struct {
 	// 已缓冲的(最多 4096 条)仍在被消费,不等待就统计会拿到偏小的数字
 	// (实测打印「共宠物 0 只」而实际 730 只)。
 	done chan struct{}
+
+	// prefetchHome 是登录后预热家园快照的钩子(实现见 server.PrefetchHomeQuery)。
+	// 做成字段且允许为 nil:测试构造时置 nil —— 否则每个用例的那次登录都会起一个
+	// 真连 rocodex.org 的 goroutine(慢、依赖外网、还会刷日志)。
+	prefetchHome func(uid string)
 }
 
 // connState 是单条 GCP 连接的实时地图状态。场景 res 与区域只在切场景/跨触发体时下发、
@@ -139,11 +144,12 @@ type acctState struct {
 func New(st *store.Store, db *gamedata.DB, srv *server.Server) *Pipeline {
 	p := &Pipeline{
 		st: st, db: db, srv: srv,
-		startTS:     time.Now().Unix() - grace,
-		connAccount: map[string]string{},
-		conns:       map[string]*connState{},
-		accts:       map[string]*acctState{},
-		done:        make(chan struct{}),
+		startTS:      time.Now().Unix() - grace,
+		connAccount:  map[string]string{},
+		conns:        map[string]*connState{},
+		accts:        map[string]*acctState{},
+		done:         make(chan struct{}),
+		prefetchHome: srv.PrefetchHomeQuery,
 	}
 	if saved, err := st.LoadSessionAccounts(); err == nil {
 		p.connAccount = saved
@@ -426,6 +432,11 @@ func (p *Pipeline) registerLogin(m capture.Message) {
 	}
 	if p.connAccount[m.Session] != acc { // 同一登录会重复下发,仅首次记日志并落盘映射
 		log.Printf("用户 %s (%s) 登录成功 [%s]", acc, nick, m.Session)
+		// 登录即预热该账号的家园快照(家园查询页默认查自己,见 server.PrefetchHomeQuery)。
+		// 放在「首次见到该账号」这个分支里:同一登录会重复下发,不必反复触发。
+		if p.prefetchHome != nil {
+			p.prefetchHome(strconv.FormatUint(id, 10))
+		}
 		// 同一连接切换账号(退出登录换号):先让**旧账号**下线。必须按账号结束而非按连接
 		// —— 会话是账号级的(见 store.StartPlaySession),旧账号可能在别的连接上还挂着会话。
 		if old := p.connAccount[m.Session]; old != "" {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/whoisnian/rocom-capture/internal/envfile"
+	"github.com/zxsos/roco-go/internal/envfile"
 )
 
 // 管理面板改 Web 监听地址(ROCOM_ADDR)。

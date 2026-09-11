@@ -1,4 +1,4 @@
-module github.com/whoisnian/rocom-capture
+module github.com/zxsos/roco-go
 
 go 1.26.4
 

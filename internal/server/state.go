@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // 本文件承载 Server 上几组互不相关的状态,各自带自己的锁。

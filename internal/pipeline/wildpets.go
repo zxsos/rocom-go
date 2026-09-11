@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/pet"
-	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/server"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/roco-go/internal/server"
 )
 
 // ---- 实时地图的野生宠物图层(见 docs/data.md 3.5)----

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/zxsos/roco-go/internal/pet"
 )
 
 // Event 是一条获得宠物事件(放生/赠送出等减少事件不入库)。

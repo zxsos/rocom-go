@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/whoisnian/rocom-capture/internal/pbdesc"
+	"github.com/zxsos/roco-go/internal/pbdesc"
 )
 
 func main() {

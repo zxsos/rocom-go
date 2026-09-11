@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/gcp"
-	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/zxsos/roco-go/internal/gcp"
+	"github.com/zxsos/roco-go/internal/pet"
 )
 
 // 验证「库里已有蛋」这个常见场景下,登录后能否让前端刷新。

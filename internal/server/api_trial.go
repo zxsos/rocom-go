@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // 草系徽章试炼接口(见 internal/trial 与 docs/pcap-20260831-grass-trial.md)。

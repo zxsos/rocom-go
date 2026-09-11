@@ -19,9 +19,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/capture"
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/scene"
+	"github.com/zxsos/roco-go/internal/capture"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/scene"
 )
 
 // minSegSpan 与 pipeline.buildPos 的判据一致:SegSpan 小于它就不下发轨迹。

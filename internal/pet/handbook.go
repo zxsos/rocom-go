@@ -3,7 +3,7 @@ package pet
 import (
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/whoisnian/rocom-capture/internal/wire"
+	"github.com/zxsos/roco-go/internal/wire"
 )
 
 // GlassCollect 是图鉴记录里收集到的一种炫彩变体(普通/隐藏)。

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/zxsos/roco-go/internal/pet"
 )
 
 // 精灵蛋的持久化。与宠物同样按 account 隔离,主键 (account, egg gid)。

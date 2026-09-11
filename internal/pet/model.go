@@ -3,8 +3,8 @@ package pet
 import (
 	"math"
 
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/pb"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/pb"
 )
 
 // PetBoxLoc 是宠物在仓库盒子里的位置(box_id 从 1 起,slot 盒内格位从 0 起)。

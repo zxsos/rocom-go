@@ -4,11 +4,11 @@ import (
 	"math"
 	"time"
 
-	"github.com/whoisnian/rocom-capture/internal/capture"
-	"github.com/whoisnian/rocom-capture/internal/gamedata"
-	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/server"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/capture"
+	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // ---- 眠枭之星/不咕钟零件收集判定(见 docs/data.md 3.4)----

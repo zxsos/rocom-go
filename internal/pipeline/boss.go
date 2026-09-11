@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/whoisnian/rocom-capture/internal/capture"
-	"github.com/whoisnian/rocom-capture/internal/scene"
-	"github.com/whoisnian/rocom-capture/internal/server"
-	"github.com/whoisnian/rocom-capture/internal/store"
+	"github.com/zxsos/roco-go/internal/capture"
+	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/roco-go/internal/store"
 )
 
 // flowerItem 是一只花种(花灵)BOSS 的展示信息:花种页卡片按此渲染。

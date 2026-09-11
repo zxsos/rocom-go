@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/whoisnian/rocom-capture/internal/pet"
+	"github.com/zxsos/roco-go/internal/pet"
 )
 
 // TestEggHatchUpdateSingleClock 守「孵化进度的采样时刻只有一个钟」。

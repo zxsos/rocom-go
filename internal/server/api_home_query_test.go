@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // 本文件锁住家园查询的三件容易悄悄坏掉的事:
@@ -310,5 +312,100 @@ func TestHomeQueryAcceptsAnyUIDLength(t *testing.T) {
 				t.Errorf("发给上游的应是 %s,实得 %s", want, sent)
 			}
 		})
+	}
+}
+
+// waitHomeCache 轮询等某个 uid 的预热结果落进缓存(预热是异步的)。
+func waitHomeCache(t *testing.T, s *Server, uid string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := s.homeCacheGet(uid); ok {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("等预热落缓存超时(5s)")
+}
+
+// TestPrefetchHomeQuery 守「登录后预热家园快照」:结果要落进缓存,让家园查询页进页面即命中。
+//
+// 为什么值得单测:预热的全部价值就是「把进页面那几秒提前省掉」,而它是异步的 ——
+// 写错(忘了 homeCacheSet、或干脆同步阻塞在那儿)时页面照样能跑通,只是白等一场,
+// 编译与其余用例都拦不住。
+func TestPrefetchHomeQuery(t *testing.T) {
+	s := newTestServer(t)
+	var mu sync.Mutex
+	calls := 0
+	stubHomeUpstream(t, func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		w.Write([]byte(homeUpstreamBody))
+	})
+
+	s.PrefetchHomeQuery("5678116")
+	waitHomeCache(t, s, "5678116") // 异步:等它落缓存
+
+	mu.Lock()
+	n1 := calls
+	mu.Unlock()
+	if n1 != 1 {
+		t.Fatalf("预热应回源 1 次,实得 %d", n1)
+	}
+
+	// 缓存还新鲜时再预热(同一账号 15 分钟内重复登录、或另一台设备同时在玩)不该再回源
+	s.PrefetchHomeQuery("5678116")
+	time.Sleep(300 * time.Millisecond)
+	mu.Lock()
+	n2 := calls
+	mu.Unlock()
+	if n2 != 1 {
+		t.Errorf("缓存新鲜时预热不该重复回源,calls=%d", n2)
+	}
+
+	// 页面查询直接命中预热好的那份
+	code, got := homeQueryGet(t, s, "uid=5678116")
+	if code != http.StatusOK || !got.Cached {
+		t.Errorf("预热后进页面应命中缓存: code=%d cached=%v", code, got.Cached)
+	}
+	if got.HomeName != "牢大" {
+		t.Errorf("缓存里应是预热那份,实得 homeName=%q", got.HomeName)
+	}
+}
+
+// TestPrefetchHomeQueryQuiet 守预热的静默:上游挂了不写脏缓存,uid 非法不回源。
+//
+// 预热挂在**登录路径**上,它出问题会牵连登录——故这里钉死「失败什么都不做」。
+func TestPrefetchHomeQueryQuiet(t *testing.T) {
+	s := newTestServer(t)
+	var mu sync.Mutex
+	calls := 0
+	stubHomeUpstream(t, func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		w.WriteHeader(http.StatusBadGateway) // 上游一直挂
+	})
+
+	// 回源失败:不 panic,也不写缓存(写进去等于让页面显示一份空数据)
+	s.PrefetchHomeQuery("5678116")
+	time.Sleep(500 * time.Millisecond)
+	if _, ok := s.homeCacheGet("5678116"); ok {
+		t.Error("回源失败时不该写缓存")
+	}
+
+	// uid 非法:压根不该回源(它会被直接拼进上游请求体,见 homeUIDOK)
+	mu.Lock()
+	before := calls
+	mu.Unlock()
+	s.PrefetchHomeQuery("abc")
+	s.PrefetchHomeQuery("")
+	time.Sleep(300 * time.Millisecond)
+	mu.Lock()
+	after := calls
+	mu.Unlock()
+	if after != before {
+		t.Errorf("uid 非法时不该回源,calls %d → %d", before, after)
 	}
 }
