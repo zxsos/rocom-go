@@ -267,7 +267,7 @@ sudo ./scripts/deploy.sh --uninstall
 预构建镜像(**amd64/x86_64**,免登录):
 
 ```bash
-docker pull docker.cnb.cool/test00123/roco:latest
+docker pull docker.cnb.cool/bangbang222/roco:latest
 ```
 
 其它架构(ARM 等)从源码本地构建:`docker build -t rocom-go .`
@@ -304,7 +304,7 @@ docker run -d --name rocom-go --restart unless-stopped \
   --network host \
   -e TZ=Asia/Shanghai \
   -v rocom-data:/data \
-  docker.cnb.cool/test00123/roco:latest \
+  docker.cnb.cool/bangbang222/roco:latest \
   -iface ens17
 ```
 
@@ -316,7 +316,7 @@ docker run -d --name rocom-go --restart unless-stopped \
   --network host \
   -e TZ=Asia/Shanghai \
   -v rocom-data:/data \
-  docker.cnb.cool/test00123/roco:latest \
+  docker.cnb.cool/bangbang222/roco:latest \
   -iface ens17 -skip-self-ip=false -tls
 ```
 
@@ -418,7 +418,7 @@ docker logs -f rocom-go                      # 看日志
 docker restart rocom-go                      # 重启
 
 # 更新镜像(数据库在卷里,不丢历史)
-docker pull docker.cnb.cool/test00123/roco:latest
+docker pull docker.cnb.cool/bangbang222/roco:latest
 docker rm -f rocom-go && docker run ...      # 用同样的 docker run 命令重建
 
 # 备份(SQLite 热备)
@@ -446,7 +446,7 @@ docker run --rm -v rocom-data:/data -v $(pwd):/backup alpine \
   ```bash
   docker run -d --name rocom-go-replay -p 4939:4939 \
     -v /path/to/pcap:/pcap:ro -v rocom-data:/data \
-    docker.cnb.cool/test00123/roco:latest -pcap /pcap/xxx.pcap
+    docker.cnb.cool/bangbang222/roco:latest -pcap /pcap/xxx.pcap
   ```
 
 > 已实测:构建、离线回放(743 只宠物解析)、Web API、数据落卷、管理面板配置闭环

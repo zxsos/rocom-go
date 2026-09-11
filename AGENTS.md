@@ -8,7 +8,8 @@
 不读内存、不注入进程，只解析网络流量。Go 后端 + React 前端，构建为单二进制(前端经 embed)。
 
 面向使用者的说明见 [README.md](README.md)；设计细节见 `docs/`：
-[协议](docs/protocol.md)、[数据来源与解析](docs/data.md)、[服务架构](docs/architecture.md)、
+[协议](docs/protocol.md)、[登录报文 0x0102 字段拆解](docs/protocol-0x0102-login.md)、
+[数据来源与解析](docs/data.md)、[服务架构](docs/architecture.md)、
 [参考资料](docs/reference.md)。
 
 ## 解包数据流程

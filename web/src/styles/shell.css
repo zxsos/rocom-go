@@ -480,3 +480,14 @@ html[data-privacy] .brand { color: var(--fg-dim); }
 @media (max-width: 359px) {
   .topbar-ver { display: none; }
 }
+
+/* 360~389px 这一档(安卓基准 360、iPhone 375/8 等)是**带上版本号之后**最挤的一段:
+   用线上真实账号量过(称号「赚钱王」+ UID 9 位 → 账号触发条 189px)——
+     360px:顶栏溢出 4px、品牌被压到 28px、顶栏被挤高(54 → 63px);
+     375px:不溢出但顶栏仍被挤高;390px 起才恢复正常。
+   故只在这一档把内边距 12→8、gap 8→4,合计腾出 24px(360px 下留 8px 余量)。
+   390px 以上维持原样;≤359px 因为隐藏了版本号本来就不缺空间,也不动 —— 别把它当成
+   「手机端统一收紧」,它只为「多出来的那 34px 版本号」服务,见 .topbar-ver 的注释。 */
+@media (min-width: 360px) and (max-width: 389px) {
+  .topbar { gap: 4px; padding: 8px; }
+}
