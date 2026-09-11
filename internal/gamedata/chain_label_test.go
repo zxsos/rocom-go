@@ -2,6 +2,7 @@ package gamedata
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -367,8 +368,34 @@ func TestChainOptionsSkipsInfertile(t *testing.T) {
 	if eggless == 0 {
 		t.Fatal("没有「能生育但查不到蛋图」的形态 —— 样本不足,上面这段断言等于没测")
 	}
-	t.Logf("全库 %d 个形态 → 候选 %d 个品种;滤掉 %d 个形态所属的不育品种,保住 %d 个只是查不到蛋图的形态",
-		len(bases), len(opts), dropped, eggless)
+
+	// 3. 每个候选都要带**链首**的蛋组名:培育页拿它把品种候选收窄到「与某只宠物至少共一个
+	//    蛋组」的那批。下发成别的东西(id、别的形态的蛋组、或空)时收窄出来的品种就是错的,
+	//    而下拉上完全看不出来 —— 玩家只会发现「按蛋组找品种时少了好几个」。
+	withGroups, emptyGroups := 0, 0
+	for _, o := range opts {
+		want := eggGroupNames(db.PetEggGroups(o.Base))
+		if len(want) == 0 {
+			if len(o.EggGroups) != 0 {
+				t.Errorf("品种 %q 的链首 %d 查不到蛋组,选项里却有 %v", o.Label, o.Base, o.EggGroups)
+			}
+			emptyGroups++
+			continue
+		}
+		withGroups++
+		if !slices.Equal(o.EggGroups, want) {
+			t.Errorf("品种 %q 的蛋组 = %v, 期望 %v(链首 %d 的 PetEggGroups)", o.Label, o.EggGroups, want, o.Base)
+		}
+		if slices.Contains(o.EggGroups, "未发现") {
+			t.Errorf("品种 %q 的蛋组带着「未发现」—— 它的整条链本该不进候选", o.Label)
+		}
+	}
+	if withGroups == 0 {
+		t.Fatal("没有一个候选带蛋组 —— 样本不足,上面这段断言等于没测")
+	}
+	t.Logf("全库 %d 个形态 → 候选 %d 个品种;滤掉 %d 个形态所属的不育品种,保住 %d 个只是查不到蛋图的形态;"+
+		"候选里 %d 个带蛋组、%d 个链首没配蛋组",
+		len(bases), len(opts), dropped, eggless, withGroups, emptyGroups)
 }
 
 // chainOptKey 复刻 ChainOptions 的去重键(有链按链 id、无链按名字),供上面那条测试反查。

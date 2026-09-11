@@ -508,6 +508,9 @@
           "base": "int",
           "count": "int",
           "egg": "str",
+          "eggGroups": [
+            {}
+          ],
           "evo": "int",
           "img": "str",
           "label": "str",

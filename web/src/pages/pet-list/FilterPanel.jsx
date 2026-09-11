@@ -1,6 +1,6 @@
 import React, { useContext } from 'react'
 import { IconsContext } from '../../context'
-import { ALL_TYPES, ALL_EGG_GROUPS } from '../../constants'
+import { ALL_TYPES, ALL_EGG_GROUPS, eggGroupLabel } from '../../constants'
 import { InlineIcon } from '../../components/icons'
 import { Gender } from '../../components/badges'
 import { IconClose, IconRefresh } from '../../components/svg'
@@ -21,6 +21,8 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
   const icons = useContext(IconsContext)
   // 已选条件计数:分组级 + 全局(见 filters.js 的 countPicked)。
   const { look: nLook, gift: nGift, body: nBody, from: nFrom, total: picked } = countPicked(filter)
+  // 长按设下的「蛋组完全相同」(见下面蛋组那一组):与 chip 多选互斥,故与 chip 分开显示。
+  const exactEgg = filter.eggGroupsExact || []
 
   return (
     <>
@@ -143,18 +145,30 @@ export default function FilterPanel({ filter, options, total, collapsed, onClose
             />
           </div>
           {/* 蛋组改 chip 多选(与系别同款控件):一只宠物最多两个蛋组,选多个的意图
-              是「这几组里有哪些」,下拉单选每次只能看一组,对比时要来回切。 */}
+              是「这几组里有哪些」,下拉单选每次只能看一组,对比时要来回切。
+              选项是 {value,label}:显示名走 label(官方名「未发现」在界面上读作「无蛋组」),
+              发给后端的仍是 value —— 见 constants.js 里为什么这两个词不能合成一个。 */}
           <div className="filter-group">
             <label>蛋组</label>
             <div className="chips">
-              {ALL_EGG_GROUPS.map((g) => (
+              {ALL_EGG_GROUPS.map(({ value, label }) => (
                 <span
-                  key={g}
-                  className={'chip chip-egg' + ((filter.eggGroups || []).includes(g) ? ' on' : '')}
-                  onClick={() => toggleEggGroup(g)}
-                >{g}</span>
+                  key={value}
+                  className={'chip chip-egg' + ((filter.eggGroups || []).includes(value) ? ' on' : '')}
+                  onClick={() => toggleEggGroup(value)}
+                >{label}</span>
               ))}
             </div>
+            {/* 长按「筛选相同蛋组」设下的条件:它不是 chip(与上面那套是两种口径,不是多选中的一项),
+                但必须**看得见、清得掉** —— 否则列表只出蛋组一模一样的那几只,而面板上看不出是谁
+                设的、也无处取消(这套筛选是持久化的,刷新还在)。 */}
+            {exactEgg.length ? (
+              <div className="filter-exact">
+                <span className="fe-k">蛋组完全相同</span>
+                <span className="fe-v">{exactEgg.map(eggGroupLabel).join(' / ')}</span>
+                <button className="fe-clear" onClick={() => set({ eggGroupsExact: [] })}>清除</button>
+              </div>
+            ) : null}
             <div className="filter-hint">可多选，多选=拥有其中任一组即命中（一只宠物最多两个蛋组）</div>
           </div>
         </fieldset>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, useContext } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getPets, getFilterOptions, getNameOptions, getBoxes, getTeams, getPetPage, subscribe } from '../../api'
 import { AccountContext } from '../../context'
 import { useStoredFlag, useStoredJSON } from '../../hooks/useStoredState'
@@ -25,6 +26,7 @@ const NO_TEAMS = { slots: [] }
 
 export default function PetList() {
   const account = useContext(AccountContext)
+  const navigate = useNavigate() // 长按「孵蛋配种」跳到培育页(见 breedFrom)
   const [filter, setFilter] = useStoredJSON(sessionStorage, FILTER_KEY, DEFAULT_FILTER, sanitizeFilter)
 
   // 盒子筛选是账号绑定的(盒子 id 归属特定账号),切账号必须清掉——否则拿 A 的盒 id 去查 B 的宠物。
@@ -60,6 +62,7 @@ export default function PetList() {
   const lpRef = useRef(null)        // 长按定时器
   const lpFiredRef = useRef(false)  // 本次触摸是否已触发长按
   const menuAtRef = useRef(0)       // 菜单打开时刻(用于忽略紧随的合成 click)
+  const menuRef = useRef(null)      // 菜单节点(渲染后量实际高度,见下面的视口钳制)
   const syncRef = useRef(sync)      // 供 SSE 回调读取最新同步开关(避免闭包旧值)
 
   // 列表随筛选条件重取;SSE 防抖重载复用同一个 refresh(内部读最新 fetcher,拿到的就是最新筛选)。
@@ -140,29 +143,47 @@ export default function PetList() {
       s.has(t) ? s.delete(t) : s.add(t)
       return { ...f, types: [...s], page: 1 }
     })
+  // 蛋组两种口径互斥:点 chip 是「这几组里有哪些」(OR),长按设的是「跟这套一模一样」。
+  // 碰过哪套就只留哪套 —— 后端两种都收到时以精确为准,不清的话面板上那排高亮的 chip 其实
+  // 不生效(用户会以为选中的组没起作用),那正是本仓库最忌讳的静默状态。
   const toggleEggGroup = (g) =>
     setFilter((f) => {
       const s = new Set(f.eggGroups || [])
       s.has(g) ? s.delete(g) : s.add(g)
-      return { ...f, eggGroups: [...s], page: 1 }
+      return { ...f, eggGroups: [...s], eggGroupsExact: [], page: 1 }
     })
   const sortBy = (key) =>
     setFilter((f) => ({ ...f, sort: key, order: f.sort === key && f.order === 'asc' ? 'desc' : 'asc', page: 1 }))
-  // 打开详情弹窗(不离开列表,保留当前操作状态);复制编号到剪贴板
+  // 打开详情弹窗(不离开列表,保留当前操作状态)。
   const openDetail = (gid) => { setSelected(gid); setDetailGid(gid); setMenu(null) }
-  const copyGid = (gid) => {
-    try { navigator.clipboard && navigator.clipboard.writeText(String(gid)) } catch { /* ignore */ }
-    setMenu(null)
-  }
+  // 孵蛋配种:带着这只宠物的 gid 去培育页,由那边开「新建培育线」并按它的蛋组预置候选
+  // (长按♀会把她的品种一并填好)。只传 gid、不传蛋组/性别快照 —— 数据以库为准,链接才不会
+  // 在宠物进化/送人之后仍按旧快照配种。
+  const breedFrom = (p) => { setMenu(null); navigate('/breeding?new=' + p.gid) }
   // 重置:清空所有过滤条件,保留排序与每页档位
   const reset = () => setFilter((f) => ({ page: 1, pageSize: f.pageSize, sort: f.sort, order: f.order }))
 
-  // 右键/长按菜单:选中并在 (x,y) 弹出(限制不溢出视口),菜单内带上宠物用于"筛选相同…"
+  // 右键/长按菜单:选中并在 (x,y) 弹出,菜单内带上宠物用于"筛选相同…"。
+  // 这里只钳**水平**方向(菜单宽度基本固定);竖直方向不在打开时估算 —— 菜单高度随宠物而变
+  // (有无蛋组两项差 ~74px,共 4~6 项),写死一个估高会让它在屏幕底部被截掉一半。改成渲染后
+  // 量实际高度再上移(见下面的 useLayoutEffect)。
   const openMenu = (p, x, y) => {
     setSelected(p.gid)
     menuAtRef.current = Date.now()
-    setMenu({ gid: p.gid, pet: p, x: Math.min(x, window.innerWidth - 140), y: Math.min(y, window.innerHeight - 180) })
+    setMenu({ gid: p.gid, pet: p, x: Math.min(x, window.innerWidth - 140), y })
   }
+
+  // 菜单下沿超出视口时整体上移。useLayoutEffect 在浏览器 paint 之前跑,量完就改位置,
+  // 用户看不到它先闪在底部再跳上来。判等后再 set:上移到贴住顶边仍放不下时(极矮的窗口)
+  // 位置不再变化,否则每次量完都 set 一个新对象会自锁成死循环。
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!menu || !el) return
+    const over = el.getBoundingClientRect().bottom - (window.innerHeight - 8)
+    if (over <= 0) return
+    const nextY = Math.max(8, menu.y - over)
+    if (nextY !== menu.y) setMenu({ ...menu, y: nextY })
+  }, [menu])
   // 应用一项筛选并关闭菜单(set 会把页码重置为 1)
   const filterSame = (patch) => { set(patch); setMenu(null) }
   // 菜单打开后:点击空白/滚动/Esc 关闭(忽略打开瞬间紧随的合成 click)
@@ -311,7 +332,7 @@ export default function PetList() {
         </div>
       </section>
 
-      <ContextMenu menu={menu} onDetail={openDetail} onCopy={copyGid} onFilterSame={filterSame} />
+      <ContextMenu menu={menu} menuRef={menuRef} onDetail={openDetail} onFilterSame={filterSame} onBreed={breedFrom} />
 
       {detailGid != null && <PetDetailModal gid={detailGid} onClose={() => setDetailGid(null)} />}
     </div>

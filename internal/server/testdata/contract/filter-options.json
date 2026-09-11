@@ -7,6 +7,10 @@
       "base": 3001,
       "count": 1,
       "egg": "egg/egg_miaomiao.webp",
+      "eggGroups": [
+        "动物",
+        "拟人"
+      ],
       "evo": 3001,
       "img": "HeadIcon/3001.webp",
       "label": "喵喵（喵呜/魔力猫/叶冕魔力猫/武斗酷猫）",
@@ -16,6 +20,10 @@
       "base": 3003,
       "count": 1,
       "egg": "egg/egg_huohua.webp",
+      "eggGroups": [
+        "魔力",
+        "巨灵"
+      ],
       "evo": 3003,
       "img": "HeadIcon/3003.webp",
       "label": "火花（焰火/火神/烈火战神）",

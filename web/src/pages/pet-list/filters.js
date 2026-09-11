@@ -67,6 +67,10 @@ export const DEFAULT_FILTER = { page: 1, pageSize: 20, sort: 'boxpos', order: 'a
 // 迁移不是洁癖:不迁的话旧值会**静默留在 filter 里而不再生效** —— 面板上看不到任何
 // 蛋组被选中,但用户以为自己还筛着,列表却悄悄多出一堆。sessionStorage 里这份状态
 // 只在本次会话有效,迁移一次即可,不必在组件里常驻兼容分支。
+//
+// 长按「筛选相同蛋组」写的 eggGroupsExact 是**全新键**,没有旧形状要迁,原样透传即可
+// (旧键迁移分支不碰它)。它与 eggGroups 是两种口径,两份同时存在时后端以精确为准,
+// 前端则保证用户碰过哪套就只留哪套(见 PetList.toggleEggGroup)。
 export const sanitizeFilter = (v, fallback) => {
   if (!v || typeof v !== 'object') return fallback
   if (typeof v.eggGroup !== 'string') return v
@@ -84,14 +88,22 @@ export const sanitizeFilter = (v, fallback) => {
 // 独立成纯函数而非内联在组件里,是为了能给它写断言(见 verify-filter-count.mjs);
 // 与同文件的 sanitizeView 同一考虑。
 const b = (v) => (v ? 1 : 0)
+
+// eggGroupPicked 蛋组条件数:OR 多选按**个数**算(与系别同口径 —— 选 3 个组就是 3 条条件),
+// 而长按设的「完全相同」不论几组都只算**一条** —— 它问的是「跟这一套一模一样」,拆成两条
+// 会把同一个条件数两遍(面板上「已选 N 项」与实际收窄程度就对不上了)。
+// 两者互斥(见 PetList.toggleEggGroup),故取其一而不是相加。
+function eggGroupPicked(f) {
+  return (f.eggGroupsExact || []).length ? 1 : (f.eggGroups || []).length
+}
+
 export function countPicked(f) {
   f = f || {}
   const look = (f.types || []).length + b(f.shiny) + b(f.colorful) + b(f.gender)
   // 性格:单选 nature 与多选 natureIn 是同一条件的两种存法,算一条。
   const gift = b(f.nature || f.natureIn) + b(f.talentRank) + b(f.speciality)
   const body = b(f.medal) + b(f.medalBig) + b(f.medalSmall) + b(f.medalHigh) + b(f.medalLow)
-  // 蛋组:多选按个数算(与系别同口径 —— 选 3 个组就是 3 条条件)
-  const from = b(f.box) + b(f.catchRange) + (f.eggGroups || []).length
+  const from = b(f.box) + b(f.catchRange) + eggGroupPicked(f)
   return { look, gift, body, from, total: look + gift + body + from }
 }
 
