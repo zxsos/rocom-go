@@ -18,7 +18,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
   // 性格那一枚徽标要靠方阵才能把一组名字还原成「加物攻」(见 pets.goalNatureLabel)——
   // 拿不到方阵时它退化成「N 种性格」,而不是显示一个错的维度名。
   const bits = goalBits(line.goal, matrix)
-  const bars = goalProgress(line)
+  const bars = goalProgress(line, matrix)
   const pend = pendCounts(line.pending)
   // chains 只为「代数还是空的线」服务:那种没有亲本快照可拿,退回这个品种的蛋(见 pets.lineAvatar)。
   const avatar = lineAvatar(line, chains)
@@ -32,7 +32,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
       type="button"
       className={'br-card s-' + status + (pend.incubating + pend.claim > 0 ? ' has-pending' : '')}
       onClick={() => onOpen(line.id)}
-      title={`${kind} · 第 ${st.gens} 代 · 点击展开这条培育线`}
+      title={`${kind}${line.mother ? ` · 种母 ${line.mother.name}` : ''} · 第 ${st.gens} 代 · 点击展开这条培育线`}
     >
       <span className="br-card-top">
         {avatar
@@ -40,7 +40,13 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
           : <span className="br-card-img ph">?</span>}
         <span className="br-card-name">
           <span className="br-card-species">{kind}</span>
-          <span className="br-card-sub muted">{st.gens} 代 · 最近 {fmtShortTime(line.updatedAt)}</span>
+          {/* 种母:同一个品种可以同时有几条线(几个窝、几只母本各孵各的),光看品种名
+              那几条卡片一模一样。线的身份就是种母,故把她的名字写在这里 —— 这是唯一
+              能把它们区分开的信息。没固定种母的线(老线还没接过蛋)明说,不留空。 */}
+          <span className="br-card-sub muted">
+            {line.mother ? `种母 ${line.mother.name}` : '未定种母'}
+            {' · '}{st.gens} 代 · 最近 {fmtShortTime(line.updatedAt)}
+          </span>
         </span>
         <span className={'br-status s-' + status}>{STATUS[status] || status}</span>
       </span>
@@ -58,8 +64,8 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
           {bars.map((b) => (
             <span key={b.k} className="br-bar" title={b.title}>
               <span className="br-bar-k">{b.k}</span>
-              <span className="br-bar-t"><i className={'br-bar-f ' + b.cls} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
-              <span className="br-bar-v">{b.text}</span>
+              <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
+              <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
             </span>
           ))}
         </span>
@@ -78,8 +84,8 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
         ) : null}
         {pend.incubating === 0 && pend.claim === 0 ? <span /> : null}
         {st.gens > 0 ? (
-          <span className="br-best">
-            历代最佳
+          <span className="br-best" title="各维分别取历代最优(可能来自不同子代),不等于「同一只达标」—— 点开这条线看「最接近达标的一代」">
+            历代各维最佳
             <b className={voiceHot(st.bestVoice) || ''}>{st.bestVoice == null ? '—' : st.bestVoice}</b>
             <b className={pctHot(st.bestWeight) || ''}>{st.bestWeight == null ? '—' : fmtPct(st.bestWeight) + '%'}</b>
           </span>

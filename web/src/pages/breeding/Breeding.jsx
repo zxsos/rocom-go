@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  claimBreedingChild, deleteBreeding, getBreeding, getFilterOptions, getNameOptions, saveBreeding, subscribe,
+  claimBreedingChild, deleteBreeding, getBreeding, getFilterOptions, getNameOptions, mergeBreeding,
+  saveBreeding, subscribe,
 } from '../../api'
 import { AccountContext } from '../../context'
 import { useAsyncData } from '../../hooks/useAsyncData'
@@ -136,7 +137,15 @@ export default function Breeding() {
         () => {
           setCreating(false); setNewChain(''); setNewGoal(EMPTY_GOAL)
           openLine(id)
-          toast('培育线已建立 —— 填上目标后建议才有意义')
+          // 同品种已经有进行中的线时多说一句。不拦 —— 同一个品种同时开几条线是正常用法
+          // (几个窝、几只母本各孵各的,它们**不会**互相干扰:蛋按种母归线)。
+          // 但要讲清这条新线此刻还没有种母,要等第一次收蛋才固定到某只母本身上。
+          const same = lines.filter((l) => (l.status || 'active') === 'active'
+            && chainKey(l) === newChain).length
+          toast(same > 0
+            ? `培育线已建立 —— 这个品种还有 ${same} 条进行中的线,它们各跟各的种母,互不干扰。`
+              + '这条线还没固定种母,第一次收蛋时会按当时的母本固定下来'
+            : '培育线已建立 —— 填上目标后建议才有意义')
         },
         (e) => toast((e && e.message) || '建线失败'),
       )
@@ -173,8 +182,14 @@ export default function Breeding() {
         </div>
         {line ? (
           <LineDetail
-            line={line} chains={chains} chainItems={chainItems}
+            line={line} lines={lines} chains={chains} chainItems={chainItems}
             natureMatrix={natureMatrix} loading={loading} busy={busy}
+            onOpenLine={openLine}
+            onMerge={(id) => run(() => mergeBreeding(id)).then((ok) => {
+              // 合并后这条线就没了:停在这一屏会显示「这条培育线不在了」。跳到母线更自然 ——
+              // 代数都在它那儿。
+              if (ok && line.parentLineId) openLine(line.parentLineId)
+            })}
             onSave={(next) => run(() => saveBreeding(next))}
             onClaim={(gen, gid) => run(() => claimBreedingChild(line.id, gen, gid), `已认领第 ${gen} 代`)}
             onRemove={(id) => { closeLine(); run(() => deleteBreeding(id), '培育线已删除') }}

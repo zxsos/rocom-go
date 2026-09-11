@@ -1,6 +1,7 @@
 package pet
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -218,6 +219,111 @@ func TestMarkHatchedThenClaimChild(t *testing.T) {
 	}
 }
 
+// brPool 按「每位母本 × 它的父本列表」造候选池(测试用)。
+//
+// 真池子的父本是**共用**的(Candidate.FatherIdx 指向 Pool.Fathers),这里不去重 ——
+// 按给的顺序追加进父本表、下标自然对上,组合的遍历次序与逐母本各存一份时完全一致。
+func brPool(mothers []EggParent, fatherLists ...[]EggParent) Pool {
+	p := Pool{}
+	for i, m := range mothers {
+		c := Candidate{Mother: m, Ambiguous: len(fatherLists[i]) > 1}
+		for _, f := range fatherLists[i] {
+			c.FatherIdx = append(c.FatherIdx, int32(len(p.Fathers)))
+			p.Fathers = append(p.Fathers, f)
+		}
+		p.Cands = append(p.Cands, c)
+	}
+	return p
+}
+
+// refSuggest 是 Suggest 的**参照实现**:全量物化 + 稳定排序 + 截断(优化前的做法)。
+//
+// 留着它只为一个目的:证明改成「单趟维护 top-N」之后结果没变。算法一换,最怕的就是
+// 输出悄悄漂移 —— 契约 golden 只有 3 组建议、覆盖不到等价元素的次序,而这条能。
+func refSuggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool) []Suggestion {
+	var out []Suggestion
+	for _, c := range pool.Cands {
+		for _, idx := range c.FatherIdx {
+			f := pool.Fathers[idx]
+			e := Predict(c.Mother, f, g)
+			out = append(out, Suggestion{
+				Mother:    c.Mother,
+				Father:    f,
+				Exp:       e,
+				Score:     Score(e, g),
+				Ambiguous: c.Ambiguous,
+				Backcross: childGids[f.Gid],
+			})
+		}
+	}
+	sortSuggestions(out)
+	if n > 0 && len(out) > n {
+		out = out[:n]
+	}
+	return out
+}
+
+// TestSuggestTopNMatchesFullSort 单趟 top-N 必须与「全量稳定排序后取前 n」**逐条一致**。
+//
+// 组合数远超 n,且刻意造出**完全等价**的组合(双亲属性一模一样 → Score/WeightHi/Voice
+// 三键全等):这类元素的次序最容易在换算法时漂移,而页面虽看不出、契约 golden 也未必覆盖。
+func TestSuggestTopNMatchesFullSort(t *testing.T) {
+	// 每只属性只取少数几种取值 → 大量组合三键全等
+	mk := func(gid uint32, gender string, voice int32, pct float64) *Pet {
+		return &Pet{Gid: gid, Species: "火神", BaseConfID: 3006, Gender: gender,
+			Voice: voice, WeightPct: &pct, EggGroups: []gamedata.EggGroup{{Name: "龙"}}}
+	}
+	pets := []*Pet{
+		mk(1, "♀", 40, 60), mk(2, "♀", 40, 60), mk(3, "♀", -20, 60),
+		mk(101, "♂", 88, 60), mk(102, "♂", 88, 60), mk(103, "♂", 0, 60), mk(104, "♂", 0, 60),
+	}
+	pool := BreedPool(ChainRef{Evo: 1, Bases: map[uint32]bool{3006: true}}, pets)
+	if len(pool.Cands) == 0 {
+		t.Fatal("候选池为空")
+	}
+	v, w := int32(96), 98.0
+	goal := BreedingGoal{Voice: &v, WeightPct: &w, Nature: "固执"}
+
+	for _, n := range []int{1, 3, 5, 100} {
+		got := Suggest(pool, goal, n, nil)
+		want := refSuggest(pool, goal, n, nil)
+		if len(got) != len(want) {
+			t.Fatalf("n=%d 条数 = %d, 期望 %d", n, len(got), len(want))
+		}
+		for i := range want {
+			if got[i].Mother.Gid != want[i].Mother.Gid || got[i].Father.Gid != want[i].Father.Gid {
+				t.Errorf("n=%d 第 %d 条 = 母%d×父%d, 期望 母%d×父%d(等价元素的次序漂移了)",
+					n, i, got[i].Mother.Gid, got[i].Father.Gid, want[i].Mother.Gid, want[i].Father.Gid)
+			}
+			if !brNear(got[i].Score, want[i].Score) {
+				t.Errorf("n=%d 第 %d 条分数 = %v, 期望 %v", n, i, got[i].Score, want[i].Score)
+			}
+			if got[i].Ambiguous != want[i].Ambiguous {
+				t.Errorf("n=%d 第 %d 条 Ambiguous = %v, 期望 %v", n, i, got[i].Ambiguous, want[i].Ambiguous)
+			}
+		}
+	}
+}
+
+// TestTopNInsertKeepsEarlierOnTie 池满时,与末位**等价**的新元素不能挤掉先来者。
+// 这正是「稳定排序」的语义;若实现成抢占,契约 golden 与上面那条等价性测试都会红。
+func TestTopNInsertKeepsEarlierOnTie(t *testing.T) {
+	eq := func(gid uint32) Suggestion {
+		return Suggestion{Mother: EggParent{Gid: gid}, Score: 0.5, Exp: Expectation{Voice: 10, WeightHi: 50}}
+	}
+	// 三个完全等价的元素依次入池(容量 2):留下来的必须是前两个
+	top := topNInsert(topNInsert(topNInsert(nil, eq(1), 2), eq(2), 2), eq(3), 2)
+	if len(top) != 2 || top[0].Mother.Gid != 1 || top[1].Mother.Gid != 2 {
+		t.Fatalf("等价元素被后来的挤掉了: %d,%d", top[0].Mother.Gid, top[1].Mother.Gid)
+	}
+	// 更好的元素应当插到前面
+	better := Suggestion{Mother: EggParent{Gid: 9}, Score: 0.1, Exp: Expectation{Voice: 10, WeightHi: 50}}
+	top = topNInsert(top, better, 2)
+	if top[0].Mother.Gid != 9 {
+		t.Errorf("更好的元素应排在最前,实则 %d", top[0].Mother.Gid)
+	}
+}
+
 // TestFillParentSnapshotOnlyBlanks 补全只填**空缺**的固有属性,形态相关的一律不碰。
 func TestFillParentSnapshotOnlyBlanks(t *testing.T) {
 	// 收蛋那一刻母本还没进宠物库:快照只有 gid 与名字
@@ -282,7 +388,7 @@ func TestSuggestMarksBackcross(t *testing.T) {
 	m := brParent(1, "母", 0, 50, "固执")
 	sire := brParent(2, "种公", 0, 50, "固执")
 	own := brParent(9, "自己的崽", 0, 50, "固执")
-	cands := []Candidate{{Mother: m, Fathers: []EggParent{sire, own}}}
+	cands := brPool([]EggParent{m}, []EggParent{sire, own})
 
 	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, map[uint32]bool{9: true})
 	if len(got) != 2 {
@@ -353,6 +459,18 @@ func TestScoreOnlyFilledGoals(t *testing.T) {
 	if got := Score(e, BreedingGoal{Voice: brI32(100), WeightPct: brF64(60), Nature: "勇敢"}); math.Abs(got-want) > 1e-9 {
 		t.Errorf("三项全填 = %.4f, 期望 %.4f", got, want)
 	}
+	// 「达标即满分」:方向化后超过目标(高目标)或更轻(低目标)都算 0 分 ——
+	// 不该再因为「离目标更远」被扣分,否则达标的组合会被排到未达标的后面。
+	if got := Score(Expectation{Voice: 100}, BreedingGoal{Voice: brI32(90)}); got != 0 {
+		t.Errorf("嗓音超过目标(100 ≥ 90) = %.4f, 期望 0", got)
+	}
+	if got := Score(Expectation{WeightPct: 20}, BreedingGoal{WeightPct: brF64(30)}); got != 0 {
+		t.Errorf("低体重目标(20 ≤ 30) = %.4f, 期望 0", got)
+	}
+	// 未达标才扣分:目标 90 只到 80 → |80-90|/100 = 0.1
+	if got := Score(Expectation{WeightPct: 80}, BreedingGoal{WeightPct: brF64(90)}); math.Abs(got-0.1) > 1e-9 {
+		t.Errorf("体重未达标 = %.4f, 期望 0.1000", got)
+	}
 	// 一个都没填:所有组合等价,不能除零
 	if got := Score(e, BreedingGoal{}); got != 0 {
 		t.Errorf("没填目标 = %.4f, 期望 0", got)
@@ -362,17 +480,14 @@ func TestScoreOnlyFilledGoals(t *testing.T) {
 // TestSuggestSortsByDistanceAndFlagsAmbiguous 建议按离目标的差距升序,串窝的母本为每个父本
 // 候选各出一条并标 Ambiguous —— 不能替玩家猜实际是哪个父本(见 docs/data.md 3.6 的串窝)。
 func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
-	cands := []Candidate{
-		{ // 单候选母本:嗓音 90 × 100 → 95,还差 5
-			Mother:  brParent(10, "狼灵甲", 90, 80, ""),
-			Fathers: []EggParent{brParent(11, "狼灵乙", 100, 80, "")},
+	cands := brPool(
+		[]EggParent{
+			brParent(10, "狼灵甲", 90, 80, ""), // 单候选母本:嗓音 90 × 100 → 95,还差 5
+			brParent(20, "狼灵丙", 80, 80, ""), // 串窝母本:两个父本候选,期望分别是 85 与 100
 		},
-		{ // 串窝母本:两个父本候选,期望分别是 85 与 100
-			Mother:    brParent(20, "狼灵丙", 80, 80, ""),
-			Fathers:   []EggParent{brParent(21, "候选一", 90, 80, ""), brParent(22, "候选二", 120, 80, "")},
-			Ambiguous: true,
-		},
-	}
+		[]EggParent{brParent(11, "狼灵乙", 100, 80, "")},
+		[]EggParent{brParent(21, "候选一", 90, 80, ""), brParent(22, "候选二", 120, 80, "")},
+	)
 	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, nil)
 	if len(got) != 3 {
 		t.Fatalf("组合数 = %d, 期望 3(串窝母本出两条)", len(got))
@@ -404,12 +519,12 @@ func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
 // 才够得着,差一点也不行 —— 且正负对称(+100 与 -100 是同一条规则)。
 func TestVoiceReachFloorMean(t *testing.T) {
 	// 一位母本 × 若干父本候选,是最小的候选池形状。
-	pool := func(mv int32, fvs ...int32) []Candidate {
-		c := Candidate{Mother: brParent(1, "母", mv, 80, "")}
+	pool := func(mv int32, fvs ...int32) Pool {
+		fathers := make([]EggParent, 0, len(fvs))
 		for i, fv := range fvs {
-			c.Fathers = append(c.Fathers, brParent(uint32(10+i), "父", fv, 80, ""))
+			fathers = append(fathers, brParent(uint32(10+i), "父", fv, 80, ""))
 		}
-		return []Candidate{c}
+		return brPool([]EggParent{brParent(1, "母", mv, 80, "")}, fathers)
 	}
 
 	if got := VoiceReachOf(pool(100, 100), 100); !got.Hit || got.Best != 100 {
@@ -427,17 +542,27 @@ func TestVoiceReachFloorMean(t *testing.T) {
 	if got := VoiceReachOf(pool(-99, -99), -100); got.Hit || got.Best != -99 {
 		t.Errorf("-99 × -99 → %+v, 期望不命中且 Best=-99", got)
 	}
-	// 多候选:取**离目标最近**的那一组,不是嗓音最大的那一组(目标 100 时二者恰好一致,
-	// 故这里用两位母本把两种口径区分开)。
-	cands := append(pool(40, 88, 60), Candidate{
-		Mother:  brParent(2, "母二", 90, 80, ""),
-		Fathers: []EggParent{brParent(20, "父二", 100, 80, "")},
-	})
-	if got := VoiceReachOf(cands, 100); got.Hit || got.Best != 95 {
+	// 多候选:目标 100 在中心 0 之上(方向为高),Best 取**目标方向上的极值**(此处即最大)。
+	multi := brPool(
+		[]EggParent{brParent(1, "母", 40, 80, ""), brParent(2, "母二", 90, 80, "")},
+		[]EggParent{brParent(10, "父", 88, 80, ""), brParent(11, "父", 60, 80, "")},
+		[]EggParent{brParent(20, "父二", 100, 80, "")},
+	)
+	if got := VoiceReachOf(multi, 100); got.Hit || got.Best != 95 {
 		t.Errorf("多候选池 → %+v, 期望 Best=95(90 与 100 的均值)且不命中", got)
 	}
+	// 方向化后 Best 取方向极值、不是「离目标最近」:可达集 {95,100} 对目标 96,「最近」会挑到
+	// 反方向的 95(判够不着),而 100 其实已经达标 —— 照它推荐会让玩家白配好几代。
+	reach := brPool(
+		[]EggParent{brParent(1, "母", 90, 80, ""), brParent(2, "母二", 100, 80, "")},
+		[]EggParent{brParent(10, "父", 100, 80, "")},
+		[]EggParent{brParent(11, "父二", 100, 80, "")},
+	)
+	if got := VoiceReachOf(reach, 96); !got.Hit || got.Best != 100 {
+		t.Errorf("可达集 {95,100} 对目标 96 → %+v, 期望命中且 Best=100", got)
+	}
 	// 空池:够不着就报够不着 —— 刚建的空线不该被显示成「目标已可达」。
-	if got := VoiceReachOf(nil, 100); got.Hit || got.Best != 100 {
+	if got := VoiceReachOf(Pool{}, 100); got.Hit || got.Best != 100 {
 		t.Errorf("空池 → %+v, 期望不命中", got)
 	}
 }
@@ -499,8 +624,8 @@ func TestBackcrossWithoutChild(t *testing.T) {
 	}
 }
 
-// TestLineStats 汇总口径:填了目标取**离目标最近**的(玩家要的是达标);没填目标时取
-// 最极端的(收集向玩法要的就是极端个体)。
+// TestLineStats 汇总口径:填了目标取「**达标优先,其次离目标最近**」(玩家要的是达标);
+// 没填目标时取最极端的(收集向玩法要的就是极端个体)。
 func TestLineStats(t *testing.T) {
 	line := &BreedingLine{
 		Gens: []Generation{
@@ -524,12 +649,22 @@ func TestLineStats(t *testing.T) {
 	line.Goal = BreedingGoal{Voice: brI32(100)}
 	_, bv, _ = LineStats(line)
 	if bv == nil || *bv != 96 {
-		t.Errorf("目标嗓音 100 时最佳 = %v, 期望 96(离目标最近)", bv)
+		t.Errorf("目标嗓音 100 时最佳 = %v, 期望 96(都没达标,取离目标最近)", bv)
 	}
 	line.Goal = BreedingGoal{WeightPct: brF64(60)}
 	_, _, bw = LineStats(line)
 	if bw == nil || *bw != 60 {
 		t.Errorf("目标体重 60%% 时最佳 = %v, 期望 60", bw)
+	}
+	// 方向化后「达标优先」:一个已达标的 100 比一个只差 1 却未达标的 95 更该当选 ——
+	// 「只取离目标最近」会挑出 95,让卡片写着一个未达标的「最佳」。
+	line.Goal = BreedingGoal{Voice: brI32(96)}
+	line.Gens = []Generation{
+		{Gen: 1, Child: brChild(1, "差一点", 95, 60, "")},
+		{Gen: 2, Child: brChild(2, "已达标", 100, 60, "")},
+	}
+	if _, bv, _ := LineStats(line); bv == nil || *bv != 100 {
+		t.Errorf("达标优先时最佳 = %v, 期望 100(已达标,优于未达标的 95)", bv)
 	}
 	if _, bv, bw := LineStats(nil); bv != nil || bw != nil {
 		t.Error("nil 培育线不该panic,也不该给出最佳值")
@@ -538,8 +673,9 @@ func TestLineStats(t *testing.T) {
 
 // TestReachGoal 达成判定:存在某一代的子代**同时**满足全部已填目标项。
 //
-// 三项口径各配一个反例,因为它们都容易被「顺手放宽」改坏:嗓音是确定值(差 1 就是没到)、
-// 体重允许 2pp(实测波动,精确相等等于永不达标)、性格全等。
+// 口径是**方向化**的(见 reached):目标偏高(嗓音 > 0、体重 > 50)时「≥ 目标」算到、偏低时
+// 「≤ 目标」算到、正好在中心时精确相等;体重**没有** ±2pp 容差。每一项都配了反例 ——
+// 它们都容易被「顺手放宽」改坏,而放宽错方向恰恰会毁掉往低刷的目标(极限嗓音 -100 / 体重 0%)。
 func TestReachGoal(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -547,21 +683,28 @@ func TestReachGoal(t *testing.T) {
 		child *EggParent
 		want  bool
 	}{
-		{"嗓音命中", BreedingGoal{Voice: brI32(100)}, brChild(1, "一代", 100, 50, ""), true},
-		{"嗓音差 1 不算命中", BreedingGoal{Voice: brI32(100)}, brChild(1, "一代", 99, 50, ""), false},
-		{"体重在 2pp 容差内", BreedingGoal{WeightPct: brF64(90)}, brChild(1, "一代", 0, 88, ""), true},
-		{"体重超出 2pp", BreedingGoal{WeightPct: brF64(90)}, brChild(1, "一代", 0, 87.9, ""), false},
+		{"高嗓音:正好命中", BreedingGoal{Voice: brI32(96)}, brChild(1, "一代", 96, 50, ""), true},
+		{"高嗓音:超过也算命中", BreedingGoal{Voice: brI32(96)}, brChild(1, "一代", 97, 50, ""), true},
+		{"高嗓音:低于目标不算", BreedingGoal{Voice: brI32(96)}, brChild(1, "一代", 95, 50, ""), false},
+		{"低嗓音:更低也算命中", BreedingGoal{Voice: brI32(-96)}, brChild(1, "一代", -100, 50, ""), true},
+		{"低嗓音:高于目标不算", BreedingGoal{Voice: brI32(-96)}, brChild(1, "一代", -95, 50, ""), false},
+		{"中心嗓音:按精确相等", BreedingGoal{Voice: brI32(0)}, brChild(1, "一代", 1, 50, ""), false},
+		{"体重正好命中", BreedingGoal{WeightPct: brF64(90)}, brChild(1, "一代", 0, 90, ""), true},
+		{"体重超过也算命中", BreedingGoal{WeightPct: brF64(90)}, brChild(1, "一代", 0, 94, ""), true},
+		{"体重低于目标 2pp 不再算命中", BreedingGoal{WeightPct: brF64(90)}, brChild(1, "一代", 0, 88, ""), false},
+		{"低体重目标:更轻也算命中", BreedingGoal{WeightPct: brF64(10)}, brChild(1, "一代", 0, 5, ""), true},
+		{"低体重目标:更重不算命中", BreedingGoal{WeightPct: brF64(10)}, brChild(1, "一代", 0, 12, ""), false},
 		{"体重未知不算命中", BreedingGoal{WeightPct: brF64(90)}, &EggParent{Gid: 1, Name: "一代"}, false},
 		{"性格全等", BreedingGoal{Nature: "胆小"}, brChild(1, "一代", 0, 50, "胆小"), true},
 		{"性格不同不算命中", BreedingGoal{Nature: "胆小"}, brChild(1, "一代", 0, 50, "固执"), false},
 		{
 			"三项同时满足",
-			BreedingGoal{Voice: brI32(100), WeightPct: brF64(90), Nature: "胆小"},
+			BreedingGoal{Voice: brI32(96), WeightPct: brF64(90), Nature: "胆小"},
 			brChild(1, "一代", 100, 91, "胆小"), true,
 		},
 		{
 			"三项里缺一项",
-			BreedingGoal{Voice: brI32(100), WeightPct: brF64(90), Nature: "胆小"},
+			BreedingGoal{Voice: brI32(96), WeightPct: brF64(90), Nature: "胆小"},
 			brChild(1, "一代", 100, 91, "固执"), false,
 		},
 	}
@@ -596,6 +739,39 @@ func TestReachGoal(t *testing.T) {
 	}
 	if ReachGoal(nil) {
 		t.Error("nil 培育线判成了达成")
+	}
+}
+
+// TestReached 方向化达标判定的本体:高目标 ≥、低目标 ≤、中心精确。
+//
+// 直接测这个函数(而不是只经 ReachGoal)是因为**中心与两个方向**是三条独立分支,混进业务
+// 用例里不容易看全;方向判反正是「页面显示达标、状态却不翻」这类静默错误的根。
+func TestReached(t *testing.T) {
+	cases := []struct {
+		name              string
+		cur, goal, lo, hi float64
+		want              bool
+	}{
+		{"高目标:等于", 96, 96, -100, 100, true},
+		{"高目标:超过", 97, 96, -100, 100, true},
+		{"高目标:不足", 95, 96, -100, 100, false},
+		{"低目标:等于", -96, -96, -100, 100, true},
+		{"低目标:更低", -100, -96, -100, 100, true},
+		{"低目标:不足", -95, -96, -100, 100, false},
+		{"中心:精确相等", 0, 0, -100, 100, true},
+		{"中心:偏离不算", 1, 0, -100, 100, false},
+		{"体重高目标:等于", 90, 90, 0, 100, true},
+		{"体重高目标:更重", 95, 90, 0, 100, true},
+		{"体重低目标:更轻", 5, 10, 0, 100, true},
+		{"体重低目标:更重不算", 12, 10, 0, 100, false},
+		{"体重中心:精确", 50, 50, 0, 100, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := reached(c.cur, c.goal, c.lo, c.hi); got != c.want {
+				t.Errorf("reached(%v, %v) = %v, 期望 %v", c.cur, c.goal, got, c.want)
+			}
+		})
 	}
 }
 
@@ -660,8 +836,8 @@ func TestBreedCandidates(t *testing.T) {
 	}
 	pets := []*Pet{
 		mk(1, "乙母", "火神", "♀", "龙"),
-		mk(2, "甲公", "火神", "♂", "龙"),   // 与"龙"有交 → 进种公
-		mk(3, "丙公", "火神", "♂", "虫"),   // 蛋组不交 → 被粗筛掉
+		mk(2, "甲公", "火神", "♂", "龙"), // 与"龙"有交 → 进种公
+		mk(3, "丙公", "火神", "♂", "虫"), // 蛋组不交 → 被粗筛掉
 		mk(4, "甲母", "火神", "♀", "龙"),
 		mk(5, "小子", "火神", "♂", "龙"),
 		mk(6, "外人", "水灵", "♀", "龙"), // 别的品种 → 三类都不进
@@ -798,7 +974,7 @@ func TestChainRefMatch(t *testing.T) {
 	if !ref.Match(mother) || !ref.Match(father) {
 		t.Fatalf("链 %d 上的 %s/%s 没被认成「%s」这个品种的一员", evo, later.name, ms[0].name, ms[0].name)
 	}
-	if got := BreedPool(ref, pets); len(got) != 1 || got[0].Mother.Species != later.name {
+	if got := BreedPool(ref, pets); len(got.Cands) != 1 || got.Cands[0].Mother.Species != later.name {
 		t.Fatalf("候选池 = %+v, 期望把链上另一阶段的 %s 当种母", got, later.name)
 	}
 	// 反过来:同一只个体在「只认名字」的引用下不匹配(这正是升级前的行为)。
@@ -863,4 +1039,211 @@ func candNames(cs []PetCandidate) []string {
 		out = append(out, c.Name)
 	}
 	return out
+}
+
+// TestEggMatchSameAsGroupsMatch PoolSource.eggMatch(走蛋组掩码)必须与 EggGroupsMatch
+// (逐个比组名)给出**同一个答案**。
+//
+// 为什么钉这条:掩码是内层「每只母本 × 全部雄性」这个平方级热点的捷径,而捷径与口径一旦
+// 分叉,表现是「某些组合莫名配不上 / 莫名配上了」—— 不报错,页面上也只是一组建议消失了。
+// 空组、空名、多组这几类边界正是最容易分叉的地方,故都列进用例。
+func TestEggMatchSameAsGroupsMatch(t *testing.T) {
+	groups := [][]gamedata.EggGroup{
+		nil,
+		{},
+		{{Name: "龙"}},
+		{{Name: "兽"}},
+		{{Name: "龙"}, {Name: "兽"}},
+		{{Name: "龙"}, {Name: "飞行"}},
+		{{Name: ""}},              // 只有空名:与「没有蛋组」同义
+		{{Name: ""}, {Name: "龙"}}, // 空名不该挡住另一个有效组
+		{{ID: 1, Name: "龙", Desc: "描述不参与匹配"}}, // 只有 ID/Desc 不同的同一组
+	}
+	// 每种蛋组各造一只 ♀ 与一只 ♂:src.males[i] 于是正好对应 groups[i]
+	pets := make([]*Pet, 0, len(groups)*2)
+	for i, gs := range groups {
+		pets = append(pets, &Pet{Gid: uint32(100 + i), Name: "母", Gender: "♀", EggGroups: gs})
+		pets = append(pets, &Pet{Gid: uint32(200 + i), Name: "公", Gender: "♂", EggGroups: gs})
+	}
+	src := NewPoolSource(pets)
+	if src.bitOf == nil {
+		t.Fatal("蛋组种类远少于 64,掩码本该启用")
+	}
+	for _, m := range groups {
+		mMask := src.maskOf(m)
+		for j := range groups {
+			want := EggGroupsMatch(m, groups[j])
+			if got := src.eggMatch(m, mMask, j); got != want {
+				t.Errorf("母 %+v × 公 %+v: 掩码 = %v, EggGroupsMatch = %v", m, groups[j], got, want)
+			}
+		}
+	}
+}
+
+// TestEggMatchFallsBackWhenTooManyGroups 蛋组种类超过 64 时掩码装不下,必须**整体**退回
+// 字符串比较 —— 而不是给一部分宠物用掩码、另一部分不用(那会让「能不能配」自相矛盾)。
+func TestEggMatchFallsBackWhenTooManyGroups(t *testing.T) {
+	const n = 70 // > 64
+	groups := make([][]gamedata.EggGroup, 0, n)
+	pets := make([]*Pet, 0, n*2)
+	for i := 0; i < n; i++ {
+		g := []gamedata.EggGroup{{Name: fmt.Sprintf("组%d", i)}}
+		groups = append(groups, g)
+		pets = append(pets, &Pet{Gid: uint32(1000 + i), Name: "母", Gender: "♀", EggGroups: g})
+		pets = append(pets, &Pet{Gid: uint32(2000 + i), Name: "公", Gender: "♂", EggGroups: g})
+	}
+	src := NewPoolSource(pets)
+	if src.bitOf != nil {
+		t.Fatalf("%d 种蛋组仍启用了掩码:超过 64 就该整体退回字符串比较", n)
+	}
+	for _, i := range []int{0, 1, 33, 68, 69} {
+		for _, j := range []int{0, 5, 64, 69} {
+			want := EggGroupsMatch(groups[i], groups[j])
+			if got := src.eggMatch(groups[i], 0, j); got != want {
+				t.Errorf("退回路径 组%d × 组%d = %v, 期望 %v", i, j, got, want)
+			}
+		}
+	}
+	// 退回之后候选池仍要照常工作:每一位母本只配上同组那只公(还要排除自己,故为 0)。
+	pool := src.BreedPool(ChainRef{Species: "母"})
+	if len(pool.Cands) != 0 {
+		t.Errorf("空品种引用 = %d 位候选, 期望 0", len(pool.Cands))
+	}
+}
+
+// TestMotherGidOf 老线没有 MotherGid 字段,要靠末代派生 —— 这是「不做迁移就能认种母」的前提。
+func TestMotherGidOf(t *testing.T) {
+	mk := func(gid uint32) *EggParent { return &EggParent{Gid: gid} }
+	// 新线:存了就直接用
+	if got := MotherGidOf(&BreedingLine{MotherGid: 77}); got != 77 {
+		t.Errorf("新线 = %d, 期望 77", got)
+	}
+	// 老线:取**末代**的母本,不是第一代
+	old := &BreedingLine{Gens: []Generation{
+		{Gen: 1, Mother: mk(11)},
+		{Gen: 2, Mother: mk(22)},
+		{Gen: 3, Mother: mk(33)},
+	}}
+	if got := MotherGidOf(old); got != 33 {
+		t.Errorf("老线 = %d, 期望 33(末代的母本,不是第一代的 11)", got)
+	}
+	// 末代可能在 Pending 里(待认领的代同样带母本)
+	if got := MotherGidOf(&BreedingLine{Gens: old.Gens, Pending: []Generation{{Gen: 4, Mother: mk(44)}}}); got != 44 {
+		t.Errorf("末代在 Pending = %d, 期望 44", got)
+	}
+	// 某代没有母本(手工提交上来的代):跳过它往前找,而不是返回 0
+	if got := MotherGidOf(&BreedingLine{Gens: []Generation{
+		{Gen: 1, Mother: mk(11)}, {Gen: 2}, {Gen: 3},
+	}}); got != 11 {
+		t.Errorf("末两代缺母本 = %d, 期望 11(往前找到仅有的那只)", got)
+	}
+	// 一代都没有:手工建的空线,派生不出来 → 0(此时按品种兜底)
+	if got := MotherGidOf(&BreedingLine{}); got != 0 {
+		t.Errorf("空线 = %d, 期望 0", got)
+	}
+	if got := MotherGidOf(nil); got != 0 {
+		t.Errorf("nil 线 = %d, 期望 0", got)
+	}
+}
+
+// TestChildLineInherits 换上的新种母是本线子代时自动开子线:目标与代数都要接上,否则培育史断在这里。
+func TestChildLineInherits(t *testing.T) {
+	v, w := int32(96), 98.0
+	parent := &BreedingLine{
+		ID: "mom", MotherGid: 1,
+		Goal: BreedingGoal{Voice: &v, WeightPct: &w, Nature: "固执"},
+		Gens: []Generation{{Gen: 1}, {Gen: 2}, {Gen: 3}},
+	}
+	ps := &EggParents{Mother: &EggParent{Gid: 9, Name: "接班的子代", Species: "火神"}}
+	child := NewChildLine("kid", parent, ps, 100)
+
+	if child.ParentLineID != "mom" {
+		t.Errorf("ParentLineID = %q, 期望 mom", child.ParentLineID)
+	}
+	if child.MotherGid != 9 {
+		t.Errorf("MotherGid = %d, 期望 9(新种母)", child.MotherGid)
+	}
+	if child.Goal.Voice == nil || *child.Goal.Voice != 96 {
+		t.Errorf("目标没继承 = %+v, 期望嗓音 96", child.Goal)
+	}
+	// 代数接在母线之后:子线第一代是 4,不是 1
+	if got := NextGen(child); got != 4 {
+		t.Errorf("子线第一代 = %d, 期望 4(母线已有 3 代)", got)
+	}
+	if got := AppendPending(child, ps, 0, 100); got != 4 {
+		t.Errorf("AppendPending 返回 %d, 期望 4", got)
+	}
+	// 普通线(非子线)仍从 1 开始
+	if got := NextGen(&BreedingLine{}); got != 1 {
+		t.Errorf("普通线第一代 = %d, 期望 1", got)
+	}
+}
+
+// TestDescendantGids 历代子代集合:回交标签与「换上的母本是不是本线孵出来的」都靠它。
+func TestDescendantGids(t *testing.T) {
+	l := &BreedingLine{Gens: []Generation{
+		{Gen: 1, Child: &EggParent{Gid: 101}},
+		{Gen: 2}, // 还没认领:不算
+		{Gen: 3, Child: &EggParent{Gid: 103}},
+	}}
+	got := DescendantGids(l)
+	if !got[101] || !got[103] {
+		t.Errorf("集合 = %v, 期望含 101 与 103", got)
+	}
+	if len(got) != 2 {
+		t.Errorf("集合大小 = %d, 期望 2(未认领的那代不算)", len(got))
+	}
+}
+
+// TestMergeChildLine 子线并入母线:代数**原样搬**而不是重排(子线代数本就接着母线数),
+// 目标不搬回去(母线那份才是权威的),且只认真正的父子关系。
+func TestMergeChildLine(t *testing.T) {
+	v := int32(96)
+	parent := &BreedingLine{
+		ID: "mom", MotherGid: 1, Goal: BreedingGoal{Voice: &v},
+		Gens: []Generation{{Gen: 1}, {Gen: 2}},
+	}
+	child := &BreedingLine{
+		ID: "kid", ParentLineID: "mom", MotherGid: 9, GenBase: 2,
+		Goal: BreedingGoal{Voice: &v}, // 从母线继承来的
+		Gens: []Generation{{Gen: 3}, {Gen: 4}},
+		Pending: []Generation{
+			{Gen: 5},
+		},
+	}
+	if !MergeChildLine(parent, child) {
+		t.Fatal("合并没成功")
+	}
+	if len(parent.Gens) != 4 {
+		t.Fatalf("母线代数 = %d, 期望 4", len(parent.Gens))
+	}
+	// 代数必须连续且升序 —— 原样搬的前提是子线本就接着数(GenBase)
+	for i, g := range parent.Gens {
+		if g.Gen != i+1 {
+			t.Errorf("第 %d 条的代数 = %d, 期望 %d(搬完之后要按代数排好)", i, g.Gen, i+1)
+		}
+	}
+	if len(parent.Pending) != 1 || parent.Pending[0].Gen != 5 {
+		t.Errorf("待认领 = %+v, 期望还剩第 5 代", parent.Pending)
+	}
+	if child.Gens != nil || child.Pending != nil {
+		t.Error("子线的代数没清空:删掉它之后这些就没了,留着只是隐患")
+	}
+	// 目标仍是母线自己的(没被子线那份副本覆盖)
+	if parent.Goal.Voice == nil || *parent.Goal.Voice != 96 {
+		t.Errorf("母线目标 = %+v, 期望不变", parent.Goal)
+	}
+
+	// 不是这条线的孩子 → 不动手(否则会把别人的历史并进来)
+	other := &BreedingLine{ID: "x", ParentLineID: "someone-else", Gens: []Generation{{Gen: 1}}}
+	if MergeChildLine(parent, other) {
+		t.Error("不是子线却合并成功了")
+	}
+	if len(parent.Gens) != 4 {
+		t.Errorf("母线代数被改成了 %d, 期望保持 4", len(parent.Gens))
+	}
+	// 没有代可搬 → 不动手
+	if MergeChildLine(parent, &BreedingLine{ID: "empty", ParentLineID: "mom"}) {
+		t.Error("空子线也合并成功了")
+	}
 }

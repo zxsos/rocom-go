@@ -317,7 +317,7 @@ function childDeltas(child, prev, goal) {
   if (!child || !prev) return []
   const out = []
   const dv = (child.voice || 0) - (prev.voice || 0)
-  const dirV = stepDelta(child.voice, prev.voice, goal.voice)
+  const dirV = stepDelta(child.voice, prev.voice, goal.voice, 'voice')
   if (dirV) {
     out.push({
       k: 'v', dir: dirV, text: `V${dv > 0 ? '+' : ''}${dv}`,
@@ -326,7 +326,7 @@ function childDeltas(child, prev, goal) {
   }
   if (child.weightPct != null && prev.weightPct != null) {
     const dw = child.weightPct - prev.weightPct
-    const dirW = stepDelta(child.weightPct, prev.weightPct, goal.weightPct)
+    const dirW = stepDelta(child.weightPct, prev.weightPct, goal.weightPct, 'weight')
     if (dirW && Math.abs(dw) >= 0.05) {
       out.push({
         k: 'w', dir: dirW, text: `W${dw > 0 ? '+' : ''}${dw.toFixed(1)}pp`,

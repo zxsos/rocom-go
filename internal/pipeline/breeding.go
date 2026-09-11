@@ -62,15 +62,34 @@ func (p *Pipeline) recordLay(sc *store.Scoped, acc string, eggGid uint32, ps *pe
 	// 品种取自**母本快照的 Evo**(蛋的物种随母本):链口径下「阿米亚特」与「罗隐」是同一条线,
 	// 按物种名找线会把它们劈成两条。Evo==0(无链形态)时退回按名字,见 pet.ChainRef。
 	ref := pet.ChainRefOf(p.db, ps.Mother.Evo, species)
-	line, err := sc.FindActiveBreedingLine(ref)
+	hit, parent, err := sc.FindLineForMother(ps.Mother.Gid, ref)
 	if err != nil {
-		log.Printf("用户 %s 查品种 %s(Evo=%d)的培育线失败: %v", acc, species, ref.Evo, err)
+		log.Printf("用户 %s 查种母 %d(品种 %s Evo=%d)的培育线失败: %v",
+			acc, ps.Mother.Gid, species, ref.Evo, err)
 		return
 	}
+	// 三级归属,次序不能换(见 store.FindLineForMother 的注释):
+	//   ① hit    这只种母身上已经挂了一条线 → 直接沿用,不换种母就不换线;
+	//   ② parent 她是某条线孵出来的 → 开**子线**接在那条之后(子代接班当种母);
+	//   ③ 都没有 → 外来血脉(野外抓的),开**独立新线**。不去猜挂到哪条已有线下:
+	//      同品种 5 条线里挑一条就是猜,猜错是把一颗蛋记进别人的培育史。
+	line := hit
 	if line == nil {
-		// 这个品种还没有进行中的线:开一条。目标留空,由玩家回头再定 ——
-		// 没目标不耽误记录,反而能先攒下几代再决定往哪刷。
-		line = pet.NewAutoLine(autoLineID(ref.Evo, species, ps.Mother.ConfID, now), ps, now.Unix())
+		id := autoLineID(ref.Evo, species, ps.Mother.ConfID, ps.Mother.Gid, now)
+		if parent != nil {
+			line = pet.NewChildLine(id, parent, ps, now.Unix())
+		} else {
+			// 目标留空,由玩家回头再定 —— 没目标不耽误记录,反而能先攒下几代再决定往哪刷。
+			line = pet.NewAutoLine(id, ps, now.Unix())
+		}
+	}
+	// 老线 / 手工建的线没有 MotherGid:此刻把这只种母**固定**下来。
+	//
+	// 不固定的话每次收蛋都要重走一遍「末代派生 → 空线兜底」,而兜底那一条(同品种取最近更新
+	// 的)仍然是会漂移的 —— 漂移正是本次要去掉的东西。固定之后,这条线从此只认这只种母,
+	// 除非玩家换种母(那会开子线或独立新线)。
+	if line.MotherGid == 0 {
+		line.MotherGid = ps.Mother.Gid
 	}
 	gen := pet.AppendPending(line, ps, eggGid, now.Unix())
 	if gen == 0 {
@@ -264,7 +283,11 @@ func (p *Pipeline) claimPendingChildren(sc *store.Scoped, acc string, now time.T
 //
 // 带时刻后缀而不是「auto-<品种>」:同品种的线可以被归档后再开新的,固定 id 会把上一次的
 // 历史覆盖掉(线是同 id 覆盖写),而培育史恰恰是不能丢的东西。
-func autoLineID(evo uint32, species string, confID uint32, now time.Time) string {
+//
+// **必须带种母 gid**:线的身份已经改成种母(见 pet.BreedingLine.MotherGid),同一个品种
+// 可以同时有几条线在推进(几个窝、几只母本各孵各的)。键里没有种母的话,同一秒内收的两颗
+// 蛋会算出同一个 id —— 而线是同 id 覆盖写,后写的那条会把前一条**整条培育史抹掉**。
+func autoLineID(evo uint32, species string, confID, motherGid uint32, now time.Time) string {
 	key := species
 	switch {
 	case evo != 0:
@@ -274,5 +297,5 @@ func autoLineID(evo uint32, species string, confID uint32, now time.Time) string
 	case key == "":
 		key = fmt.Sprint(confID) // 品种名可能带空格/多语言,用 conf_id 更稳
 	}
-	return fmt.Sprintf("auto-%s-%d", key, now.Unix())
+	return fmt.Sprintf("auto-%s-%d-%d", key, motherGid, now.Unix())
 }

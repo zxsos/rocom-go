@@ -141,7 +141,38 @@
 }
 .br-bar-f.w { background: linear-gradient(90deg, var(--c-earn), var(--green)); }
 .br-bar-f.s { background: linear-gradient(90deg, var(--accent), var(--green)); }
+/* 达标项:条满格并转绿,文字也转绿 —— 与「差 / 未命中」分开,卡在哪一项一眼能看出
+   (性格此前压根没有进度条,线停在进行中的原因因此看不见)。 */
+.br-bar-f.hit { background: linear-gradient(90deg, var(--accent), var(--green)); }
 .br-bar-v { flex: none; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.br-bar-v.hit { color: var(--green); }
+
+/* 最接近达标的一代:各维最佳是「分别」看的,这里给同一只的逐项命中 ——
+   它就是「为什么还停在进行中」的答案(见 pets.bestChild)。 */
+.br-bestgen { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; margin: 2px 0 8px; }
+.br-bestgen-k { color: var(--fg-dim); }
+.br-bestgen-gen {
+  font: inherit; padding: 1px 8px; border-radius: 999px; cursor: pointer;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg);
+}
+.br-bestgen-gen:disabled { cursor: default; opacity: .8; }
+.br-hit {
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.br-hit.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+
+/* 「已达标但状态没跟上」:判定放宽(高目标 ≥、低目标 ≤)后,老数据可能停在进行中 ——
+   给一句说明与一个显式入口,而不是静默改写玩家自己设的状态。 */
+.br-stale {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; color: var(--fg-dim); margin: 2px 0 8px;
+  padding: 6px 8px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+.br-stale button { margin-left: auto; }
 .br-card-hint { font-size: 11px; line-height: 1.5; }
 .br-card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
 .br-pend {
@@ -455,6 +486,25 @@ button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-s
 .br-detail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .br-detail-head { margin-bottom: 0; }
 .br-detail-meta { font-size: 12px; }
+/* 谱系:换种母会开子线,一条培育史在库里是一串线(见 pets.lineageOf)。横排 + 箭头,
+   点任一段跳过去 —— 玩家要知道「这一路是怎么过来的」,而不是只看当前这一段的代数。 */
+.br-lineage { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.br-lineage-k { flex: 0 0 auto; }
+.br-lineage-arrow { flex: 0 0 auto; opacity: 0.7; }
+.br-lineage-seg {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg-1, transparent); color: var(--fg); cursor: pointer;
+}
+.br-lineage-seg:hover:not(:disabled) { border-color: var(--accent); }
+.br-lineage-seg:disabled { cursor: default; }
+.br-lineage-seg.on { border-color: var(--accent); font-weight: 600; }
+.br-lineage-seg em { font-style: normal; opacity: 0.6; }
+.br-lineage-sum { margin-left: auto; flex: 0 0 auto; }
+
+/* 种母:与品种名同一行的第二标识(同一个品种可以同时有几条线,只有品种名分不出是哪一条),
+   故按次要标题画 —— 比元信息重、比品种名轻。窄屏让它可以自己占一行(见下面 media)。 */
+.br-detail-mother { font-size: 13px; font-weight: 600; white-space: nowrap; }
 /* 详情头部的品种选择器:它同时是这一屏的**标题**(见 LineDetail 的 changeKind),故按标题的
    字重与字号画;宽度给上限 —— 链名最长会到「阿米亚特（阿米樱/罗隐/深渊罗隐）」这种,
    不设上限会把状态胶囊挤出可视区。 */
@@ -510,6 +560,7 @@ button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-s
   .br-detail-kind, .br-detail-head .br-status-seg { flex: 1 1 100%; }
   .br-detail-head .spacer { display: none; }
   .br-detail-meta { flex: 1 1 auto; }
+  .br-detail-mother { flex: 1 1 100%; }
 
   /* 建议卡的头像缩一档:把宽度让给名字与数值(× 的高度由 --sug-av-c 自动跟随,不会掉队) */
   .br-sug { --sug-av: 34px; }

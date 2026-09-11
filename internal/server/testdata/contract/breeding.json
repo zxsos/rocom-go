@@ -116,6 +116,21 @@
       "lostChildGens": [
         4
       ],
+      "mother": {
+        "confId": 2000672,
+        "gender": "♀",
+        "gid": 2001,
+        "heightM": 1.5,
+        "heightPct": 0,
+        "img": "HeadIcon/3006.webp",
+        "name": "小母",
+        "nature": "固执",
+        "species": "火神",
+        "talentRank": "A",
+        "voice": 40,
+        "weightKg": 88,
+        "weightPct": 0
+      },
       "pending": [
         {
           "at": 1700000100,

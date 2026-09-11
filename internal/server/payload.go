@@ -618,7 +618,13 @@ type BreedingLinePayload struct {
 	*pet.BreedingLine
 	// ChainName 是这条线认的品种的展示名(进化链 + 各阶段,见 gamedata.ChainLabelOf)。
 	// 链口径下 Species 只是「建线时那个形态名」,单独显示会让人以为线只认那一个阶段。
-	ChainName string           `json:"chainName,omitempty"`
+	ChainName string `json:"chainName,omitempty"`
+	// Mother 这条线**当前**那个种母的快照(按 MotherGidOf 定位,库里查不到时为空)。
+	//
+	// 为什么要单独下发:线的身份是种母,同一个品种可以有好几条线 —— 卡片上若只有品种名,
+	// 那几条看起来一模一样,玩家分不出哪条是哪只母本的。头像 + 名字才能一眼认出来。
+	// 空线(一代都没有)也能显示,正是靠它:那种线里没有 mother 快照可翻。
+	Mother    *pet.EggParent   `json:"mother,omitempty"`
 	Suggest   []pet.Suggestion `json:"suggest,omitempty"`   // 种公/种母推荐(已排序,取前 N)
 	Backcross *pet.Backcross   `json:"backcross,omitempty"` // 回交 vs 换种的对比;还没子代时为 nil
 	// Reach 是现有候选的下一代嗓音极限,只在目标填了嗓音时下发:子代 = floor((母+父)/2),

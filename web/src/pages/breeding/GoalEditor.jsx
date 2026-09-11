@@ -146,9 +146,11 @@ export default function GoalEditor({ line, natureMatrix, onSave, busy }) {
       {/* 自动标记的口径写在**填目标的地方**:「已达成」是后端在写入记录时自己打上的,
           玩家看到状态跳变得知道是谁改的、以及怎么改回去(见 pet.ReachGoal / AutoDoneOnReach)。 */}
       <p className="br-hint muted">
-        三项可以任意组合,只想培育一项就只填那一项。性格可以只要求<b>正面加某一维</b>
-        (那 5 个性格都算达标),也可以点名一个确切性格。填了的项被<b>某一代的同一只子代</b>
-        全部满足时,这条线会自动标成「已达成」(可以手动改回「进行中」接着刷)。
+        三项可以任意组合,只想培育一项就只填那一项。<b>达标按方向算</b>:目标偏高
+        (嗓音 &gt; 0、体重 &gt; 50%)时「达到或超过」就算,目标偏低时「达到或低于」就算,
+        正中间按精确相等。性格可以只要求<b>正面加某一维</b>(那 5 个性格都算达标),也可以点名
+        一个确切性格。填了的项被<b>某一代的同一只子代</b>全部满足时,这条线会自动标成
+        「已达成」(可以手动改回「进行中」接着刷)。
       </p>
       <div className="br-goal-act">
         <button className="btn primary small" disabled={!dirty || busy} onClick={() => onSave(parsed)}>

@@ -128,19 +128,127 @@ type BreedingLine struct {
 	Evo       uint32       `json:"evo,omitempty"`
 	Species   string       `json:"species"`          // 品种名(随母本;无链时即匹配键)
 	ConfID    uint32       `json:"confId,omitempty"` // 品种 conf_id
-	Goal      BreedingGoal `json:"goal"`
-	Status    string       `json:"status"`
-	Gens      []Generation `json:"gens"`
-	Pending   []Generation `json:"pending,omitempty"` // 待认领子代的一代
-	CreatedAt int64        `json:"createdAt"`
-	UpdatedAt int64        `json:"updatedAt"`
+	// MotherGid 这条线**固定在哪个种母身上**(个体 gid)。
+	//
+	// 为什么线的身份是种母而不是品种:蛋趴在谁的窝上是个**确定的事实**,而「同品种最近更新的
+	// 那条线」是猜的 —— 同一个品种同时开几个窝、几只母本各孵各的时,那几颗蛋会被全记到一条
+	// 线上,而且记到哪条还会随 updated_at 漂移。换成种母后,同一品种的几条线天然互不干扰。
+	//
+	// 0 = 还没固定(手工建的、一代都没有的线)。老线也都没有这个字段,由 MotherGidOf 从末代
+	// 派生 —— 与 DeriveChain 同一套路子:老数据读取时补,不做迁移。
+	MotherGid uint32 `json:"motherGid,omitempty"`
+	// ParentLineID 子线指向的**母线** id;空 = 不是子线。
+	//
+	// 什么时候会有子线:拿这条线孵出的子代当新母本(选育的核心操作)—— 换了种母就换了线,
+	// 但她是这条线的孩子,故挂上来:代数接着母线数(见 GenBase),页面沿链把培育史串起来。
+	// 野外抓来的母本与任何线都没有血缘,不会走到这里 —— 那种是**独立新线**(见 NewAutoLine)。
+	ParentLineID string `json:"parentLineId,omitempty"`
+	// GenBase 本线代数**接在哪个数之后**:子线 = 母线最后一代的代数(见 NewChildLine),
+	// 故子线的第一代是 GenBase+1,而不是 1。普通线为 0(从 1 开始)。
+	//
+	// 有了它,代数在整条谱系上是连续的 —— 而物理合并(把子线并进母线)也就只是把 Gens
+	// 原样搬过去,不必再重排,那正是「合并不可逆」这个顾虑的解法。
+	GenBase      int            `json:"genBase,omitempty"`
+	Goal         BreedingGoal   `json:"goal"`
+	Status       string         `json:"status"`
+	Gens         []Generation   `json:"gens"`
+	Pending      []Generation   `json:"pending,omitempty"` // 待认领子代的一代
+	CreatedAt    int64          `json:"createdAt"`
+	UpdatedAt    int64          `json:"updatedAt"`
+}
+
+// MotherGidOf 这条线**当前**的种母 gid:新线存了就直接用,老线按末代派生。
+//
+// 老线为什么能派生:它每一代都存着 Mother 快照(含 gid),末代那只就是当前的种母。这与
+// DeriveChain(老线按名字补出品种身份)同一套路子 —— 老数据读取时补、不落库,不做迁移。
+//
+// 两处容错:
+//   - 末代可能在 Pending 里(待认领的代同样带母本),扫描口径与 NextGen 一致;
+//   - 某代的 Mother 可能整个缺失 —— handleBreedingSave 是整条覆盖写、不校验 Gens,手工
+//     构造的请求能把没有母本的代提交上来(前端的「必选种母」只是客户端校验)。故跳过它们
+//     往前找,全都没有才返回 0。
+//
+// 返回 0 表示「这条线还没固定种母」(手工建的空线),此时按品种兜底。
+func MotherGidOf(l *BreedingLine) uint32 {
+	if l == nil {
+		return 0
+	}
+	if l.MotherGid != 0 {
+		return l.MotherGid
+	}
+	gid, gen := uint32(0), 0
+	for _, g := range l.Gens {
+		if g.Mother != nil && g.Mother.Gid != 0 && g.Gen >= gen {
+			gid, gen = g.Mother.Gid, g.Gen
+		}
+	}
+	for _, g := range l.Pending {
+		if g.Mother != nil && g.Mother.Gid != 0 && g.Gen >= gen {
+			gid, gen = g.Mother.Gid, g.Gen
+		}
+	}
+	return gid
+}
+
+// DescendantGids 这条线历代子代的 gid 集合(已认领的)。
+//
+// 两个用处:① 建议里若父本落在其中,那便是回交(见 Suggest);② 换种母时判「新母本是不是
+// 这条线孵出来的」—— 是就自动开子线,不是(野外抓的)就开独立新线。
+func DescendantGids(l *BreedingLine) map[uint32]bool {
+	out := make(map[uint32]bool)
+	if l == nil {
+		return out
+	}
+	for _, g := range l.Gens {
+		if g.Child != nil && g.Child.Gid != 0 {
+			out[g.Child.Gid] = true
+		}
+	}
+	return out
 }
 
 // —— 预测 ——
 //
 // 体重的乐观上界(百分点):两条实测都比双亲均值高(94.610→96.332 是 +1.72pp,
 // 99.754→100 是 +0.25pp),故除均值外再给一个「最好能到哪」的上界,而不是假装精确。
+//
+// ⚠️ 它**只服务预测**(Expectation.WeightHi 与建议排序的次键),不再是「达标」的容差 ——
+// 达标口径见 reached:按目标方向比(高目标 ≥、低目标 ≤),没有正负容差。
 const weightOptimisticPP = 2.0
+
+// —— 达标判定:按目标方向「达到即达标」——
+//
+// 嗓音(-100~100)与体重百分位(0~100)都是**有极值的轴**,玩家的目标是在轴上挑一个点:
+// 「96 声」想往上够、「-100 声」想往下够、「0% 体重」想要最轻。故方向由目标偏向哪一端决定,
+// 而不是一律 ≥ —— 一律 ≥ 会让「极限嗓音 -100」「极限体重 0%」这种往低刷的目标变成**任何
+// 个体都达标**(等于目标失效),那一侧的模板也就废了。
+//
+// 目标正好落在轴中心(嗓音 0 / 体重 50)时没有方向可言,按精确相等(罕见边界)。
+//
+// 这套口径是**前后端唯一真源**:web/src/pages/breeding/pets.js 的 goalReached 必须与它逐字
+// 一致 —— 页面上的「达标」用的正是这里判 done 的同一判定,两处不等会冒出「页面写着达标、
+// 状态还停在进行中」。docs/data.md 3.6 有说明。
+func reached(cur, goal, lo, hi float64) bool {
+	center := (lo + hi) / 2
+	switch {
+	case goal > center:
+		return cur >= goal
+	case goal < center:
+		return cur <= goal
+	default:
+		return cur == goal
+	}
+}
+
+// voiceReached 嗓音是否达标(轴 = VoiceLow~VoiceHigh)。
+func voiceReached(cur, goal int32) bool {
+	return reached(float64(cur), float64(goal), VoiceLow, VoiceHigh)
+}
+
+// weightReached 体重百分位是否达标(轴 = 0~100)。
+func weightReached(cur, goal float64) bool {
+	return reached(cur, goal, 0, 100)
+}
 
 // —— 性格遗传(玩法规则,见 docs/data.md 3.6)——
 //
@@ -201,20 +309,33 @@ func meanPct(a, b *float64) float64 {
 }
 
 // Predict 预测某对双亲孵出的子代。目标 g 只影响性格命中概率(嗓音/体重与目标无关)。
+//
+// 逐组合调用时请改用 predictWith + 预算好的目标集合:本函数每次都会重新解析一遍
+// 目标集合(见 predictWith 的注释)。
 func Predict(mother, father EggParent, g BreedingGoal) Expectation {
+	return predictWith(mother, father, g.natures())
+}
+
+// predictWith 与 Predict 同义,但目标集合由调用方**预算好**传入。
+//
+// 为什么需要它:`natures()` 每次都要建一个 map 去重、再 append 出一个切片;而一次
+// Predict 里它会被调到 4 次(是否填了性格目标、命中概率、两个亲本各自是否命中),
+// 加上 Score 里的 1 次 —— 一个组合就是 5 次分配。选种建议要跑几万个组合,那里
+// 是纯粹的白花钱。故热点循环在**循环外**解析一次,循环内一律走本函数。
+func predictWith(mother, father EggParent, targets []string) Expectation {
 	e := Expectation{
-		Voice:     int32(math.Floor(float64(mother.Voice+father.Voice) / 2)),
+		Voice:     voiceOf(mother, father),
 		WeightPct: meanPct(mother.WeightPct, father.WeightPct),
 	}
 	e.WeightHi = math.Min(100, e.WeightPct+weightOptimisticPP)
 	switch {
-	case !g.hasNatureGoal():
+	case len(targets) == 0:
 		e.NatureFrom = "none"
 	default:
-		e.NatureP = natureHitP(mother, father, g)
+		e.NatureP = natureHitPWith(mother, father, targets)
 		// parent = 命中的主要来源是那两个 30% 槽位(双亲都带时就是 60%);roll = 双亲都没有,
 		// 只剩 40% 的重掷槽可指望。两者都还要加上重掷槽本身掷中的那一份。
-		if g.hitNature(mother.Nature) || g.hitNature(father.Nature) {
+		if hitTargets(mother.Nature, targets) || hitTargets(father.Nature, targets) {
 			e.NatureFrom = "parent"
 		} else {
 			e.NatureFrom = "roll"
@@ -223,13 +344,39 @@ func Predict(mother, father EggParent, g BreedingGoal) Expectation {
 	return e
 }
 
+// voiceOf 子代嗓音 = 双亲均值**向下取整**(玩法事实,见文件头与 docs/data.md 3.6)。
+//
+// 单独拎出来是因为 VoiceReachOf 要遍历全部组合却只关心嗓音 —— 走 Predict 会为每个组合
+// 多算体重、多构造一个 Expectation。向下取整对**负数**与 Go 的整数除法不同(那是向零),
+// 故仍用 math.Floor,不图快改成 `(a+b)/2`。
+func voiceOf(mother, father EggParent) int32 {
+	return int32(math.Floor(float64(mother.Voice+father.Voice) / 2))
+}
+
+// hitTargets 性格名是否落在目标集合里(见 BreedingGoal.hitNature)。
+func hitTargets(name string, targets []string) bool {
+	if name == "" {
+		return false
+	}
+	for _, t := range targets {
+		if t == name {
+			return true
+		}
+	}
+	return false
+}
+
 // natureHitP 子代性格落在**目标集合**里的概率:重掷槽按集合大小分摊(0.4 × |集合| / 全表条数,
 // 任何性格都能从它掷出来),再加上双亲各自带集合内性格时的那 30%。
 //
 // 上限钳到 1:集合被手改成一堆重复/超长的名字时,公式加起来会超过 1,而概率超过 1 只会在
 // 页面上显示成「120%」这种一眼假的数字。
 func natureHitP(mother, father EggParent, g BreedingGoal) float64 {
-	targets := g.natures()
+	return natureHitPWith(mother, father, g.natures())
+}
+
+// natureHitPWith 见 natureHitP,目标集合由调用方预算(见 predictWith 的注释)。
+func natureHitPWith(mother, father EggParent, targets []string) float64 {
 	if len(targets) == 0 {
 		return 0
 	}
@@ -248,18 +395,30 @@ func natureHitP(mother, father EggParent, g BreedingGoal) float64 {
 // Score 期望值与目标的差距(0~1,越小越好)。**只对填了的目标项计分**,未填的维度不参与,
 // 否则「只想刷嗓音」的线会被没填的体重项拖着走。
 func Score(e Expectation, g BreedingGoal) float64 {
+	return scoreWith(e, g, g.natures())
+}
+
+// scoreWith 与 Score 同义,目标集合由调用方预算(理由见 predictWith 的注释:
+// Score 原本每调一次都要重新解析一遍目标集合)。
+func scoreWith(e Expectation, g BreedingGoal, targets []string) float64 {
 	var sum, n float64
+	// 每项都进分母(达标也是「填了的一项」);只有未达标才累积距离 —— **达标即满分**。
 	if g.Voice != nil {
-		sum += math.Abs(float64(e.Voice)-float64(*g.Voice)) / float64(VoiceHigh-VoiceLow)
 		n++
+		if !voiceReached(e.Voice, *g.Voice) {
+			sum += math.Abs(float64(e.Voice)-float64(*g.Voice)) / float64(VoiceHigh-VoiceLow)
+		}
 	}
 	if g.WeightPct != nil {
-		sum += math.Abs(e.WeightPct-*g.WeightPct) / 100
 		n++
+		if !weightReached(e.WeightPct, *g.WeightPct) {
+			sum += math.Abs(e.WeightPct-*g.WeightPct) / 100
+		}
 	}
-	if g.hasNatureGoal() {
-		sum += 1 - e.NatureP
+	if len(targets) > 0 {
 		n++
+		// 性格是概率、没有「值」可判方向:仍按「离命中还差多少」计分(全中为 0)。
+		sum += 1 - e.NatureP
 	}
 	if n == 0 {
 		return 0 // 什么目标都没填:所有组合等价
@@ -271,9 +430,25 @@ func Score(e Expectation, g BreedingGoal) float64 {
 
 // Candidate 一位候选种母及其可配的父本(串窝时多个,来自服务器的 lay_egg_couple)。
 type Candidate struct {
-	Mother    EggParent   `json:"mother"`
-	Fathers   []EggParent `json:"fathers"`
-	Ambiguous bool        `json:"ambiguous"` // 父本不唯一:实际是谁只能等破壳后反推
+	Mother EggParent `json:"mother"`
+	// FatherIdx 可配父本在**所属 Pool.Fathers** 里的下标,不是父本本身。
+	//
+	// 为什么存下标而不是各存一份 EggParent:同一位种公能给多位母本配对,逐母本存一份
+	// 等于把「母本数 × 父本数」整个物化一遍 —— 实测 1000 只宠物(500♀ × 500♂)时是
+	// 41MB,而 Suggest 与 VoiceReachOf 只是遍历它算个数,根本不需要人手一份拷贝。
+	// 存下标后父本常驻一份(几百项,L2 装得下),遍历从「扫几十 MB 结构体」变成
+	// 「扫几 MB 整数」。
+	FatherIdx []int32 `json:"fatherIdx"`
+	Ambiguous bool    `json:"ambiguous"` // 父本不唯一:实际是谁只能等破壳后反推
+}
+
+// Pool 一个品种的候选池:候选母本 + 全池**共用**的父本表(见 Candidate.FatherIdx)。
+//
+// 遍历组合请走 Cands[i].FatherIdx 去 Fathers 里取,别假定候选自带父本 —— 那正是去物化
+// 要去掉的那份拷贝。
+type Pool struct {
+	Cands   []Candidate
+	Fathers []EggParent
 }
 
 // Suggestion 一个推荐组合:谁配谁、预期出什么、离目标多远。
@@ -294,29 +469,75 @@ type Suggestion struct {
 // childGids 是这条线历代子代的 gid 集合:父本落在里面即为**回交**(子代 × 亲本那样往上
 // 倒着配),此时给组合标上 Backcross。前端那颗「回交」标签此前一直是死的 —— 后端从没
 // 赋过值,而"这一组是不是回交"只有线自己知道(候选池里看不出来)。
-func Suggest(cands []Candidate, g BreedingGoal, n int, childGids map[uint32]bool) []Suggestion {
+func Suggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool) []Suggestion {
+	// 目标集合在循环外解析一次:每个组合都要用它算命中概率与打分,重复解析是白花钱
+	// (见 predictWith 的注释)。
+	targets := g.natures()
 	var out []Suggestion
-	for _, c := range cands {
-		for _, f := range c.Fathers {
-			e := Predict(c.Mother, f, g)
-			out = append(out, Suggestion{
+	if n > 0 {
+		out = make([]Suggestion, 0, n)
+	}
+	for _, c := range pool.Cands {
+		for _, idx := range c.FatherIdx {
+			f := pool.Fathers[idx]
+			e := predictWith(c.Mother, f, targets)
+			s := Suggestion{
 				Mother:    c.Mother,
 				Father:    f,
 				Exp:       e,
-				Score:     Score(e, g),
+				Score:     scoreWith(e, g, targets),
 				Ambiguous: c.Ambiguous,
 				Backcross: childGids[f.Gid],
-			})
+			}
+			if n > 0 {
+				out = topNInsert(out, s, n)
+				continue
+			}
+			out = append(out, s)
 		}
 	}
-	sortSuggestions(out)
-	if n > 0 && len(out) > n {
-		out = out[:n]
+	if n <= 0 {
+		// n<=0 表示「全给」(只有测试用):规模小,走原路的全量稳定排序。
+		sortSuggestions(out)
+		return out
 	}
 	return out
 }
 
+// topNInsert 把 s 插进**升序**的前 N 名候选池,池长不超过 n;返回池(可能被原样返回)。
+//
+// 为什么单趟维护而不是全量排序:组合数是母本数 × 父本数,几百只宠物就上万、上千只就几十万。
+// 原先先全量物化再对**全部**组合做插入排序(O(k²)),1 万组合实测 700ms、25 万组合要几分钟;
+// 而且要的只是前 5 条,却给每个组合都拷了一份完整的 Suggestion(内含母/父两个 EggParent)。
+// 单趟维护长度 n 的池后是 O(k·n)(n 为常数,等价 O(k)),内存从 O(k) 降到 O(n)。
+//
+// **语义必须与「全量稳定排序后取前 n」完全一致**,否则契约 golden 里那几组建议会变:
+//   - 插入位置 = 第一个**不比 s 更好**的元素之前,故等价元素(Score/WeightHi/Voice 三键全等)
+//     时 s 落在**后面**,不抢占先来者的位置 —— 与插入排序的稳定语义一致;
+//   - 池满时只有 s **严格**优于末位才替换,等价则淘汰 s(稳定排序下后到的等价元素排在第 n 之后)。
+func topNInsert(top []Suggestion, s Suggestion, n int) []Suggestion {
+	i := len(top)
+	for i > 0 && lessSuggestion(s, top[i-1]) {
+		i--
+	}
+	if len(top) >= n {
+		if i >= n {
+			return top // 不比末位好(或与之等价):挤不进去
+		}
+		copy(top[i+1:], top[i:n-1]) // 末位被挤出
+		top[i] = s
+		return top
+	}
+	top = append(top, s)
+	copy(top[i+1:], top[i:])
+	top[i] = s
+	return top
+}
+
 // sortSuggestions 按差距升序;同分时按「体重上界更高、嗓音更极端」排前,让结果稳定可复现。
+//
+// 插入排序是**稳定**的:等价元素保留输入次序(比较用的是严格 < >,相等即不交换)。
+// 这个性质被上面的 topNInsert 与契约 golden 依赖,换成不稳定的排序会让输出次序漂移。
 func sortSuggestions(s []Suggestion) {
 	for i := 1; i < len(s); i++ {
 		for j := i; j > 0 && lessSuggestion(s[j], s[j-1]); j-- {
@@ -340,35 +561,54 @@ func lessSuggestion(a, b Suggestion) bool {
 // VoiceReach 是「拿现有候选去配,下一代嗓音最远能到哪」的结论。
 //
 // 为什么要单独算:子代嗓音 = floor((母+父)/2)(见 Predict),是**向下取整的均值**,不是
-// 「子代能超过双亲」。于是目标 +100 只有 100 × 100 孵得出,任一方不足 100 都只能无限接近
-// (99 × 100 → 99,再迭代也一样);负向完全对称 —— 目标 -100 同样只有 -100 × -100 够得着。
-// 没有这个结论时,页面会把「99 × 100 → 预期 99、差 1」照常排进前几名:看着在进步,实则
-// 永远到不了,玩家会照着它白配好几代。
+// 「子代能超过双亲」。于是高目标很难够:目标 +100 只有 100 × 100 孵得出,任一方不足 100 都
+// 只能无限接近(99 × 100 → 99,再迭代也一样);往低刷的目标容易些 —— floor 朝负无穷取整,
+// 目标 -100 时 -100 × -99 → -100 也够得着。没有这个结论时,页面会把「99 × 100 → 预期 99、
+// 差 1」照常排进前几名:看着在进步,实则永远到不了,玩家会照着它白配好几代。
 type VoiceReach struct {
 	Target int32 `json:"target"` // 这条线的目标嗓音
-	Best   int32 `json:"best"`   // 现有候选里离目标最近的那一组能达到的预期嗓音
-	Hit    bool  `json:"hit"`    // 是否真有组合恰好命中目标(Best == Target)
+	Best   int32 `json:"best"`   // 现有候选在**目标方向上**能达到的极值:高目标取最高、低目标取最低、中心取最近
+	Hit    bool  `json:"hit"`    // 该极值本身是否已达标(与 goalHit 同一判定,见 reached)
 }
 
 // VoiceReachOf 遍历候选池求可达性,枚举口径与 Suggest 完全一致(每个母本 × 它的每个父本
 // 候选)—— 页面推荐的正是这批组合,结论必须说的是同一批,不能另立一套筛选。
 //
+// Best 取**目标方向上的极值**(见 betterReachVoice),不能一律取「离目标最近」:方向化达标下
+// 最近的那个可能落在目标的反面 —— 可达集 {95,100}、目标 96 时最近的是 95(判够不着),而 100
+// 其实已经达标。Hit 用与 goalHit 同一个 reached 判定。
+//
 // 空池返回 Best=Target、Hit=false:没有候选时「够不着」比「达到了」诚实(前端据 Hit 提示),
 // 否则一条刚建的空线会被报成「目标已可达」。
-func VoiceReachOf(cands []Candidate, target int32) VoiceReach {
+func VoiceReachOf(pool Pool, target int32) VoiceReach {
 	out := VoiceReach{Target: target, Best: target}
 	found := false
-	for _, c := range cands {
-		for _, f := range c.Fathers {
-			// 只关心嗓音,故不传这条线的目标:Predict 里目标只影响性格命中概率。
-			v := Predict(c.Mother, f, BreedingGoal{}).Voice
-			if !found || abs32(v-target) < abs32(out.Best-target) {
+	for _, c := range pool.Cands {
+		for _, idx := range c.FatherIdx {
+			// 只关心嗓音,故直接算而不用 Predict:那会为每个组合多算体重、多构造一个
+			// Expectation —— 而这里要遍历全部组合(上千只宠物时是几十万次)。
+			v := voiceOf(c.Mother, pool.Fathers[idx])
+			if !found || betterReachVoice(v, out.Best, target) {
 				out.Best, found = v, true
 			}
 		}
 	}
-	out.Hit = found && out.Best == target
+	out.Hit = found && voiceReached(out.Best, target)
 	return out
+}
+
+// betterReachVoice v 是否比 cur 更该被记作「目标方向上的极值」:高目标看谁更大、低目标看谁更小、
+// 中心看谁离目标更近。与 reached 的方向口径一一对应。
+func betterReachVoice(v, cur, target int32) bool {
+	const center int32 = (VoiceLow + VoiceHigh) / 2
+	switch {
+	case target > center:
+		return v > cur
+	case target < center:
+		return v < cur
+	default:
+		return abs32(v-target) < abs32(cur-target)
+	}
 }
 
 // —— 回交建议 ——
@@ -505,8 +745,9 @@ func abs32(v int32) int32 {
 
 // LineStats 汇总一条线:代数、历代最佳嗓音、历代最佳体重百分位。
 //
-// 「最佳」按目标算:填了目标就取离目标最近的(玩家要的是达标,不是极端);没填目标时
-// 嗓音取绝对值最大的、体重取最重的 —— 收集向的玩法要的就是极端个体。
+// 「最佳」按目标算:**达标优先,其次离目标最近**(方向化后,一个已达标的 97 不该被一个没达标
+// 的 96 挤掉 —— 那正是「只取离目标最近」会露出的错);没填目标时嗓音取绝对值最大的、
+// 体重取最重的 —— 收集向的玩法要的就是极端个体。
 func LineStats(l *BreedingLine) (gens int, bestVoice *int32, bestWeight *float64) {
 	if l == nil {
 		return 0, nil, nil
@@ -530,15 +771,28 @@ func LineStats(l *BreedingLine) (gens int, bestVoice *int32, bestWeight *float64
 }
 
 // closerVoice 这一代的嗓音是否比已记录的最佳值更值得留下。
+//
+// 目标是「**达标优先**,其次离目标更近」:方向化后一个已达标的 97 显然比一个没达标的 96
+// 更值得留 —— 而「只取离目标最近」会把 96 选出来,让卡片写着一个未达标的「最佳」。
+// 两者达标状态相同(都中或都不中)时才比距离。没填目标时仍取绝对值最大的(收集向玩法)。
 func closerVoice(c EggParent, best *int32, g BreedingGoal) bool {
 	if g.Voice != nil {
+		ch, bh := voiceReached(c.Voice, *g.Voice), voiceReached(*best, *g.Voice)
+		if ch != bh {
+			return ch
+		}
 		return math.Abs(float64(c.Voice-*g.Voice)) < math.Abs(float64(*best-*g.Voice))
 	}
 	return abs32(c.Voice) > abs32(*best)
 }
 
+// closerWeight 同 closerVoice,体重那一路。
 func closerWeight(pct float64, best *float64, g BreedingGoal) bool {
 	if g.WeightPct != nil {
+		ch, bh := weightReached(pct, *g.WeightPct), weightReached(*best, *g.WeightPct)
+		if ch != bh {
+			return ch
+		}
 		return math.Abs(pct-*g.WeightPct) < math.Abs(*best-*g.WeightPct)
 	}
 	return pct > *best
@@ -551,11 +805,11 @@ func closerWeight(pct float64, best *float64, g BreedingGoal) bool {
 // 为什么要求同一代同时满足,而不是「各目标分别被不同子代满足」:玩家的意图是「培育出一只
 // 大块头婉转声就停」—— 要的是那一只,不是「嗓音达标的一只 + 体重达标的另一只」。
 //
-// 各项口径:
-//   - 嗓音**精确相等**。子代嗓音 = floor((母+父)/2) 是确定值(见 Predict),没有随机成分,
-//     差 1 就是没到;与 VoiceReach.Hit 判「够不够得着」用的是同一口径。
-//   - 体重允许 weightOptimisticPP 的容差。实测体重在双亲百分位均值上下浮动(两条样本
-//     分别高 1.72pp 与 0.25pp),要求精确相等等于永远差一点点、永不达标。
+// 各项口径(全部走 reached 的方向化判定):
+//   - 嗓音:目标 > 0 时「≥ 目标」算到,目标 < 0 时「≤ 目标」算到,目标 = 0 时精确相等。
+//     子代嗓音 = floor((母+父)/2) 是确定值(见 Predict),方向化后「97 对目标 96」算达标。
+//   - 体重:同方向化(轴 0~100,中心 50)。**没有 ±2pp 容差** —— 那只是预测的乐观上界
+//     (Expectation.WeightHi),不再参与达标。
 //   - 性格落在目标集合里。它本就是概率继承,到了就是到了;「正面加某维」时集合里那 5 个都算。
 //
 // 目标一项未填时恒为 false:没有目标的线谈不上「达成」,否则新建的空线会被立刻判成达成。
@@ -574,14 +828,14 @@ func ReachGoal(l *BreedingLine) bool {
 	return false
 }
 
-// goalHit 一只子代是否同时满足全部已填目标项。
+// goalHit 一只子代是否同时满足全部已填目标项(方向化达标,见 reached)。
 func goalHit(c EggParent, g BreedingGoal) bool {
-	if g.Voice != nil && c.Voice != *g.Voice {
+	if g.Voice != nil && !voiceReached(c.Voice, *g.Voice) {
 		return false
 	}
 	if g.WeightPct != nil {
 		// 体重未知(该形态没有取值范围)不算命中:拿 0 去比会把「测不出」当成「最轻的」。
-		if c.WeightPct == nil || math.Abs(*c.WeightPct-*g.WeightPct) > weightOptimisticPP {
+		if c.WeightPct == nil || !weightReached(*c.WeightPct, *g.WeightPct) {
 			return false
 		}
 	}
@@ -796,30 +1050,118 @@ func DeriveChain(db *gamedata.DB, l *BreedingLine) {
 //
 // 配不出父本的母本不返回(没有可推荐组合,列出来只是噪音)。候选的 Ambiguous 表示「这位
 // 母本有多个可配种公」,由玩家自己挑一只放进小窝,而不是我们替他选。
-func BreedPool(ref ChainRef, pets []*Pet) []Candidate {
-	if ref.Empty() {
-		return nil
+func BreedPool(ref ChainRef, pets []*Pet) Pool {
+	return NewPoolSource(pets).BreedPool(ref)
+}
+
+// PoolSource 一次请求内**跨培育线共用**的候选素材:雄性快照与它们的蛋组掩码。
+//
+// 为什么单独拎出来:这两样只按**性别**筛,与品种(ref)无关 —— 同一份宠物库下每条线算出来
+// 的雄性集合完全一样,而 handleBreeding 要为每个账号的全部线各建一次候选池。逐线各建
+// 一遍等于把几百次 ParentSnapshot 与蛋组掩码重复做 N 遍(线通常个位数)。
+//
+// 与 handleBreeding 里已有的 pets / byGid 是同一层东西:一次请求建一次,给全部线用。
+type PoolSource struct {
+	pets     []*Pet // 母本仍要按 ref 筛,故全库留一份(只用于读)
+	males    []EggParent
+	maleMk   []uint64                  // 与 males 一一对应的蛋组掩码(见 maskOf)
+	maleEggs [][]gamedata.EggGroup     // 同上:掩码不可用时的退回路径要用(见 eggMatch)
+	// bitOf 组名 → 位。为 nil 表示蛋组种类超过 64,掩码装不下,一律退回字符串比较。
+	bitOf map[string]uint64
+}
+
+// NewPoolSource 按一份宠物库建候选素材。蛋组在这里**一次性**编号成位(见 eggMatch)。
+func NewPoolSource(pets []*Pet) PoolSource {
+	src := PoolSource{pets: pets}
+	seen := make(map[string]bool, 16)
+	for _, p := range pets {
+		for _, g := range p.EggGroups {
+			if g.Name != "" {
+				seen[g.Name] = true
+			}
+		}
 	}
-	var out []Candidate
-	for _, m := range pets {
+	// 掩码只装得下 64 种组。超了就整体退回字符串比较 —— 而不是给一部分宠物用掩码、
+	// 另一部分不用:两条路算出来的「能不能配」必须时刻一致,混着用迟早分叉。
+	if len(seen) <= 64 {
+		src.bitOf = make(map[string]uint64, len(seen))
+		var bit uint64 = 1
+		for n := range seen {
+			src.bitOf[n] = bit
+			bit <<= 1
+		}
+	}
+	for _, p := range pets {
+		if p.Gender != "♂" {
+			continue
+		}
+		src.males = append(src.males, ParentSnapshot(p))
+		src.maleMk = append(src.maleMk, src.maskOf(p.EggGroups))
+		src.maleEggs = append(src.maleEggs, p.EggGroups)
+	}
+	return src
+}
+
+// maskOf 蛋组 → 位掩码。未登记的名字(含空名)贡献 0 位,与 EggGroupsMatch 跳过空名同义。
+func (src PoolSource) maskOf(gs []gamedata.EggGroup) uint64 {
+	if src.bitOf == nil {
+		return 0
+	}
+	var m uint64
+	for _, g := range gs {
+		m |= src.bitOf[g.Name]
+	}
+	return m
+}
+
+// eggMatch 这位母本与第 maleIdx 位种公能不能配上(蛋组有交集)。
+//
+// **必须与 EggGroupsMatch 同义**,由 TestEggMatchSameAsGroupsMatch 逐对钉住。
+//
+// 走掩码是为了内层的「每只母本 × 全部雄性」循环 —— 那是全库唯一的平方级热点,嵌套比名字
+// 时每对要做几次字符串 ==,换成掩码后只剩一次 AND。mMasks 是母本那侧**预算好**的掩码:
+// 一位母本要跟几百只公比,不预算就是每位母本重算几百遍。
+//
+// 掩码不可用时(蛋组种类 > 64)原样退回 EggGroupsMatch —— 口径只有一份,不重写第二套。
+func (src PoolSource) eggMatch(mEggs []gamedata.EggGroup, mMask uint64, maleIdx int) bool {
+	if src.bitOf == nil {
+		return EggGroupsMatch(mEggs, src.maleEggs[maleIdx])
+	}
+	return mMask&src.maleMk[maleIdx] != 0
+}
+
+// BreedPool 为本品种挑候选:库里同品种(链)的 ♀ 当种母,与母本共用蛋组的 ♂ 当种公。
+//
+// 返回的 Pool 里父本只有**一份**(见 Candidate.FatherIdx)。
+func (src PoolSource) BreedPool(ref ChainRef) Pool {
+	if ref.Empty() {
+		return Pool{}
+	}
+	out := Pool{Fathers: src.males}
+	var idxs []int32
+	for _, m := range src.pets {
 		if !ref.Match(m) || m.Gender != "♀" {
 			continue
 		}
-		c := Candidate{Mother: ParentSnapshot(m)}
-		for _, f := range pets {
-			if f.Gid == m.Gid || f.Gender != "♂" {
+		mMask := src.maskOf(m.EggGroups)
+		for i, snap := range src.males {
+			// 不能跟自己配(同一个体只有一个 gid)。
+			if snap.Gid == m.Gid {
 				continue
 			}
-			if !EggGroupsMatch(m.EggGroups, f.EggGroups) {
+			if !src.eggMatch(m.EggGroups, mMask, i) {
 				continue
 			}
-			c.Fathers = append(c.Fathers, ParentSnapshot(f))
+			idxs = append(idxs, int32(i))
 		}
-		if len(c.Fathers) == 0 {
+		if len(idxs) == 0 {
 			continue
 		}
-		c.Ambiguous = len(c.Fathers) > 1
-		out = append(out, c)
+		c := Candidate{Mother: ParentSnapshot(m), FatherIdx: make([]int32, len(idxs))}
+		copy(c.FatherIdx, idxs)
+		idxs = idxs[:0]
+		c.Ambiguous = len(c.FatherIdx) > 1
+		out.Cands = append(out.Cands, c)
 	}
 	return out
 }
@@ -956,6 +1298,9 @@ func LatestChild(l *BreedingLine) (child, mother, father EggParent, ok bool) {
 // 两代就会同号 —— 认领按代数定位,便会补到错误的一代上。
 func NextGen(l *BreedingLine) int {
 	gen := 0
+	if l != nil {
+		gen = l.GenBase // 子线接在母线之后:本线第一代是 GenBase+1
+	}
 	for _, g := range l.Gens {
 		if g.Gen > gen {
 			gen = g.Gen
@@ -1024,6 +1369,35 @@ func FindGenByEgg(l *BreedingLine, eggGid uint32) (Generation, bool) {
 		}
 	}
 	return Generation{}, false
+}
+
+// MergeChildLine 把子线**物理并入**母线:子线的历代原样搬过去,子线随后由调用方删掉。
+//
+// 为什么能「原样搬」而不用重排代数:子线的代数本来就是接着母线数的(见 NewChildLine 的
+// GenBase),两边的代数不会撞,合并后按代数排一遍即可。这正是 GenBase 的第二个用处 ——
+// 没有它,合并就得改子线每一代的 gen,那是个不可逆、且改错了无从察觉的操作。
+//
+// 搬什么:Gens 与 Pending 全搬(那是子线自己孵出来的历史)。**目标不搬** —— 子线的目标是
+// 从母线继承来的,母线自己那份才是权威的,搬回去等于拿副本覆盖原件。
+//
+// **孙辈要由调用方重挂**:以这条子线为 ParentLineID 的线若不改挂到母线上,谱系视图上就
+// 从这一代断掉(它们会指向一条已经不存在的线)。本函数只改传进来的这两条,碰不到全库。
+//
+// 返回是否真的搬了。**不可逆** —— 子线删掉就没有了,故调用方必须二次确认(见
+// handleBreedingMerge)。子线不是这条线的孩子、或本来就没有代数,都返回 false 且不动手。
+func MergeChildLine(parent, child *BreedingLine) bool {
+	if parent == nil || child == nil || parent.ID == "" || child.ID == "" {
+		return false
+	}
+	if child.ParentLineID != parent.ID || (len(child.Gens) == 0 && len(child.Pending) == 0) {
+		return false
+	}
+	parent.Gens = append(parent.Gens, child.Gens...)
+	sortGenerations(parent.Gens)
+	parent.Pending = append(parent.Pending, child.Pending...)
+	sortGenerations(parent.Pending)
+	child.Gens, child.Pending = nil, nil
+	return true
 }
 
 // MarkHatched 破壳回包给出孵出的 gid 时,把它记到那一代上。
@@ -1118,6 +1492,30 @@ func NewAutoLine(id string, ps *EggParents, at int64) *BreedingLine {
 		l.Evo = ps.Mother.Evo
 		l.Species = ps.Mother.Species
 		l.ConfID = ps.Mother.ConfID
+		l.MotherGid = ps.Mother.Gid
 	}
+	return l
+}
+
+// NewChildLine 开一条**子线**:换上的新种母是 parent 孵出来的子代时走这里。
+//
+// 为什么换了种母就得换行:线的身份是种母(见 MotherGid),换了就是另一条线 —— 这是「同一
+// 品种几条线互不干扰」的代价,也是它的前提。故这里不接着母线记,而是挂成子线:
+//   - ParentLineID 指向母线,页面沿链把培育史串起来;
+//   - 继承母线的目标(换种母不是换目标,玩家没必要重填一遍);
+//   - GenBase 取母线最后一代的代数,故子线的第一代接着往下数,代数在整条谱系上连续。
+//
+// **只继承目标**:Gens / Pending 是母线的历史,由 ParentLineID 引用,不复制过来 —— 复制就
+// 成了两份,将来物理合并时无从判断哪份是真的。
+//
+// 野外抓来的、与任何线都没有血缘的母本**不**走这里,而是 NewAutoLine 开独立新线。
+func NewChildLine(id string, parent *BreedingLine, ps *EggParents, at int64) *BreedingLine {
+	l := NewAutoLine(id, ps, at)
+	if parent == nil {
+		return l
+	}
+	l.ParentLineID = parent.ID
+	l.Goal = parent.Goal
+	l.GenBase = NextGen(parent) - 1 // 母线最后一代的代数
 	return l
 }

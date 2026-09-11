@@ -119,7 +119,7 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 	// mutation_type bit0=异色,异色宠物部分有专属头像/全身图(无则回退普通)。
 	shiny := p.GetMutationType()&1 != 0
 	confID, base := p.GetConfId(), p.GetBaseConfId()
-	species, image := db.Species(confID), db.PetImage(confID, shiny)
+	species := db.Species(confID)
 	var book, stage uint32
 	var form string
 	if base != 0 {
@@ -128,9 +128,6 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 				species = info.Name
 			}
 			book, form, stage = info.Book, info.Form, info.Stage
-			if img := db.PetImageByBase(base, shiny); img != (gamedata.PetImage{}) {
-				image = img
-			}
 		}
 	}
 
@@ -169,9 +166,10 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 		// mutation_type 为位标志: bit0=异色, bit3=炫彩(实测样本验证)。
 		Shiny:    shiny,
 		Colorful: p.GetMutationType()&8 != 0,
-
-		Image: image,
 	}
+	// 图片按「当前形态 → 进化线一阶」的次序取,单独走 FillPetImage —— store 的窄投影
+	// 读取要用同一套,两处各写一套迟早分叉(见该函数的注释)。
+	FillPetImage(db, out)
 
 	// 炫彩外观类型/数值直接取自 GlassInfo(与 mutation_type bit3 一致),
 	// 前端据此用玻璃色卡素材 CSS mask 渲染色卡(见 web/src/components/badges.jsx)。
@@ -241,6 +239,28 @@ func ToPet(p *pb.PetData, db *gamedata.DB) *Pet {
 	}
 
 	return out
+}
+
+// FillPetImage 按「当前形态 → 进化线一阶」的次序补出各尺寸图片路径。
+//
+// 为什么这个次序:base_conf_id 指向**当前形态**,conf_id 只到进化线一阶 —— 只按 conf_id
+// 取会把进化过的宠物显示成一阶的样子(火神显示成火花),故先给一阶兜底、再由形态覆盖。
+//
+// 抽成函数是因为 store 的**窄投影**读取也要补这一项:那条路不反序列化 data JSON,图片
+// 只能按同样的规则从 gamedata 重算。两处各写一套迟早分叉(与 FillSizePercentile 同理)。
+//
+// shiny 参与取图:异色变体有专属头像,但仅在「索引里有该字段且 webp 确已 embed」时才用,
+// 否则回退普通图(见 gamedata.imageOf)—— 故这里必须把 Shiny 传下去。
+func FillPetImage(db *gamedata.DB, pets ...*Pet) {
+	for _, p := range pets {
+		img := db.PetImage(p.ConfID, p.Shiny)
+		if p.BaseConfID != 0 {
+			if byBase := db.PetImageByBase(p.BaseConfID, p.Shiny); byBase != (gamedata.PetImage{}) {
+				img = byBase
+			}
+		}
+		p.Image = img
+	}
 }
 
 // FillSizePercentile 按当前形态(base_conf_id)为宠物注入身高/体重取值范围及当前值百分位。
