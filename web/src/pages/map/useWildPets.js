@@ -128,7 +128,7 @@ export function useWildPets(account) {
   const seenIdsRef = useRef(new Set())
   const initedRef = useRef(false)
   useEffect(() => {
-    // 空列表不参与「已见」结转:点过「清空」或这会儿确实一只都没有时,不能把已见集合清光 ——
+    // 空列表不参与「已见」结转:传送清屏、或这会儿确实一只都没有时,不能把已见集合清光 ——
     // 否则同一批宠下次推回来会被当成「新出现」,走回去一趟能把提醒重弹一遍。
     if (!pets.length) return
     const ids = new Set(pets.map((p) => p.id))
@@ -191,12 +191,6 @@ export function useWildPets(account) {
   const toggleDual = () => setDual((prev) => !prev)
   const toggleHideStale = () => setHideStale((prev) => !prev)
 
-  // clear 清掉当前这一批标记 —— **只清前端**:后端管线里的观测态(见过谁、什么时候离开)
-  // 一点没动。后端按 150ms 窗口推全量(见后端 wildsDebounce 的实测),玩家一走动、有实体
-  // 进出就再推一批过来 —— 故这是「卡顿得受不了时把这一屏先清干净」,站着不动时一直有效,
-  // 不是删数据。真删要动后端,而那与「不值得为它留删数据入口」的既有决定相左
-  // (见 server.go 里 DELETE /api/wildpets 那段注释)。
-  const clear = useCallback(() => setData({ pets: [], allPets: [] }), [setData])
   // 双牌开关变化时联动「仅双牌时提醒」:开 → 自动勾选(一步到位「只看双牌 + 只提醒双牌」);
   // 关时不自动取消(保留用户选择;关后 isDualMedal 仍按 ≥2 条判,仍能工作)。
   // 只改 state,落盘交给上面那个 effect(避免 updater 里的副作用)。
@@ -264,7 +258,7 @@ export function useWildPets(account) {
     open, toggleOpen,
     rangeRules, setRangeRules,
     dual, toggleDual,
-    hideStale, toggleHideStale, clear,
+    hideStale, toggleHideStale,
     notify, toggleNotify, notifyDualOnly, toggleNotifyDualOnly,
   }
 }

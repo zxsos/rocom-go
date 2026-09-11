@@ -39,6 +39,27 @@ const loadHD = () => {
   try { return localStorage.getItem(HD_LS_KEY) === '1' } catch { return false }
 }
 
+// 标准底图的像素上限(大世界 4096,见 gen_bigmap.py 的 WORLD_PX)。
+//
+// **为什么要有这个门槛**:mapPx ≤ 4096 时标准底图是缩小显示的、已经最清晰,再盖一张
+// 8192² 的高清层不会多出一个像素的细节,却要白白解码 8192×8192×4B = **268MB 位图**
+// 并常驻显存(标准底图才 67MB)。实测这正是「开了高清就卡顿」的来源 —— 开关一开就挂载,
+// 与当前缩放无关,而默认缩放(桌面 mapPx≈3500)根本用不到高清。
+// 故高清层按当前缩放门控:只有放大到超出标准底图分辨率、标准底图开始被插值放大时才挂载。
+const HD_MIN_MAP_PX = 4096
+
+// 布局尺寸的封顶值 = 各层自己的源分辨率。世界底图 4096²(gen_bigmap.py 的 WORLD_PX);
+// 家园底图虽只有 2048²,但它的 mapPx 本就很小(zoom 上限低、场景小),够不到这个封顶,
+// 故统一用 4096 即可,不必按场景分支。
+const BASE_SRC_PX = 4096
+
+// 高清瓦片规格:4×4 张 2048²(见 scripts/fetch_bigmap_hd.py 与 gamedata.MapImageHD),
+// 整图等效边长 8192。前端的可见性判定、定位与 URL 拼接都按这套切分来 ——
+// 改这里必须同步改生成脚本,两处不一致会错位或抓到不存在的文件。
+const HD_SIDE = 4
+const HD_TILE_PX = 2048
+const HD_TOTAL_PX = HD_SIDE * HD_TILE_PX
+
 // useMapEngine 抽离自 MapPage:地图引擎内核——位置/外推/RAF/视图状态 + 图层数据订阅。
 // 浮窗与主页面共用此 hook,各自渲染外壳(MapViz),省一份逻辑拷贝。
 export function useMapEngine(account) {
@@ -90,6 +111,59 @@ export function useMapEngine(account) {
   // 中赋的最新位置,导致 onTap 距离计算用到旧坐标。
   const view = usePanZoom(onTap)
   const { focusRef, stRef } = view
+
+  // —— 高清瓦片:只挂载视口当前覆盖到的那几张 ——
+  //
+  // 为什么不能整图:8192² 解码后是 268MB 位图,一次性呈现会把主线程卡住数秒(实测无 GPU
+  // 的环境下单帧 2.8s)。切成 4×4 张 2048²(每张 ≈16MB)后,每次只取视口覆盖到的 1~4 张,
+  // 内存与首挂开销都降一个量级。
+  //
+  // 为什么走定时器而不是 applyFrame:后者在玩家静止时会停(见 tick 的静止判定),而视口范围
+  // 在静止时本来也不变 —— 挂进去反而要多绕一层。代价是快速移动时瓦片最多晚 200ms 跟上;
+  // 但高清层是**叠加**不是替换,那些还没跟上的地方透出的是标准底图,不会出现空白。
+  const [hdTiles, setHdTiles] = useState(null)
+  const hdKeyRef = useRef('')
+  const hdGateRef = useRef(false)
+  const hdDir = pos && pos.imgHd ? pos.imgHd : ''
+  useEffect(() => {
+    if (!hd || !hdDir) {
+      hdKeyRef.current = ''
+      hdGateRef.current = false
+      setHdTiles(null)
+      return
+    }
+    const check = () => {
+      const st = stRef.current
+      const mapPx = (Math.min(st.vp.w, st.vp.h) || 1) * st.zoom
+      // 门控(带迟滞,见 HD_MIN_MAP_PX):mapPx 未超出标准底图的分辨率时不挂瓦片 ——
+      // 此时标准底图是缩小显示、已经最清晰,挂了也不会多出一个像素。
+      const on = hdGateRef.current ? mapPx > HD_MIN_MAP_PX * 0.93 : mapPx > HD_MIN_MAP_PX
+      hdGateRef.current = on
+      let list = null
+      if (on) {
+        // 可视范围 = 视口中心(focusRef,跟随模式下即玩家)± 半个视口换算成的地图比例。
+        const f = focusRef.current
+        const hu = st.vp.w / 2 / mapPx
+        const hv = st.vp.h / 2 / mapPx
+        const c0 = Math.max(0, Math.floor((f.u - hu) * HD_SIDE))
+        const c1 = Math.min(HD_SIDE - 1, Math.floor((f.u + hu) * HD_SIDE))
+        const r0 = Math.max(0, Math.floor((f.v - hv) * HD_SIDE))
+        const r1 = Math.min(HD_SIDE - 1, Math.floor((f.v + hv) * HD_SIDE))
+        list = []
+        for (let r = r0; r <= r1; r++) {
+          for (let c = c0; c <= c1; c++) list.push(r * HD_SIDE + c + 1)
+        }
+      }
+      const key = list ? list.join(',') : ''
+      if (key !== hdKeyRef.current) {
+        hdKeyRef.current = key
+        setHdTiles(list)
+      }
+    }
+    check()
+    const id = setInterval(check, 200)
+    return () => clearInterval(id)
+  }, [hd, hdDir, stRef, focusRef])
   const pois = usePois(account, pos && pos.sceneResId)
   const wilds = useWildPets(account)
   wildsRef.current = wilds.marks
@@ -266,7 +340,7 @@ export function useMapEngine(account) {
 
   return {
     pos, hasMap, imgError, layerError, setImgError, setLayerError,
-    hd, setHd,
+    hd, setHd, hdTiles,
     view, worldRef, arrowRef, battleRef, applyFrame,
     pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, setWildTip, wildDist, setWildDist, onTap, clearUiState,
@@ -287,11 +361,20 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
   // 本函数与 useMapEngine **不是同一个作用域**,漏传就只在运行时炸 ReferenceError
   // (vite build 不做 no-undef 检查,构建照样过)—— 曾因此地图整页白屏。
   const { pos, hasMap, layerError, setImgError, setLayerError,
-    hd, setHd,
+    hd, setHd, hdTiles,
     view, worldRef, arrowRef, battleRef, pois, wilds, gathers, home, paint, routes,
     detailGid, setDetailGid, wildTip, wildDist,
     draggingRef, pokeFrame } = engine
   const mapPx = (Math.min(view.vp.w, view.vp.h) || 1) * view.zoom
+  // 底图的**布局尺寸封顶在源分辨率**(见 BASE_SRC_PX)。mapPx 最大可到 22560px
+  // (视口 705 × ZOOM_MAX 32),DOM 尺寸跟着涨会让 .map-world 变成 22560² 的合成层 ——
+  // 超过 Chromium 的图层尺寸上限时它会放弃合成提升、退回主线程逐帧绘制。而源图只有
+  // 4096²,布局尺寸超过它不会多出一个像素的细节,超出的放大交给 GPU 缩放即可,视觉等价
+  // (实测渲染矩形与 .map-world 完全重合)。mapPx 未超过封顶时布局尺寸就是 mapPx,与原行为一致。
+  //
+  // ⚠️ 实测口径:无 GPU 的 headless 里封顶前后稳态帧率无差异(都是 60fps)—— 它防的是
+  // 超大合成层被降级,别指望它解决高清瓦片的加载开销(那是下面 hdTiles 的事)。
+  const basePx = Math.min(mapPx, BASE_SRC_PX)
   // 包装 usePanZoom 的指针 handlers:拖动期间置 draggingRef(RAF 静止判定因此不停),
   // 按下时 pokeFrame 重启可能已停的 RAF。否则玩家静止时 RAF 停止,单指平移只更新
   // focusRef 没有帧循环消费,画面不动(双指缩放因 setZoom 每次触发重渲染画帧而不受影响)。
@@ -320,8 +403,11 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
           替换掉标准底图会让海洋露空,故两层同时存在(见下面的 map-base-hd)。 */}
       {pos && pos.imgHd && (
         <button className={'map-btn map-btn-hd' + (hd ? ' on' : '')}
-          title={hd ? '高清底图:已开启(大陆为高清素材,远海仍为标准图)'
-            : '高清底图:把大陆部分换成大分辨率素材'}
+          title={!hd
+            ? '高清底图:开启后,放大到超出标准底图分辨率时自动切用大分辨率素材(按视口分块加载)'
+            : (hdTiles
+              ? '高清底图:已开启(大陆为高清素材,远海仍为标准图)'
+              : '高清底图:已开启,继续放大会自动生效 —— 当前缩放还没超出标准底图的分辨率,挂上高清也是白解码')}
           onClick={() => setHd((v) => !v)}>高清</button>
       )}
       <button className="map-btn" title="放大" disabled={!zoomReady}
@@ -353,15 +439,31 @@ export function MapViz({ engine, layersActive, onToggleLayers, pip }) {
         <div className="map-vp" ref={view.attachVp} {...handlers}>
           <div className="map-world" ref={worldRef} style={{ width: mapPx, height: mapPx }}>
             <img className="map-base" src={imgURL(`bigmap/${pos.img}.webp`)} alt={pos.sceneName}
-              draggable={false} onError={() => setImgError(true)} />
+              draggable={false} onError={() => setImgError(true)}
+              style={{ width: basePx, height: basePx, transform: `scale(${mapPx / basePx})`, transformOrigin: '0 0' }} />
             {/* 高清叠加层:透明处透出上面那张标准底图,故两层同用一张地图的投影、
                 天然对齐(见 internal/gamedata/map.go 的 MapImageHD)。
                 压在层图/涂地/各标记之下 —— 它们都该盖在地形之上。
                 切换只是挂载/卸载这个节点,标准底图始终在,故不会有空窗或闪烁。 */}
-            {hd && pos.imgHd && (
-              <img className="map-base map-base-hd" src={imgURL(`bigmap/${pos.imgHd}.webp`)}
-                alt="" draggable={false} />
-            )}
+            {hdTiles && hdTiles.map((n) => {
+              // 瓦片 n(1 起,行主序)覆盖地图归一化区间的 [col/4,(col+1)/4] × [row/4,(row+1)/4]。
+              // 定位用 mapPx 坐标(与标记层同一套),尺寸则固定 2048²(源分辨率)+ GPU 缩放 ——
+              // 与标准底图同一套路,并因此天然与它共用一套投影、逐像素对齐。
+              const col = (n - 1) % HD_SIDE
+              const row = ((n - 1) / HD_SIDE) | 0
+              return (
+                <img key={n} className="map-base map-base-hd" alt="" draggable={false}
+                  src={imgURL(`bigmap/${pos.imgHd}/${String(n).padStart(2, '0')}.webp`)}
+                  style={{
+                    left: (col / HD_SIDE) * mapPx,
+                    top: (row / HD_SIDE) * mapPx,
+                    width: HD_TILE_PX,
+                    height: HD_TILE_PX,
+                    transform: `scale(${mapPx / HD_TOTAL_PX})`,
+                    transformOrigin: '0 0',
+                  }} />
+              )
+            })}
             {pos.layer && !layerError && (
               <img className="map-layer" src={imgURL(`bigmap/${pos.layer.img}.webp`)} alt="" draggable={false}
                 onError={() => setLayerError(true)}

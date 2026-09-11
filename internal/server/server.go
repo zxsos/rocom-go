@@ -237,9 +237,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/pois", s.handlePois)
 	s.mux.HandleFunc("GET /api/gathers", s.handleGathers)
 	s.mux.HandleFunc("GET /api/wildpets", s.handleWildPets)
-	// 曾有 DELETE /api/wildpets(清空野生宠标记),已删除:换场景本就整份作废
-	// (见 pipeline.resetWilds),同场景内的灰点又有 4 小时 TTL 兜着 —— 手动清空只剩
-	// 「不想看这些灰点了」这一种用处,不值为它留一个删数据的入口。
+	// 曾有 DELETE /api/wildpets(清空野生宠标记),已删除:换场景/传送本就整份作废
+	// (见 pipeline.resetWilds),走出 AOI 的灰点又有 4 小时 TTL 兜着,前端另有
+	// 「不画已离开视野的」开关 —— 手动清空只剩「不想看这些灰点了」这一种用处,
+	// 不值为它留一个删数据的入口(前端那个一键清空的按钮也已一并删掉)。
 	s.mux.HandleFunc("GET /api/paint", s.handlePaint)
 	s.mux.HandleFunc("DELETE /api/paint", s.handlePaintReset)
 	s.mux.HandleFunc("GET /api/home", s.handleHome)

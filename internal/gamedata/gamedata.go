@@ -237,14 +237,17 @@ func Load() (*DB, error) {
 		}
 		return nil
 	})
-	// 有高清版的底图:scripts/fetch_bigmap_hd.py 产出的 bigmap/<名>_hd.webp(见 MapImageHD)。
-	// 复用上面那份 embed 文件清单判定 —— 该脚本只在抓到图时才落盘,故「文件在」即「有高清版」;
-	// 没有的场景(家园、魔法学院…)前端不显示「高清」开关。
+	// 有高清瓦片的底图:scripts/fetch_bigmap_hd.py 产出的 bigmap/<底图名>_hd/<NN>.webp 目录
+	// (见 MapImageHD)。以 01.webp 的存在为准 —— 该脚本要么写全 16 张、要么报错退出,
+	// 不会留下半套,故查一张即可判定。没有的场景(家园、魔法学院…)前端不显示「高清」开关。
+	//
+	// 键是**底图名**(如 "10003",不带 _hd 后缀),与 MapImageHD 的查询口径一致;
+	// 目录名上的 _hd 是这个索引的实现细节,不要漏掉 TrimSuffix(漏了会让查询永远落空)。
 	hdMaps := map[string]bool{}
 	for p := range imgFiles {
 		if name, ok := strings.CutPrefix(p, "bigmap/"); ok {
-			if base, ok := strings.CutSuffix(name, "_hd.webp"); ok {
-				hdMaps[base] = true
+			if dir, ok := strings.CutSuffix(name, "/01.webp"); ok && strings.HasSuffix(dir, "_hd") {
+				hdMaps[strings.TrimSuffix(dir, "_hd")] = true
 			}
 		}
 	}

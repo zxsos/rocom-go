@@ -101,8 +101,8 @@ uv run python scripts/gen_gamedata.py  # Bin 配置 + all.pb → names.json(含�
 uv run python scripts/gen_images.py    # 宠物头像/全身图 → img/{HeadIcon,BigHeadIcon256,Pet256} webp
 uv run python scripts/gen_icons.py     # 属性/血脉/奖牌/POI 等 UI 图标 → img/{filter,blood,static,worldmap,medal} webp
 uv run python scripts/gen_bigmap.py    # 大地图/分层切片 → img/bigmap{,/layer} webp(实时地图页)
-uv run python scripts/fetch_bigmap_hd.py  # (可选,需联网)第三方 8192² 高清底图 → img/bigmap/*_hd.webp
-                                          #  供地图页「高清」开关;非解包数据,见 docs/data.md 3.1
+uv run python scripts/fetch_bigmap_hd.py  # (可选,需联网)第三方高清底图瓦片 → img/bigmap/<res>_hd/
+                                          #  供地图页「高清」开关按视口分块加载;非解包数据,见 docs/data.md 3.1
 
 # 2. 构建前端到 embed 目录
 cd web && npm install && npm run build && cd ..
