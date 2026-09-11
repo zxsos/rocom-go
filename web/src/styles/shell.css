@@ -18,6 +18,9 @@
    这块的价值就在于「看起来不像开关」,做显著了反而失去意义。 */
 .brand { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; line-height: 1; font-family: var(--font-display); cursor: pointer; background: none; border: none; padding: 0; transition: color .15s ease; }
 .brand-logo { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+/* 应用版本号:紧挨品牌的弱化小字,真源是仓库根 VERSION(web/vite.config.js 注入)。
+   窄屏隐藏(见下方 760px 媒体查询):顶栏要留给账号选择器与操作按钮。 */
+.topbar-ver { font-size: 10px; font-weight: 600; color: var(--fg-dim); font-variant-numeric: tabular-nums; user-select: none; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
   display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); color: var(--fg-dim);
@@ -387,6 +390,7 @@ html[data-privacy] .brand { color: var(--fg-dim); }
   /* 移动端顶栏:收紧间距,给内容(账号选择器)更多横向空间;全屏/主题按钮缩成纯图标(隐藏文字) */
   .topbar { gap: 8px; padding: 8px 12px; }
   .brand { font-size: 10px; max-width: none; }
+  .topbar-ver { display: none; }
   .topbar-fs { padding: 6px 8px; }
   .topbar-fs-text { display: none; }
   /* 手机端触发条**整体靠右**:
