@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — 在 Linux 网关上部署/更新 rocom-capture,数据与程序分离,更新不丢历史。
+# deploy.sh — 在 Linux 网关上部署/更新 rocom-go,数据与程序分离,更新不丢历史。
 #
 # 数据(rocom.db / TLS 证书)放在独立的 /var/lib/rocom/ 下,程序放在 /opt/rocom/ 下。
 # 更新时只替换二进制并重启服务,数据库与证书不受影响——会话密钥/归属/场景全部预热恢复,
@@ -12,8 +12,8 @@
 #                                   #   sudo ROCOM_GIT_REMOTE=cnb ./deploy.sh --build
 #                                   # (需先: git remote add cnb https://cnb.cool/roco12/roco.git)
 #   sudo ./deploy.sh                # 首次安装或更新已有二进制(自动找 dist/ 或当前目录)
-#   sudo ./deploy.sh --binary /tmp/rocom-capture  # 指定二进制路径
-#   sudo ./deploy.sh --archive x.tar  # 从 tar 包安装(内含 rocom-capture 单文件)
+#   sudo ./deploy.sh --binary /tmp/rocom-go  # 指定二进制路径
+#   sudo ./deploy.sh --archive x.tar  # 从 tar 包安装(内含 rocom-go 单文件)
 #   sudo ./deploy.sh --stop           # 仅停止服务(不删除数据)
 #   sudo ./deploy.sh --backup         # 备份数据库到 /var/lib/rocom/backup/
 #   sudo ./deploy.sh --migrate /root/roco  # 从旧目录迁移数据并安装(首次从手动部署切到 systemd)
@@ -48,11 +48,11 @@ INSTALL_DIR="/opt/rocom"
 RUN_SCRIPT="$INSTALL_DIR/run.sh"
 DATA_DIR="/var/lib/rocom"
 BACKUP_DIR="$DATA_DIR/backup"
-SERVICE_NAME="rocom"
+SERVICE_NAME="rocom-go"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 ENV_FILE="/etc/rocom.env"
 
-BIN_NAME="rocom-capture"
+BIN_NAME="rocom-go"
 ARCH="$(uname -m)"
 case "$ARCH" in
     x86_64)  ARCH="amd64" ;;
@@ -176,7 +176,7 @@ write_service() {
     cat > "$RUN_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 # 由 deploy.sh 生成,勿手改;参数调整请编辑 /etc/rocom.env
-BIN=/opt/rocom/rocom-capture
+BIN=/opt/rocom/rocom-go
 args=(
   -db /var/lib/rocom/rocom.db
   -cert /var/lib/rocom/rocom-cert.pem
@@ -210,7 +210,7 @@ EOF
     chmod +x "$RUN_SCRIPT"
     cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=rocom-capture (游戏流量抓包与统计)
+Description=rocom-go (游戏流量抓包与统计)
 After=network-online.target
 Wants=network-online.target
 
@@ -230,7 +230,7 @@ StateDirectory=rocom
 # 日志走 journald
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=rocom
+SyslogIdentifier=rocom-go
 
 [Install]
 WantedBy=multi-user.target
@@ -245,7 +245,7 @@ write_env() {
         return
     fi
     cat > "$ENV_FILE" <<EOF
-# rocom-capture 运行参数(改后执行: systemctl restart rocom)
+# rocom-go 运行参数(改后执行: systemctl restart rocom-go)
 # 抓包网卡(默认 eth0)
 ROCOM_IFACE=eth0
 # 游戏端口(默认 8195)
@@ -272,7 +272,38 @@ ROCOM_EGG_API_KEY=
 ROCOM_EXTRA=
 EOF
     chmod 600 "$ENV_FILE"
-    echo "已写入 $ENV_FILE —— 请编辑填入 ROCOM_IFACE 等参数后执行: systemctl start rocom"
+    echo "已写入 $ENV_FILE —— 请编辑填入 ROCOM_IFACE 等参数后执行: systemctl start rocom-go"
+}
+
+# ---- 旧单元退役(单元名 rocom → rocom-go)----
+#
+# 2026-09 项目改名为 rocom-go 时,systemd 单元名从 rocom.service 改成 rocom-go.service。
+# 旧单元若留在机器上,问题有二:① 它与新单元**抢同一个 Web 端口**,谁先起谁得;
+# ② 它指向的 /opt/rocom/rocom-capture 已被新二进制替换/删除,只会反复重启失败刷日志。
+# 故安装/迁移时顺手停用并删除旧单元文件。
+#
+# 只退役「单元文件」:不碰 /etc/rocom.env、/opt/rocom、/var/lib/rocom —— 配置与数据原样复用。
+LEGACY_SERVICE_NAME="rocom"
+retire_legacy_unit() {
+    local legacy_file="/etc/systemd/system/${LEGACY_SERVICE_NAME}.service"
+    local touched=0
+    if systemctl is-active --quiet "$LEGACY_SERVICE_NAME" 2>/dev/null; then
+        echo "停用旧单元 $LEGACY_SERVICE_NAME(项目已改名为 $SERVICE_NAME)..."
+        systemctl stop "$LEGACY_SERVICE_NAME" || true
+        touched=1
+    fi
+    if systemctl is-enabled --quiet "$LEGACY_SERVICE_NAME" 2>/dev/null; then
+        systemctl disable "$LEGACY_SERVICE_NAME" 2>/dev/null || true
+        touched=1
+    fi
+    if [[ -f "$legacy_file" ]]; then
+        rm -f "$legacy_file"
+        echo "已删除旧单元文件 $legacy_file"
+        touched=1
+    fi
+    if [[ "$touched" -eq 1 ]]; then
+        systemctl daemon-reload
+    fi
 }
 
 # ---- 主流程 ----
@@ -292,7 +323,7 @@ case "$ACTION" in
         # 默认用 HTTPS(公开仓库匿名可拉,服务器无需配 SSH key)。
         REMOTE="${ROCOM_GIT_REMOTE:-github}"
         if ! git remote get-url "$REMOTE" >/dev/null 2>&1; then
-            git remote add "$REMOTE" "${ROCOM_GIT_REMOTE_URL:-https://github.com/zxsos/roco-go.git}"
+            git remote add "$REMOTE" "${ROCOM_GIT_REMOTE_URL:-https://github.com/zxsos/rocom-go.git}"
         fi
         echo "==> 拉取最新代码 ($REPO_DIR, remote: $REMOTE)"
         git pull --ff-only "$REMOTE" master
@@ -366,7 +397,7 @@ case "$ACTION" in
         check_frontend_assets "$FRONTEND_OUT"
 
         echo "==> 编译 (go build,前端 embed)"
-        CGO_ENABLED=1 go build -trimpath -o "$BIN_NAME" ./cmd/rocom-capture
+        CGO_ENABLED=1 go build -trimpath -o "$BIN_NAME" ./cmd/rocom-go
         echo "    产物: $REPO_DIR/$BIN_NAME ($(du -h "$BIN_NAME" | cut -f1))"
 
         # 编译完,设置 BINARY 让 install 分支用这个二进制
@@ -377,6 +408,9 @@ case "$ACTION" in
     install)
         SRC_BIN="$(find_binary)"
         mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
+
+        # 旧单元名(rocom)退役:改名后若不清掉,它会与新单元抢 Web 端口
+        retire_legacy_unit
 
         # 停旧服务(若在运行)
         if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -402,10 +436,10 @@ case "$ACTION" in
             systemctl restart "$SERVICE_NAME"
             sleep 1
             systemctl status "$SERVICE_NAME" --no-pager || true
-            echo "==> 部署完成。日志: journalctl -u rocom -f"
+            echo "==> 部署完成。日志: journalctl -u rocom-go -f"
         else
             echo "==> 二进制已就位。请编辑 $ENV_FILE 填入 ROCOM_IFACE 后执行:"
-            echo "      systemctl start rocom"
+            echo "      systemctl start rocom-go"
         fi
         ;;
 
@@ -415,7 +449,7 @@ case "$ACTION" in
         ;;
 
     migrate)
-        # 从手动部署(rocom-capture 直接跑在工作目录、库在工作目录下)迁移到 systemd 管理。
+        # 从手动部署(rocom-go 直接跑在工作目录、库在工作目录下)迁移到 systemd 管理。
         # 会:停旧进程 → 搬库与证书 → 识别旧启动参数生成 env → 安装二进制 → 启动服务。
         SRC_DIR="$MIGRATE_SRC"
         if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR" ]]; then
@@ -491,7 +525,7 @@ case "$ACTION" in
                     -merchant-smtp-pass) ROCOM_SMTP_PASS="$2"; shift 2 ;;
                     -egg-api-key)   ROCOM_EGG_API_KEY="$2"; shift 2 ;;
                     -skip-self-ip)  ROCOM_SKIP_SELF_IP="$2"; shift 2 ;;
-                    -db|-cert|-key|rocom-capture|sudo) shift ;;
+                    -db|-cert|-key|rocom-go|sudo) shift ;;
                     -socks5-max-conns) shift 2 ;;  # systemd service 用默认值
                     *) shift ;;
                 esac
@@ -499,7 +533,7 @@ case "$ACTION" in
 
             # 写 env(覆盖,因为是从旧进程提取的)
             cat > "$ENV_FILE" <<EOF
-# rocom-capture 运行参数(由 deploy.sh --migrate 从旧进程自动生成)
+# rocom-go 运行参数(由 deploy.sh --migrate 从旧进程自动生成)
 # 抓包网卡
 ROCOM_IFACE=${ROCOM_IFACE:-eth0}
 # 游戏端口
@@ -535,6 +569,9 @@ EOF
         cp -f "$SRC_BIN" "$INSTALL_DIR/$BIN_NAME"
         chmod +x "$INSTALL_DIR/$BIN_NAME"
 
+        # 旧单元名(rocom)退役,理由见 retire_legacy_unit
+        retire_legacy_unit
+
         write_service
         if [[ "$ENV_AUTO" -eq 0 ]]; then
             write_env  # 没从旧进程提取到参数,用默认模板
@@ -551,7 +588,7 @@ EOF
         echo "==> 迁移完成。"
         echo "    旧目录 $SRC_DIR 可在确认无误后手动删除:"
         echo "      rm -rf $SRC_DIR"
-        echo "    数据已迁移到 $DATA_DIR,日志: journalctl -u rocom -f"
+        echo "    数据已迁移到 $DATA_DIR,日志: journalctl -u rocom-go -f"
         ;;
 
     backup)
@@ -577,6 +614,8 @@ EOF
         systemctl disable "$SERVICE_NAME" 2>/dev/null || true
         rm -f "$SERVICE_FILE" "$ENV_FILE"
         rm -rf "$INSTALL_DIR"
+        # 改名前的旧单元一并清掉,否则它会被 systemd 当成另一个服务重新拉起
+        retire_legacy_unit
         systemctl daemon-reload
         if [[ "$PURGE" -eq 1 ]]; then
             rm -rf "$DATA_DIR"

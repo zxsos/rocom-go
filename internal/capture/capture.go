@@ -15,7 +15,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/google/gopacket/reassembly"
-	"github.com/zxsos/roco-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/gcp"
 )
 
 // Message 是一条解密后的应用层消息。

@@ -126,7 +126,7 @@ export default function WebAddrCard({ config, error, onChanged, notice }) {
         <h3>Web 服务</h3>
         <p className="admin-hint">
           配置文件不可写({config.path || '/etc/rocom.env'}),无法在此修改监听地址。
-          请在服务器上编辑该文件后执行 <code>systemctl restart rocom</code>。
+          请在服务器上编辑该文件后执行 <code>systemctl restart rocom-go</code>。
         </p>
         <p className="admin-hint">当前监听:<code>{web.realAddr || web.addr || '—'}</code></p>
       </div>

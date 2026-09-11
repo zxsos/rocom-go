@@ -5,9 +5,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/trial"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/trial"
 )
 
 // 本文件锁住「见闻录补录」的**两条入口**。

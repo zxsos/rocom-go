@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // 建议最多返回多少条组合。5 条够玩家在小窝里挑 —— 再多只是把同一只母本换个父亲再列一遍,

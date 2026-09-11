@@ -24,7 +24,7 @@ rocom-key.pem
 # cmd/ 下每个命令 go build 的默认产出名与目录同名,四个都要列全 ——
 # 只列主程序的话,调试工具(pcapdump 等)编完会挂在 git status 里
 /rocom
-/rocom-capture
+/rocom-go
 /movean
 /pbdump_descr
 /pcapdump

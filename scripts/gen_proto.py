@@ -16,7 +16,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pbdesc
 
-PKG = "github.com/zxsos/roco-go/internal/pb"
+PKG = "github.com/zxsos/rocom-go/internal/pb"
 OUT = "internal/pb"
 # 解析根:com_pet(PetData/背包) + com_pet_team(大世界队伍 PetTeamInfo)。闭包动态合并求取。
 ROOTS = ["com_pet.proto", "com_pet_team.proto"]

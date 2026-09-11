@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/zxsos/roco-go/internal/pbdesc"
+	"github.com/zxsos/rocom-go/internal/pbdesc"
 )
 
 // handleDebugParse 把调试页某条消息的原始数据解析成可读树:

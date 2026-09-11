@@ -187,7 +187,7 @@ export function AdvConfigCard({ config, error, onSave }) {
       <p className="admin-hint">
         改动会写入 <code>{config.path}</code> 并立即生效:令牌纯热更,代理热重启(不影响抓包)。
         HTTPS 与抓包网卡属启动项,改它们需要编辑该文件后执行
-        {' '}<code>systemctl restart rocom</code>;Web 监听地址可在下方「Web 服务」卡片里改。
+        {' '}<code>systemctl restart rocom-go</code>;Web 监听地址可在下方「Web 服务」卡片里改。
       </p>
 
       {!config.writable ? <Readonly path={config.path} /> : (

@@ -40,7 +40,7 @@ web/dist/
 # 开发期二进制
 pcapdump
 dist/
-rocom-capture
+rocom-go
 rocom-cert.pem
 rocom-key.pem
 

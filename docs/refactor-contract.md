@@ -153,8 +153,8 @@ _（暂无）_
 
 验收「实时刷新」类功能需要**仍在推送**的后端，而不是一次性快照。
 
-- **后端**：`go build ./cmd/rocom-capture` 后
-  `./rocom-capture -pcap <样本> -db /tmp/x.db -addr :4939`。
+- **后端**：`go build ./cmd/rocom-go` 后
+  `./rocom-go -pcap <样本> -db /tmp/x.db -addr :4939`。
   回放是一次性的（3.3MB pcap 约 40ms 放完），故**先挂 SSE 再起服务**
   才收得到推送 —— `scripts/capture_sse.sh` 封装了这个顺序。
 - **前端**：dev server（5173）已配 `/api` 代理到 4939，连自己的后端即可。

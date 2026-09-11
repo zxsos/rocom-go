@@ -7,13 +7,13 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/pet"
-	"github.com/zxsos/roco-go/internal/scene"
-	"github.com/zxsos/roco-go/internal/server"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // 本文件给管线补测试。

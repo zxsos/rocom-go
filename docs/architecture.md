@@ -44,7 +44,7 @@
 | `pipeline` | 消费 `capture` 输出的消息流:账号归属、宠物入库/事件、实时地图与星星/野生宠物状态、家园小窝图层与精灵蛋入库(原 main 的 consume 循环;按 pets/position/stars/wildpets/home/eggs 分文件) |
 | `server` | REST API、SSE 广播(`Hub`)、embed 前端静态资源;另持有**涂地覆盖位图**(`paint.go`:管线记、HTTP 读同一份内存,攒批落盘,见 docs/data.md 3.8) |
 
-`cmd/rocom-capture/main.go` 组装上述模块并启动抓包与 HTTP。
+`cmd/rocom-go/main.go` 组装上述模块并启动抓包与 HTTP。
 
 ## 3. 抓包与重组要点
 
@@ -232,8 +232,8 @@
 
 ## 8. 部署形态
 
-单二进制 `rocom-capture`：
-- 实时：`sudo ./rocom-capture -iface <网卡> -addr :4939`(需 root，网卡须为客户端设备流量必经)
-- 离线：`./rocom-capture -pcap <文件> -addr :4939`
+单二进制 `rocom-go`：
+- 实时：`sudo ./rocom-go -iface <网卡> -addr :4939`(需 root，网卡须为客户端设备流量必经)
+- 离线：`./rocom-go -pcap <文件> -addr :4939`
 
 数据库默认 `rocom.db`(SQLite 文件)。详见 [README](../README.md)。

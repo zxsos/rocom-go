@@ -1,6 +1,6 @@
 // Package socks5 提供极简的 RFC 1928 SOCKS5 代理服务器(仅 TCP CONNECT,无认证)。
 // 面向"云服务器当网关抓自己进程出站流量"的部署场景:手机把游戏流量代理到本机,
-// rocom-capture 整网卡抓包即可看到代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false)。
+// rocom-go 整网卡抓包即可看到代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false)。
 package socks5
 
 import (

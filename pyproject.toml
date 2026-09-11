@@ -1,5 +1,5 @@
 [project]
-name = "rocom-capture-scripts"
+name = "rocom-go-scripts"
 version = "0"
 description = "代码生成脚本(解析解包目录的 all.pb 描述符与 Bin 配置 → internal/pb 与 names.json)"
 # >=3.10 + pillow 钉死精确版本: 确保所有人解析到同一 libwebp,webp 转码字节可复现

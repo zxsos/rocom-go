@@ -6,9 +6,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/scene"
 )
 
 // 本文件测「被牵着走/双人骑乘时的位置补位」(position.go 的 onVisitorPos)。

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zxsos/roco-go/internal/envfile"
+	"github.com/zxsos/rocom-go/internal/envfile"
 )
 
 // 本文件守管理面板改配置这条链路的三条不变量:
@@ -23,7 +23,7 @@ func newConfigTestServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	s := newTestServer(t)
 	envPath := filepath.Join(t.TempDir(), "rocom.env")
-	if err := os.WriteFile(envPath, []byte("# rocom-capture 运行参数\nROCOM_IFACE=eth0\nROCOM_SOCKS5_ADDR=\n"), 0o600); err != nil {
+	if err := os.WriteFile(envPath, []byte("# rocom-go 运行参数\nROCOM_IFACE=eth0\nROCOM_SOCKS5_ADDR=\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s.setEnvPath(envPath)

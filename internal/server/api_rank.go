@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // todayCST 返回今天(北京时间,UTC+8)的 yyyy-mm-dd。

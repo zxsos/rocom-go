@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/pet"
 )
 
 // petUpsertSQL 是单只宠物的 upsert 语句(UpsertPet 与 UpsertPets 共用,占位符顺序见 petArgs)。

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // newTestServerFrom 用既有的库另起一个 Server(模拟「服务重启」)。

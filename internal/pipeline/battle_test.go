@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/scene"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 

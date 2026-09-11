@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/zxsos/roco-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gamedata"
 )
 
 // 培育页建议计算的基准护栏。

@@ -4,12 +4,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/capture"
-	"github.com/zxsos/roco-go/internal/gamedata"
-	"github.com/zxsos/roco-go/internal/gcp"
-	"github.com/zxsos/roco-go/internal/scene"
-	"github.com/zxsos/roco-go/internal/server"
-	"github.com/zxsos/roco-go/internal/store"
+	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/rocom-go/internal/scene"
+	"github.com/zxsos/rocom-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/store"
 )
 
 // handleScene 处理实时地图与星星相关的场景消息;返回是否已消费。

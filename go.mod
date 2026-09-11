@@ -1,4 +1,4 @@
-module github.com/zxsos/roco-go
+module github.com/zxsos/rocom-go
 
 go 1.26.4
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zxsos/roco-go/internal/server"
+	"github.com/zxsos/rocom-go/internal/server"
 )
 
 // 本文件覆盖花种(花灵 BOSS)相关的逻辑。

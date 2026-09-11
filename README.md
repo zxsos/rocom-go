@@ -108,7 +108,7 @@ uv run python scripts/fetch_bigmap_hd.py  # (可选,需联网)第三方高清底
 cd web && npm install && npm run build && cd ..
 
 # 3. 构建单二进制
-go build -o rocom-capture ./cmd/rocom-capture
+go build -o rocom-go ./cmd/rocom-go
 ```
 
 ### 前端开发
@@ -148,7 +148,7 @@ npm run verify:live   # 需先按提示备好 pcap;会抓真实 SSE 事件喂给
 # 装 zig (以本机 Arch Linux 为例)
 sudo pacman -S zig
 
-make release   # → dist/rocom-capture-linux-amd64、dist/rocom-capture-linux-arm64(均静态、已 strip)
+make release   # → dist/rocom-go-linux-amd64、dist/rocom-go-linux-arm64(均静态、已 strip)
 make clean     # 清理 dist/
 ```
 
@@ -176,13 +176,13 @@ cp -r <游戏Paks目录>/* ~/Downloads/rocom/Paks/
 
 ```bash
 # 实时抓包(需 root；网卡需为手机流量的必经之路)
-sudo ./rocom-capture -iface <网卡> -port 8195 -addr :4939
+sudo ./rocom-go -iface <网卡> -port 8195 -addr :4939
 
 # 离线回放已抓的 pcap
-./rocom-capture -pcap ./pcap/xxx.pcap -addr :4939
+./rocom-go -pcap ./pcap/xxx.pcap -addr :4939
 
 # 启用 HTTPS(自签证书;手机经局域网访问时用)
-sudo ./rocom-capture -iface <网卡> -tls
+sudo ./rocom-go -iface <网卡> -tls
 
 # 云端 socks5 抓包:本机同时当 socks5 网关 + 抓包机(带公网 IP 的服务器)
 #   -socks5-addr :1080   内置 SOCKS5 代理(仅 TCP CONNECT、无认证),手机 clash mate 连「公网IP:1080」
@@ -194,7 +194,7 @@ sudo ./rocom-capture -iface <网卡> -tls
 #   -socks5-user/-socks5-pass  RFC 1929 用户名/密码认证。Clash 里在 socks5 代理上填同款
 #                              username/password 即可。注意该认证密码是明文传输的(无加密
 #                              通道),公网直连建议白名单+认证双保险,或走 tailscale 加密隧道。
-sudo ./rocom-capture -iface eth0 -socks5-addr :1080 -skip-self-ip=false \
+sudo ./rocom-go -iface eth0 -socks5-addr :1080 -skip-self-ip=false \
   -socks5-allow 1.2.3.4 -socks5-user rocom -socks5-pass 换成强密码 -tls
 # ↑ 把 1.2.3.4 换成手机当前公网出口 IP;手机 IP 变了就更新参数重启。
 
@@ -226,9 +226,9 @@ sudo ./scripts/deploy.sh --build
 
 # 首次跑完后编辑配置填入 socks5 等参数,然后启动
 sudo vim /etc/rocom.env          # 填 ROCOM_SOCKS5_ADDR / USER / PASS 等
-sudo systemctl restart rocom
-sudo systemctl status rocom
-journalctl -u rocom -f           # 看日志
+sudo systemctl restart rocom-go
+sudo systemctl status rocom-go
+journalctl -u rocom-go -f           # 看日志
 
 # 从手动部署迁移(已有旧库在跑,想切到 systemd 管理)
 #    自动停旧进程、搬库与证书到 /var/lib/rocom、从旧启动参数生成 env
@@ -238,18 +238,23 @@ sudo ./scripts/deploy.sh --migrate /root/roco
 sudo ./scripts/deploy.sh --backup
 
 # 从 tar 包安装(而非本地 dist/)
-sudo ./scripts/deploy.sh --archive rocom-capture.tar
+sudo ./scripts/deploy.sh --archive rocom-go.tar
 
 # 卸载(默认保留数据,加 --purge 才连数据一起删)
 sudo ./scripts/deploy.sh --uninstall
 ```
 
+> **从旧名 `rocom` 升级过来?** 项目已改名为 `rocom-go`,systemd 单元名随之由 `rocom.service`
+> 变成 `rocom-go.service`。跑一次 `scripts/deploy.sh` 会**自动停用并删除旧单元**(否则两个单元会
+> 抢同一个 Web 端口),而配置 `/etc/rocom.env`、程序目录 `/opt/rocom`、数据库
+> `/var/lib/rocom/rocom.db` **一律不动** —— 不需要搬数据,只是之后 `systemctl` 认的名字变了。
+
 `/etc/rocom.env` 里的多数项可在管理面板(`#/admin`,隐式入口)直接改,改动立即生效并写回该文件;
-只有抓包网卡、游戏端口、HTTPS 属启动项,改它们仍需 `systemctl restart rocom`。
+只有抓包网卡、游戏端口、HTTPS 属启动项,改它们仍需 `systemctl restart rocom-go`。
 **Web 监听地址**也可以在线改,但它正是你用来改它的那条连接的另一端,故不直接生效:先在新端口
 试运行,从新地址打开过面板后才落盘;90 秒内不确认会自动回滚(详见 [docs/api/](docs/api/README.md))。
 
-更新流程只替换 `/opt/rocom/rocom-capture` 并 `systemctl restart`,数据库 `/var/lib/rocom/rocom.db`
+更新流程只替换 `/opt/rocom/rocom-go` 并 `systemctl restart`,数据库 `/var/lib/rocom/rocom.db`
 不受影响。重启后自动从 `sessions` 表预热会话密钥、连接归属、场景定位(有效期 24h),对仍存活的
 游戏连接从中段继续解密,历史统计原样保留。仅当库 schema 变化(新版加了字段/表)时才需删库重建——
 `CREATE TABLE IF NOT EXISTS` 是幂等的,schema 没变就直接打开旧库即可。
@@ -265,7 +270,7 @@ sudo ./scripts/deploy.sh --uninstall
 docker pull docker.cnb.cool/test00123/roco:latest
 ```
 
-其它架构(ARM 等)从源码本地构建:`docker build -t rocom-capture .`
+其它架构(ARM 等)从源码本地构建:`docker build -t rocom-go .`
 
 #### 先选一种方式
 
@@ -294,7 +299,7 @@ ip route get 8.8.8.8
 **场景 A —— 局域网网关:**
 
 ```bash
-docker run -d --name rocom --restart unless-stopped \
+docker run -d --name rocom-go --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW \
   --network host \
   -e TZ=Asia/Shanghai \
@@ -306,7 +311,7 @@ docker run -d --name rocom --restart unless-stopped \
 **场景 B —— 云端 socks5**(比 A 多 `-skip-self-ip=false` 与 `-tls`):
 
 ```bash
-docker run -d --name rocom --restart unless-stopped \
+docker run -d --name rocom-go --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW \
   --network host \
   -e TZ=Asia/Shanghai \
@@ -325,7 +330,7 @@ docker run -d --name rocom --restart unless-stopped \
 
 ```bash
 docker ps --filter name=rocom --format '{{.Status}}'   # 期望 Up,不是 Restarting
-docker logs rocom 2>&1 | tail -12                      # 期望看到下面这段「抓包配置」
+docker logs rocom-go 2>&1 | tail -12                      # 期望看到下面这段「抓包配置」
 ```
 
 开始抓包前会打一段固定格式的摘要,`docker logs` 里一眼核对:
@@ -382,7 +387,7 @@ https://<服务器IP>:4939/#/admin
 **现在这段有自动兜底**:启动横幅会打出实际生效的 `-skip-self-ip`,运行期还有一道自检会把它抓出来。
 
 ⚠️ 它是 `RunLive(iface, skipSelf)` 的参数,**引擎启动时一次性生效**,面板改不了、
-热更也不生效,必须 `docker restart rocom`。
+热更也不生效,必须 `docker restart rocom-go`。
 
 #### 配置文件与管理面板
 
@@ -404,17 +409,17 @@ https://<服务器IP>:4939/#/admin
 | socks5 地址 / 白名单 / 账号密码 / 连接数上限 | ✅ **立即**(代理热重启,抓包不中断) |
 | 图鉴令牌、SMTP 邮箱 | ✅ 立即 |
 | Web 监听地址 | ✅ 面板内「试运行 → 确认」,不用 restart |
-| **抓包网卡 / 游戏端口 / HTTPS / `-skip-self-ip`** | ❌ **必须 `docker restart rocom`** |
+| **抓包网卡 / 游戏端口 / HTTPS / `-skip-self-ip`** | ❌ **必须 `docker restart rocom-go`** |
 
 #### 日常运维
 
 ```bash
-docker logs -f rocom                      # 看日志
-docker restart rocom                      # 重启
+docker logs -f rocom-go                      # 看日志
+docker restart rocom-go                      # 重启
 
 # 更新镜像(数据库在卷里,不丢历史)
 docker pull docker.cnb.cool/test00123/roco:latest
-docker rm -f rocom && docker run ...      # 用同样的 docker run 命令重建
+docker rm -f rocom-go && docker run ...      # 用同样的 docker run 命令重建
 
 # 备份(SQLite 热备)
 docker run --rm -v rocom-data:/data -v $(pwd):/backup alpine \
@@ -431,7 +436,7 @@ docker run --rm -v rocom-data:/data -v $(pwd):/backup alpine \
   host 模式的代价是端口直接占宿主机,`-p` 不生效(端口由 `-addr` 定)。
 - **数据持久化**:数据库在卷的 `/data/rocom.db`,重建容器 / 更新镜像都不丢历史;
   自签证书也生成在这里,信任一次后复用。**公网 IP 变了要删证书重生成**:
-  `docker exec rocom rm -f /data/rocom-cert.pem /data/rocom-key.pem && docker restart rocom`
+  `docker exec rocom-go rm -f /data/rocom-cert.pem /data/rocom-key.pem && docker restart rocom-go`
 - **cgo 不能关**:抓包用 `gopacket/afpacket`,必须 `CGO_ENABLED=1`;builder 阶段
   除 gcc 外还要 `linux-headers`(提供 `linux/if_packet.h`),少装会编译失败。
 - **公网 socks5 务必设白名单**:`-socks5-allow <手机公网IP>`。全网扫描器几分钟内
@@ -439,7 +444,7 @@ docker run --rm -v rocom-data:/data -v $(pwd):/backup alpine \
   密码认证(RFC 1929)是明文传输的,只能当第二道防线。
 - **离线回放**:不需要 capability 与 host 网络,挂 pcap 即可:
   ```bash
-  docker run -d --name rocom-replay -p 4939:4939 \
+  docker run -d --name rocom-go-replay -p 4939:4939 \
     -v /path/to/pcap:/pcap:ro -v rocom-data:/data \
     docker.cnb.cool/test00123/roco:latest -pcap /pcap/xxx.pcap
   ```

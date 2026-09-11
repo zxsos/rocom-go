@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/zxsos/roco-go/internal/pet"
+	"github.com/zxsos/rocom-go/internal/pet"
 )
 
 // ReplaceHandbookGlasses 用登录包解析出的图鉴炫彩收集整体替换本账号全部记录
