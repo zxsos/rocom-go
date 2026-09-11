@@ -20,12 +20,21 @@
 # ---- 构建阶段 ----
 FROM golang:1.26-alpine AS builder
 
+# Alpine 官方 CDN(dl-cdn.alpinelinux.org)从 CNB 构建机上慢得离谱 —— 实测单个包最长 37s,
+# build-base 装到第 5/34 个包时已过 3 分钟,整个构建卡在这一层。换成腾讯云的 Alpine 镜像源
+# (CNB 构建机在腾讯云内,最快)。只 sed 主机名,不动版本路径,故 alpine 主版本升级无需改这里。
+# 换别家:mirrors.aliyun.com / mirrors.tuna.tsinghua.edu.cn。
+RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.cloud.tencent.com#g' /etc/apk/repositories
+
 # build-base    = gcc + musl-dev + binutils,cgo 编译所需
 # linux-headers = **必需**:afpacket 要 #include <linux/if_packet.h>(AF_PACKET 的
 #                 tpacket 结构体定义),而 build-base 只带 C 库与编译器、不带内核头。
 #                 少了它编译会停在 "fatal error: linux/if_packet.h: No such file"。
 # git           = go mod download 取依赖(改用 vendor 后可去掉)
 RUN apk add --no-cache build-base linux-headers git
+
+# Go 模块同样走国内代理(go.sum 已锁定全部依赖与校验和,代理只负责下载,不降低校验强度)
+ENV GOPROXY=https://goproxy.cn,direct
 
 WORKDIR /src
 
@@ -40,6 +49,9 @@ RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/rocom-go ./cmd/roc
 
 # ---- 运行阶段 ----
 FROM alpine:3.22
+
+# 同 builder 阶段:换掉慢的官方 CDN,否则 ca-certificates/tzdata 这几包也要等好几分钟
+RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.cloud.tencent.com#g' /etc/apk/repositories
 
 # ca-certificates:查随机蛋物种要打第三方图鉴 HTTPS 接口,缺根证书会 x509 报错
 # tzdata:     容器默认 UTC,装上才能用 TZ=Asia/Shanghai 让日志与「午后」这类
