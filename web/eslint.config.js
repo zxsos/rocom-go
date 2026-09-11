@@ -16,7 +16,9 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: globals.browser,
+      // __APP_VERSION__ 由 vite 的 define 注入(值来自仓库根 VERSION,见 vite.config.js),
+      // 不是浏览器全局,故显式登记,否则会被 no-undef 误报。
+      globals: { ...globals.browser, __APP_VERSION__: 'readonly' },
       parserOptions: {
         ecmaFeatures: { jsx: true },
       },

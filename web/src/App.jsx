@@ -72,6 +72,9 @@ export default function App() {
                 onClick={togglePrivacy} title={privacyOn ? '点击解除遮罩' : '点击开启遮罩'}>
                 <img className="brand-logo" src="/logo.svg" alt="" draggable={false} /><span className="privacy">妙妙屋</span>
               </button>
+              {/* 应用版本号:唯一真源是仓库根 VERSION,构建时注入(见 vite.config.js)。
+                  既是给玩家看的「跑的是哪一版」,也是排障时第一句要问的信息。 */}
+              <span className="topbar-ver" title="应用版本(赛季.大更新.小更新)">v{__APP_VERSION__}</span>
               <TopNav />
               {fullscreen.supported && (
                 <button type="button" className={'topbar-fs' + (fullscreen.isFull ? ' on' : '')}
