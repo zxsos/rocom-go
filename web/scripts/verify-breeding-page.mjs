@@ -116,24 +116,33 @@ const onDims = dims.filter((el) => el.className.includes('on'))
 check('样本目标(物攻那一行)对应维度被点亮',
   onDims.length === 1 && textOf(onDims[0]) === '+物攻',
   onDims.map(textOf).join(' ') || '一个都没点亮')
+// 目标性别:三个 chip(不限 / ♂ / ♀),样本没填性别故「不限」为选中态。
+const genderChips = [...doc.querySelectorAll('.br-gender .chip')]
+check('目标性别有三个 chip', genderChips.length === 3, genderChips.map(textOf).join(' '))
+check('没填性别时「不限」选中', !!genderChips[0] && textOf(genderChips[0]) === '不限' && genderChips[0].className.includes('on'),
+  genderChips.map((el) => `${textOf(el)}${el.className.includes('on') ? '(on)' : ''}`).join(' '))
 // 建议行与回交对比里的性格目标都应显示成「加物攻」而不是 5 个名字
 check('目标性格显示成「加物攻」', (doc.body.textContent || '').includes('加物攻'),
   (doc.body.textContent || '').includes('加物攻') ? '' : '页面上找不到「加物攻」')
 check('后端没有把一组名字散在页面上', !doc.querySelector('.br-sug-nature')?.textContent.includes('勇敢'),
   textOf(doc.querySelector('.br-sug-nature')))
 
-// —— 目标差距:性格维度也要有一行,且达标项写明「达标」——
+// —— 目标差距:数值维度(V/W)画进度条,性格 / 性别改旗标 ——
 // 契约样本:目标 V96 / W98 / 加物攻,第 1 代子代 V88 / W0 / 固执 → 性格命中,V/W 未达标。
-// 此前只画 V/W,性格没有进度条,「为什么还停在进行中」在页面上完全看不见。
+// 性格与性别不是「有极值的轴」,离目标没有远近可言,故不给进度条 —— 改为并排旗标,达标转绿;
+// 且性格显示**完整名字**,不是「加物攻」那种维度缩写。
 const progBars = [...doc.querySelectorAll('.br-progress .br-bar')]
-check('进度概览三项都出(含性格)', progBars.length === 3,
+check('进度概览只给数值维度(V/W)画条', progBars.length === 2,
   progBars.map((el) => textOf(el.querySelector('.br-bar-k'))).join('/'))
-const natProg = progBars.find((el) => textOf(el.querySelector('.br-bar-k')) === '性')
-check('性格达标时写明「达标」', !!natProg && textOf(natProg.querySelector('.br-bar-v')).includes('达标'),
-  natProg ? textOf(natProg.querySelector('.br-bar-v')) : '没有性格进度行')
 const wProg = progBars.find((el) => textOf(el.querySelector('.br-bar-k')) === 'W')
 check('体重未达标时说「差」而不是「达标」', !!wProg && textOf(wProg.querySelector('.br-bar-v')).includes('差'),
   wProg ? textOf(wProg.querySelector('.br-bar-v')) : '没有体重进度行')
+const progFlags = [...doc.querySelectorAll('.br-progress .br-flag')]
+const natProg = progFlags.find((el) => textOf(el).includes('性格'))
+check('性格改为旗标且命中时写「达标」', !!natProg && textOf(natProg).includes('达标'),
+  natProg ? textOf(natProg) : '没有性格旗标')
+check('性格旗标显示完整名字(不缩写成维度)', !!natProg && /逞强|固执|大胆/.test(textOf(natProg)),
+  natProg ? textOf(natProg) : '')
 // 「最接近达标的一代」:同一只子代的逐项命中 —— V/W 未达标时须指出还差几项
 const bestgen = doc.querySelector('.br-bestgen')
 check('详情页给出「最接近达标的一代」', !!bestgen && textOf(bestgen).includes('最接近达标的一代'),

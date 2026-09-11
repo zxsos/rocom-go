@@ -103,7 +103,7 @@ export default function GenerationRow({
           : null}
         {same ? (
           <span className="br-tag same" title={same === 'both'
-            ? '与上一代同一对双亲 —— 嗓音是双亲均值的向下取整,故这一胎与上一胎必然一样,再孵只是在掷体重与性格'
+            ? '与上一代同一对双亲 —— 嗓音是双亲均值的向零取整,故这一胎与上一胎必然一样,再孵只是在掷体重与性格'
             : '与上一代同一只母本(父本未定)—— 嗓音至少不会因母本而变,想推进得换父本'}>
             {same === 'both' ? '同双亲' : '同母本'}
           </span>

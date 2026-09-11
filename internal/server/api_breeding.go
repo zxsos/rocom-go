@@ -146,11 +146,15 @@ func (s *Server) breedingView(l *pet.BreedingLine, c breedingCtx) BreedingLinePa
 	// 品种的展示名(链上各阶段都列出来,见 gamedata.ChainLabelOf):只显示 Species 会让人以为
 	// 这条线只认那一个形态,而链上其它阶段的 ♀ 同样能用 —— 那正是这个页面最容易踩的坑。
 	v.ChainName = c.db.ChainLabelOf(l.Evo, l.Species)
-	// 种母快照:同品种几条线靠它区分(见 payload 的 Mother)。库里已没有她(放生/送人)时留空。
+	// 种母快照:同品种几条线靠它区分(见 payload 的 Mother)。库里已没有她(放生/送人)时留空,
+	// 但要**标记**出来 —— 「固定过、被放生」与「从没固定过」是两回事,前端要分开显示(见
+	// payload 的 MotherReleased)。
 	if mg := pet.MotherGidOf(l); mg != 0 {
 		if p, ok := c.byGid[mg]; ok {
 			snap := pet.ParentSnapshot(p)
 			v.Mother = &snap
+		} else {
+			v.MotherReleased = true
 		}
 	}
 	pool := c.src.BreedPool(c.chainRefOf(l))

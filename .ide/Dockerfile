@@ -7,7 +7,7 @@
 # 装进 /root 的东西默认不漫游(见 docs 说明),重建就没了。故把工具链声明进镜像,
 # 与代码同源、一次构建长期复用。
 #
-# 构建入口:.cnb.yml 的 vscode 事件(build: .ide/Dockerfile),构建上下文为仓库根目录。
+# 构建入口:.cnb.yml 的 master.push 流水线(docker build -f .ide/Dockerfile),构建上下文为仓库根目录。
 
 FROM cnbcool/default-dev-env:latest
 

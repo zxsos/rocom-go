@@ -147,6 +147,20 @@
 .br-bar-v { flex: none; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
 .br-bar-v.hit { color: var(--green); }
 
+/* 性格 / 性别:没有「离目标多远」可言(命中就是命中),故不给进度条 ——
+   并排两枚旗标,达标转绿。放在 V/W 条形之下,一行同时放得下两项。 */
+.br-flags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.br-flag {
+  display: inline-flex; align-items: baseline; gap: 5px; min-width: 0;
+  padding: 2px 9px; border-radius: 999px; font-size: 11px;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-dim);
+}
+.br-flag em { font-style: normal; opacity: .65; }
+.br-flag b { font-weight: 600; color: var(--fg); }
+.br-flag i { font-style: normal; }
+.br-flag.hit { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.br-flag.hit b, .br-flag.hit i { color: var(--green); }
+
 /* 最接近达标的一代:各维最佳是「分别」看的,这里给同一只的逐项命中 ——
    它就是「为什么还停在进行中」的答案(见 pets.bestChild)。 */
 .br-bestgen { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; margin: 2px 0 8px; }
@@ -162,6 +176,11 @@
   font-variant-numeric: tabular-nums;
 }
 .br-hit.on { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+
+/* 目标性别:破壳前完全不可预测,故它只是一个「达成」条件、不参与建议排序 ——
+   单独一行,与「性格正面加某维」那排 chip 分开,免得被当成又一个可优化的维度。 */
+.br-gender { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.br-gender-k { color: var(--fg-dim); }
 
 /* 「已达标但状态没跟上」:判定放宽(高目标 ≥、低目标 ≤)后,老数据可能停在进行中 ——
    给一句说明与一个显式入口,而不是静默改写玩家自己设的状态。 */

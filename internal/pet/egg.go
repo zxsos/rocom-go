@@ -599,14 +599,15 @@ func FillEggDerived(v *EggView, db *gamedata.DB) {
 	v.Medals = eggMedals(db, weight, voice)
 }
 
-// parentVoice 按「双亲嗓音均值向下取整」推这颗蛋的嗓音(实测规律,见 docs/data.md 3.6)。
+// parentVoice 按「双亲嗓音均值向零取整(正数向下、负数向上)」推这颗蛋的嗓音
+// (实测规律,见 docs/data.md 3.6)。
 // 串窝时父本不唯一,逐个候选算一遍取上下界;没有双亲快照则 ok=false。
 func parentVoice(p *EggParents) (lo, hi int32, ok bool) {
 	if p == nil || p.Mother == nil || len(p.Fathers) == 0 {
 		return 0, 0, false
 	}
 	for i, f := range p.Fathers {
-		v := int32(math.Floor(float64(p.Mother.Voice+f.Voice) / 2))
+		v := (p.Mother.Voice + f.Voice) / 2
 		if i == 0 || v < lo {
 			lo = v
 		}

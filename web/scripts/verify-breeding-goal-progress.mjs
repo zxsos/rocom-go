@@ -3,7 +3,8 @@
 //      算到、正中间精确相等。子代 97 对目标 96 是达标,不再显示「差 1」
 //   2. 体重**没有** ±2pp 容差:目标 98 只认 ≥98(97.5 不算)
 //   3. 未达标才说差多少,且**不区分**超出 / 不足(只有「够到」与「差多少」两态)
-//   4. 性格维度有形目:命中 → 达标,未命中 → 未命中
+//   4. 性格 / 性别**不给进度条**(不是数值轴),改为同排旗标:命中 → 达标,未命中 → 未命中;
+//      性格显示**完整名字**(不缩写成「加物攻」那种维度名)
 //   5. bestChild 选出「同一只」里命中项最多、距离最近的一代 —— 与「各维最佳」是两回事
 //
 //   node scripts/verify-breeding-goal-progress.mjs
@@ -64,28 +65,31 @@ const underTxt = gi(95.5, 98, 'weight').text
 check('不出现「超出 / 高 / 低」方向词',
   !['超', '高', '低'].some((w) => overTxt.includes(w) || underTxt.includes(w)), `${overTxt} | ${underTxt}`)
 
-// —— 2. 整条线的进度行(goalProgress)——
+// —— 2. 整条线的进度行(goalProgress:bars 数值轴 / flags 命中态)——
 // 目标 V96 / W98 / 固执:1 代 V96 / W99.6 / 固执
 const line = {
   goal: { voice: 96, weightPct: 98, nature: '固执' },
   gens: [{ gen: 1, child: { voice: 96, weightPct: 99.6, nature: '固执', name: '子' } }],
 }
-const bars = pets.goalProgress(line, matrix)
-check('三项目标 → 三行进度(含性格)', bars.length === 3, bars.map((b) => b.k).join(''))
-check('V 行达标', (bars.find((b) => b.k === 'V') || {}).hit === true, (bars.find((b) => b.k === 'V') || {}).text)
-check('W 行达标(不再是差 1.6)', (bars.find((b) => b.k === 'W') || {}).hit === true, (bars.find((b) => b.k === 'W') || {}).text)
-const natBar = bars.find((b) => b.k === '性')
-check('性 行出现且达标', !!natBar && natBar.hit === true, natBar && natBar.text)
+const prog = pets.goalProgress(line, matrix)
+// 嗓音 / 体重是有极值的数值轴 → 进度条;性格只有命中与未命中 → 不给条,单列旗标。
+check('数值维度 → 两条进度条(V/W)', prog.bars.length === 2, prog.bars.map((b) => b.k).join(''))
+check('V 行达标', (prog.bars.find((b) => b.k === 'V') || {}).hit === true, (prog.bars.find((b) => b.k === 'V') || {}).text)
+check('W 行达标(不再是差 1.6)', (prog.bars.find((b) => b.k === 'W') || {}).hit === true, (prog.bars.find((b) => b.k === 'W') || {}).text)
+// 性格:不缩写 —— 显示完整名字,而不是「加物攻」这种维度名
+const natFlag = prog.flags.find((f) => f.k === '性格')
+check('性格改为旗标(无进度条)且达标,显示完整名字', !!natFlag && natFlag.hit === true && natFlag.text === '固执', natFlag && natFlag.text)
+check('性格不再出现在进度条里', !prog.bars.some((b) => b.k === '性'), prog.bars.map((b) => b.k).join(''))
 // 报告里的另一类线:目标 96、子代 97 → 现在也算达标
 const up = pets.goalProgress({ goal: { voice: 96 }, gens: [{ gen: 1, child: { voice: 97, weightPct: null, nature: '' } }] }, matrix)
-check('子代 97 对目标 96 → V 行达标', up[0].hit === true, up[0].text)
-// 只填嗓音 → 只有一行(没填的维度不参与,与后端「只对填了的项计分」同口径)
-check('只填嗓音 → 一行', pets.goalProgress({ goal: { voice: 96 }, gens: line.gens }, matrix).length === 1)
+check('子代 97 对目标 96 → V 行达标', up.bars[0].hit === true, up.bars[0].text)
+// 只填嗓音 → 只有一条(没填的维度不参与,与后端「只对填了的项计分」同口径)
+check('只填嗓音 → 一条进度条', pets.goalProgress({ goal: { voice: 96 }, gens: line.gens }, matrix).bars.length === 1)
 
 // 性格未命中:线卡在「进行中」的真实原因,必须显示出来
 const missLine = { goal: { nature: '固执' }, gens: [{ gen: 1, child: { voice: 0, weightPct: null, nature: '开朗' } }] }
-const missBar = pets.goalProgress(missLine, matrix).find((b) => b.k === '性')
-check('性格未命中 → 未命中', !!missBar && missBar.hit === false && missBar.text === '未命中', missBar && missBar.text)
+const missFlag = pets.goalProgress(missLine, matrix).flags.find((f) => f.k === '性格')
+check('性格未命中 → 旗标未命中(仍显示目标名字)', !!missFlag && missFlag.hit === false && missFlag.text === '固执', missFlag && missFlag.text)
 check('natureHit:命中为 true', pets.natureHit(line, line.goal) === true)
 check('natureHit:未命中为 false', pets.natureHit(missLine, missLine.goal) === false)
 
@@ -128,6 +132,43 @@ const best = pets.lineStats({
   ],
 })
 check('历代最佳达标优先:取 100 而非更近的 95', best.bestVoice === 100, String(best.bestVoice))
+
+// —— 4. 目标性别(♂ / ♀)——
+// 破壳前不可预测,故只用于「达成」判定与页面提示;但它是子代**确定**的属性,可以逐只比。
+check('hasGenderGoal:填了才算', pets.hasGenderGoal({ gender: '♀' }) === true && pets.hasGenderGoal({}) === false)
+check('parseGoal 只认 ♂ / ♀', (() => {
+  const ok = pets.parseGoal({ gender: '♀' })
+  const bad = pets.parseGoal({ gender: 'x' })
+  return ok.gender === '♀' && !('gender' in bad)
+})())
+check('goalToInput 带出 gender', pets.goalToInput({ gender: '♂' }).gender === '♂')
+check('sameGoal 认性别差异',
+  pets.sameGoal({ gender: '♀' }, { gender: '♂' }) === false
+  && pets.sameGoal({ gender: '♀' }, { gender: '♀' }) === true)
+check('hasGoal 认性别', pets.hasGoal({ gender: '♀' }) === true)
+
+const gLine = { goal: { gender: '♀' }, gens: [{ gen: 1, child: { voice: 0, weightPct: null, nature: '', gender: '♂' } }] }
+check('genderHit:不符为 false', pets.genderHit(gLine, gLine.goal) === false)
+check('genderHit:相符为 true',
+  pets.genderHit({ goal: { gender: '♀' }, gens: [{ gen: 1, child: { gender: '♀' } }] }, { gender: '♀' }) === true)
+check('childHits 带性别项', pets.childHits({ gender: '♂', voice: 0, nature: '' }, { gender: '♀' }).gender === false)
+const gProg = pets.goalProgress(gLine, matrix)
+check('性别不给进度条,改为旗标', gProg.bars.length === 0 && gProg.flags.length === 1
+  && gProg.flags[0].k === '性别' && gProg.flags[0].hit === false,
+  gProg.flags.map((f) => `${f.k}:${f.text}`).join(' '))
+check('性别旗标达标时命中',
+  pets.goalProgress({ goal: { gender: '♀' }, gens: [{ gen: 1, child: { gender: '♀' } }] }, matrix).flags[0].hit === true)
+check('goalBits 有性别徽标', pets.goalBits({ gender: '♀' }).some((b) => b.k === '♂♀' && b.on === true && b.v === '♀'))
+check('性别参与 bestChild 排名', (() => {
+  const b = pets.bestChild({
+    goal: { gender: '♀' },
+    gens: [
+      { gen: 1, child: { voice: 0, weightPct: null, nature: '', gender: '♂' } },
+      { gen: 2, child: { voice: 0, weightPct: null, nature: '', gender: '♀' } },
+    ],
+  })
+  return !!b && b.gen === 2 && b.miss === 0
+})())
 
 await server.close()
 const bad = results.filter((r) => !r.ok)

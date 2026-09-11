@@ -33,7 +33,7 @@ export default function LineDetail({
   // 只有一段时(没有换过种母)不显示这一条 —— 凭空冒出「谱系」两个字只会让人困惑。
   const chain = useMemo(() => lineageOf(lines, line.id), [lines, line.id])
   const cs = useMemo(() => chainStats(lines, line.id), [lines, line.id])
-  const bars = goalProgress(line, natureMatrix)
+  const { bars, flags } = goalProgress(line)
   // 最接近同时达标的那一只子代(见 pets.bestChild):它与上面的「各维最佳」是两个问题 ——
   // 后者可能来自不同代,而「为什么还没达成」只有前者能回答。
   const bc = bestChild(line)
@@ -138,8 +138,10 @@ export default function LineDetail({
             换种母不在这里改:换了种母就是另一条线,收蛋时后端会自动开子线或独立新线。 */}
         <span className="br-detail-mother" title={line.mother
           ? `这条线固定在种母「${line.mother.name}」身上:她孵的蛋自动记到这里。换种母时后端会另开一条线`
-          : '这条线还没固定种母:第一次收蛋时会按当时的母本固定下来'}>
-          {line.mother ? `种母 ${line.mother.name}` : '未定种母'}
+          : line.motherReleased
+            ? '这条线的种母已经不在宠物库里了(放生 / 送人)。线仍按品种匹配候选,但她孵的蛋不会再自动记到这里'
+            : '这条线还没固定种母:第一次收蛋时会按当时的母本固定下来'}>
+          {line.mother ? `种母 ${line.mother.name}` : line.motherReleased ? '种母已放生' : '未定种母'}
         </span>
         <span className="muted br-detail-meta">
           {st.gens} 代已记录
@@ -166,8 +168,8 @@ export default function LineDetail({
                 className={'br-lineage-seg' + (l.id === line.id ? ' on' : '')}
                 disabled={l.id === line.id || busy}
                 onClick={() => onOpenLine && onOpenLine(l.id)}
-                title={`${l.mother ? `种母 ${l.mother.name}` : '未定种母'} · ${lineStats(l).gens} 代`}>
-                {l.mother ? l.mother.name : (l.species || '未定')}
+                title={`${l.mother ? `种母 ${l.mother.name}` : l.motherReleased ? '种母已放生' : '未定种母'} · ${lineStats(l).gens} 代`}>
+                {l.mother ? l.mother.name : (l.motherReleased ? '已放生' : (l.species || '未定'))}
                 <em>{lineStats(l).gens} 代</em>
               </button>
             </React.Fragment>
@@ -258,6 +260,9 @@ export default function LineDetail({
                     {bc.hits.nature !== undefined
                       ? <span className={'br-hit' + (bc.hits.nature ? ' on' : '')} title={bc.hits.nature ? '性格已达标' : '性格未达标'}>{bc.child.nature || '性格未知'}</span>
                       : null}
+                    {bc.hits.gender !== undefined
+                      ? <span className={'br-hit' + (bc.hits.gender ? ' on' : '')} title={bc.hits.gender ? '性别已达标' : '性别未达标'}>{bc.child.gender || '性别未知'}</span>
+                      : null}
                     <span className="muted">{bc.miss === 0 ? '全部达标' : `还差 ${bc.miss} 项`}</span>
                   </div>
                 ) : null}
@@ -271,15 +276,29 @@ export default function LineDetail({
                       onClick={() => onSave({ ...line, status: 'done' })}>标为已达成</button>
                   </div>
                 ) : null}
-                {bars.length === 0 ? (
+                {bars.length === 0 && flags.length === 0 ? (
                   <p className="br-hint muted">目标还是空的 —— 填上以后这里会显示每一代离目标还有多远。</p>
-                ) : bars.map((b) => (
-                  <div key={b.k} className="br-bar" title={b.title}>
-                    <span className="br-bar-k">{b.k}</span>
-                    <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
-                    <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
-                  </div>
-                ))}
+                ) : (
+                  <>
+                    {bars.map((b) => (
+                      <div key={b.k} className="br-bar" title={b.title}>
+                        <span className="br-bar-k">{b.k}</span>
+                        <span className="br-bar-t"><i className={'br-bar-f ' + b.cls + (b.hit ? ' hit' : '')} style={{ width: b.pct.toFixed(1) + '%' }} /></span>
+                        <span className={'br-bar-v' + (b.hit ? ' hit' : '')}>{b.text}</span>
+                      </div>
+                    ))}
+                    {/* 性格 / 性别不是「有极值的轴」,只有命中与未命中 —— 并排一行旗标,不占进度条的位置。 */}
+                    {flags.length > 0 ? (
+                      <div className="br-flags">
+                        {flags.map((f) => (
+                          <span key={f.k} className={'br-flag' + (f.hit ? ' hit' : '')} title={f.title}>
+                            <em>{f.k}</em><b>{f.text}</b><i>{f.hit ? '达标' : '未命中'}</i>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </>
             )}
           </section>

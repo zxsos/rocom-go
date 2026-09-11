@@ -58,3 +58,6 @@ mdldbg
 # C# 解包工具(scripts/unpack)构建产物
 /scripts/unpack/bin/
 /scripts/unpack/obj/
+
+
+web/mock-dist/

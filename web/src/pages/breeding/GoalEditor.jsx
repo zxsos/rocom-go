@@ -20,7 +20,15 @@ export const GOAL_TEMPLATES = [
   { k: 'w-lo', label: '极限体重 0%', key: 'weightPct', val: '0' },
 ]
 
-const EMPTY = { voice: '', weightPct: '', nature: '', natureIn: [] }
+const EMPTY = { voice: '', weightPct: '', nature: '', natureIn: [], gender: '' }
+
+// 目标性别选项:空 = 不限(与后端 BreedingGoal.Gender 的空值同义)。
+// 它**不参与建议排序**(子代性别破壳前不可预测、双亲怎么配都一样),只用于判定「达成」。
+const GENDERS = [
+  { v: '', label: '不限', title: '不挑性别 —— 子代是 ♂ 是 ♀ 都算达标' },
+  { v: '♂', label: '♂', title: '雄性' },
+  { v: '♀', label: '♀', title: '雌性' },
+]
 
 // tplActive 模板是否处于激活态。由输入框里的**当前值**纯派生,而不是另存一份「点过哪个模板」:
 // 值可以直接被手输改掉(把 100 改成 95),高亮必须跟着掉 —— 存一份状态就会出现「高亮着,
@@ -106,6 +114,17 @@ export function GoalFields({ value, onChange, matrix }) {
           ))}
         </div>
       ) : null}
+      {/* 目标性别:它与 V/W/性格不同 —— 破壳前完全不可预测,故只是一个「达成」条件,
+          不会影响建议怎么排(见 pets.hasGenderGoal 与后端 BreedingGoal.Gender)。 */}
+      <div className="br-gender">
+        <span className="br-gender-k">目标性别</span>
+        {GENDERS.map((gd) => (
+          <button key={gd.label} type="button"
+            className={'chip' + (String(value.gender || '') === gd.v ? ' on' : '')}
+            title={gd.title}
+            onClick={() => set('gender', gd.v)}>{gd.label}</button>
+        ))}
+      </div>
       <div className="br-goal-tpl">
         {GOAL_TEMPLATES.map((t) => (
           <button key={t.k} type="button"
@@ -146,11 +165,12 @@ export default function GoalEditor({ line, natureMatrix, onSave, busy }) {
       {/* 自动标记的口径写在**填目标的地方**:「已达成」是后端在写入记录时自己打上的,
           玩家看到状态跳变得知道是谁改的、以及怎么改回去(见 pet.ReachGoal / AutoDoneOnReach)。 */}
       <p className="br-hint muted">
-        三项可以任意组合,只想培育一项就只填那一项。<b>达标按方向算</b>:目标偏高
+        各项可以任意组合,只想培育一项就只填那一项。<b>达标按方向算</b>:目标偏高
         (嗓音 &gt; 0、体重 &gt; 50%)时「达到或超过」就算,目标偏低时「达到或低于」就算,
         正中间按精确相等。性格可以只要求<b>正面加某一维</b>(那 5 个性格都算达标),也可以点名
-        一个确切性格。填了的项被<b>某一代的同一只子代</b>全部满足时,这条线会自动标成
-        「已达成」(可以手动改回「进行中」接着刷)。
+        一个确切性格;<b>性别</b>破壳前不可预测,只用于判定达成(不参与建议排序)。
+        填了的项被<b>某一代的同一只子代</b>全部满足时,这条线会自动标成「已达成」
+        (可以手动改回「进行中」接着刷)。
       </p>
       <div className="br-goal-act">
         <button className="btn primary small" disabled={!dirty || busy} onClick={() => onSave(parsed)}>

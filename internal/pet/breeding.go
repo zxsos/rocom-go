@@ -11,7 +11,7 @@ import (
 //
 // 玩法事实(见 docs/data.md 3.6,全部来自实测):
 //   - 蛋的**物种必定随母本**,故一条培育线 = 一个品种;
-//   - 嗓音 = 双亲均值向下取整(已由 parentVoice 落地);
+//   - 嗓音 = 双亲均值向零取整(正数向下、负数向上;已由 parentVoice 落地);
 //   - 体重在**双亲百分位均值**上下浮动(两条实测样本分别高 1.72pp 与 0.25pp);
 //   - 性格按固定分档继承:母 30% / 父 30% / 其余 40% 重掷(见下面的常量);
 //     天分同样有概率继承双亲(实测吻合),但比例未知,故本包不预测它。
@@ -47,6 +47,11 @@ type BreedingGoal struct {
 	//
 	// 与 Nature 同时填时按**并集**算:改目标时留下的另一半不该被悄悄吃掉。通常只填一个。
 	NatureIn []string `json:"natureIn,omitempty"`
+	// Gender 是**目标性别**(♂ / ♀,空 = 不限)。它只参与「达标」判定与页面提示,**不参与选种
+	// 建议的打分**:子代性别在破壳那一刻才由服务器定下,协议里没有任何字段能让它在收蛋/孵蛋前被
+	// 推出来(与物种/身高体重不同 —— 那些下蛋时就已经定死、蛋本身也有迹可循)。双亲怎么配都不影响
+	// 它,故打分时无从区分,加进去只会给每条建议加同一个常数、把「差多少」这个数搅浑。
+	Gender string `json:"gender,omitempty"`
 }
 
 // natures 目标性格集合(去重、去空),Nature 与 NatureIn 合并后的那份。
@@ -69,6 +74,9 @@ func (g BreedingGoal) natures() []string {
 
 // hasNatureGoal 是否填了性格目标(精确那一个,或「正面加某维」的那一组)。
 func (g BreedingGoal) hasNatureGoal() bool { return len(g.natures()) > 0 }
+
+// hasGenderGoal 是否填了性别目标(见 BreedingGoal.Gender)。
+func (g BreedingGoal) hasGenderGoal() bool { return g.Gender != "" }
 
 // hitNature 某个性格名是否落在目标集合里。空名(快照缺性格)一律不命中 ——
 // 拿空串去比会让「测不出性格」被当成「正好是我要的那个」。
@@ -276,7 +284,7 @@ const (
 
 // Expectation 是某对双亲**预期**孵出什么。全部是预测值,不是实测值 —— UI 上要能看出这一点。
 type Expectation struct {
-	Voice     int32   `json:"voice"`     // floor((母+父)/2)
+	Voice     int32   `json:"voice"`     // 向零取整((母+父)/2)
 	WeightPct float64 `json:"weightPct"` // 双亲百分位均值
 	// WeightHi 是乐观上界(实测略高于均值)。**页面不再把它画成区间**:浮动是实测噪声、不是
 	// 可依赖的收益,`89.0~94.2%` 会被读成「至少能到 89」。它仍要留在响应里 —— 回交对比与
@@ -344,13 +352,14 @@ func predictWith(mother, father EggParent, targets []string) Expectation {
 	return e
 }
 
-// voiceOf 子代嗓音 = 双亲均值**向下取整**(玩法事实,见文件头与 docs/data.md 3.6)。
+// voiceOf 子代嗓音 = 双亲均值的**向零取整**(正数向下、负数向上取整;见文件头与 docs/data.md 3.6)。
 //
 // 单独拎出来是因为 VoiceReachOf 要遍历全部组合却只关心嗓音 —— 走 Predict 会为每个组合
-// 多算体重、多构造一个 Expectation。向下取整对**负数**与 Go 的整数除法不同(那是向零),
-// 故仍用 math.Floor,不图快改成 `(a+b)/2`。
+// 多算体重、多构造一个 Expectation。取整方向在**负数**区间是关键:实测是「朝零取整」
+// (≈整数除法,与 C++ 侧 `(a+b)/2` 同源),故 -99.5 记 -99 而不是 -100 —— 这正好就是 Go
+// 整数除法的行为,直接 `(a+b)/2` 即可,**不要**改成 math.Floor(那会把负数再往下取一档)。
 func voiceOf(mother, father EggParent) int32 {
-	return int32(math.Floor(float64(mother.Voice+father.Voice) / 2))
+	return (mother.Voice + father.Voice) / 2
 }
 
 // hitTargets 性格名是否落在目标集合里(见 BreedingGoal.hitNature)。
@@ -394,6 +403,12 @@ func natureHitPWith(mother, father EggParent, targets []string) float64 {
 
 // Score 期望值与目标的差距(0~1,越小越好)。**只对填了的目标项计分**,未填的维度不参与,
 // 否则「只想刷嗓音」的线会被没填的体重项拖着走。
+//
+// 方向化后**已达标的项记 0 分**(见 reached):「≥ 目标」与「正好 = 目标」都是好结果,不该因为
+// 「超得越多越远」把达标的组合排到后面。未达标的项才按离目标的归一化距离计分。
+//
+// **性别目标不在这里计分**(见 BreedingGoal.Gender):它在破壳前不可预测,双亲怎么配都一样,
+// 计进去只会给每条建议加同一个常数。
 func Score(e Expectation, g BreedingGoal) float64 {
 	return scoreWith(e, g, g.natures())
 }
@@ -560,11 +575,11 @@ func lessSuggestion(a, b Suggestion) bool {
 
 // VoiceReach 是「拿现有候选去配,下一代嗓音最远能到哪」的结论。
 //
-// 为什么要单独算:子代嗓音 = floor((母+父)/2)(见 Predict),是**向下取整的均值**,不是
-// 「子代能超过双亲」。于是高目标很难够:目标 +100 只有 100 × 100 孵得出,任一方不足 100 都
-// 只能无限接近(99 × 100 → 99,再迭代也一样);往低刷的目标容易些 —— floor 朝负无穷取整,
-// 目标 -100 时 -100 × -99 → -100 也够得着。没有这个结论时,页面会把「99 × 100 → 预期 99、
-// 差 1」照常排进前几名:看着在进步,实则永远到不了,玩家会照着它白配好几代。
+// 为什么要单独算:子代嗓音 = 双亲均值的**向零取整**(见 Predict),不是「子代能超过双亲」。
+// 于是高目标很难够:目标 +100 只有 100 × 100 孵得出,任一方不足 100 都只能无限接近
+// (99 × 100 → 99,再迭代也一样)。负向是对称的 —— 取整朝零,`-100 × -99 → -99` 够不到目标
+// -100,只有 -100 × -100 才行。没有这个结论时,页面会把「99 × 100 → 预期 99、差 1」照常
+// 排进前几名:看着在进步,实则永远到不了,玩家会照着它白配好几代。
 type VoiceReach struct {
 	Target int32 `json:"target"` // 这条线的目标嗓音
 	Best   int32 `json:"best"`   // 现有候选在**目标方向上**能达到的极值:高目标取最高、低目标取最低、中心取最近
@@ -807,17 +822,18 @@ func closerWeight(pct float64, best *float64, g BreedingGoal) bool {
 //
 // 各项口径(全部走 reached 的方向化判定):
 //   - 嗓音:目标 > 0 时「≥ 目标」算到,目标 < 0 时「≤ 目标」算到,目标 = 0 时精确相等。
-//     子代嗓音 = floor((母+父)/2) 是确定值(见 Predict),方向化后「97 对目标 96」算达标。
+//     子代嗓音 = 双亲均值的向零取整,是确定值(见 Predict),方向化后「97 对目标 96」算达标。
 //   - 体重:同方向化(轴 0~100,中心 50)。**没有 ±2pp 容差** —— 那只是预测的乐观上界
 //     (Expectation.WeightHi),不再参与达标。
 //   - 性格落在目标集合里。它本就是概率继承,到了就是到了;「正面加某维」时集合里那 5 个都算。
+//   - 性别相符(♂ / ♀)。破壳前不可预测,但破壳后是确定的 —— 判定它不涉及概率(快照缺性别不算命中)。
 //
 // 目标一项未填时恒为 false:没有目标的线谈不上「达成」,否则新建的空线会被立刻判成达成。
 func ReachGoal(l *BreedingLine) bool {
 	if l == nil {
 		return false
 	}
-	if l.Goal.Voice == nil && l.Goal.WeightPct == nil && !l.Goal.hasNatureGoal() {
+	if l.Goal.Voice == nil && l.Goal.WeightPct == nil && !l.Goal.hasNatureGoal() && !l.Goal.hasGenderGoal() {
 		return false
 	}
 	for i := range l.Gens {
@@ -840,6 +856,9 @@ func goalHit(c EggParent, g BreedingGoal) bool {
 		}
 	}
 	if g.hasNatureGoal() && !g.hitNature(c.Nature) {
+		return false
+	}
+	if g.hasGenderGoal() && c.Gender != g.Gender {
 		return false
 	}
 	return true

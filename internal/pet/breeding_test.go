@@ -27,11 +27,18 @@ func brChild(gid uint32, name string, voice int32, pct float64, nature string) *
 	return &p
 }
 
+// brGendered 在 brChild 的基础上补一个性别 —— 性别目标只跟它比(其它 helper 不带性别)。
+func brGendered(gid uint32, name string, voice int32, pct float64, nature, gender string) *EggParent {
+	p := brChild(gid, name, voice, pct, nature)
+	p.Gender = gender
+	return p
+}
+
 // TestPredictVoiceAndWeight 嗓音与体重的预测口径。
 //
-// 嗓音取双亲均值向下取整(已由 parentVoice 落地);体重取双亲百分位均值,并给一个乐观上界 ——
-// 两条实测都比均值高(94.610 → 96.332 是 +1.72pp,99.754 → 100 是 +0.25pp),故上界取
-// 均值 +2pp 且不超过 100。这里用实测样本当输入,免得口径漂了没人发现。
+// 嗓音取双亲均值**向零取整**(正数向下、负数向上,见 breeding.go 的 voiceOf);体重取双亲百分位
+// 均值,并给一个乐观上界 —— 两条实测都比均值高(94.610 → 96.332 是 +1.72pp,99.754 → 100 是
+// +0.25pp),故上界取均值 +2pp 且不超过 100。这里用实测样本当输入,免得口径漂了没人发现。
 func TestPredictVoiceAndWeight(t *testing.T) {
 	cases := []struct {
 		name              string
@@ -42,8 +49,8 @@ func TestPredictVoiceAndWeight(t *testing.T) {
 	}{
 		{"实测样本:双亲同 94.610%", 96, 96, 94.610, 94.610, 96, 94.610, 96.610},
 		{"实测样本:双亲同 99.754% 时上界被 100 截断", 100, 100, 99.754, 99.754, 100, 99.754, 100},
-		{"嗓音向下取整:61 与 62 → 61", 61, 62, 50, 50, 61, 50, 52},
-		{"负嗓音同样向下取整:-61 与 -62 → -62", -61, -62, 1, 1, -62, 1, 3},
+		{"非负嗓音向下取整:61 与 62 → 61", 61, 62, 50, 50, 61, 50, 52},
+		{"负嗓音向上取整(向零):-61 与 -62 → -61", -61, -62, 1, 1, -61, 1, 3},
 		{"双亲百分位不同则取均值", 0, 0, 40, 80, 0, 60, 62},
 	}
 	for _, c := range cases {
@@ -52,7 +59,7 @@ func TestPredictVoiceAndWeight(t *testing.T) {
 			f := brParent(2, "父", c.fv, c.fw, "")
 			got := Predict(m, f, BreedingGoal{})
 			if got.Voice != c.wantVoice {
-				t.Errorf("嗓音 = %d, 期望 %d(双亲均值向下取整)", got.Voice, c.wantVoice)
+				t.Errorf("嗓音 = %d, 期望 %d(双亲均值向零取整)", got.Voice, c.wantVoice)
 			}
 			if math.Abs(got.WeightPct-c.wantPct) > 1e-9 {
 				t.Errorf("体重百分位 = %.3f, 期望 %.3f", got.WeightPct, c.wantPct)
@@ -477,6 +484,18 @@ func TestScoreOnlyFilledGoals(t *testing.T) {
 	}
 }
 
+// TestScoreIgnoresGender 性别目标**不进 Score**:它在破壳前不可预测,双亲怎么配都一样,
+// 计进去只会给每条建议加同一个常数、把「差多少」这个数搅浑。
+func TestScoreIgnoresGender(t *testing.T) {
+	e := Expectation{Voice: 96, WeightPct: 60, NatureP: 0.5}
+	if withG, without := Score(e, BreedingGoal{Gender: "♀"}), Score(e, BreedingGoal{}); withG != without {
+		t.Errorf("只填性别 = %.4f, 没填 = %.4f —— 性别不该影响打分", withG, without)
+	}
+	if withG, without := Score(e, BreedingGoal{Voice: brI32(96), Gender: "♀"}), Score(e, BreedingGoal{Voice: brI32(96)}); withG != without {
+		t.Error("性别目标不该改变其它已填项的打分")
+	}
+}
+
 // TestSuggestSortsByDistanceAndFlagsAmbiguous 建议按离目标的差距升序,串窝的母本为每个父本
 // 候选各出一条并标 Ambiguous —— 不能替玩家猜实际是哪个父本(见 docs/data.md 3.6 的串窝)。
 func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
@@ -515,9 +534,9 @@ func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
 	}
 }
 
-// TestVoiceReachFloorMean 可达性:子代嗓音 = floor((母+父)/2),故目标只有「双亲都到位」
-// 才够得着,差一点也不行 —— 且正负对称(+100 与 -100 是同一条规则)。
-func TestVoiceReachFloorMean(t *testing.T) {
+// TestVoiceReachRoundTowardZero 可达性:子代嗓音 = 双亲均值**向零取整**(正数向下、负数向上),
+// 故目标只有「双亲都到位」才够得着,差一点也不行 —— 且正负对称(+100 与 -100 是同一条规则)。
+func TestVoiceReachRoundTowardZero(t *testing.T) {
 	// 一位母本 × 若干父本候选,是最小的候选池形状。
 	pool := func(mv int32, fvs ...int32) Pool {
 		fathers := make([]EggParent, 0, len(fvs))
@@ -534,13 +553,13 @@ func TestVoiceReachFloorMean(t *testing.T) {
 	if got := VoiceReachOf(pool(100, 99), 100); got.Hit || got.Best != 99 {
 		t.Errorf("99 × 100 → %+v, 期望不命中且 Best=99", got)
 	}
-	// 负向**不是**简单镜像:floor 朝负无穷取整,故 -100 × -99 → floor(-99.5) = -100 够得着,
-	// 而 -99 × -99 → -99 够不着。可达性只能按公式逐组枚举,不能拿「±对称」去猜。
-	if got := VoiceReachOf(pool(-100, -99), -100); !got.Hit || got.Best != -100 {
-		t.Errorf("-100 × -99 → %+v, 期望命中 -100(floor 朝负无穷)", got)
+	// 负向与正向对称:取整朝零,故 -100 × -99 → -99(不是 -100),够不到目标 -100;
+	// 只有 -100 × -100 才够得着。
+	if got := VoiceReachOf(pool(-100, -100), -100); !got.Hit || got.Best != -100 {
+		t.Errorf("-100 × -100 → %+v, 期望命中 -100", got)
 	}
-	if got := VoiceReachOf(pool(-99, -99), -100); got.Hit || got.Best != -99 {
-		t.Errorf("-99 × -99 → %+v, 期望不命中且 Best=-99", got)
+	if got := VoiceReachOf(pool(-100, -99), -100); got.Hit || got.Best != -99 {
+		t.Errorf("-100 × -99 → %+v, 期望不命中且 Best=-99(取整朝零)", got)
 	}
 	// 多候选:目标 100 在中心 0 之上(方向为高),Best 取**目标方向上的极值**(此处即最大)。
 	multi := brPool(
@@ -706,6 +725,19 @@ func TestReachGoal(t *testing.T) {
 			"三项里缺一项",
 			BreedingGoal{Voice: brI32(96), WeightPct: brF64(90), Nature: "胆小"},
 			brChild(1, "一代", 100, 91, "固执"), false,
+		},
+		{"性别:命中", BreedingGoal{Gender: "♀"}, brGendered(1, "一代", 0, 50, "", "♀"), true},
+		{"性别:不符不算命中", BreedingGoal{Gender: "♀"}, brGendered(1, "一代", 0, 50, "", "♂"), false},
+		{"性别:快照缺性别不算命中", BreedingGoal{Gender: "♀"}, brGendered(1, "一代", 0, 50, "", ""), false},
+		{
+			"嗓音+体重+性格+性别同时满足",
+			BreedingGoal{Voice: brI32(96), WeightPct: brF64(90), Nature: "胆小", Gender: "♀"},
+			brGendered(1, "一代", 100, 91, "胆小", "♀"), true,
+		},
+		{
+			"性别是唯一缺项",
+			BreedingGoal{Voice: brI32(96), Gender: "♀"},
+			brGendered(1, "一代", 100, 50, "", "♂"), false,
 		},
 	}
 	for _, c := range cases {

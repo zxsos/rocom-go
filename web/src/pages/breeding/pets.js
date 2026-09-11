@@ -138,7 +138,7 @@ export function lineStats(line) {
   return { gens, bestVoice, bestWeight }
 }
 
-// goalBits 把目标拆成三枚徽标。未填的项显示「—」而不是消失 —— 卡片高度才不会一张高一张矮。
+// goalBits 把目标拆成四枚徽标。未填的项显示「—」而不是消失 —— 卡片高度才不会一张高一张矮。
 // 性格那一枚显示的是 goalNatureLabel:确切性格给名字,「正面加某维」给「加物攻」。
 export function goalBits(goal, matrix) {
   const g = goal || {}
@@ -147,6 +147,7 @@ export function goalBits(goal, matrix) {
     { k: 'V', on: g.voice != null, v: g.voice != null ? String(g.voice) : '—', title: '目标嗓音(-100~100),留空表示不关心' },
     { k: 'W', on: g.weightPct != null, v: g.weightPct != null ? `${fmtPct(g.weightPct)}%` : '—', title: '目标体重百分位(0~100),留空表示不关心' },
     { k: '性', on: !!nat, v: nat || '—', title: '目标性格:一个确切性格名,或「性格正面加某维」的一组;留空表示不关心' },
+    { k: '♂♀', on: hasGenderGoal(g), v: g.gender || '—', title: '目标性别(♂ / ♀),留空表示不关心 —— 破壳前不可预测,只用于判定达成' },
   ]
 }
 
@@ -155,7 +156,14 @@ export const fmtPct = (v) => (v == null ? '—' : Number(v).toFixed(1))
 // hasGoal 这条线填过任何一项目标吗(没填的话建议是无意义的:所有组合等价)。
 export function hasGoal(goal) {
   const g = goal || {}
-  return g.voice != null || g.weightPct != null || hasNatureGoal(g)
+  return g.voice != null || g.weightPct != null || hasNatureGoal(g) || hasGenderGoal(g)
+}
+
+// hasGenderGoal 填了性别目标吗(镜像后端 BreedingGoal.hasGenderGoal)。
+// 与后端同一口径(非空即填了):parseGoal 已把非法值挡在提交之前。
+export function hasGenderGoal(goal) {
+  const g = goal || {}
+  return !!g.gender
 }
 
 // —— 谱系:子线链 ——
@@ -273,19 +281,33 @@ export function natureHit(line, goal) {
   return false
 }
 
-// goalProgress 卡片/详情页的「离目标还有多远」进度条:**三项都出**(没填的维度不参与,
-// 否则只想刷嗓音的线会被没填的体重项拖着走,与后端打分同口径)。
-// pct = 1 - 归一化差距,达标项直接满格;text 里写的才是「达标 / 差多少」。
+// genderHit 是否已有子代性别与目标相符(镜像后端 goalHit 的性别那一项)。
+// 与性格同理:它也是「达成」可能卡住的一项,得在进度里有表示。快照缺性别(空串)不算命中。
+export function genderHit(line, goal) {
+  const g = goal || {}
+  if (!g.gender) return false
+  for (const gen of (line && line.gens) || []) {
+    if (gen.child && gen.child.gender === g.gender) return true
+  }
+  return false
+}
+
+// goalProgress 卡片/详情页的「离目标还有多远」,分**两种展示语言**(没填的维度都不参与,
+// 否则只想刷嗓音的线会被没填的体重项拖着走,与后端打分同口径):
 //
-// matrix 只用于把目标性格显示成「加物攻」这种维度名(见 goalNatureLabel),缺失时退化成
-// 名字或「N 种性格」。
-export function goalProgress(line, matrix) {
+//   - bars:嗓音 / 体重 —— 它们是有极值的**数值轴**,「离目标多远」说得清,故画进度条;
+//     pct = 1 - 归一化差距,达标项直接满格;text 里写的才是「达标 / 差多少」。
+//   - flags:性格 / 性别 —— 「命中 / 未命中」两态,没有「快满了」这回事,故**不给进度条**,
+//     并排一行旗标(见 .br-flag)。性格显示**完整名字**而不是「加物攻」这种维度缩写:
+//     玩家要认的是具体哪几个性格,不是它归在哪一维。
+export function goalProgress(line) {
   const goal = (line && line.goal) || {}
   const st = lineStats(line)
-  const out = []
+  const bars = []
+  const flags = []
   const v = goal.voice != null ? goalItem(st.bestVoice, goal.voice, 'voice') : null
   if (v) {
-    out.push({
+    bars.push({
       k: 'V', cls: 'v', pct: v.hit ? 100 : clamp01(1 - v.diff / VOICE_SPAN) * 100,
       text: v.text, hit: v.hit,
       title: `历代最佳嗓音 ${st.bestVoice},目标 ${goal.voice}`,
@@ -293,7 +315,7 @@ export function goalProgress(line, matrix) {
   }
   const w = goal.weightPct != null ? goalItem(st.bestWeight, goal.weightPct, 'weight') : null
   if (w) {
-    out.push({
+    bars.push({
       k: 'W', cls: 'w', pct: w.hit ? 100 : clamp01(1 - w.diff / 100) * 100,
       text: w.text, hit: w.hit,
       title: `历代最佳体重百分位 ${fmtPct(st.bestWeight)}%,目标 ${fmtPct(goal.weightPct)}%`,
@@ -301,14 +323,19 @@ export function goalProgress(line, matrix) {
   }
   if (hasNatureGoal(goal)) {
     const hit = natureHit(line, goal)
-    out.push({
-      k: '性', cls: 'n', pct: hit ? 100 : 0,
-      text: hit ? `${goalNatureLabel(goal, matrix)} · 达标` : '未命中',
-      hit,
+    flags.push({
+      k: '性格', text: goalNatures(goal).join('/'), hit,
       title: hit ? '已有子代命中目标性格' : '还没有子代命中目标性格 —— 这是「未达成」最常见的原因',
     })
   }
-  return out
+  if (hasGenderGoal(goal)) {
+    const hit = genderHit(line, goal)
+    flags.push({
+      k: '性别', text: goal.gender, hit,
+      title: hit ? `已有子代是 ${goal.gender}` : `还没有子代是 ${goal.gender} —— 性别破壳前不可预测,只能多孵几只`,
+    })
+  }
+  return { bars, flags }
 }
 
 // —— 同一只达标(与「各维最佳」是两个问题)——
@@ -318,7 +345,7 @@ export function goalProgress(line, matrix) {
 // 此前页面只把前者画在目标旁边,于是「各维都差不多了」被读成「同一只快达标了」。下面这几个
 // 函数补上后一个问题,让页面能直接说出「还差哪一项」。
 
-// childHits 某只子代对三项已填目标的逐项命中情况(镜像后端 pet.goalHit,只列填了的维度)。
+// childHits 某只子代对各项已填目标的逐项命中情况(镜像后端 pet.goalHit,只列填了的维度)。
 export function childHits(child, goal) {
   const g = goal || {}
   const hits = {}
@@ -327,6 +354,8 @@ export function childHits(child, goal) {
     hits.weight = child.weightPct != null && goalReached(child.weightPct, g.weightPct, 'weight')
   }
   if (hasNatureGoal(g)) hits.nature = goalNatures(g).includes(child.nature)
+  // 性别破壳后是**确定**的,故直接比;快照缺性别(空串)不算命中。
+  if (hasGenderGoal(g)) hits.gender = child.gender === g.gender
   return hits
 }
 
@@ -371,6 +400,12 @@ function goalDistance(child, goal) {
   if (hasNatureGoal(g)) {
     n++
     sum += goalNatures(g).includes(child.nature) ? 0 : 1
+  }
+  // 性别按命中与否记 0/1(与性格同款)。注意它只影响这里的**排名**,不影响后端建议打分 ——
+  // 那边评的是「还没孵出来的预期」,而性别在破壳前不可预测(见后端 BreedingGoal.Gender)。
+  if (hasGenderGoal(g)) {
+    n++
+    sum += child.gender === g.gender ? 0 : 1
   }
   return n === 0 ? 0 : sum / n
 }
@@ -522,6 +557,9 @@ export function parseGoal(v) {
     if (t && !list.includes(t)) list.push(t)
   }
   if (list.length) out.natureIn = list
+  // 性别只认 ♂ / ♀:脏值(手改的请求、旧版本)在这里就丢掉,而不是提交上去永远匹配不上任何子代。
+  const gd = String(g.gender == null ? '' : g.gender).trim()
+  if (gd === '♂' || gd === '♀') out.gender = gd
   return out
 }
 
@@ -533,6 +571,7 @@ export function goalToInput(goal) {
     weightPct: g.weightPct == null ? '' : String(g.weightPct),
     nature: g.nature || '',
     natureIn: Array.isArray(g.natureIn) ? g.natureIn.slice() : [],
+    gender: g.gender || '',
   }
 }
 
@@ -547,6 +586,7 @@ export function sameGoal(a, b) {
   const x = parseGoal(goalToInput(a))
   const y = parseGoal(goalToInput(b))
   return x.voice === y.voice && x.weightPct === y.weightPct
+    && x.gender === y.gender
     && sameNames(goalNatures(x), goalNatures(y))
 }
 
@@ -608,7 +648,7 @@ export const genState = (g) => (g?.childGid ? 'claim' : g?.eggGid ? 'incubating'
 
 // sameParents 这一代与上一条记录的双亲是否相同。
 //
-// 嗓音 = floor((母 + 父) / 2) 是**确定值**(见 docs/data.md 3.6),所以双亲相同意味着
+// 嗓音 = 双亲均值向零取整(见 docs/data.md 3.6)是**确定值**,所以双亲相同意味着
 // 这一胎的嗓音与上一胎**必然一模一样** —— 再孵只是在掷体重与性格的随机,不是在推进。
 // 刷嗓音时这恰恰是最该看见的一句话:否则玩家会以为多孵几胎总能更高。
 //
