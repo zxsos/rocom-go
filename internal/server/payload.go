@@ -56,6 +56,10 @@ type PositionPayload struct {
 	SceneCfgID int32   `json:"sceneCfgId"`
 	SceneName  string  `json:"sceneName"`
 	Img        string  `json:"img"` // 底图文件名(家园按等级 <res>_<lv>);无底图为空串
+	// ImgHd 是高清底图文件名(同样不含扩展名,前端拼 /img/bigmap/<名>.webp);
+	// 该场景没有高清版时不下发。它只覆盖大陆与近海(远海透明),前端是把它**叠在**
+	// Img 之上而非替换,故两个字段同生共死 —— 见 gamedata.MapImageHD。
+	ImgHd string `json:"imgHd,omitempty"`
 	X          int32   `json:"x"`
 	Y          int32   `json:"y"`
 	Z          int32   `json:"z"`

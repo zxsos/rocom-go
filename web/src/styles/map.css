@@ -123,6 +123,11 @@
    作为一张纹理整体平移,消除底图与层图移动先后。缩放仍改 width/height(全分辨率栅格化,不模糊)。 */
 .map-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .map-base { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+/* 高清底图叠加层:同一张地图的 2 倍分辨率素材,只覆盖大陆与近海(远海透明),
+   故叠在标准底图之上而非替换它(见 internal/gamedata/map.go 的 MapImageHD)。
+   必须绝对定位铺满 —— 标准底图走普通流,两层都走普通流会上下堆叠、整张地图错位;
+   不吃指针事件,手势要能穿透到底下的 .map-vp 做平移/捏合。 */
+.map-base-hd { position: absolute; left: 0; top: 0; pointer-events: none; }
 /* 洞穴/地下层切片:叠加在底图上对应地理位置(透明处透出底图)。 */
 .map-layer { position: absolute; user-select: none; -webkit-user-drag: none; pointer-events: none; }
 /* 涂地(已扫过的区域):淡填充 + 细描边两层,都铺满底图、CSS 拉到底图尺寸,压在标记之下,
@@ -317,6 +322,9 @@
 .map-btn:disabled:hover { transform: none; border-color: var(--line); color: var(--fg-dim); background: var(--bar-bg); box-shadow: none; }
 /* 右上角控制组里的 ☰(图层侧栏开关):所有宽度开/关图层抽屉 */
 .map-layers-toggle { display: flex; }
+/* 高清底图开关:控制组里唯一的中文文字按钮(其余是 ＋/－/◎/⧉ 这类单个符号),
+   字号要收到 13px 才放得下两个字 —— 容器固定 38×38,见 .map-btn。 */
+.map-btn-hd { font-size: 13px; letter-spacing: .5px; }
 
 /* POI 标记(炼金釜/魔力之源/…):在 .map-world 内按底图归一化坐标定位,尺寸恒定不随缩放变大,
    故用 translate(-50%,-50%) 把图标中心对准锚点。

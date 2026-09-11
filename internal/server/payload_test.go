@@ -56,7 +56,7 @@ func TestPositionPayloadKeys(t *testing.T) {
 	u, v, vu, vv := 0.5, 0.5, 0.1, 0.2
 	p := PositionPayload{
 		Account: "UID:1", SceneResID: 10003, SceneCfgID: 1001,
-		SceneName: "卡洛西亚大陆", Img: "bigmap/10003.webp",
+		SceneName: "卡洛西亚大陆", Img: "bigmap/10003.webp", ImgHd: "bigmap/10003_hd.webp",
 		X: 1, Y: 2, Z: 3, Heading: 1, Stop: true, Paintable: true,
 		InBattle: true,
 		Ts:       1, TsMs: 1000,
@@ -65,7 +65,7 @@ func TestPositionPayloadKeys(t *testing.T) {
 		LayerOnly: true, Layer: map[string]any{"k": 1},
 	}
 	eq(t, "PositionPayload", keys(t, p), []string{
-		"account", "heading", "img", "inBattle", "layer", "layerOnly", "paintable",
+		"account", "heading", "img", "imgHd", "inBattle", "layer", "layerOnly", "paintable",
 		"path", "sceneCfgId", "sceneName", "sceneResId", "stop",
 		"ts", "tsMs", "u", "v", "vu", "vv", "x", "y", "z",
 	})

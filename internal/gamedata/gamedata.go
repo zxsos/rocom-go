@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 //go:embed data/names.json
@@ -62,6 +63,7 @@ type DB struct {
 	sceneDefRes map[string]int32    // scene_cfg_id -> 默认 scene_res_id(res 未知时兜底定位)
 	sceneRes    map[string]sceneRes // scene_res_cfg_id -> {名称, 所属 scene_cfg_id}
 	maps        map[uint32]MapInfo  // 有大地图底图的 scene_res_cfg_id -> 投影参数
+	hdMaps      map[string]bool     // 有高清底图的底图名(bigmap/<名>_hd.webp 存在),见 MapImageHD
 	layers      []LayerInfo         // 分层地图(洞穴/地下层),按 cave_name 前缀/位置定位
 	poiKinds    []POIKind           // 大地图 POI 图层清单(有序,前端开关)
 	pois        map[uint32][]POI    // scene_res_cfg_id -> 该场景的 POI(世界坐标)
@@ -235,6 +237,17 @@ func Load() (*DB, error) {
 		}
 		return nil
 	})
+	// 有高清版的底图:scripts/fetch_bigmap_hd.py 产出的 bigmap/<名>_hd.webp(见 MapImageHD)。
+	// 复用上面那份 embed 文件清单判定 —— 该脚本只在抓到图时才落盘,故「文件在」即「有高清版」;
+	// 没有的场景(家园、魔法学院…)前端不显示「高清」开关。
+	hdMaps := map[string]bool{}
+	for p := range imgFiles {
+		if name, ok := strings.CutPrefix(p, "bigmap/"); ok {
+			if base, ok := strings.CutSuffix(name, "_hd.webp"); ok {
+				hdMaps[base] = true
+			}
+		}
+	}
 	maps := make(map[uint32]MapInfo, len(raw.Maps))
 	for k, v := range raw.Maps {
 		if id, err := strconv.ParseUint(k, 10, 32); err == nil {
@@ -338,6 +351,7 @@ func Load() (*DB, error) {
 		sceneDefRes:    raw.SceneDefaultRes,
 		sceneRes:       raw.SceneRes,
 		maps:           maps,
+		hdMaps:         hdMaps,
 		layers:         layers,
 		poiKinds:       raw.POIKinds,
 		pois:           pois,

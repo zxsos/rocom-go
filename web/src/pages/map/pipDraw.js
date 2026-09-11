@@ -177,6 +177,9 @@ export function renderToCanvas(ctx, snap) {
 
   if (!snap.sceneImg) { drawNoMap(ctx, snap); return }
 
+  // 底图只用**标准版**,不叠主地图那个高清层(见 useMapEngine.jsx 的 map-base-hd):
+  // 小窗上限 512px,4096² 的原图已远超它的像素密度,再挂一张 4.6MB 的高清层
+  // 只是白烧解码与显存,画上去也看不出差别。
   const base = loadIcon(`bigmap/${snap.sceneImg}.webp`)
   if (base) ctx.drawImage(base, origin.x, origin.y, mapPx, mapPx)
 
