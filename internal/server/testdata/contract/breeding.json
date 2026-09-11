@@ -47,6 +47,22 @@
         }
       },
       "evo": 3003,
+      "father": {
+        "confId": 2000672,
+        "gender": "♂",
+        "gid": 2002,
+        "heightM": 1.5,
+        "heightPct": 0,
+        "img": "HeadIcon/3006.webp",
+        "name": "小公乙",
+        "nature": "固执",
+        "species": "火神",
+        "talentRank": "A",
+        "voice": -20,
+        "weightKg": 88,
+        "weightPct": 0
+      },
+      "fatherGid": 2002,
       "gens": [
         {
           "at": 1700000000,
@@ -131,6 +147,22 @@
         "weightKg": 88,
         "weightPct": 0
       },
+      "nestPlan": {
+        "confId": 3001,
+        "gender": "♀",
+        "gid": 2005,
+        "heightM": 1,
+        "heightPct": 100,
+        "img": "HeadIcon/3001.webp",
+        "name": "小水母",
+        "nature": "胆小",
+        "species": "水蓝蓝",
+        "talentRank": "B",
+        "voice": 5,
+        "weightKg": 20,
+        "weightPct": 100
+      },
+      "nestPlanGid": 2005,
       "pending": [
         {
           "at": 1700000100,
@@ -392,5 +424,8 @@
       ],
       "updatedAt": 1700000100
     }
-  ]
+  ],
+  "nest": {
+    "gid": 0
+  }
 }

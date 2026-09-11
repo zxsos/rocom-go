@@ -22,7 +22,7 @@ func xyz(x, y, z int32) []byte {
 }
 
 // homeInfoMsg 拼一个 ZoneSceneClientEnterSceneFinishNtyAck:home_info(22) 里含
-// home_level(4)/room_level(5)/room_layout(20)/lay_egg_couple(22)。
+// home_name(1)/home_owner_id(2)/home_level(4)/room_level(5)/room_layout(20)/lay_egg_couple(22)。
 func homeInfoMsg(nests [][]byte, couples []byte) []byte {
 	var plane []byte
 	for _, n := range nests {
@@ -30,10 +30,12 @@ func homeInfoMsg(nests [][]byte, couples []byte) []byte {
 	}
 	room := fMsg(20, plane)               // room_plane_list
 	layout := fMsg(1, room)               // rooms
-	hi := fVar(4, 25)                     // home_level
-	hi = append(hi, fVar(5, 5)...)        // room_level
-	hi = append(hi, fMsg(20, layout)...)  // room_layout
-	hi = append(hi, fMsg(22, couples)...) // lay_egg_couple
+	hi := fMsg(1, []byte("示例玩家"))            // home_name
+	hi = append(hi, fVar(2, 100000002)...) // home_owner_id:判「这个家是不是自己的」(见 HomeInfo.OwnerID)
+	hi = append(hi, fVar(4, 25)...)        // home_level
+	hi = append(hi, fVar(5, 5)...)         // room_level
+	hi = append(hi, fMsg(20, layout)...)   // room_layout
+	hi = append(hi, fMsg(22, couples)...)  // lay_egg_couple
 	return fMsg(22, hi)
 }
 
@@ -64,6 +66,11 @@ func TestParseHomeInfo(t *testing.T) {
 	}
 	if hi.Level != 25 || hi.RoomLevel != 5 {
 		t.Errorf("等级 = %d/%d, want 25/5", hi.Level, hi.RoomLevel)
+	}
+	// 归属:学院小窝的真值只在**自己的**家里认(见 pipeline.syncAcademyNest),故这两个字段
+	// 必须真的解出来 —— 漏了它们,好友家园里的窝就会被当成自己的。
+	if hi.OwnerID != 100000002 || hi.Name != "示例玩家" {
+		t.Errorf("归属 = %d/%q, want 100000002/示例玩家", hi.OwnerID, hi.Name)
 	}
 	if len(hi.Nests) != 3 { // 本包不认小窝,家具全给出,由调用方按 config_id 过滤
 		t.Fatalf("家具数 = %d, want 3", len(hi.Nests))

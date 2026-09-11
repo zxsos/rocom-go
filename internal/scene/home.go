@@ -55,8 +55,15 @@ type Couple struct {
 type HomeInfo struct {
 	Level     uint32
 	RoomLevel uint32
-	Nests     []Nest
-	Couples   []Couple
+	// OwnerID 这个家园的主人(0x014a 的 home_info.home_owner_id)。**与登录 uid、self_info 里的
+	// logic_id 同口径**(实测三者都是同一个数),故可直接与当前账号比对 —— 这是判断
+	// 「这个家是不是自己的」的唯一可靠依据:好友家园里也有小窝家具,那是对方的宠物,
+	// 不该拿来写自己的状态(见 pipeline 的 syncAcademyNest)。0 = 这条消息没带。
+	OwnerID uint64
+	// Name 家园名(home_info.home_name),只用于展示与排错;判归属看 OwnerID。
+	Name    string
+	Nests   []Nest
+	Couples []Couple
 }
 
 // ParseHomeInfo 从 0x014a 的 AppBody 取 home_info(22);非家园场景返回 ok=false。
@@ -68,6 +75,10 @@ func ParseHomeInfo(body []byte) (HomeInfo, bool) {
 	var out HomeInfo
 	scanFields(hi, func(num protowire.Number, typ protowire.Type, val []byte, v uint64) {
 		switch {
+		case num == 1 && typ == protowire.BytesType: // home_name
+			out.Name = string(val)
+		case num == 2 && typ == protowire.VarintType: // home_owner_id(见 HomeInfo.OwnerID)
+			out.OwnerID = v
 		case num == 4 && typ == protowire.VarintType:
 			out.Level = uint32(v)
 		case num == 5 && typ == protowire.VarintType:

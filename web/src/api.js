@@ -261,7 +261,7 @@ export const queryEggMatch = async (height, weight, maxSecs) => {
 
 // getBreeding 拉取本账号全部培育线:
 //   {lines:[{id,evo,species,chainName,confId,goal:{voice,weightPct,nature,natureIn},status,
-//            gens:[],pending:[],createdAt,updatedAt,
+//            nestPlanGid,nestPlan:{…},nestPlanReleased,gens:[],pending:[],createdAt,updatedAt,
 //            suggest:[{mother,father,exp:{voice,weightPct,weightHi,natureP,natureFrom},
 //                      score,ambiguous,backcross}],
 //            backcross:{advised,reason,withParent,exp,alt,altExp}}]}
@@ -276,7 +276,18 @@ export const queryEggMatch = async (height, weight, maxSecs) => {
 //
 // 建议(含回交对比)**不单独开接口**:它依赖这条线的目标,目标一改建议就变;分开请求的话
 // 前端每次改目标都得记住再拉一次,还会出现「线已更新、建议是旧的」的中间态(见 api_breeding.go)。
-export const getBreeding = () => getJSON('/api/breeding?' + buildQuery(), { lines: [] })
+//
+// 学院小窝里那只参与孵蛋时子代性格 **100% 随它** —— 建议里那些命中率的 natureFrom 会变成
+// `nest`(见 docs/data.md 3.6)。「小窝里是谁」有**两个来源**,别混着读:
+//   - 顶层 nest 是**游戏真值**(全库唯一,`{gid,name,nature}`,`gid:0` = 空着):由家园管线
+//     自动维护(玩家在游戏里放/抱走就跟着变),页面**不要**写它 —— 除非走 setNest 手工兜底。
+//   - 每条线的 `nestPlanGid` 是**本线的计划值**(0 = 没设):「打算把小窝给谁」,用于还没真放进去
+//     时试算概率。随线整条保存,派生 nestPlan 是它的快照(仅 gid≠0 且在库时出现)、
+//     `nestPlanReleased:true` 表示指定过但那只已不在库。
+// 后端算建议用的**生效值 = nestPlanGid || nest.gid**(设了计划按计划、没设按真值),故 suggest/
+// backcross 都已按生效值算好,前端如实呈现即可,不要自己重算概率。
+// 它与线一起下发,亲本卡上的勾选因此不必再单拉一次;真值走 setNest,计划随 saveBreeding 落库。
+export const getBreeding = () => getJSON('/api/breeding?' + buildQuery(), { lines: [], nest: { gid: 0 } })
 
 // getBreedingPool 拉某个品种的补录候选池:
 //   {evo, species, mothers:[], fathers:[], kids:[]},每项是精简候选
@@ -321,6 +332,27 @@ export async function saveBreeding(line) {
     body: JSON.stringify(line),
   })
   if (!r.ok) throw await httpError(r, '保存失败')
+  return r.json()
+}
+
+// setNest 把一只放进学院小窝(gid=0 = 把小窝空出来)。**手工兜底**(正常由家园管线自动维护):
+// 玩家在游戏里放/抱走,后端会跟着更新这份真值,页面不需要主动写它 —— 只在「还没抓到小窝数据、
+// 但确实已经放好了」时,让玩家用它把计划一次性扶正成事实(详情页状态行的「记为游戏真值」)。
+//
+// 注意与「本线计划」的分工:想试算「换谁更好」不该走这里,而应改培育线的 `nestPlanGid`
+// (随 saveBreeding 整条覆盖写)—— 那才只影响这条线、不动游戏里的事实(见 getBreeding 注释)。
+//
+// 小窝**全库唯一**:改另一只就是把原来那只换出来 —— 后端只存一个 gid,故两张亲本卡天然互斥,
+// 前端不必自己维护「只能勾一个」(维护了反而多一处可能与后端不一致的状态)。
+// 响应与小窝接口同形({gid,name,nature});但调用方一律 refresh 重拉(见 Breeding.jsx):
+// 这一改动的是**建议里的性格命中率**,而那是后端算的,本地只改勾选状态会与卡片上的数字不一致。
+export async function setNest(gid) {
+  const r = await fetch('/api/nest?' + buildQuery(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gid }),
+  })
+  if (!r.ok) throw await httpError(r, '设置学院小窝失败')
   return r.json()
 }
 

@@ -1,8 +1,10 @@
 package pipeline
 
 import (
+	"log"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zxsos/rocom-go/internal/pet"
@@ -18,6 +20,9 @@ import (
 //
 // 小窝取自**家具列表**而不是实体,因为空窝没有任何实体,只有家具那一行——「小窝可能为空」
 // 正是要显示的状态之一。窝与宠物靠 furniture_guid 对应,窝与蛋靠蛋实体的 attach_item_id 对应。
+//
+// 这里还顺手维护一件**跨场景的全局状态**:学院小窝里住着谁(见 syncAcademyNest)—— 它是
+// 「子代性格 100% 遗传」的依据,而那是游戏事实、不是玩家设定,故跟着家园快照一起进。
 
 // homeEgg 是趴在某个窝上、还没收的蛋。
 type homeEgg struct {
@@ -32,6 +37,13 @@ type homeState struct {
 	res       int32
 	level     uint32
 	roomLevel uint32
+	// ownerID 这个家园的主人(见 scene.HomeInfo.OwnerID):0 = 快照没带归属。
+	// 与 ownHome 一起判「这个家是不是自己的」—— 好友家园里也有学院小窝,不能拿来写自己的真值
+	// (见 syncAcademyNest)。
+	ownerID uint64
+	// ownHome 这份快照是不是自己的家:ownerID 与当前账号的 uid 相等。
+	// ownerID 为 0(判不了)时这里恒为 false,调用方据此走弱判据。
+	ownHome   bool
 	nests     []scene.Nest              // 只留小窝家具,按 guid 稳定排序
 	pets      map[uint64]*scene.HomePet // actor_id -> 入住宠物
 	eggs      map[uint64]*homeEgg       // actor_id -> 窝上的蛋
@@ -79,6 +91,7 @@ func (p *Pipeline) onHomeSnapshot(conn, acc string, body []byte, res int32) bool
 	}
 	h := &homeState{
 		res: res, level: hi.Level, roomLevel: hi.RoomLevel,
+		ownerID: hi.OwnerID, ownHome: hi.OwnerID != 0 && hi.OwnerID == accountUID(acc),
 		pets: map[uint64]*scene.HomePet{}, eggs: map[uint64]*homeEgg{},
 		couples: map[uint64][]uint64{},
 	}
@@ -95,6 +108,8 @@ func (p *Pipeline) onHomeSnapshot(conn, acc string, body []byte, res int32) bool
 		p.addHomeActor(h, a, true)
 	}
 	p.conn(conn).home = h
+	// 学院小窝里是谁 = 游戏事实,先同步再推送(见 syncAcademyNest)。
+	p.syncAcademyNest(conn, acc)
 	p.pushHome(conn, acc)
 	return true
 }
@@ -142,8 +157,78 @@ func (p *Pipeline) observeHome(conn, acc string, body []byte) {
 		}
 	}
 	if changed {
+		// 住户进出小窝最常见的就是这一刻(玩家在自己家里把宠物放进/抱出学院小窝),
+		// 故这里也要同步真值,而不是只在进场景那一次。
+		p.syncAcademyNest(conn, acc)
 		p.pushHome(conn, acc)
 	}
+}
+
+// syncAcademyNest 把「学院小窝里住着谁」同步成全局真值(培育页按它算性格 100% 遗传,见 data.md 3.6)。
+//
+// 为什么要自动做:小窝里那只参与孵蛋时子代性格 100% 随它,而「谁在小窝里」是游戏里的一个
+// **事实**(家具的住户),不该让玩家再到页面上手工勾一遍 —— 管线本来就已经解出了住户(见 pushHome
+// 里那个 petAt),这里只是把同一个值写进全局设置。玩家自己「打算怎么放」仍由培育线里的计划值表达。
+//
+// 三条纪律:
+//   - **只认自己的家**:好友家园里也有学院小窝(config 1001072),那是对方的宠物。归属在
+//     0x014a 的 home_info.home_owner_id 里,与登录 uid 同口径(见 scene.HomeInfo.OwnerID);
+//     判不了归属时只按「住户确实在本账号宠物库里」这条弱判据,且**只增不清**。
+//   - **只在值真变时写库 + 广播**:家园消息极高频(一次进场景 0x0414 就有上百条),每次都写盘、
+//     每次都广播会让培育页反复重拉。稳态下这里是一次点查、零写入。
+//   - **「没有这件家具」不动已有值**:那多半是还没解锁这个玩法,不该顺手把玩家手工设的值清掉;
+//     只有「家具在、但窝是空的」才算事实上的空窝。
+func (p *Pipeline) syncAcademyNest(conn, acc string) {
+	cs := p.conns[conn]
+	if cs == nil || cs.home == nil {
+		return
+	}
+	h := cs.home
+	// 归属明确、但不是自己的家:什么都不做(别人家的窝与自己的设置无关,更不能清)。
+	if h.ownerID != 0 && !h.ownHome {
+		return
+	}
+	var guid uint64
+	for _, n := range h.nests {
+		if p.db.IsAcademyNest(n.ConfigID) {
+			guid = n.GUID
+			break
+		}
+	}
+	if guid == 0 {
+		return // 自己家里没有学院小窝(还没解锁/这件家具没放):不动既有值
+	}
+	var gid uint32
+	if _, hp := h.petAt(guid); hp != nil {
+		gid = hp.PetGid
+	}
+	if !h.ownHome {
+		// 弱判据(这条快照没带归属):空窝不动、住户必须在自己的库里。
+		if gid == 0 {
+			return
+		}
+		if pp, err := p.st.For(acc).GetPet(gid); err != nil || pp == nil {
+			return
+		}
+	}
+	if p.st.AcademyGid() == gid {
+		return
+	}
+	if err := p.st.SetAcademyGid(gid); err != nil {
+		log.Printf("学院小窝: 同步真值 %d 失败: %v", gid, err)
+		return
+	}
+	// 培育页的性格命中率是按真值算的,改完得让它重拉(与培育的其它写操作同一套路)。
+	p.srv.Hub().Broadcast("breeding", acc, map[string]any{"account": acc})
+}
+
+// accountUID 取 "UID:<uid>" 里的 uid;取不出返回 0(此时家园归属判不了,走弱判据)。
+func accountUID(acc string) uint64 {
+	v, err := strconv.ParseUint(strings.TrimPrefix(acc, "UID:"), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 // leaveHome 在换场景/传送时作废家园状态并推空(前端随即撤掉小窝图层)。

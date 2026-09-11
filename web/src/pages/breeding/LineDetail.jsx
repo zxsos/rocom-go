@@ -1,7 +1,4 @@
-import React, { useCallback, useContext, useMemo } from 'react'
-import { getBreedingPool } from '../../api'
-import { AccountContext } from '../../context'
-import { useAsyncData } from '../../hooks/useAsyncData'
+import React, { useCallback, useMemo } from 'react'
 import { confirmDialog } from '../../components/confirm'
 import ComboSelect from '../../components/ComboSelect'
 import { fmtShortTime } from '../../utils/format'
@@ -10,7 +7,12 @@ import { chainStats, lineageOf } from './pets'
 import GenerationRow from './GenerationRow'
 import RecordPanel from './RecordPanel'
 import SuggestPanel from './SuggestPanel'
-import { bestChild, chainKey, chainOf, fmtPct, goalProgress, lineStats, pendCounts } from './pets'
+import {
+  bestChild, chainKey, chainOf, fatherCandidates, fmtPct, goalProgress, lineStats, pendCounts,
+  petPickerOption,
+} from './pets'
+import ParentSlot, { NestHint, ParentRow, parentCard, releasedCard } from './ParentSlot'
+import useBreedPool from './useBreedPool'
 
 const STATUS = [
   { k: 'active', label: '进行中', title: '继续推进这条线(破壳的自动记录只会记到「进行中」的线上)' },
@@ -25,9 +27,10 @@ const STATUS = [
 // 与建议挤在一行只会两边都读不清。
 export default function LineDetail({
   line, lines, chains, chainItems, natureMatrix, loading,
+  nest, onNestTruth,
   onSave, onClaim, onRemove, onPet, onLocate, onOpenLine, onMerge, busy,
 }) {
-  const pets = useLinePets(line)
+  const pets = useBreedPool(line)
   const st = lineStats(line)
   // 谱系:换种母会开子线(见 internal/pet.NewChildLine),故一条培育史在库里是一串线。
   // 只有一段时(没有换过种母)不显示这一条 —— 凭空冒出「谱系」两个字只会让人困惑。
@@ -42,6 +45,56 @@ export default function LineDetail({
   // 是 true,之后任何写入都不会再翻。不静默改写玩家的状态,给一个显式入口。
   const allHit = !!bc && bc.miss === 0
   const pend = pendCounts(line.pending)
+
+  // —— 亲本(种母 × 种公)——
+  //
+  // 种母是这条线的**身份**(她孵的蛋自动记到这里,见 pet.BreedingLine.MotherGid),故这里只读;
+  // 种公是**计划值**(每代实际用的父本另记在各代里),可以随时换 —— 换个公就是换个公,不必另开线。
+  //
+  // 蛋组不在快照里(pet.EggParent 没有这个字段),故按 gid 从候选池那份里取出来补上:
+  // 同一只宠物在两处的形状不同,摆平它比让卡片去猜简单(见 ParentSlot.parentCard)。
+  const motherCand = useMemo(
+    () => pets.mothers.find((p) => p.gid === (line.mother && line.mother.gid)) || null,
+    [pets.mothers, line.mother],
+  )
+  const fatherCand = useMemo(
+    () => pets.fathers.find((p) => p.gid === (line.father && line.father.gid)) || null,
+    [pets.fathers, line.father],
+  )
+  // 指定过、但那位已不在库:没有快照可用,造一张只有名字的卡给种母位(她的位是只读的,
+  // 必须显示「已不在库」而不是「＋ 选种母」);种公位可换,故改成一句提示 + 让他重新挑。
+  const motherCard = parentCard(line.mother, motherCand && motherCand.eggGroups)
+    || (line.motherReleased ? releasedCard() : null)
+  const fatherCard = parentCard(line.father, fatherCand && fatherCand.eggGroups)
+  const fatherReleasedHint = line.fatherReleased ? '原来指定的种公已不在库（放生 / 送人），换一位即可' : null
+  // 学院小窝的三个取值分给两张卡(见 ParentSlot 里那段注释):
+  //   nestTruth  = 游戏真值(响应顶层 nest,工具改不了);
+  //   nestPlanGid= 本线的计划值(随线保存);
+  //   nestEff    = 后端算概率时用的**生效值** = 计划优先、没计划才回落真值 —— 勾选看它,
+  //               才能与卡上那些百分比(后端按同一个 gid 算的)指同一只。
+  // onNest 在详情里就是写本线的计划值(经 onSave 整条覆盖写),不碰 /api/nest:那才是
+  // 「本线打算把小窝给谁」的落点;要改游戏里的事实得去游戏里放/抱。
+  const nestTruth = (nest && nest.gid) || 0
+  const nestPlanGid = line.nestPlanGid || 0
+  const nestEff = nestPlanGid || nestTruth
+  // 两张卡上的勾选都写**本线的计划值**(gid=0 = 清掉计划、回落真值):整条覆盖写,与别的写操作
+  // 同一套路(经 onSave → run)。种母位是只读的(不能换这只母本),但**照样能勾计划** ——
+  // 只读说的是身份,不是说她不能当小窝里那只。
+  const setNestPlan = useCallback((gid) => {
+    onSave({ ...line, nestPlanGid: gid ? Number(gid) : 0 })
+  }, [line, onSave])
+  // 取值优先用**快照里的 gid**,没有快照时退回线上存的 gid:老线只存了 MotherGid 那条链路、
+  // 快照由读取时派生,两种情形都可能只拿到一半。
+  const motherValue = String((line.mother && line.mother.gid) || line.motherGid || '')
+  const fatherValue = String((line.father && line.father.gid) || line.fatherGid || '')
+  // 换种公的候选与建线时**同一套口径**(见 Breeding 里的注释):先按品种取池子,再按母本蛋组收。
+  const fatherOpts = useMemo(
+    () => fatherCandidates(pets.fathers, motherCand).map(petPickerOption),
+    [pets.fathers, motherCand],
+  )
+  const changeFather = useCallback((gid) => {
+    onSave({ ...line, fatherGid: gid ? Number(gid) : 0 })
+  }, [line, onSave])
 
   const rows = useMemo(() => {
     const all = [
@@ -133,16 +186,8 @@ export default function LineDetail({
               onClick={() => onSave({ ...line, status: s.k })}>{s.label}</button>
           ))}
         </div>
-        {/* 种母:这条线的身份就是她(见 internal/pet.BreedingLine.MotherGid)。放在标题旁边
-            而不是埋在元信息里 —— 同一个品种可以同时有几条线,只有品种名分不出是哪一条。
-            换种母不在这里改:换了种母就是另一条线,收蛋时后端会自动开子线或独立新线。 */}
-        <span className="br-detail-mother" title={line.mother
-          ? `这条线固定在种母「${line.mother.name}」身上:她孵的蛋自动记到这里。换种母时后端会另开一条线`
-          : line.motherReleased
-            ? '这条线的种母已经不在宠物库里了(放生 / 送人)。线仍按品种匹配候选,但她孵的蛋不会再自动记到这里'
-            : '这条线还没固定种母:第一次收蛋时会按当时的母本固定下来'}>
-          {line.mother ? `种母 ${line.mother.name}` : line.motherReleased ? '种母已放生' : '未定种母'}
-        </span>
+        {/* 种母与种公移到头部下面那一行(见下面的亲本区):它们是「一对」,塞在工具栏里
+            只能一个一个地摆,「母 × 公」这件事就散了。这里只留代数的元信息。 */}
         <span className="muted br-detail-meta">
           {st.gens} 代已记录
           {/* 待孵与待认领分开写:前者是在等一颗蛋,后者是在等子代进背包 ——
@@ -153,6 +198,31 @@ export default function LineDetail({
         </span>
         <div className="spacer" />
         <button className="btn ghost danger small" disabled={busy} onClick={removeLine}>删除这条线</button>
+      </div>
+
+      {/* 亲本:这条线押的那一对(与建线表单是同一张卡,见 ParentSlot)。
+          种母只读 —— 她孵的蛋自动记到这里,换种母就是另一条线;种公可换 —— 它只是计划值,
+          各代实际用的父本仍记在各代里(那里写着抓包抓到的真实父本)。
+          「学院小窝」勾选照给:两位都可能正是小窝里那只(母本尤其常见),而这份加成与性别无关。
+          种母位**只读**也不妨碍勾它 —— 只读说的是「不能换这只母本」,不是「不能把她放进小窝」。 */}
+      <div className="br-parents-block">
+        <ParentRow
+          mother={(
+            <ParentSlot role="mother" card={motherCard} value={motherValue} disabled
+              nestGid={nestEff} nestTruth={nestTruth} nestPlanGid={nestPlanGid} onNest={setNestPlan}
+              disabledHint="还没固定种母:第一次收蛋时按当时的母本固定"
+              title="种母是这条线的身份:她孵的蛋自动记到这里。换种母请在游戏里用她收蛋,后端会自动另开一条线" />
+          )}
+          father={(
+            <ParentSlot role="father" card={fatherCard} options={fatherOpts} value={fatherValue}
+              disabled={busy} disabledHint="加载中…" onChange={changeFather} releasedHint={fatherReleasedHint}
+              nestGid={nestEff} nestTruth={nestTruth} nestPlanGid={nestPlanGid} onNest={setNestPlan}
+              title="种公是计划值:改它只影响这条线的展示与补录默认值,不会改动任何一代已记录的真实父本" />
+          )}
+        />
+        <NestHint truth={nest} planGid={nestPlanGid} plan={line.nestPlan} planReleased={line.nestPlanReleased}
+          onClearPlan={() => onSave({ ...line, nestPlanGid: 0 })}
+          onCommitTruth={onNestTruth} />
       </div>
 
       {/* 谱系:换种母会开子线(子代接班当种母是选育的典型操作),故一条培育史在库里是
@@ -317,36 +387,3 @@ function prevChildOf(rows, i) {
   }
   return null
 }
-
-// useLinePets 一次取齐这条线要用的三类候选(种母 / 种公 / 子代),来自后端按品种裁剪好的候选池。
-//
-// 一个查询,而不是两次 200 条分页:分页的天花板(store.clampPageSize)正好卡在候选池的要害上 ——
-// 漏掉一页就等于「库里还有更合适的个体,玩家却无从知道」,而补录是照着记忆 / 截图去找某一只有
-// 没有在库里。三个队列的范围规则(同品种 ♀、与母本同蛋组的 ♂、同品种)都只跟品种有关,后端
-// 一并算完,前端只做关键词过滤(见 internal/pet.BreedCandidates)。
-//
-// 按**品种**(evo + species)缓存:同一条线内多次展开 / 收起不重拉;改目标也**不重拉**
-// —— 候选池与目标无关(见 api.js 的 getBreedingPool)。两个字段都要进依赖:无链形态的 evo 是 0,
-// 仅凭它区分不出品种。
-function useLinePets(line) {
-  const account = useContext(AccountContext)
-  const evo = line.evo || 0
-  const species = line.species || ''
-
-  const { data } = useAsyncData(
-    useCallback(
-      () => (evo || species ? getBreedingPool(evo, species) : Promise.resolve(null)),
-      [evo, species],
-    ),
-    { fallback: null, reloadKey: account },
-  )
-
-  return useMemo(() => ({
-    mothers: ((data && data.mothers) || []).slice().sort(byVoiceDesc),
-    fathers: ((data && data.fathers) || []).slice().sort(byVoiceDesc),
-    kids: ((data && data.kids) || []).slice().sort(byVoiceDesc),
-  }), [data])
-}
-
-// byVoiceDesc 候选按嗓音绝对值降序:极端个体排在前面,先看到的多半是玩家真正想要的。
-const byVoiceDesc = (a, b) => Math.abs(b.voice || 0) - Math.abs(a.voice || 0)

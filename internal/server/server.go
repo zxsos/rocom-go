@@ -263,6 +263,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/breeding", s.handleBreedingSave)
 	s.mux.HandleFunc("DELETE /api/breeding", s.handleBreedingDelete)
 	s.mux.HandleFunc("POST /api/breeding/claim", s.handleBreedingClaim)
+	// 学院小窝:全库唯一一只,它参与孵蛋时子代性格 100% 随它(见 api_breeding.go 的 handleNest)。
+	s.mux.HandleFunc("GET /api/nest", s.handleNest)
+	s.mux.HandleFunc("POST /api/nest", s.handleNest)
 	// 子线并入母线:换种母开出的子线可以合成一条(不可逆,故前端要二次确认)。
 	s.mux.HandleFunc("POST /api/breeding/merge", s.handleBreedingMerge)
 	// 孵化倍率实测:玩家点「开始测速」→ 游戏内开两次孵蛋器 → 后端取差分

@@ -121,6 +121,19 @@ func (db *DB) EggNPCItem(npcCfgID uint32) uint32 { return db.eggNPCs[npcCfgID] }
 // NestFurniture 返回该家具 config_id 是否为可入住宠物的小窝,以及家具名。
 func (db *DB) NestFurniture(cfgID uint32) (string, bool) { n, ok := db.nestFurn[cfgID]; return n, ok }
 
+// AcademyNestConfigID 是**学院小窝**的家具 config_id。
+//
+// 玩法(新赛季):小窝里那只参与孵蛋时,子代性格 **100% 随它**(见 docs/data.md 3.6)。
+// 它在游戏里**全库唯一**,工具侧据此把「谁在小窝里」同步成全局真值(见 pipeline.syncAcademyNest)。
+//
+// 为什么写死 id 而不是按名字判:名字是**展示串**(NestFurniture 返回的就是它),改一次译名
+// 判定就静默失效 —— 而那种失效表现为「小窝里是谁不再自动跟」,不报错、看不出来。
+// 实测同一家园里可以有 10 个精灵小窝(1001071),学院小窝只有一个。
+const AcademyNestConfigID uint32 = 1001072
+
+// IsAcademyNest 这件家具是不是学院小窝(见 AcademyNestConfigID)。
+func (db *DB) IsAcademyNest(cfgID uint32) bool { return cfgID == AcademyNestConfigID }
+
 // EggIcon 返回蛋图标的相对路径(egg/<原名>.webp);图标缺失时回退通用蛋图。
 // 少数未上线物种的蛋图没随包解出(gen_icons 会报「缺 PNG」),回退保证前端不出空图。
 func (db *DB) EggIcon(itemID uint32) string {

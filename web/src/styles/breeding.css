@@ -69,6 +69,191 @@
 /* 新建线:品种一行独占(它是这条线以后自动记录的匹配键,填错就收不到自动代数了) */
 .br-new-species { max-width: 260px; }
 .br-new { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+
+/* ---- 亲本(种母 × 种公):建线表单可选、线详情成对展示(见 ParentSlot.jsx)----
+   做成一对**等权重**的卡,而不是两个各自独立的下拉:玩家要定的是「哪一对」,
+   并排摆出来 + 中间一个连接符,「母 × 公」这件事才在版面上成立。 */
+.br-parents { display: flex; align-items: stretch; gap: 8px; }
+.br-parents-x {
+  align-self: center; flex: none;
+  color: var(--fg-dim); font-size: 13px; opacity: .7; user-select: none;
+}
+.br-parent {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 7px 9px 8px; border-radius: var(--radius);
+  background: var(--bg-2); border: 1px solid var(--line);
+  transition: border-color .18s ease, background .18s ease;
+}
+/* 未选:虚线 + 透明底 —— 「这里还空着、可以点」要一眼看出来 */
+.br-parent:not(.on) { border-style: dashed; background: transparent; }
+/* 已选:主色描边 + 淡底(与 .toggle 的选中态同一套语言,不再另造一种蓝) */
+.br-parent.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); }
+/* 禁用(还没选品种):压暗而不是隐藏 —— 让玩家知道这两位**待会儿**能选 */
+.br-parent.off { opacity: .7; }
+/* 卡内的下拉去掉自己的边框与底色:整张卡就是那个触发器(否则是框里套框) */
+.br-parent .dropdown-trigger { border: 0; background: transparent; padding: 3px 2px; font-size: 13px; }
+.br-parent .dropdown-trigger:hover { background: transparent; }
+.br-parent-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); }
+.br-parent-role { font-weight: 500; letter-spacing: .02em; }
+/* 「你长按的那只」这类来源标注:小胶囊,抢眼但不喧宾 */
+.br-parent-badge { padding: 0 6px; border-radius: 999px; font-size: 10px; background: var(--accent); color: #fff; }
+.br-parent-x {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center;
+  padding: 2px; border: 0; border-radius: 4px; background: none;
+  color: var(--fg-dim); cursor: pointer;
+}
+.br-parent-x:hover { color: var(--fg); background: var(--bg-3); }
+/* 卡底一行:物种 + 蛋组标签(蛋组沿用列表卡片那枚 .egg-group,两处同色) */
+.br-parent-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; min-height: 18px; }
+.br-parent-species { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-parent-rel { color: var(--fg-dim); }
+/* 指定过、但那位已经不在库:压暗并改用暗淡字色 —— 他仍占着这个位置(不是空的),
+   但不该再像在库的个体那样抢眼。 */
+.br-parent.rel { background: transparent; border-color: var(--line); }
+.br-parent.rel .dropdown-value, .br-parent.rel .br-parent-ro { color: var(--fg-dim); }
+
+/* ---- 学院小窝:草编按钮 + 绿草头像框(见 ParentSlot.jsx 与 NestGrass.jsx)----
+   这一块的视觉主题只有一个词:**草编**。所以它刻意不用站点其余处的蓝(--accent):用蓝它就
+   变成「又一个开关」,而它管的是小窝里那株草。绿色在两种主题下都成立(base.css 的 --green:
+   暗色 #3fb950 / 亮色 #1a7f37),故按钮、草环、洗底全走绿色一系。 */
+.br-nest {
+  display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; width: fit-content;
+  max-width: 100%; margin-top: 4px; padding: 3px 9px 3px 7px;
+  font-size: 11px; color: var(--fg-dim); cursor: pointer; user-select: none;
+  background: color-mix(in srgb, var(--bg-3) 55%, transparent);
+  border: 1px solid var(--line); border-radius: 999px;
+  transition: color .16s ease, border-color .16s ease, background .16s ease;
+}
+/* 「学院小窝」四个字不许拆行:胶囊本来就窄,一折成「学院小 / 窝」这枚按钮就散了 */
+.br-nest > span { white-space: nowrap; }
+/* 结论那句在按钮**下方**单独一行(见 ParentSlot 的注释):塞进胶囊里会把胶囊撑成整条横幅。
+   计划态虚线下划、实况态实色 —— 与按钮边框的虚线/实线同一套语言。 */
+.br-nest-note {
+  width: fit-content; margin: 3px 0 0 3px; font-size: 11px; line-height: 1.5;
+  color: color-mix(in srgb, var(--green) 78%, var(--fg));
+}
+.br-nest-note.plan { border-bottom: 1px dashed color-mix(in srgb, var(--green) 55%, transparent); }
+.br-nest:hover { color: var(--fg); border-color: color-mix(in srgb, var(--green) 55%, var(--line)); }
+/* 勾选重画:原生小方框贴在这枚草编胶囊里像补上去的,故自己画一枚「草粒」开关 ——
+   轨道随状态由灰转绿、滑块往右长出去。input 仍在 label 里、仍是真 checkbox(受控/读屏/验收照旧)。 */
+.br-nest input {
+  appearance: none; -webkit-appearance: none;
+  position: relative; flex: none; width: 22px; height: 12px; margin: 0; cursor: pointer;
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: 999px;
+  transition: background .18s ease, border-color .18s ease;
+}
+.br-nest input::after {
+  content: ''; position: absolute; top: 1px; left: 1px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--fg-dim);
+  transition: left .2s cubic-bezier(.2, 1.4, .4, 1), background .2s ease;
+}
+.br-nest input:checked { background: color-mix(in srgb, var(--green) 88%, #000); border-color: color-mix(in srgb, var(--green) 70%, #000); }
+.br-nest input:checked::after { left: 11px; background: #fff; }
+/* 点中的那一下:轻轻一弹(草是有弹性的)。只加在 .on 上,故只在状态翻过来时播一次。 */
+.br-nest.on {
+  color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent);
+  border-style: dashed; border-color: color-mix(in srgb, var(--green) 70%, var(--line));
+  animation: ng-pop .34s cubic-bezier(.2, 1.5, .4, 1);
+}
+/* 实况态用实线实底(「这是事实」),计划态保持虚线浅底(「这还只是打算」)—— 与那句小字的
+   虚线下划是同一套语言,不靠文字也能一眼分开。 */
+.br-nest.on:not(.plan) {
+  border-style: solid; background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+/* 草芽图标跟 currentColor 走(见 NestSprig),故三种状态各是各的颜色;悬停时轻轻歪一下 */
+.ng-sprig { flex: none; display: block; transition: transform .18s ease; }
+.ng-sprig path { fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+.br-nest:hover .ng-sprig { transform: rotate(-7deg) scale(1.1); }
+/* (勾上后那句结论的样式见上面的 .br-nest-note —— 它在按钮外面,不在这枚胶囊里) */
+/* 勾是**游戏事实**、工具里取消不了(要去游戏里抱走):画成「不可动」的样子,并保住光标语义 ——
+   一个会点的框点不动,比一开始就显示成不可点更让人困惑。 */
+.br-nest.locked { cursor: default; border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.br-nest.locked:hover { color: var(--green); }
+.br-nest.locked input, .br-nest.locked input:disabled { cursor: not-allowed; }
+
+/* 选中之后整张卡也要「长草」:一层极淡的草色洗底 + 草色描边,让它在并列的两张亲本卡里一眼可辨
+   (只靠按钮变色,扫视时容易漏)。 */
+.br-parent.nest-picked {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--green) 17%, transparent),
+    color-mix(in srgb, var(--green) 5%, transparent));
+  animation: ng-bloom .55s ease-out;
+}
+/* 草环要 46px、头像只有 22px:选中时把内容整体右移一格,草环才有地方铺开 ——
+   不腾地方就只能压住名字,那时这圈草看起来是「贴上去的」而不是「长出来的」。 */
+.br-parent.nest-picked .dropdown-trigger,
+.br-parent.nest-picked .br-parent-ro { padding-left: 28px; }
+
+/* 草环本体。位置由 .dropdown-av-wrap(position: relative)锚定,尺寸固定 46px、与头像同心
+   (46-22)/2 = 12px 的向外偏移,故 left/top 各让 12/-23 即可同心)。 */
+.ng-wreath {
+  position: absolute; left: -12px; top: 50%; width: 46px; height: 46px;
+  margin-top: -23px; pointer-events: none;
+}
+.ng-wreath-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* 「编」的四个层次(见 NestGrass 的注释):环带给厚度 → 纤维给纹理 → 三股草绳给结构 →
+   内外缘收边。形状信息全在**沿圆周**的方向上,径向一律只做短纤维 —— 径向做长草就是上一版
+   那种「往四周发散」的样子(像蒲公英),而编绳不像蒲公英。 */
+.ng-band {
+  fill: none; stroke: #3f9e46; stroke-width: 4.8; opacity: .3;
+  animation: ng-fade .5s ease-out both;
+}
+.ng-rim { fill: none; stroke: #7fd07a; stroke-width: .9; opacity: .5; animation: ng-fade .5s ease-out .1s both; }
+.ng-rim-out { stroke: #2f7d38; stroke-width: .8; opacity: .42; animation-delay: .18s; }
+/* 纤维:带宽内的一圈短划,深浅两色交错、长短参差 —— 纹理就在这里,没有它就是一条塑料带 */
+.ng-fiber { stroke: #6ec96f; stroke-width: .45; opacity: .3; animation: ng-fade .45s ease-out both; }
+.ng-fiber.dark { stroke: #2f7d38; opacity: .38; }
+.ng-fiber.dim { opacity: .16; }
+/* 三股草绳:pathLength=100 把长度归一,于是 dasharray/dashoffset 都能写死 —— 「生长」就是
+   一股接一股从 0 画满一整圈,看上去是沿头像**绕一圈编进去**,而不是往外长。 */
+.ng-strand {
+  fill: none; stroke-linecap: round; stroke-width: 1.15;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: ng-weave .72s ease-out forwards;
+}
+.ng-strand-0 { stroke: #62c268; }
+.ng-strand-1 { stroke: #3f8f47; stroke-width: 1.25; }
+.ng-strand-2 { stroke: #7ad37a; stroke-width: 1.05; }
+/* 三处小叶结:贴着环长的两片小叶(切向),给一点手工感 */
+.ng-knot { fill: #3f9e46; opacity: .95; animation: ng-fade .4s ease-out both; }
+/* 那一圈涟漪:圆环本身在扩散,与「编」不冲突,但只留一道、淡一点 */
+.ng-sweep {
+  position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  border-radius: 50%; border: 1.2px solid color-mix(in srgb, var(--green) 55%, transparent);
+  animation: ng-sweep .8s ease-out both;
+}
+/* 花粉:只留三粒,位置由内联 left/top 定,这里只做「向上飘散」这一个动作 */
+.ng-speck {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #a9e07a; opacity: 0;
+  animation: ng-float .95s ease-out both;
+}
+@keyframes ng-weave { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes ng-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ng-pop { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: none; } }
+@keyframes ng-bloom {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 45%, transparent); }
+  to { box-shadow: 0 0 0 7px transparent; }
+}
+@keyframes ng-sweep { from { opacity: .6; transform: scale(.52); } to { opacity: 0; transform: scale(1.5); } }
+@keyframes ng-float {
+  0% { opacity: 0; transform: translateY(2px) scale(.4); }
+  35% { opacity: .85; }
+  100% { opacity: 0; transform: translateY(-8px) scale(.9); }
+}
+/* 减少动态:环直接编好(静态的环本身就是信息),涟漪与花粉整段去掉 ——
+   留一个停在半途的圈,比不留更像坏了。故草绳要显式把 dashoffset 归零,不能只关动画。 */
+@media (prefers-reduced-motion: reduce) {
+  .ng-band, .ng-rim, .ng-fiber, .ng-knot, .br-nest.on, .br-parent.nest-picked { animation: none; }
+  .ng-strand { animation: none; stroke-dashoffset: 0; }
+  .ng-sweep, .ng-speck { display: none; }
+}
+/* 「小窝里现在是哪只」那一行:.br-hint 的 margin 是 0,这里自己跟上亲本卡拉开一点 */
+.br-nest-hint { margin-top: 4px; }
+/* 状态行里的动作按钮(「改用游戏真值」「记为游戏真值」「清掉计划」):.br-hint 是段落,
+   按钮要跟在同一行、又与正文拉开一点,故用 inline-flex 而不是让 .btn 自己撑满一行。 */
+.br-nest-acts { display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
 .br-filters { gap: 9px; }
 .br-filters .input { max-width: 200px; }
 .br-status-seg { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -521,9 +706,9 @@ button.br-pi:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-s
 .br-lineage-seg em { font-style: normal; opacity: 0.6; }
 .br-lineage-sum { margin-left: auto; flex: 0 0 auto; }
 
-/* 种母:与品种名同一行的第二标识(同一个品种可以同时有几条线,只有品种名分不出是哪一条),
-   故按次要标题画 —— 比元信息重、比品种名轻。窄屏让它可以自己占一行(见下面 media)。 */
-.br-detail-mother { font-size: 13px; font-weight: 600; white-space: nowrap; }
+/* 详情里的亲本区:独占一行放在头部工具栏下方(工具栏里塞不下这一对,见 LineDetail 的注释)。
+   与建线表单里的那份是同一套卡(.br-parent),这里只补一点与上下块的间距。 */
+.br-parents-block { margin-top: 2px; }
 /* 详情头部的品种选择器:它同时是这一屏的**标题**(见 LineDetail 的 changeKind),故按标题的
    字重与字号画;宽度给上限 —— 链名最长会到「阿米亚特（阿米樱/罗隐/深渊罗隐）」这种,
    不设上限会把状态胶囊挤出可视区。 */

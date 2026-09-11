@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -783,6 +784,151 @@ func TestContractBreeding(t *testing.T) {
 	checkGolden(t, "breeding", get(t, s, "/api/breeding?account="+contractAcc), nil)
 }
 
+// TestContractNest 锁学院小窝的对外形状(GET /api/nest):{gid, name, nature}。
+//
+// 样本故意设成**有主**的一窝,而不是空窝那份:name 与 nature 是按 gid 现查宠物库补出来的
+// (不落库),空窝只有 gid 一个键 —— 而 docs/api/fields.json 是从 golden 样本生成的,
+// 样本里没有这两个键,就等于对外契约里没写它们。
+//
+// 「设成有主之后建议里的性格变成多少」不进 golden,用断言守:那要造一条含它在内的组合,
+// 进 golden 会把 breeding 那份样本里 parent / roll 两种来源的样本挤掉,而那两种同样要锁
+// (见 TestContractBreeding 的样本说明)。
+func TestContractNest(t *testing.T) {
+	s := newTestServer(t)
+	seedContract(t, s)
+	seedBreeding(t, s)
+
+	// 空窝:只有 gid=0 一个键。它不进 golden(有主那份锁形状),但「没设过」这个默认状态
+	// 必须是对的 —— 多出一个 name:"" 会让前端把「没设」画成「设了一只没名字的」。
+	var empty map[string]any
+	if err := json.Unmarshal(get(t, s, "/api/nest?account="+contractAcc), &empty); err != nil {
+		t.Fatalf("解析空窝响应: %v", err)
+	}
+	if len(empty) != 1 || empty["gid"] != float64(0) {
+		t.Fatalf("空窝响应 = %v, 期望只有 gid=0", empty)
+	}
+
+	// 小窝里那只设成 2001:这条线的种母,性格「固执」正好也是线的目标性格
+	post := func(body string) *httptest.ResponseRecorder {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST", "/api/nest?account="+contractAcc,
+			strings.NewReader(body)))
+		return rr
+	}
+	if rr := post(`{"gid":2001}`); rr.Code != 200 {
+		t.Fatalf("设置学院小窝: %d %s", rr.Code, rr.Body)
+	}
+	checkGolden(t, "nest", get(t, s, "/api/nest?account="+contractAcc), nil)
+
+	// setPlan 改这条线的**计划值**(0 = 清掉)。整条覆盖写就是改它的方式,不为一个字段新开端点;
+	// 顺带也把「计划怎么进来」这条路走通了 —— 前端就是这么发的(见 Breeding.jsx 的 createLine)。
+	setPlan := func(gid uint32) {
+		t.Helper()
+		var raw struct {
+			Lines []pet.BreedingLine `json:"lines"`
+		}
+		if err := json.Unmarshal(get(t, s, "/api/breeding?account="+contractAcc), &raw); err != nil {
+			t.Fatalf("解析培育线: %v", err)
+		}
+		if len(raw.Lines) != 1 {
+			t.Fatalf("培育线数 = %d, 期望 1", len(raw.Lines))
+		}
+		line := raw.Lines[0]
+		line.NestPlanGid = gid
+		body, err := json.Marshal(line)
+		if err != nil {
+			t.Fatalf("序列化培育线: %v", err)
+		}
+		rr := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rr, httptest.NewRequest("POST", "/api/breeding?account="+contractAcc,
+			strings.NewReader(string(body))))
+		if rr.Code != 200 {
+			t.Fatalf("改学院小窝计划为 %d: %d %s", gid, rr.Code, rr.Body)
+		}
+	}
+
+	// 先清掉种子里的计划值(seedBreeding 给了一个,好让 nestPlan 那几个键进 golden):
+	// 这时生效值 = 真值。含小窝那只的组合,性格从「概率」变成「必中」(nest/1)—— 这条断言是
+	// 这套玩法唯一的出口:概率算错时页面上只会显示一个不好看的数字,不报错、也不红任何编译。
+	setPlan(0)
+	type sugView struct {
+		Mother struct {
+			Gid uint32 `json:"gid"`
+		} `json:"mother"`
+		Father struct {
+			Gid uint32 `json:"gid"`
+		} `json:"father"`
+		Exp struct {
+			NatureP    float64 `json:"natureP"`
+			NatureFrom string  `json:"natureFrom"`
+		} `json:"exp"`
+	}
+	// 建议在线本体里(lines[].suggest),不在响应顶层。
+	var view struct {
+		Lines []struct {
+			Suggest []sugView `json:"suggest"`
+		} `json:"lines"`
+	}
+	if err := json.Unmarshal(get(t, s, "/api/breeding?account="+contractAcc), &view); err != nil {
+		t.Fatalf("解析培育响应: %v", err)
+	}
+	if len(view.Lines) != 1 {
+		t.Fatalf("培育线数 = %d, 期望 1(样本见 seedBreeding)", len(view.Lines))
+	}
+	suggest := view.Lines[0].Suggest
+	if len(suggest) == 0 {
+		t.Fatal("这条线一条建议都没有,断言失去意义(候选池样本见 seedBreeding)")
+	}
+	for _, sg := range suggest {
+		if sg.Mother.Gid != 2001 {
+			t.Errorf("建议里出现了别的母本 %d —— 样本池只有 2001,断言口径要跟着改", sg.Mother.Gid)
+			continue
+		}
+		if sg.Exp.NatureFrom != "nest" || sg.Exp.NatureP != 1 {
+			t.Errorf("小窝里那只那组建议 = %s/%.4f, 期望 nest/1", sg.Exp.NatureFrom, sg.Exp.NatureP)
+		}
+	}
+
+	// 计划值优先于真值(口径见 api_breeding.go 的 breedingView):把计划改成 2002(池里的一位
+	// 种公),真值仍是 2001(种母)。生效值变成 2002 后**只有含它的那组**必中,含 2001 的那几组
+	// 回落常规概率 —— 后半句正是「计划是覆盖、不是叠加」的证据:若真值还在参与,它们会继续是 nest/1。
+	setPlan(2002)
+	if err := json.Unmarshal(get(t, s, "/api/breeding?account="+contractAcc), &view); err != nil {
+		t.Fatalf("解析培育响应: %v", err)
+	}
+	var sawPlan, sawTruthOnly bool
+	for _, sg := range view.Lines[0].Suggest {
+		if sg.Father.Gid == 2002 {
+			if sg.Exp.NatureFrom != "nest" || sg.Exp.NatureP != 1 {
+				t.Errorf("计划那只那组建议 = %s/%.4f, 期望 nest/1", sg.Exp.NatureFrom, sg.Exp.NatureP)
+			}
+			sawPlan = true
+			continue
+		}
+		if sg.Exp.NatureFrom == "nest" || sg.Exp.NatureP >= 1 {
+			t.Errorf("不含计划那只的组合 = %s/%.4f, 期望回落常规概率(计划应当覆盖真值)",
+				sg.Exp.NatureFrom, sg.Exp.NatureP)
+		}
+		sawTruthOnly = true
+	}
+	if !sawPlan || !sawTruthOnly {
+		t.Fatalf("样本没覆盖到两种组合(含计划 %v / 仅真值 %v),断言失去意义", sawPlan, sawTruthOnly)
+	}
+
+	// 库里没有的 gid 不给设:否则页面上勾上了、百分比却一动不动,比报错难查(见 handleNest)
+	if rr := post(`{"gid":999999}`); rr.Code != http.StatusBadRequest {
+		t.Errorf("设一只库里没有的宠物: 状态码 %d, 期望 400", rr.Code)
+	}
+	// 清空(0):回到空窝,且落库 —— 只改内存的话重启就悄悄回来了
+	if rr := post(`{"gid":0}`); rr.Code != 200 {
+		t.Fatalf("清空学院小窝: %d %s", rr.Code, rr.Body)
+	}
+	if got := s.store.AcademyGid(); got != 0 {
+		t.Errorf("清空后小窝里还是 %d", got)
+	}
+}
+
 // TestContractBreedingPool 锁定 /api/breeding/pool 的候选池形状。
 //
 // 与 breeding 同理:候选池的字段名写在 pet.PetCandidate **内嵌**的 pet.EggParent 上,
@@ -834,7 +980,18 @@ func seedBreeding(t *testing.T, s *Server) {
 	// 2004 是「换种」要用的备选:没有它的话回交建议会走进「没有别的候选可比」那条捷径,
 	// 而两栏对比(回交 vs 换种)才是这块 UI 的主体 —— 那部分字段必须进 golden。
 	extra := mk(2004, "小公丙", "♂", 60)
-	for _, p := range []*pet.Pet{mother, father, child, extra} {
+	// 2005 是「学院小窝计划值」的样本,刻意选**另一条链**的宠物:它在宠物库里(故 nestPlan
+	// 快照能解析出来),却不在本线的候选池里(池按品种=进化链收人),于是它对 suggest 的取值
+	// 毫无影响 —— 那份样本(以及里面的 natureFrom: parent / roll)原样保住。契约要锁的是
+	// 「这几个键在不在」,不该为补一个键把别的样本挤掉。
+	planPet := &pet.Pet{
+		Gid: 2005, ConfID: 3001, BaseConfID: 3001,
+		Species: "水蓝蓝", Name: "小水母", Level: 20, Gender: "♀", Nature: "胆小",
+		HeightM: 1.0, WeightKg: 20, Voice: 5, TalentRank: "B",
+	}
+	planPet.Image = s.db.PetImageByBase(planPet.BaseConfID, false)
+	planPet.EggGroups = s.db.PetEggGroups(planPet.BaseConfID)
+	for _, p := range []*pet.Pet{mother, father, child, extra, planPet} {
 		if _, err := sc.UpsertPet(p); err != nil {
 			t.Fatalf("写入宠物 gid=%d: %v", p.Gid, err)
 		}
@@ -851,6 +1008,15 @@ func seedBreeding(t *testing.T, s *Server) {
 		ID: "contract-line", Species: "火神", ConfID: 3006,
 		Goal:   pet.BreedingGoal{Voice: &voice, WeightPct: &wpct, Nature: "固执", NatureIn: natureRow},
 		Status: pet.BreedingActive,
+		// 指定种公(计划值):**必须显式给**,否则 father/fatherGid 这两个新键会因 omitempty
+		// 整条不进 golden —— 而 docs/api/fields.json 正是从 golden 样本生成的,样本里没有
+		// 就等于对外契约里没写这个字段(与上面 goal 同时给 nature/natureIn 是同一个理由)。
+		// 种母那侧不用给:MotherGidOf 会从末代派生,顶层 mother 照样进 golden。
+		FatherGid: father.Gid,
+		// 学院小窝的**计划值**同理要显式给:nestPlanGid / nestPlan / nestPlanReleased 三个键
+		// 全靠在样本里出现才会进 golden 与 docs/api/fields.json。
+		// 游戏真值那一侧(nest 非空、生效值=真值)由 TestContractNest 用断言守,不进这份样本。
+		NestPlanGid: planPet.Gid,
 		// 第 1 代是已认领的完整记录(手动补录);第 2 代是**待认领**的一代 ——
 		// 破壳时只知道双亲、子代还没认领,这一支的字段(pending / fathers 多候选 / 无 child)
 		// 与已认领那支完全不同,故两者都要有。

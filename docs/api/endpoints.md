@@ -92,7 +92,9 @@
 | `POST /api/breeding` | — | ✓ | 建线或**整条更新**（body 就是一条培育线：目标、状态、全部代数） |
 | `DELETE /api/breeding` | — | ✓ | 删一条线（`?id=`；只删记录，**不碰任何宠物**） |
 | `POST /api/breeding/claim` | — | ✓ | 认领子代（body: `id`、`gen`、`childGid`） |
-| `GET /api/breeding/pool` | — | ✓ | 补录面板的候选池（品种用 `?evo=`，无链形态用 `?species=`；见 [schemas.md](schemas.md#get-apibreedingpool)） |
+| `GET /api/breeding/pool` | — | ✓ | 亲本候选池（品种用 `?evo=`，无链形态用 `?species=`；**都不给 = 全库雌雄**，供建线表单先挑亲本；见 [schemas.md](schemas.md#get-apibreedingpool)） |
+| `GET /api/nest` | — | ✓ | **学院小窝**真值：游戏里现在是哪只（`{gid, name, nature}`，`gid: 0` = 空着） |
+| `POST /api/nest` | — | ✓ | 手工兜底：把某只记为小窝真值 / 清空（body: `gid`，`0` = 清空）。全库**唯一**一只，库里没有的 gid 会 400 |
 
 建议与线**一起下发**，不另开 `/suggest` 接口：建议依赖这条线的目标，目标一改建议就变；
 分开请求时前端每次改目标都得记得再拉一次，还会出现「线已更新、建议是旧的」的中间态。
@@ -101,9 +103,24 @@
 代价是两处同时改会互相覆盖 —— 单机自用工具不值得为它做并发合并（真要并发，后写的那份
 也是用户自己刚点的）。同样的取舍沿用 `eggs` 表那套：目标三项皆可空，只填关心的。
 
+建线时可以一并指定**种母**与**种公**（`motherGid` / `fatherGid`，都是可选的、可以只给一边）；
+不给就让这两个 gid 保持 0：种母仍是「第一次收蛋时按当时的母本固定」，种公则是「还没指定」。
+后端对 `fatherGid` **不做校验也不做兜底** —— 它可以指向一只已经放生的宠（线上存的是玩家当时的
+意图，读取时按 `fatherReleased` 标记出来，见 [schemas.md](schemas.md#get-apibreeding)）。
+
 认领走 `pet.ClaimGeneration`（**管线里的自动认领是同一份实现**）：子代快照必须按当前
 gamedata 从 `pets` 里重新取（前端拿不到权威的那份），且「从待认领挪进正式代数」只该有
 一处实现，否则自动与手动认领早晚各写一套、行为分叉。
+
+**学院小窝**（`GET|POST /api/nest`）在游戏里只有一只，故它是**全库唯一**的一个 gid（不按账号隔离，
+见 [schemas.md](schemas.md#getpost-apinest)）。它参与孵蛋时子代性格 **100% 随它** —— 建议里的
+`natureFrom` 会变成 `nest`。
+
+这个真值**由游戏流自动维护**：自己家园里那件 `config_id 1001072` 家具的住户是它，家园管线解出来后
+写进同一张单行表并广播 SSE `breeding`（见 `docs/data.md` 的培育一节）；`POST /api/nest` 只剩手工兜底。
+玩家自己「打算把小窝给谁」是**另一件事**，存在培育线里（`nestPlanGid`，走 `POST /api/breeding`），
+预测口径是「计划 ?? 真值」。凡改动真值的路径都广播 `breeding`：性格命中率是后端算的，前端本地只改
+勾选状态就会出现「卡上勾着、数字没变」的假象。
 
 五个接口里三个写操作落库后都广播 SSE **`breeding`**（只带 `{account}`，前端自行重拉）——
 整条线含全部代数，塞进推送太重（与 `eggs`、`trial` 同一路数）。

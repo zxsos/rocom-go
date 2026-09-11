@@ -12,6 +12,17 @@ import (
 func brI32(v int32) *int32     { return &v }
 func brF64(v float64) *float64 { return &v }
 
+// brDB 取名称库:BreedCandidates 要给候选现查一次所属进化链(见 petCandidate —— 快照本身
+// 不带链 id,而前端要靠它把「选了这只种母」翻成「这条线认哪个品种」)。
+func brDB(t *testing.T) *gamedata.DB {
+	t.Helper()
+	db, err := gamedata.Load()
+	if err != nil {
+		t.Fatalf("加载名称库: %v", err)
+	}
+	return db
+}
+
 // brNear 比两个概率是否相等。它是几项浮点相加的结果,**相加顺序不同末位就会差一点点**
 // (0.4/30 + 0.3 + 0.3 与 2×0.3 + 0.4/30 不等),故不能直接用 !=。
 func brNear(a, b float64) bool { return math.Abs(a-b) < 1e-12 }
@@ -57,7 +68,7 @@ func TestPredictVoiceAndWeight(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			m := brParent(1, "母", c.mv, c.mw, "")
 			f := brParent(2, "父", c.fv, c.fw, "")
-			got := Predict(m, f, BreedingGoal{})
+			got := Predict(m, f, BreedingGoal{}, 0)
 			if got.Voice != c.wantVoice {
 				t.Errorf("嗓音 = %d, 期望 %d(双亲均值向零取整)", got.Voice, c.wantVoice)
 			}
@@ -76,16 +87,16 @@ func TestPredictVoiceAndWeight(t *testing.T) {
 func TestPredictWeightWithMissingPct(t *testing.T) {
 	m := EggParent{Gid: 1, Name: "母", Voice: 10, WeightPct: brF64(60)}
 	f := EggParent{Gid: 2, Name: "父", Voice: 10}
-	if got := Predict(m, f, BreedingGoal{}).WeightPct; math.Abs(got-60) > 1e-9 {
+	if got := Predict(m, f, BreedingGoal{}, 0).WeightPct; math.Abs(got-60) > 1e-9 {
 		t.Errorf("母方 60%% / 父方未知时 = %.1f, 期望 60(以已知的一方为准)", got)
 	}
 	f.WeightPct = brF64(80)
 	m.WeightPct = nil
-	if got := Predict(m, f, BreedingGoal{}).WeightPct; math.Abs(got-80) > 1e-9 {
+	if got := Predict(m, f, BreedingGoal{}, 0).WeightPct; math.Abs(got-80) > 1e-9 {
 		t.Errorf("母方未知 / 父方 80%% 时 = %.1f, 期望 80", got)
 	}
 	m.WeightPct, f.WeightPct = nil, nil
-	if got := Predict(m, f, BreedingGoal{}).WeightPct; got != 0 {
+	if got := Predict(m, f, BreedingGoal{}, 0).WeightPct; got != 0 {
 		t.Errorf("双方都未知时 = %.1f, 期望 0", got)
 	}
 }
@@ -102,22 +113,22 @@ func TestPredictNatureChance(t *testing.T) {
 	// —— 那张表里 id 28 与 id 31 同为「平和」,实测 7545 只宠物的性格 id 里 31 从未出现。
 	const rollPart = 0.4 / 30 // 重掷槽掷中的那一份 —— 三档都要加上它
 
-	if got := Predict(m, f, BreedingGoal{Nature: "勇敢"}); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
+	if got := Predict(m, f, BreedingGoal{Nature: "勇敢"}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
 		t.Errorf("目标性格只在母方身上时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.3+rollPart)
 	}
-	if got := Predict(m, f, BreedingGoal{Nature: "胆小"}); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
+	if got := Predict(m, f, BreedingGoal{Nature: "胆小"}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
 		t.Errorf("目标性格只在父方身上时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.3+rollPart)
 	}
 	// 双亲性格相同:两个槽位指向同一个性格,合计 60%。**不是两次独立判定** ——
 	// 那样会算成 1 − 0.7 × 0.7 = 51%,与「两个都是则 60%」的规则不符。
 	same := brParent(3, "父", 0, 50, "勇敢")
-	if got := Predict(m, same, BreedingGoal{Nature: "勇敢"}); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.6+rollPart) {
+	if got := Predict(m, same, BreedingGoal{Nature: "勇敢"}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.6+rollPart) {
 		t.Errorf("双亲都带目标性格时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.6+rollPart)
 	}
-	if got := Predict(m, f, BreedingGoal{Nature: "固执"}); got.NatureFrom != "roll" || !brNear(got.NatureP, rollPart) {
+	if got := Predict(m, f, BreedingGoal{Nature: "固执"}, 0); got.NatureFrom != "roll" || !brNear(got.NatureP, rollPart) {
 		t.Errorf("双亲都没有该性格时 = %s/%.4f, 期望 roll/%.4f", got.NatureFrom, got.NatureP, rollPart)
 	}
-	if got := Predict(m, f, BreedingGoal{}); got.NatureFrom != "none" || got.NatureP != 0 {
+	if got := Predict(m, f, BreedingGoal{}, 0); got.NatureFrom != "none" || got.NatureP != 0 {
 		t.Errorf("没设性格目标时 = %s/%.2f, 期望 none/0", got.NatureFrom, got.NatureP)
 	}
 }
@@ -133,23 +144,96 @@ func TestPredictNatureSetGoal(t *testing.T) {
 	m := brParent(1, "母", 0, 50, "固执") // 在集合里
 	f := brParent(2, "父", 0, 50, "胆小") // 不在
 
-	if got := Predict(m, f, BreedingGoal{NatureIn: row}); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+0.4*5/30) {
+	if got := Predict(m, f, BreedingGoal{NatureIn: row}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+0.4*5/30) {
 		t.Errorf("只有母方在集合里时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.3+0.4*5/30)
 	}
 	// 双亲都在集合里(两个槽位各自命中,仍合计 60%)
 	f2 := brParent(3, "父", 0, 50, "大胆")
-	if got := Predict(m, f2, BreedingGoal{NatureIn: row}); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.6+0.4*5/30) {
+	if got := Predict(m, f2, BreedingGoal{NatureIn: row}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.6+0.4*5/30) {
 		t.Errorf("双亲都在集合里时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.6+0.4*5/30)
 	}
 	// 双亲都不在集合里 → 只剩重掷槽,且它按集合大小(2 个)分摊
 	other := []string{"沉默", "平和"}
-	if got := Predict(m, f, BreedingGoal{NatureIn: other}); got.NatureFrom != "roll" || !brNear(got.NatureP, 0.4*2/30) {
+	if got := Predict(m, f, BreedingGoal{NatureIn: other}, 0); got.NatureFrom != "roll" || !brNear(got.NatureP, 0.4*2/30) {
 		t.Errorf("双亲都不在集合里时 = %s/%.4f, 期望 roll/%.4f", got.NatureFrom, got.NatureP, 0.4*2/30)
 	}
 	// Nature 与 NatureIn 同时填 → 并集:重复的名字只算一次,空名一律丢掉
 	dup := BreedingGoal{Nature: "固执", NatureIn: []string{"固执", ""}}
-	if got := Predict(m, f, dup); !brNear(got.NatureP, 0.3+0.4/30) {
+	if got := Predict(m, f, dup, 0); !brNear(got.NatureP, 0.3+0.4/30) {
 		t.Errorf("Nature 与 NatureIn 重复时 = %.4f, 期望 %.4f(去重后的并集)", got.NatureP, 0.3+0.4/30)
+	}
+}
+
+// TestPredictNatureNest 学院小窝里那只参与孵蛋时,子代性格 **100% 随它**(新赛季玩法):
+// 目标里有它这个性格就是必中(1),没有就是配不出(0)—— 重掷槽与另一个 30% 槽位都不再参与。
+//
+// 四件容易写错的事各有一条用例:
+//   - **与性别无关**:它当种母、当种公都要吃到这份加成;
+//   - **逐组合判定**:它不在这一对里时照旧 30/30/40 —— 选种建议里把它换掉的那几组正是这种;
+//   - **建议里也逐组合**:含它的一组是 1,换掉它的一组该是多少还是多少;
+//   - **性格未知时不猜**:快照缺性格时退回常规概率,而不是报一个 0%(见 nestNature)。
+func TestPredictNatureNest(t *testing.T) {
+	m := brParent(11, "母", 0, 50, "勇敢")
+	f := brParent(12, "父", 0, 50, "胆小")
+	const rollPart = 0.4 / 30 // 常规档里「重掷也可能掷中」那一份(口径见上一条测试)
+
+	if got := Predict(m, f, BreedingGoal{Nature: "勇敢"}, m.Gid); got.NatureFrom != "nest" || got.NatureP != 1 {
+		t.Errorf("小窝里那只当种母、目标正是它的性格 = %s/%.4f, 期望 nest/1", got.NatureFrom, got.NatureP)
+	}
+	// 同一份加成不分公母:小窝就在那儿,它当父本时子代照样随它
+	if got := Predict(m, f, BreedingGoal{Nature: "胆小"}, f.Gid); got.NatureFrom != "nest" || got.NatureP != 1 {
+		t.Errorf("小窝里那只当种公、目标正是它的性格 = %s/%.4f, 期望 nest/1", got.NatureFrom, got.NatureP)
+	}
+	// 目标里没有它这个性格 → **配不出**,不是「概率小」:这里必须给 0,不能给重掷那一份
+	if got := Predict(m, f, BreedingGoal{Nature: "固执"}, m.Gid); got.NatureFrom != "nest" || got.NatureP != 0 {
+		t.Errorf("小窝里那只在、目标却不是它的性格 = %s/%.4f, 期望 nest/0", got.NatureFrom, got.NatureP)
+	}
+	// 目标是一组名字(「性格正面加某维」)时按集合判:它的性格在集合里 → 必中
+	row := []string{"逞强", "固执", "勇敢"}
+	if got := Predict(m, f, BreedingGoal{NatureIn: row}, m.Gid); got.NatureFrom != "nest" || got.NatureP != 1 {
+		t.Errorf("目标是一组名字、它的性格在集合里 = %s/%.4f, 期望 nest/1", got.NatureFrom, got.NatureP)
+	}
+	// 它不在这一对里(gid 对不上)→ 不适用,照旧 30/30/40。不是「只要设了小窝就整条线 100%」——
+	// 换掉它的那几组没有这份加成,给 100% 等于报一个配不出来的数。
+	if got := Predict(m, brParent(99, "别只公", 0, 50, "胆小"), BreedingGoal{Nature: "勇敢"}, f.Gid); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
+		t.Errorf("小窝里那只不在这一对里时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.3+rollPart)
+	}
+	// 小窝里那只的性格未知(快照缺字段):退回常规概率,而不是 0% —— 「说不出准确数字」与
+	// 「没戏」是两回事,前者不该被写成后者(见 nestNature)。
+	anon := brParent(13, "无性格", 0, 50, "")
+	if got := Predict(anon, f, BreedingGoal{Nature: "勇敢"}, anon.Gid); got.NatureFrom != "roll" || !brNear(got.NatureP, rollPart) {
+		t.Errorf("小窝里那只没有性格时 = %s/%.4f, 期望 roll/%.4f", got.NatureFrom, got.NatureP, rollPart)
+	}
+	// 小窝空着(nestGid=0):一律常规概率
+	if got := Predict(m, f, BreedingGoal{Nature: "勇敢"}, 0); got.NatureFrom != "parent" || !brNear(got.NatureP, 0.3+rollPart) {
+		t.Errorf("小窝空着时 = %s/%.4f, 期望 parent/%.4f", got.NatureFrom, got.NatureP, 0.3+rollPart)
+	}
+
+	// 建议列表里同样是**逐组合**的:小窝那只当母本那组必中,换掉她的那组照旧。
+	spare := brParent(21, "别只母", 0, 50, "固执")
+	sg := Suggest(
+		brPool([]EggParent{m, spare}, []EggParent{f}, []EggParent{f}),
+		BreedingGoal{Nature: "勇敢"}, 0, nil, m.Gid,
+	)
+	if len(sg) != 2 {
+		t.Fatalf("组合数 = %d, 期望 2", len(sg))
+	}
+	var withNest, without *Suggestion
+	for i := range sg {
+		if sg[i].Mother.Gid == m.Gid {
+			withNest = &sg[i]
+		} else {
+			without = &sg[i]
+		}
+	}
+	if withNest == nil || without == nil {
+		t.Fatal("建议里没找到这两组母本")
+	}
+	if withNest.Exp.NatureFrom != "nest" || withNest.Exp.NatureP != 1 {
+		t.Errorf("含小窝那只的组合 = %s/%.4f, 期望 nest/1", withNest.Exp.NatureFrom, withNest.Exp.NatureP)
+	}
+	if without.Exp.NatureFrom != "roll" || !brNear(without.Exp.NatureP, rollPart) {
+		t.Errorf("换掉小窝那只的组合 = %s/%.4f, 期望 roll/%.4f", without.Exp.NatureFrom, without.Exp.NatureP, rollPart)
 	}
 }
 
@@ -252,7 +336,7 @@ func refSuggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool) []S
 	for _, c := range pool.Cands {
 		for _, idx := range c.FatherIdx {
 			f := pool.Fathers[idx]
-			e := Predict(c.Mother, f, g)
+			e := Predict(c.Mother, f, g, 0)
 			out = append(out, Suggestion{
 				Mother:    c.Mother,
 				Father:    f,
@@ -292,7 +376,7 @@ func TestSuggestTopNMatchesFullSort(t *testing.T) {
 	goal := BreedingGoal{Voice: &v, WeightPct: &w, Nature: "固执"}
 
 	for _, n := range []int{1, 3, 5, 100} {
-		got := Suggest(pool, goal, n, nil)
+		got := Suggest(pool, goal, n, nil, 0)
 		want := refSuggest(pool, goal, n, nil)
 		if len(got) != len(want) {
 			t.Fatalf("n=%d 条数 = %d, 期望 %d", n, len(got), len(want))
@@ -371,19 +455,19 @@ func TestBackcrossAdvicePicksOppositeSexParent(t *testing.T) {
 
 	// 子代 ♂ → 只能回配母本(♀)
 	son := EggParent{Gid: 9, Name: "崽", Gender: "♂", Voice: 70}
-	got := BackcrossAdvice(son, m, f, nil, g)
+	got := BackcrossAdvice(son, m, f, nil, g, 0)
 	if got.WithParent == nil || got.WithParent.Gid != 1 {
 		t.Errorf("♂ 子代的回交对象 = %+v, 期望母本( gid 1 )—— 只能回配 ♀", got.WithParent)
 	}
 	// 子代 ♀ → 只能回配父本(♂)
 	daughter := EggParent{Gid: 9, Name: "崽", Gender: "♀", Voice: 70}
-	got2 := BackcrossAdvice(daughter, m, f, nil, g)
+	got2 := BackcrossAdvice(daughter, m, f, nil, g, 0)
 	if got2.WithParent == nil || got2.WithParent.Gid != 2 {
 		t.Errorf("♀ 子代的回交对象 = %+v, 期望父本( gid 2 )—— 只能回配 ♂", got2.WithParent)
 	}
 	// 性别缺失时退回老口径(按离目标更近挑 → 母本 90 比父本 40 近)
 	unknown := EggParent{Gid: 9, Name: "崽", Voice: 70}
-	got3 := BackcrossAdvice(unknown, m, f, nil, g)
+	got3 := BackcrossAdvice(unknown, m, f, nil, g, 0)
 	if got3.WithParent == nil || got3.WithParent.Gid != 1 {
 		t.Errorf("性别未知时 = %+v, 期望按老口径挑母本( gid 1 )", got3.WithParent)
 	}
@@ -397,7 +481,7 @@ func TestSuggestMarksBackcross(t *testing.T) {
 	own := brParent(9, "自己的崽", 0, 50, "固执")
 	cands := brPool([]EggParent{m}, []EggParent{sire, own})
 
-	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, map[uint32]bool{9: true})
+	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, map[uint32]bool{9: true}, 0)
 	if len(got) != 2 {
 		t.Fatalf("组合数 = %d, 期望 2", len(got))
 	}
@@ -412,7 +496,7 @@ func TestSuggestMarksBackcross(t *testing.T) {
 		t.Error("父本是本线子代却没标回交")
 	}
 	// 不传子代集合时一律不标(老调用方行为不变)
-	for _, s := range Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, nil) {
+	for _, s := range Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, nil, 0) {
 		if s.Backcross {
 			t.Error("没有子代集合却标了回交")
 		}
@@ -507,7 +591,7 @@ func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
 		[]EggParent{brParent(11, "狼灵乙", 100, 80, "")},
 		[]EggParent{brParent(21, "候选一", 90, 80, ""), brParent(22, "候选二", 120, 80, "")},
 	)
-	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, nil)
+	got := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 0, nil, 0)
 	if len(got) != 3 {
 		t.Fatalf("组合数 = %d, 期望 3(串窝母本出两条)", len(got))
 	}
@@ -529,7 +613,7 @@ func TestSuggestSortsByDistanceAndFlagsAmbiguous(t *testing.T) {
 		t.Errorf("标了串窝的组合 = %d, 期望 2(串窝母本的两个候选都要标)", n)
 	}
 	// top N 截断
-	if top := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 2, nil); len(top) != 2 {
+	if top := Suggest(cands, BreedingGoal{Voice: brI32(100)}, 2, nil, 0); len(top) != 2 {
 		t.Errorf("top2 返回 %d 条", len(top))
 	}
 }
@@ -591,7 +675,7 @@ func TestBackcrossPrefersChildOverPoorParent(t *testing.T) {
 	m := brParent(1, "母", 80, 80, "")
 	f := brParent(2, "父", 80, 80, "")
 	child := brParent(3, "子代", 96, 90, "")
-	got := BackcrossAdvice(child, m, f, nil, BreedingGoal{Voice: brI32(100)})
+	got := BackcrossAdvice(child, m, f, nil, BreedingGoal{Voice: brI32(100)}, 0)
 	if !got.Advised {
 		t.Errorf("没有别的候选时 = 不建议回交(%s), 期望建议", got.Reason)
 	}
@@ -615,7 +699,7 @@ func TestBackcrossRejectsWhenPoolIsBetter(t *testing.T) {
 		brParent(3, "子代", 96, 90, ""), // 也不该拿自己配自己
 		brParent(4, "狼王", 98, 90, ""),
 	}
-	got := BackcrossAdvice(child, m, f, pool, BreedingGoal{Voice: brI32(100)})
+	got := BackcrossAdvice(child, m, f, pool, BreedingGoal{Voice: brI32(100)}, 0)
 	if got.Advised {
 		t.Errorf("池子里有 98 的候选时仍建议回交(%s)", got.Reason)
 	}
@@ -634,7 +718,7 @@ func TestBackcrossRejectsWhenPoolIsBetter(t *testing.T) {
 func TestBackcrossWithoutChild(t *testing.T) {
 	m := brParent(1, "母", 80, 80, "")
 	f := brParent(2, "父", 80, 80, "")
-	got := BackcrossAdvice(EggParent{}, m, f, nil, BreedingGoal{Voice: brI32(100)})
+	got := BackcrossAdvice(EggParent{}, m, f, nil, BreedingGoal{Voice: brI32(100)}, 0)
 	if got.Advised {
 		t.Error("没有子代却建议了回交")
 	}
@@ -901,7 +985,7 @@ func TestBreedCandidates(t *testing.T) {
 	}
 
 	ref := ChainRef{Species: "火神"} // 无链形态:按名字认品种(见 ChainRef.Match)
-	mothers, fathers, kids := BreedCandidates(ref, pets)
+	mothers, fathers, kids := BreedCandidates(brDB(t), ref, pets)
 	assertCands("种母", mothers, "乙母", "甲母")
 	assertCands("种公", fathers, "甲公", "小子")
 	assertCands("子代", kids, "乙母", "甲公", "丙公", "甲母", "小子")
@@ -915,22 +999,26 @@ func TestBreedCandidates(t *testing.T) {
 
 	// 同名时按 gid 降序:刷了一窝同名个体时,最新获得的那只排在前面。
 	dupes := []*Pet{mk(10, "同名", "火神", "♂", "龙"), mk(11, "同名", "火神", "♂", "龙")}
-	if _, f, _ := BreedCandidates(ref, dupes); f[0].Gid != 11 {
+	if _, f, _ := BreedCandidates(brDB(t), ref, dupes); f[0].Gid != 11 {
 		t.Errorf("同名候选首个 gid = %d, 期望 11(同名按 gid 降序)", f[0].Gid)
 	}
 
 	// 关键:任意一只雌性的蛋组未知 → 整个不做粗筛。否则「丙公」(虫组)会被挡掉,
 	// 而前端对那只母本的口径是不限蛋组,玩家就永远选不到它。
 	mixed := append(append([]*Pet{}, pets...), mk(7, "无组母", "火神", "♀"))
-	if _, f, _ := BreedCandidates(ref, mixed); len(f) != 3 {
+	if _, f, _ := BreedCandidates(brDB(t), ref, mixed); len(f) != 3 {
 		t.Errorf("有雌性蛋组未知时种公 = %d 只, 期望 3(粗筛整体停用,宁多勿漏)", len(f))
 	}
 
-	// 空品种与库里没有该品种:三类都空,且不 panic。
-	if m, f, k := BreedCandidates(ChainRef{}, pets); len(m)+len(f)+len(k) != 0 {
-		t.Error("品种为空时不该给出候选")
+	// 空品种 = 「还没定品种」:给**全库的雌雄**(建线表单允许先挑种母,再由她把品种带出来,
+	// 蛋随母本),但**不给子代** —— 认领子代必须有品种来限定范围(见 BreedCandidates 的注释)。
+	// 这条曾经是「三类都空」,那个口径下「先选种母」这一步在界面上就是一个空下拉。
+	if m, f, k := BreedCandidates(brDB(t), ChainRef{}, pets); len(m) != 3 || len(f) != 3 || len(k) != 0 {
+		t.Errorf("空品种时母/公/子代 = %d/%d/%d, 期望 3/3/0(全库雌雄,不给子代)",
+			len(m), len(f), len(k))
 	}
-	if m, f, k := BreedCandidates(ChainRef{Species: "不存在的品种"}, pets); len(m)+len(f)+len(k) != 0 {
+	// 库里没有这个品种:仍然三类都空(与「还没定品种」是两回事:这里品种是明确的,只是不存在)。
+	if m, f, k := BreedCandidates(brDB(t), ChainRef{Species: "不存在的品种"}, pets); len(m)+len(f)+len(k) != 0 {
 		t.Error("库里没有该品种时不该给出候选")
 	}
 }

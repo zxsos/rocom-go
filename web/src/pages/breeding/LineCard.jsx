@@ -6,6 +6,17 @@ import { fmtPct, goalBits, goalProgress, lineAvatar, lineStats, pendCounts } fro
 // 状态文案与后端 pet.BreedingActive/Done/Archived 对应;未知状态原样显示,不吞掉。
 const STATUS = { active: '进行中', done: '已达成', archived: '归档' }
 
+// parentPairText 卡片上那行亲本摘要:「种母 X × 种公 Y」。
+//
+// 只写文字、不摆那两张亲本卡:整张卡是一个 <button>,里面不能放可交互的子元素(见文件头注释)。
+// 种公没指定与「指定过但他已不在库」分开写 —— 两者在页面上是完全不同的两件事。
+function parentPairText(line) {
+  const mom = line.mother ? `种母 ${line.mother.name}` : line.motherReleased ? '种母已放生' : '未定种母'
+  if (line.father) return `${mom} × 种公 ${line.father.name}`
+  if (line.fatherReleased) return `${mom} × 种公已不在库`
+  return mom
+}
+
 // LineCard 是一条培育线的列表卡片:品种 / 状态 / 目标 / 代数与历代最佳 / 离目标多远。
 //
 // 整卡是**一个 button**(不是 div + onClick):键盘可聚焦、回车可开、读屏会念成按钮。
@@ -32,7 +43,7 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
       type="button"
       className={'br-card s-' + status + (pend.incubating + pend.claim > 0 ? ' has-pending' : '')}
       onClick={() => onOpen(line.id)}
-      title={`${kind}${line.mother ? ` · 种母 ${line.mother.name}` : line.motherReleased ? ' · 种母已放生' : ''} · 第 ${st.gens} 代 · 点击展开这条培育线`}
+      title={`${kind} · ${parentPairText(line)} · 第 ${st.gens} 代 · 点击展开这条培育线`}
     >
       <span className="br-card-top">
         {avatar
@@ -40,11 +51,11 @@ export default function LineCard({ line, chains, matrix, onOpen }) {
           : <span className="br-card-img ph">?</span>}
         <span className="br-card-name">
           <span className="br-card-species">{kind}</span>
-          {/* 种母:同一个品种可以同时有几条线(几个窝、几只母本各孵各的),光看品种名
-              那几条卡片一模一样。线的身份就是种母,故把她的名字写在这里 —— 这是唯一
-              能把它们区分开的信息。没固定种母的线(老线还没接过蛋)明说,不留空。 */}
+          {/* 亲本那对:同一个品种可以同时有几条线(几个窝、几只母本各孵各的),光看品种名
+              那几条卡片一模一样。线身份是种母、种公只是计划值,但**一对**才是玩家心里的那条线,
+              故两个都写(见 parentPairText)。没固定种母的老线明说,不留空。 */}
           <span className="br-card-sub muted">
-            {line.mother ? `种母 ${line.mother.name}` : line.motherReleased ? '种母已放生' : '未定种母'}
+            {parentPairText(line)}
             {' · '}{st.gens} 代 · 最近 {fmtShortTime(line.updatedAt)}
           </span>
         </span>

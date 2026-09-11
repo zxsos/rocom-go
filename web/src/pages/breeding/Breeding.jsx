@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useMemo, useState } from 're
 import { useSearchParams } from 'react-router-dom'
 import {
   claimBreedingChild, deleteBreeding, getBreeding, getEvolution, getFilterOptions, getNameOptions,
-  getPet, mergeBreeding, saveBreeding, subscribe,
+  getPet, mergeBreeding, saveBreeding, setNest, subscribe,
 } from '../../api'
 import { AccountContext } from '../../context'
 import { breedableEggGroups } from '../../constants'
@@ -15,7 +15,12 @@ import { IconBreeding, IconRefresh } from '../../components/svg'
 import LineCard from './LineCard'
 import LineDetail from './LineDetail'
 import { GoalFields } from './GoalEditor'
-import { chainKey, chainOf, chainOfPet, lineStats, narrowChainsByEggGroups, parseGoal, pendCounts } from './pets'
+import {
+  chainKey, chainOf, chainOfPet, fatherCandidates, lineStats, narrowChainsByEggGroups, parseGoal,
+  pendCounts, petPickerOption,
+} from './pets'
+import ParentSlot, { NestHint, ParentRow, parentCard } from './ParentSlot'
+import useBreedPool from './useBreedPool'
 
 const EMPTY_GOAL = { voice: '', weightPct: '', nature: '', natureIn: [] }
 
@@ -61,6 +66,18 @@ export default function Breeding() {
   // 长按「孵蛋配种」带过来的宠物本身与它那条进化链(后者用于认品种,见 pets.chainOfPet)
   const [breedPet, setBreedPet] = useState(null)
   const [breedSteps, setBreedSteps] = useState(null)
+  // 建线时可选的一对亲本(gid 的字符串形式,与 PetPicker 的取值一致);空串 = 不选。
+  const [newMotherGid, setNewMotherGid] = useState('')
+  const [newFatherGid, setNewFatherGid] = useState('')
+  // 建线时想给小窝的计划 (0 = 没设):此时线还没建,勾选**只改本地**,随建线请求一起提交成
+  // line.nestPlanGid。刻意不在这里调 setNest —— 那会把整个账号的小窝真值改掉,而玩家此刻
+  // 只是「这条线打算这样试算一下」,把它当成既成事实写下去是在替游戏改事实(且与后端家园
+  // 管线维护的真值打架)。旁注:线建好之后,详情页的勾选才走 onSave(写计划值)。
+  const [newNestPlanGid, setNewNestPlanGid] = useState(0)
+  // 亲本被自动取消时的说明(见下面那个 effect):不说明的话玩家只会发现「我选的公没了」。
+  const [parentNote, setParentNote] = useState('')
+  // 长按预置只做一次:玩家把预置的那侧清掉后,重渲染不该又塞回来。
+  const [prefilled, setPrefilled] = useState(false)
 
   // 「孵蛋配种」的落地:拉这只宠物的权威数据 → 打开新建表单,并按它的蛋组收窄品种候选。
   // 宠物已经不在库里(放生/送人/换了账号)时提示一句并退回普通列表 —— 不能让玩家对着一张
@@ -87,6 +104,13 @@ export default function Breeding() {
     useCallback(() => getBreeding(), []), { fallback: { lines: [] }, reloadKey: account },
   )
   const lines = useMemo(() => (data && data.lines) || [], [data])
+  // 学院小窝(全库唯一一只,随培育响应一起下发):{gid,name,nature},gid=0 表示空着。
+  // 亲本卡上的勾选与建议卡片上的「性格 100%」都由它解释,故它必须与线**同一份响应**读出来 ——
+  // 分开拉一次接口的话,刷新时机不同就会出现「卡上勾着、建议却按常规概率算」的中间态。
+  const nest = useMemo(() => (data && data.nest) || { gid: 0 }, [data])
+  // 建线表单里那两张卡的**生效值**:设了本地计划就按计划算,没设就按游戏真值 —— 与后端算建议
+  // 时用的口径(NestPlanGid || nest.gid)一致,勾选状态才不会和建完线看到的百分比指两只宠物。
+  const formNestEff = newNestPlanGid || (nest.gid || 0)
   const { data: nameOpts } = useAsyncData(
     useCallback(() => getNameOptions(), []), { fallback: { nature: [] } },
   )
@@ -126,10 +150,105 @@ export default function Breeding() {
     if (c) setNewChain(chainKey(c))
   }, [breedPet, breedSteps, pickChains])
 
+  // 长按的那只直接占住一侧:**蛋随母本**,故 ♀ 占「种母」位(她这条链由上面那步选成品种);
+  // ♂ 占「种公」位 —— 要哪条链的蛋由玩家自己挑,链上的 ♀ 才是种母。
+  // 只做一次(用标记而不是靠依赖):玩家把这一侧清掉之后重渲染,不该又被他塞回来。
+  useEffect(() => {
+    if (!breedPet || prefilled) return
+    const gid = String(breedPet.gid)
+    if (breedPet.gender === '♀') setNewMotherGid(gid)
+    else setNewFatherGid(gid)
+    setPrefilled(true)
+  }, [breedPet, prefilled])
+
   const chainItems = useMemo(
     () => pickChains.map((c) => ({ value: chainKey(c), label: c.label, sub: `${c.count} 只`, img: c.egg || c.img })),
     [pickChains],
   )
+
+  // —— 亲本(种母 / 种公)—— 都可空,任意组合(见 pet.BreedingLine 的 MotherGid / FatherGid)。
+  //
+  // 候选来自这个品种的候选池(见 useBreedPool):种母 = 同品种雌性;种公 = 与该品种雌性
+  // 共蛋组的雄性,选定种母后再按**她**的蛋组收一次(见 fatherCandidates)—— 配种要求同蛋组,
+  // 列一个配不上的公等于让玩家白建一条线。
+  const pickedChain = useMemo(() => chainOf(newChain, pickChains), [newChain, pickChains])
+  const pool = useBreedPool(pickedChain)
+  const motherCand = useMemo(
+    () => pool.mothers.find((p) => String(p.gid) === newMotherGid) || null,
+    [pool.mothers, newMotherGid],
+  )
+  const fatherPool = useMemo(() => fatherCandidates(pool.fathers, motherCand), [pool.fathers, motherCand])
+  // 长按带过来的那只:它可能还没进候选池(还没选品种、或它的蛋组与母本对不上),但**必须显示
+  // 得出来** —— 玩家长按它才进来的,卡上却空着,他只会以为没选上。
+  const presetCard = useMemo(() => {
+    if (!breedPet) return null
+    const gid = String(breedPet.gid)
+    if (gid !== newMotherGid && gid !== newFatherGid) return null
+    return parentCard(breedPet, breedableEggGroups(breedPet.eggGroups))
+  }, [breedPet, newMotherGid, newFatherGid])
+  const cardOf = useCallback(
+    (gid, cand) => parentCard(cand) || (presetCard && String(presetCard.gid) === gid ? presetCard : null),
+    [presetCard],
+  )
+  const fatherCand = useMemo(
+    () => pool.fathers.find((p) => String(p.gid) === newFatherGid) || null,
+    [pool.fathers, newFatherGid],
+  )
+  const motherCard = cardOf(newMotherGid, motherCand)
+  const fatherCard = cardOf(newFatherGid, fatherCand)
+  // 「你长按的那只」只标在长按带过来的那一侧:从列表长按进来时,得让人知道系统已经替他放好了哪一边。
+  const longPressBadge = (gid) => (breedPet && gid && String(breedPet.gid) === gid ? '你长按的那只' : null)
+  const motherOpts = useMemo(() => pool.mothers.map(petPickerOption), [pool.mothers])
+  // 池子拿到之前,把长按预置的那位补进选项里(否则下拉显示不出他);池子拿到之后不补 ——
+  // 那时「不在候选里」就是真的配不上,该由下面那个 effect 清掉并说明。
+  // loading 也要看:换品种时 data 还留着**上一个品种**的池子,拿它判「配不上」会误清。
+  const poolReady = pool.ready && !pool.loading
+  const fatherOpts = useMemo(() => {
+    const opts = fatherPool.map(petPickerOption)
+    const p = !poolReady ? presetCard : null
+    if (p && String(p.gid) === newFatherGid && !opts.some((o) => o.value === String(p.gid))) {
+      opts.unshift({ value: String(p.gid), img: p.img, name: p.name, sub: p.species })
+    }
+    return opts
+  }, [fatherPool, presetCard, newFatherGid, poolReady])
+  // 选种母 → **顺手把品种(蛋)选好**:蛋的物种随母本,她那一条链就是这条线要孵的蛋。
+  // 她在当前候选里对不上时(多半是长按带来的蛋组收窄把她的链挡在外面)先撤掉那个收窄 ——
+  // 否则下拉里会显示一个候选列表里根本没有的品种,看起来像没选上。
+  const pickMother = useCallback((gid) => {
+    setNewMotherGid(gid)
+    setParentNote('')
+    if (!gid) return
+    const c = pool.mothers.find((p) => String(p.gid) === gid)
+    if (!c) return
+    // 候选带上所属进化链(见 petCandidate 里的 Evo),故这里能直接把「这只母」翻成「哪条链」。
+    const key = chainKey(c)
+    if (!chainOf(key, chains)) {
+      // 她所属的品种不在可配种清单里(生不出蛋的那批被后端滤掉了):留着她但说清为什么没填品种。
+      setParentNote('这只种母所属的品种不在可配种清单里（生不出蛋的品种不参与配种）')
+      return
+    }
+    if (!chainOf(key, pickChains)) setParams({})
+    setNewChain(key)
+  }, [pool.mothers, chains, pickChains, setParams])
+
+  // 换品种 / 换种母之后,已选的那两位可能不再配得上:种母不属于这个品种(蛋的物种随母本,
+  // 她必须与品种同种)、或种公与母本蛋组对不上。留着就会提交一对配不出候选的亲本,而界面上
+  // 看不出来 —— 故清掉并说明一句。
+  //
+  // 只在池子**确实拿到过**之后才判(poolReady):换品种时 data 还留着上一个品种的池子,
+  // 拿它判会误清;而没定品种时后端给的是全库雌雄,那两位本来就都在里面,不会误伤。
+  useEffect(() => {
+    if (!poolReady) return
+    if (newMotherGid && !pool.mothers.some((p) => String(p.gid) === newMotherGid)) {
+      setNewMotherGid('')
+      setParentNote('换品种后原来那只种母不属于这个品种，已取消 —— 蛋随母本,也可以先选种母再来定品种')
+      return
+    }
+    if (newFatherGid && !fatherOpts.some((o) => o.value === newFatherGid)) {
+      setNewFatherGid('')
+      setParentNote('这只种公与母本蛋组对不上，已取消')
+    }
+  }, [poolReady, newMotherGid, newFatherGid, pool.mothers, fatherOpts])
 
   // 服务端推送「培育数据变了」→ 重拉整份。onOpen 也补拉一次:断线期间的消息不会重放。
   useEffect(() => subscribe('breeding', refresh, { onOpen: refresh }), [refresh])
@@ -152,6 +271,18 @@ export default function Breeding() {
       .then((ok) => { setBusy(false); return ok })
   }, [refresh])
 
+  // setNestTruth 把**游戏真值**手工兜底成某只(gid=0 = 空出来)。
+  //
+  // 正常情况真值由家园管线自动维护(见 docs/data.md 3.6),玩家不需要碰它;只在「还没抓到小窝
+  // 数据、但确实已经放好了」时,用它把本线的计划一次性扶正成事实(详情页状态行那个
+  // 「记为游戏真值」按钮)。走 run 的「提交 → 重拉 → 提示」,与别的写操作同一套路:这一改动的
+  // 是**建议里的性格命中率**,而那是后端算的 —— 本地只改勾选状态的话卡片上的百分比会对不上。
+  const setNestTruth = useCallback((gid) => run(() => setNest(gid), gid ? '已记为游戏真值' : '学院小窝已空出'), [run])
+
+  // toggleNewNestPlan 建线表单里的计划勾选:只改本地,建线时随 nestPlanGid 一起提交(见上面那段注释)。
+  // 详情页的勾选不走这里 —— 那时线已经存在,改计划就是整条覆盖写,由 LineDetail 自己 onSave。
+  const toggleNewNestPlan = useCallback((gid) => setNewNestPlanGid(gid ? Number(gid) : 0), [])
+
   const openLine = (id) => setParams({ line: id })
   const closeLine = () => setParams({})
 
@@ -169,23 +300,37 @@ export default function Breeding() {
     const id = `manual-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
     setBusy(true)
     // evo + species 是这条线认的品种(见 pets.chainKey):链上任一阶段的个体从此都算它的种母。
+    // 亲本两位都只提交**gid**(快照由服务端按当前库生成):线上存的是「指的是哪只」,
+    // 之后他改名/换形态不会让线里带一份过期的快照 —— 与历史记录存快照的分工正相反(见 schemas.md)。
     saveBreeding({
       id, evo: picked.evo, species: picked.species, goal: parseGoal(newGoal), status: 'active', gens: [],
+      // 只提交**候选里确实解析出来**的那两位:卡上显示为空(值不在候选里 —— 例如换品种后那位
+      // 还没被清掉)时,把 state 里的 gid 原样提交会建出一条「母本与品种不符」的线,而界面上
+      // 看着是空的。所见即所交。
+      ...(motherCand ? { motherGid: motherCand.gid } : {}),
+      ...(fatherCand ? { fatherGid: fatherCand.gid } : {}),
+      // 小窝计划同样「为 0 就不放进 body」(与其他可选字段一致):后端把缺失与 0 都当「没设计划」,
+      // 但少塞一个字段能让请求更像「玩家确实没打算改它」,也免得日后再加默认值时空 0 被误读。
+      ...(newNestPlanGid ? { nestPlanGid: newNestPlanGid } : {}),
     })
       .then(() => refresh())
       .then(
         () => {
           setCreating(false); setNewChain(''); setNewGoal(EMPTY_GOAL)
+          setNewMotherGid(''); setNewFatherGid(''); setParentNote(''); setNewNestPlanGid(0)
           openLine(id)
           // 同品种已经有进行中的线时多说一句。不拦 —— 同一个品种同时开几条线是正常用法
           // (几个窝、几只母本各孵各的,它们**不会**互相干扰:蛋按种母归线)。
-          // 但要讲清这条新线此刻还没有种母,要等第一次收蛋才固定到某只母本身上。
+          // 但要讲清这条新线此刻还没有种母,要等第一次收蛋才固定到某只母本身上 ——
+          // 只在玩家**没选**种母时说:选了就是已经固定了,再说不就自相矛盾了。
           const same = lines.filter((l) => (l.status || 'active') === 'active'
             && chainKey(l) === newChain).length
-          toast(same > 0
-            ? `培育线已建立 —— 这个品种还有 ${same} 条进行中的线,它们各跟各的种母,互不干扰。`
-              + '这条线还没固定种母,第一次收蛋时会按当时的母本固定下来'
-            : '培育线已建立 —— 填上目标后建议才有意义')
+          if (same > 0) {
+            toast(`培育线已建立 —— 这个品种还有 ${same} 条进行中的线,它们各跟各的种母,互不干扰。`
+              + (newMotherGid ? '' : '这条线还没固定种母,第一次收蛋时会按当时的母本固定下来'))
+          } else {
+            toast('培育线已建立 —— 填上目标后建议才有意义')
+          }
         },
         (e) => toast((e && e.message) || '建线失败'),
       )
@@ -224,6 +369,7 @@ export default function Breeding() {
           <LineDetail
             line={line} lines={lines} chains={chains} chainItems={chainItems}
             natureMatrix={natureMatrix} loading={loading} busy={busy}
+            nest={nest} onNestTruth={setNestTruth}
             onOpenLine={openLine}
             onMerge={(id) => run(() => mergeBreeding(id)).then((ok) => {
               // 合并后这条线就没了:停在这一屏会显示「这条培育线不在了」。跳到母线更自然 ——
@@ -296,6 +442,51 @@ export default function Breeding() {
             链上任一阶段的 ♀ 都能当这条线的种母,而同一只精灵的两种样子各有各的链(也各有各的蛋)。
             生不出蛋的特殊精灵(迪莫、翼王那一系)不在这里 —— 它们进不了小窝配种。
           </p>
+
+          {/* 亲本(种母 × 种公):都可空、任意组合 —— 都不选就沿用「先建线,第一次收蛋时按当时的
+              母本固定种母」那套老用法(见 pet.BreedingLine.MotherGid/FatherGid)。
+              **顺序不设限**:品种还没定也能先挑亲本(那时后端给的是全库的雌雄,见 BreedCandidates
+              的空引用那一支);定了品种之后再按品种收窄。 */}
+          <div className="br-field">
+            <span>亲本（可不填）</span>
+            <ParentRow
+              mother={(
+                <ParentSlot
+                  role="mother" card={motherCard} options={motherOpts} value={newMotherGid}
+                  badge={longPressBadge(newMotherGid)}
+                  nestGid={formNestEff} nestTruth={nest.gid || 0} nestPlanGid={newNestPlanGid} onNest={toggleNewNestPlan}
+                  title="种母决定这条线的身份与品种:她孵的蛋会记到这条线上。选了她,上面的品种(蛋)会自动跟着填好"
+                  onChange={pickMother}
+                />
+              )}
+              father={(
+                <ParentSlot
+                  role="father" card={fatherCard} options={fatherOpts} value={newFatherGid}
+                  badge={longPressBadge(newFatherGid)}
+                  nestGid={formNestEff} nestTruth={nest.gid || 0} nestPlanGid={newNestPlanGid} onNest={toggleNewNestPlan}
+                  title="种公是计划值:抓包抓到的真实父本仍按当时的记录写进各代,这里选的只是这条线打算用谁"
+                  onChange={(gid) => { setNewFatherGid(gid); setParentNote('') }}
+                />
+              )}
+            />
+            {/* 建线这一步还没有线,故这里给的是「真值 + 本地计划」,计划写不写下去由建线决定。
+                状态行也据此显示:目标只是让玩家看到勾了这一下会怎么算。 */}
+            <NestHint truth={nest} planGid={newNestPlanGid} planReleased={false}
+              onClearPlan={() => setNewNestPlanGid(0)} />
+            <p className="br-hint muted">
+              {pickedChain
+                ? `种母 ${pool.mothers.length} 只可选 · 与母本共蛋组的种公 ${fatherOpts.length} 只可选`
+                : `也可以先选种母 —— 品种(蛋)会随她自动填好 · 全库 ${pool.mothers.length} 只雌性可选`}
+            </p>
+            {/* 勾选在新线上只记下「打算」,百分比得等线建出来、建议面板算完才有 —— 不先说明,
+                玩家勾完会以为立刻该看到 100%。 */}
+            <p className="br-hint muted">
+              勾选只记下这条线的计划（试算用）；百分比在建线后的建议面板里看。
+              它不会改动游戏里的学院小窝 —— 要真放进去得在游戏里放/抱走。
+            </p>
+            {parentNote ? <p className="br-hint muted">{parentNote}</p> : null}
+          </div>
+
           <p className="br-hint muted">
             目标可以先不填(先攒几代再定也行)。填了以后下面的选配建议就会按它排序。
           </p>

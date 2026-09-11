@@ -18,6 +18,7 @@ import { IconChevronDown } from './svg'
 // 触发按钮上仍显示 placeholder —— 它表达的是「还没选」,而不是「选了一只叫『不填』的宠」。
 export default function PetPicker({
   value, options, onChange, placeholder = '选择一只…', clearLabel, disabled, className = '', title,
+  avFrame,
 }) {
   // 包一层 useMemo:否则 options 省略时每次渲染都会造一个新数组,下面的过滤 useMemo 就白算了。
   const items = useMemo(() => options || [], [options])
@@ -76,7 +77,15 @@ export default function PetPicker({
       >
         {sel ? (
           <>
-            {sel.img ? <img className="dropdown-av" src={imgURL(sel.img)} alt="" /> : null}
+            {/* 头像外套一层:调用方可以给一个「头像框」(学院小窝那圈绿草就是这么挂的,见
+                breeding/NestGrass.jsx)。这层是 inline-flex 且与 img 同尺寸,故不给框时
+                布局与从前逐像素一致 —— 只有给框的那一处才多出可见的变化。 */}
+            {sel.img || avFrame ? (
+              <span className="dropdown-av-wrap">
+                {sel.img ? <img className="dropdown-av" src={imgURL(sel.img)} alt="" /> : null}
+                {avFrame}
+              </span>
+            ) : null}
             <span className="dropdown-value">{sel.name}</span>
             {sel.sub ? <span className="dropdown-meta">{sel.sub}</span> : null}
           </>

@@ -396,6 +396,15 @@ CREATE TABLE IF NOT EXISTS egg_source (
   updated_at INTEGER
 );
 
+-- 学院小窝(单行 id=1,见 store/academy.go):gid 是**在小窝里那只**宠物,0 = 小窝空着。
+-- 全库唯一 —— 小窝只有一个,故不按账号隔离;切账号后 gid 落在别的账号的库里时谁也
+-- 对不上,等于空着(理由见 store/academy.go)。
+CREATE TABLE IF NOT EXISTS academy_nest (
+  id INTEGER PRIMARY KEY,
+  gid INTEGER NOT NULL,
+  updated_at INTEGER
+);
+
 -- 孵化倍率实测(按账号):玩家在孵蛋页点「开始测速」后开两次孵蛋器,后端取两次
 -- 进度的差分 Δv/Δt。存的是**一次测速的过程与结果**,不是历史样本数组 ——
 -- 早先那套「自动攒差分样本取中位数」已废弃:它把活动倍率(固定时间表)与在线加成

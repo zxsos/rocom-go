@@ -145,6 +145,28 @@ type BreedingLine struct {
 	// 0 = 还没固定(手工建的、一代都没有的线)。老线也都没有这个字段,由 MotherGidOf 从末代
 	// 派生 —— 与 DeriveChain 同一套路子:老数据读取时补,不做迁移。
 	MotherGid uint32 `json:"motherGid,omitempty"`
+	// FatherGid 这条线**指定**用哪只种公(个体 gid);0 = 还没指定。
+	//
+	// 与 MotherGid 是**一对**、但性质不同,三点差别都要记住:
+	//  1. **不派生**:每代的父本各不相同(同一条线可以换公、也可能串窝),末代父本代表不了
+	//     「这条线指定的种公」—— 照 MotherGidOf 那样派生只会得出一个错结论。故只认这个显式字段。
+	//  2. **只是计划值**:收蛋自动记录(pipeline.recordLay / AppendPending)**一律以抓到的真实
+	//     父本为准**,绝不读它 —— 计划不该写进历史事实里。
+	//  3. **可随时改**:它不属于线的身份(身份是种母),详情页换个公就是换个公,不必另开一条线。
+	//
+	// 它的用处只有两处:页面把「种母 × 种公」成对展示出来,以及手动补录/编辑某一代时把它
+	// 当默认父本 —— 也就是「玩家打算怎么配」,而不是「已经配出了什么」。
+	FatherGid uint32 `json:"fatherGid,omitempty"`
+	// NestPlanGid 这条线**打算**把学院小窝给哪只(个体 gid);0 = 没打算(按游戏真值算)。
+	//
+	// 与 FatherGid 是同一类**计划值**,三点性质一样:不派生、不进历史事实、随时可改。它唯一的
+	// 用处是让玩家在**还没真把宠物放进游戏小窝**时,也能按这份计划看到「子代性格 100% 遗传」的
+	// 预测(见 docs/data.md 3.6 与 store/academy.go)。游戏里真正在小窝里的是谁由家园管线自动
+	// 维护成全局真值(见 pipeline.syncAcademyNest),这条线的预测口径是「**计划 ?? 真值**」。
+	//
+	// ⚠️ 它**不参与达标判定**(ReachGoal / goalHit 只看子代快照),也不写进任何一代 ——
+	// 「我打算怎么配」与「已经配出了什么」是两回事,混起来会让玩家以为历史被改过。
+	NestPlanGid uint32 `json:"nestPlanGid,omitempty"`
 	// ParentLineID 子线指向的**母线** id;空 = 不是子线。
 	//
 	// 什么时候会有子线:拿这条线孵出的子代当新母本(选育的核心操作)—— 换了种母就换了线,
@@ -266,6 +288,12 @@ func weightReached(cur, goal float64) bool {
 // (「两个都是则 60%」说的正是这个;按独立事件算会得到 1 − 0.7 × 0.7 = 51%,与规则不符)。
 //
 // 重掷槽按全表均匀估 —— 它本身也可能掷中目标性格,故命中率一律带上 0.4/30 这一份。
+//
+// **学院小窝(新赛季玩法)** 是这套概率的唯一例外:小窝里那只(全库唯一,见 store.AcademyGid)
+// 参与孵蛋时,子代性格 **100% 随它** —— 40% 的重掷槽不再起作用,两个 30% 槽位也只剩它那一个
+// (故这时命中率非 1 即 0,见 nestNature)。它与性别无关:小窝里那只当种母或当种公都有这份加成。
+// 「参与」是**逐组合**判定的:选种建议里把它换掉的那几组照旧走上面的 30/30/40,因为那时小窝里
+// 那只根本没进这对亲本 —— 按整条线一律 100% 会给出一个配不出来的百分比。
 const (
 	natureInheritChance = 0.30 // 单个亲本的性格被子代继承的概率(母、父各占一个槽位)
 	natureRollChance    = 0.40 // 两个槽位都没中:从全部性格里重掷一个
@@ -290,8 +318,11 @@ type Expectation struct {
 	// 可依赖的收益,`89.0~94.2%` 会被读成「至少能到 89」。它仍要留在响应里 —— 回交对比与
 	// 建议排序(lessSuggestion)都在用它当「哪组更有戏」的次序。
 	WeightHi   float64 `json:"weightHi"`
-	NatureP    float64 `json:"natureP"`    // 命中目标性格的概率(母/父各 30%,再加重掷槽的 0.4/30)
-	NatureFrom string  `json:"natureFrom"` // parent=双亲之一有(双亲都带即 60% 那档) / roll=只能等重掷 / none=没设目标
+	NatureP float64 `json:"natureP"` // 命中目标性格的概率(母/父各 30%,再加重掷槽的 0.4/30)
+	// NatureFrom 这个概率**从哪来**:parent=双亲之一有(双亲都带即 60% 那档) / roll=只能等重掷 /
+	// nest=学院小窝里那只在这一对里(100% 随它,见 nestNature) / none=没设目标。
+	// 前端按它写卡片上那句解释(见 web 的 natureTitle),故新增取值必须同步那边。
+	NatureFrom string `json:"natureFrom"`
 }
 
 // pctOf 取百分位指针的值,nil(该形态没有取值范围)视为 0。
@@ -318,10 +349,14 @@ func meanPct(a, b *float64) float64 {
 
 // Predict 预测某对双亲孵出的子代。目标 g 只影响性格命中概率(嗓音/体重与目标无关)。
 //
+// nestGid 是学院小窝里那只的 gid(0 = 小窝空着,见 store.AcademyGid):它在**这一对**里时
+// 子代性格 100% 随它。逐组合都传同一个 nestGid —— 「它在不在这一对里」必须逐组合判,
+// 换掉它的那几组没有这份加成(见 nestNature)。
+//
 // 逐组合调用时请改用 predictWith + 预算好的目标集合:本函数每次都会重新解析一遍
 // 目标集合(见 predictWith 的注释)。
-func Predict(mother, father EggParent, g BreedingGoal) Expectation {
-	return predictWith(mother, father, g.natures())
+func Predict(mother, father EggParent, g BreedingGoal, nestGid uint32) Expectation {
+	return predictWith(mother, father, g.natures(), nestGid)
 }
 
 // predictWith 与 Predict 同义,但目标集合由调用方**预算好**传入。
@@ -330,7 +365,7 @@ func Predict(mother, father EggParent, g BreedingGoal) Expectation {
 // Predict 里它会被调到 4 次(是否填了性格目标、命中概率、两个亲本各自是否命中),
 // 加上 Score 里的 1 次 —— 一个组合就是 5 次分配。选种建议要跑几万个组合,那里
 // 是纯粹的白花钱。故热点循环在**循环外**解析一次,循环内一律走本函数。
-func predictWith(mother, father EggParent, targets []string) Expectation {
+func predictWith(mother, father EggParent, targets []string, nestGid uint32) Expectation {
 	e := Expectation{
 		Voice:     voiceOf(mother, father),
 		WeightPct: meanPct(mother.WeightPct, father.WeightPct),
@@ -340,7 +375,18 @@ func predictWith(mother, father EggParent, targets []string) Expectation {
 	case len(targets) == 0:
 		e.NatureFrom = "none"
 	default:
-		e.NatureP = natureHitPWith(mother, father, targets)
+		// 学院小窝里那只在这一对里:子代性格 100% 随它 —— 重掷槽与另一个 30% 槽位都不再参与,
+		// 目标里有它这个性格就是必中(1)、没有就是配不出来(0)。两种情况都写清来源是 nest,
+		// 页面才能把「改目标 / 把它换出小窝」这句提示写出来。
+		if n := nestNature(mother, father, nestGid); n != "" {
+			e.NatureFrom = "nest"
+			if hitTargets(n, targets) {
+				e.NatureP = 1
+			}
+			return e
+		}
+		// 这里传 0:小窝那一支已经在上面 return 掉了,走到这儿必然没有小窝加成。
+		e.NatureP = natureHitPWith(mother, father, targets, 0)
 		// parent = 命中的主要来源是那两个 30% 槽位(双亲都带时就是 60%);roll = 双亲都没有,
 		// 只剩 40% 的重掷槽可指望。两者都还要加上重掷槽本身掷中的那一份。
 		if hitTargets(mother.Nature, targets) || hitTargets(father.Nature, targets) {
@@ -380,13 +426,43 @@ func hitTargets(name string, targets []string) bool {
 //
 // 上限钳到 1:集合被手改成一堆重复/超长的名字时,公式加起来会超过 1,而概率超过 1 只会在
 // 页面上显示成「120%」这种一眼假的数字。
-func natureHitP(mother, father EggParent, g BreedingGoal) float64 {
-	return natureHitPWith(mother, father, g.natures())
+func natureHitP(mother, father EggParent, g BreedingGoal, nestGid uint32) float64 {
+	return natureHitPWith(mother, father, g.natures(), nestGid)
+}
+
+// nestNature 学院小窝里那只**参与这一对**孵蛋时的性格;它不在这一对里则返回空串。
+//
+// 玩法:小窝里那只孵蛋时子代性格 **100% 随它** —— 无论它是种母还是种公,故这里只认 gid、
+// 不看它在哪一侧;它不在这一对里就没有这份加成(选种建议里换掉它的那几组)。
+//
+// 空串 = 「这份加成不适用」,有两个来源:**它不在这一对里**,或**它的性格未知**(快照缺字段)。
+// 后者按「不加成」处理而不是按「必不中」:子代性格 100% 随它、而它是多少我们并不知道,
+// 给个 0% 会被读成「这只永远配不出目标」—— 那是个我们并不掌握的结论。退回常规概率(30/30/40)
+// 反而诚实:说不出准确数字时说「照常算」,而不是说「没戏」。
+func nestNature(mother, father EggParent, nestGid uint32) string {
+	if nestGid == 0 {
+		return ""
+	}
+	switch {
+	case mother.Gid == nestGid:
+		return mother.Nature
+	case father.Gid == nestGid:
+		return father.Nature
+	}
+	return ""
 }
 
 // natureHitPWith 见 natureHitP,目标集合由调用方预算(见 predictWith 的注释)。
-func natureHitPWith(mother, father EggParent, targets []string) float64 {
+func natureHitPWith(mother, father EggParent, targets []string, nestGid uint32) float64 {
 	if len(targets) == 0 {
+		return 0
+	}
+	// 学院小窝:必中或必不中。与 predictWith 里那支必须同进同退 —— 一处按 100% 显示、
+	// 另一处按 61% 排序,卡片与建议名次会同时对不上。
+	if n := nestNature(mother, father, nestGid); n != "" {
+		if hitTargets(n, targets) {
+			return 1
+		}
 		return 0
 	}
 	p := natureRollChance * float64(len(targets)) / natureCount
@@ -484,7 +560,10 @@ type Suggestion struct {
 // childGids 是这条线历代子代的 gid 集合:父本落在里面即为**回交**(子代 × 亲本那样往上
 // 倒着配),此时给组合标上 Backcross。前端那颗「回交」标签此前一直是死的 —— 后端从没
 // 赋过值,而"这一组是不是回交"只有线自己知道(候选池里看不出来)。
-func Suggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool) []Suggestion {
+//
+// nestGid 是学院小窝里那只的 gid(0 = 空着):落在组合里的那几组性格按 100% 随它算
+// (见 nestNature),把它换掉的那几组照旧 —— 与「谁真的在小窝里」这件事保持一致。
+func Suggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool, nestGid uint32) []Suggestion {
 	// 目标集合在循环外解析一次:每个组合都要用它算命中概率与打分,重复解析是白花钱
 	// (见 predictWith 的注释)。
 	targets := g.natures()
@@ -495,7 +574,7 @@ func Suggest(pool Pool, g BreedingGoal, n int, childGids map[uint32]bool) []Sugg
 	for _, c := range pool.Cands {
 		for _, idx := range c.FatherIdx {
 			f := pool.Fathers[idx]
-			e := predictWith(c.Mother, f, targets)
+			e := predictWith(c.Mother, f, targets, nestGid)
 			s := Suggestion{
 				Mother:    c.Mother,
 				Father:    f,
@@ -643,7 +722,9 @@ type Backcross struct {
 //
 // 子代为最新一代的 Child;parentA/parentB 是它的双亲;pool 是可替换的候选(不含子代自己)。
 // 没有任何可比对象(没有子代、或池子空)时 Advised=false 且 Reason 说明原因。
-func BackcrossAdvice(child, mother, father EggParent, pool []EggParent, g BreedingGoal) Backcross {
+//
+// nestGid 见 Suggest:回交那一组里若正好有小窝里那只,它的性格就是 100%(见 nestNature)。
+func BackcrossAdvice(child, mother, father EggParent, pool []EggParent, g BreedingGoal, nestGid uint32) Backcross {
 	out := Backcross{}
 	if child.Gid == 0 && child.Voice == 0 && child.Name == "" {
 		out.Reason = "还没有破壳的子代,先孵出一只再谈回交"
@@ -653,7 +734,7 @@ func BackcrossAdvice(child, mother, father EggParent, pool []EggParent, g Breedi
 	// 「离目标更近」挑 —— 与升级前一致,宁可挑错一个也不能不给建议。
 	best := backcrossParent(child, mother, father, g)
 	out.WithParent = &best
-	out.Exp = pairExpectation(child, best, g)
+	out.Exp = pairExpectation(child, best, g, nestGid)
 
 	// 换种:池子里与子代配对后最好的一只(排除子代自己与它的两个亲本)。
 	var alt *EggParent
@@ -664,7 +745,7 @@ func BackcrossAdvice(child, mother, father EggParent, pool []EggParent, g Breedi
 		if c.Gid == child.Gid || c.Gid == mother.Gid || c.Gid == father.Gid {
 			continue
 		}
-		e := pairExpectation(child, c, g)
+		e := pairExpectation(child, c, g, nestGid)
 		if s := Score(e, g); s < altScore {
 			altScore, altExp, alt = s, e, &pool[i]
 		}
@@ -730,11 +811,11 @@ func backcrossParent(child, mother, father EggParent, g BreedingGoal) EggParent 
 // 蛋的物种必定随母本(见文件头),故 Predict 的第一个参数必须是母本。子代是 ♂ 时它只能
 // 当父本、另一半才是母本 —— 摆反了整个预期都是错的:不仅数值按错的双亲算,连「孵出来
 // 是不是这个品种」都变了(♂ 子代配一只别品种的 ♀,孵出的就是那只 ♀ 的品种)。
-func pairExpectation(child, other EggParent, g BreedingGoal) Expectation {
+func pairExpectation(child, other EggParent, g BreedingGoal, nestGid uint32) Expectation {
 	if child.Gender == "♂" {
-		return Predict(other, child, g)
+		return Predict(other, child, g, nestGid)
 	}
-	return Predict(child, other, g)
+	return Predict(child, other, g, nestGid)
 }
 
 // parentDistance 亲本本身离目标多远(与 Predict 同一套计分口径,便于比较)。
@@ -1211,8 +1292,14 @@ type PetCandidate struct {
 	EggGroups []string `json:"eggGroups,omitempty"` // 蛋组社区名(前端据此按母本蛋组过滤种公)
 }
 
-func petCandidate(p *Pet) PetCandidate {
-	return PetCandidate{EggParent: ParentSnapshot(p), EggGroups: eggGroupNames(p.EggGroups)}
+func petCandidate(db *gamedata.DB, p *Pet) PetCandidate {
+	snap := ParentSnapshot(p)
+	// Evo 要现查一次:它在别的路径上是**收蛋那一刻**写下的(管线从蛋的包体里拿到,见 egg.go),
+	// 而候选是照库里的个体现造的快照,没有那个时刻。它是前端把「选了这只种母」翻成
+	// 「这条线认哪个品种」的唯一依据(蛋随母本),缺了它选完种母品种会空着 —— 而这一点
+	// 在接口层看不出来(字段在,只是恒为 0)。
+	snap.Evo = db.ChainOf(p.BaseConfID)
+	return PetCandidate{EggParent: snap, EggGroups: eggGroupNames(p.EggGroups)}
 }
 
 // BreedCandidates 按品种(链)派生补录用的三类候选:种母、种公、子代。
@@ -1237,9 +1324,24 @@ func petCandidate(p *Pet) PetCandidate {
 //
 // 顺序按「名字升序、同名按 gid 降序」:同品种同名的个体很多(刷了一窝),只有稳定且可
 // 预期的顺序,下拉里的位置才有意义;同名的把最新获得的排在前面,更可能是要找的那只。
-func BreedCandidates(ref ChainRef, pets []*Pet) (mothers, fathers, kids []PetCandidate) {
+func BreedCandidates(db *gamedata.DB, ref ChainRef, pets []*Pet) (mothers, fathers, kids []PetCandidate) {
+	// 空引用 = **还没定品种**。这时给全库的雌雄:建线表单允许先挑种母(再由她把品种带出来,
+	// 蛋随母本),而这一刻后端还不知道要看哪个品种 —— 只给「同品种」等于什么都不给。
+	//
+	// 子代仍然不给(kids 留空):认领子代必须有品种(它决定这条线认哪些个体),拿全库当子代
+	// 候选等于让玩家在几百只里找一个没有范围的答案;前端那时也必然已经定好品种了。
 	if ref.Empty() {
-		return nil, nil, nil
+		for _, p := range pets {
+			switch p.Gender {
+			case "♀":
+				mothers = append(mothers, petCandidate(db, p))
+			case "♂":
+				fathers = append(fathers, petCandidate(db, p))
+			}
+		}
+		sortCandidates(mothers)
+		sortCandidates(fathers)
+		return mothers, fathers, nil
 	}
 	var femaleEggs []gamedata.EggGroup
 	knownAll := true
@@ -1247,9 +1349,9 @@ func BreedCandidates(ref ChainRef, pets []*Pet) (mothers, fathers, kids []PetCan
 		if !ref.Match(p) {
 			continue
 		}
-		kids = append(kids, petCandidate(p))
+		kids = append(kids, petCandidate(db, p))
 		if p.Gender == "♀" {
-			mothers = append(mothers, petCandidate(p))
+			mothers = append(mothers, petCandidate(db, p))
 			femaleEggs = append(femaleEggs, p.EggGroups...)
 			if len(p.EggGroups) == 0 {
 				knownAll = false
@@ -1268,7 +1370,7 @@ func BreedCandidates(ref ChainRef, pets []*Pet) (mothers, fathers, kids []PetCan
 		} else if !ref.Match(p) {
 			continue // 蛋组判不了时退回同品种,别把全库雄性都当候选(见上面的注释)
 		}
-		fathers = append(fathers, petCandidate(p))
+		fathers = append(fathers, petCandidate(db, p))
 	}
 	sortCandidates(mothers)
 	sortCandidates(fathers)
