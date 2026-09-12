@@ -7,10 +7,16 @@
     <!-- 数字显示字体 preload:避免首次渲染时字体延迟到位导致数字先以系统字体闪现(FOUC)。
          13KB 很小,提前加载的代价可忽略;字体请求走 CORS 模式,必须带 crossorigin。 -->
     <link rel="preload" href="/fonts/bricolage-grotesque-700-subset.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- 开屏动画的三张门面图(书底/书页框/进度条,合计约 86KB)。刻意不 preload 那 12 片叶子:
+         书先立住、叶子随后长出来才是设计意图,而且 leaf/ 里最重的 top3.png 有 16KB。
+         不提前起请求的话,深蓝底先铺满、书还在路上,会看到空底 + 一根孤零零的进度条闪一下。 -->
+    <link rel="preload" href="/loading/back.png" as="image" />
+    <link rel="preload" href="/loading/front.png" as="image" />
+    <link rel="preload" href="/loading/progress.png" as="image" />
     <title>rocom-go</title>
-    <script type="module" crossorigin src="/assets/index-CP-oUyFg.js"></script>
+    <script type="module" crossorigin src="/assets/index-CqGW5qVJ.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-react-Bxabov_C.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DRrDLVKO.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CjHBhLbK.css">
   </head>
   <body>
     <div id="root"></div>

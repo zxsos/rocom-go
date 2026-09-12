@@ -135,7 +135,7 @@
 .hq-pet.is-done .hq-status { color: var(--fg-dim); }
 /* 可收取灵感:整卡高亮 + 强调色徽章,这是玩家要找的目标 */
 .hq-pet.is-ready { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--bg-1) 62%); }
-.hq-pet.is-ready .hq-status { background: var(--accent); color: #fff; border-color: var(--accent); }
+.hq-pet.is-ready .hq-status { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* —— 种植表 —— */
 .hq-table-wrap {

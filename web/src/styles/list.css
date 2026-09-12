@@ -585,7 +585,7 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
 .natmat-q-up { font-size: 9px; line-height: 1; color: var(--green); font-weight: 700; }
 .natmat-q:hover { border-color: var(--accent); }
 .natmat-q.on { background: var(--accent); border-color: var(--accent); }
-.natmat-q.on .natmat-q-up { color: #fff; }
+.natmat-q.on .natmat-q-up { color: var(--on-accent); }
 /* 半选:底用 accent 的极淡铺色 + accent 描边。与「全选」(实心)、「未选」(灰底)
    三者必须一眼可分 —— 半选意味着这一维下还有没勾的格子,点一下才补满。 */
 .natmat-q.part { background: var(--accent-soft); border-color: var(--accent); }
@@ -660,7 +660,7 @@ table.pets tr.selected .col-pet { background: var(--accent-soft); box-shadow: in
 .natmat-cell:hover { border-color: var(--accent); color: var(--fg); }
 .natmat-cell:active { transform: scale(.94); }
 .natmat-cell.on {
-  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600;
 }
 /* 对角线:该组合不存在。画一道斜线而非留白 —— 留白会被读成
    「有个没加载出来的性格」,而斜线明确表示「此格无意义」。 */

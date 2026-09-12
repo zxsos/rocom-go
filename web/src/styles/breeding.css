@@ -97,7 +97,7 @@
 .br-parent-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); }
 .br-parent-role { font-weight: 500; letter-spacing: .02em; }
 /* 「你长按的那只」这类来源标注:小胶囊,抢眼但不喧宾 */
-.br-parent-badge { padding: 0 6px; border-radius: 999px; font-size: 10px; background: var(--accent); color: #fff; }
+.br-parent-badge { padding: 0 6px; border-radius: 999px; font-size: 10px; background: var(--accent); color: var(--on-accent); }
 .br-parent-x {
   margin-left: auto; flex: none; display: inline-flex; align-items: center;
   padding: 2px; border: 0; border-radius: 4px; background: none;

@@ -781,7 +781,7 @@
 .map-nest.empty {
   width: 26px; height: 26px;
   border-style: dashed; border-color: var(--fg-dim);
-  background: rgba(11, 14, 19, .35);
+  background: rgba(var(--tip-bg-rgb), .35);
   cursor: default; filter: none;
 }
 .map-nest.empty:hover { transform: translate(-50%, -50%) scale(1.15); filter: none; }

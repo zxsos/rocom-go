@@ -87,7 +87,49 @@
    而手机恰恰是玩家最常看的端。实测(web/scripts/verify-account-width.mjs):
    360px 余量 101px、390px 余量 131px、760px 余量 501px —— 只有 ≤359px 的极窄屏放不下,
    那种机型在文件末尾单独隐藏(见 @media (max-width: 359px))。 */
-.topbar-ver { font-size: 10px; font-weight: 600; color: var(--fg-dim); font-variant-numeric: tabular-nums; user-select: none; }
+/* 版本号**同时是主题入口**(点击弹菜单,见 App.jsx)。但它在视觉上必须仍然只是一个版本号,
+   故按钮的 UA 外观被逐项抹平:padding / border / background 归零,字体与行高继承。
+   ⚠️ 别给它加内边距 —— 顶栏在 360~389px 那档是**算着这个 34px 宽**的版本号排的
+   (见本文件下方那段 @media 的注释,以及 verify-account-width.mjs 的手机分支),
+   多出一点内边距就会把那档顶栏挤高。可点性只靠 cursor 与 hover 变色表达。 */
+.topbar-ver {
+  font-size: 10px; font-weight: 600; color: var(--fg-dim);
+  font-variant-numeric: tabular-nums; user-select: none;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit; line-height: inherit;
+  -webkit-appearance: none; appearance: none;
+}
+.topbar-ver:hover { color: var(--fg); }
+
+/* ---- 主题选择菜单 ----
+   两个入口(版本号 / 主题图标)各包一层 position:relative 作锚点,面板挂在触发元素下方。
+   开合状态由 App 持有且只有一个布尔,所以**同时只会有一个面板存在** —— 这就是「两个入口同步」
+   的实现方式(不是两套状态互相同步,而是根本没有第二套状态)。
+   层级用 --z-popover:与账号下拉同级。顶栏有 backdrop-filter 会创建层叠上下文,
+   故这个值只在本栏内比较,对外恒为 --z-shell(见 base.css 的层级注释)。 */
+.ver-wrap { position: relative; display: flex; align-items: center; }
+.theme-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: var(--z-popover);
+  display: flex; flex-direction: column; gap: 7px; min-width: 208px; padding: 9px 11px;
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+/* 面板只挂在**版本号**下面(顶栏左侧),故固定向右铺。
+   但锚点只解决「朝哪边铺」,不保证落在视口内 —— 版本号左边还有品牌,窄屏上仍可能探出,
+   故 ThemeMenu 里还有一次量尺 + translateX 的夹取,别把那步当成多余而删掉。 */
+.tm-row { display: flex; align-items: center; gap: 10px; }
+.tm-label { flex: none; width: 2.4em; font-size: 12px; color: var(--fg-dim); }
+.tm-opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.tm-opt {
+  display: flex; align-items: center; gap: 3px; padding: 4px 8px 4px 5px;
+  font: inherit; font-size: 12px; color: var(--fg-dim); cursor: pointer;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.tm-opt:hover { background: var(--bg-3); color: var(--fg); }
+.tm-opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* 勾位恒定占位(见 ThemeMenu 的注释):宽度写死,选中与否都不改变按钮尺寸 */
+.tm-check { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; }
 .topnav { display: flex; gap: 4px; }
 .navlink {
   display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); color: var(--fg-dim);

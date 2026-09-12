@@ -43,6 +43,14 @@ import './styles/leaderboard.css'
 import './styles/admin.css'
 import './styles/pin.css'
 import './styles/rules.css'
+// 开屏动画:放最后。它靠 #loading 这个 id 选择器,不与其余规则争夺同名类,
+// 但内部有「同特异性靠顺序覆盖」的地方(竖屏 media query),放末尾最不容易被误改。
+import './styles/splash.css'
+// 图鉴主题的形态层(贴图与质感)。它每条规则都自带 :root[data-theme="handbook"] 前缀,
+// 特异性高于组件自身的(.navlink.active 一类),故不依赖引入顺序 —— 放最后只是图个心安。
+// ⚠️ 文件名别简写成 handbook.css:那个名字已被**炫彩图鉴页**的样式占用
+//    (pages/handbook/HandbookGlasses 的 .hb-* 一族)。两者同源不同物,合并会互相覆盖。
+import './styles/theme-handbook.css'
 
 // 路由懒加载的兜底占位(P5 将升级为与页面布局同构的骨架屏)。
 function PageLoading() {

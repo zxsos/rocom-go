@@ -1,0 +1,1300 @@
+/* 开屏加载动画:结构、时序、素材均取自洛克图鉴(roco.errorawa.dpdns.org)的 #loading 层,
+   图片在 web/public/loading/。本文件是从原站 style.css 里按 #loading 相关规则原样抽出来的,
+   只动了五处,其余(含注释里那份时序说明)保持原样:
+     1. z-index 40 → var(--z-loading),与本应用层叠标度对齐(见 base.css 的标度表);
+     2. 去掉 font-family: "FontAwesome" —— 本应用不加载该字体,开屏也没有文字;
+     3. `transition: height.5s` / `opacity.5s` 补上空格(原写法合法但多数解析器不认,
+        vite 的 CSS 压缩器可能整条丢弃,进度条的过渡就没了);
+     4. body.rotate 那条改成文件末尾的视口分档缩放(原站的 0.5 是手机画布值);
+     5. 在 #loading 规则段之后追加「退场放行指针」与「减少动态效果」两块
+        (原站没有,是本应用的无障碍约定;位置不能挪到文件开头,理由见该处注释);
+     6. #loading 补 `inset: 0` —— 不写的话它按静态位置落位,挂在 .app 之后会掉到视口下方
+        (原站把它放在 <app> 首个子元素才省得掉);
+   .loadFailed 分支(加载失败提示)未收录:失败由 App 侧的硬超时兜底,见 components/Splash.jsx。
+
+   时序要点(改动画前先看这张表,值都散在下面的规则里):
+     进度条    .box div 的 height 由 JS 按预加载张数写,transition .5s
+     播片      #loading.finish —— 叶片弹出 0.16s(错开 0.08/0.12/0.16s)、
+               飞叶 0.6~0.7s(延时 0.2~0.3s)、19 个光点 0.5~1.5s(延时 0.2~0.9s)、
+               光效 finishLight 0.6s steps(1) 扫精灵图
+     退场      #loading.hide —— 0.7s 延时时才轮到淡出,再用 1s 把背景从
+               #1F1F2D 化到透明并最终 display:none;**0.7s 那段延时就是留给播片的**,
+               两层(整层淡出 + 首个子元素淡出)见 loaded1 / loaded2
+     ⚠️ 退场总时长 1.7s 同时写在 Splash.jsx 的 EXIT_MS 里(组件按时间卸载),
+        改这里的 0.7s/1s 必须同步改那边,否则动画没播完就被摘掉。 */
+#loading {
+    position: fixed;
+    /* ⚠️ inset 必须有,别照抄原站省掉它。
+       position: fixed 不写 top/left 时按**静态位置**落位 —— 原站把 #loading 放在 <app> 的
+       首个子元素,静态位置就是 (0,0),所以它省得掉;本应用把 <Splash> 挂在 .app **之后**
+       (见 App.jsx),静态位置直接落到折叠线以下(y=821 @820 高视口),表现是「DOM 里有、
+       图片也全加载了、但整层看不见」——只有真浏览器截图能发现,jsdom 不做布局(getBoundingClientRect
+       恒为 0),verify-splash.mjs 只看结构与样式文本,两者都抓不到。 */
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    background-color: #1F1F2D;
+    z-index: var(--z-loading);
+}
+
+#loading.hide {
+    animation: loaded1 1s 0.7s forwards;
+}
+
+#loading.hide .center:first-child {
+    animation: loaded2 1s 0.7s forwards;
+}
+
+#loading .center {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    transform: scale(0.5);
+}
+
+#loading .center > div {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#loading .center .progress .box {
+    position: relative;
+    transform: scale(-1);
+    height: 219px;
+    left: 22px;
+    bottom: 32px;
+}
+
+#loading .center .progress .box div {
+    transition: height .5s;
+    height: 0%;
+    overflow: hidden;
+}
+
+#loading .center .progress .box div .finishProgress {
+    transition: opacity .5s;
+    position: absolute;
+    transform: scale(1.5);
+    opacity: 0;
+    left: 0px;
+    top: 18px;
+}
+
+#loading.finish .center .progress .box div .finishProgress {
+    animation: finishProgress 0.9s;
+}
+
+#loading .center .leftTop2 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: -110px;
+    bottom: 250px;
+}
+
+#loading.finish .center .leftTop2 img {
+    animation: finishLeaf 0.16s 0.16s forwards;
+}
+
+#loading .center .leftTop1 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: -134px;
+    bottom: 190px;
+}
+
+#loading.finish .center .leftTop1 img {
+    animation: finishLeaf 0.16s 0.08s forwards;
+}
+
+#loading .center .left2 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: -92px;
+    bottom: 129px;
+}
+
+#loading.finish .center .left2 img {
+    animation: finishLeaf 0.16s 0.16s forwards;
+}
+
+#loading .center .left1 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: -48px;
+    bottom: 107px;
+}
+
+#loading.finish .center .left1 img {
+    animation: finishLeaf 0.16s 0.12s forwards;
+}
+
+#loading .center .top4 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: 12px;
+    bottom: 376px;
+}
+
+#loading.finish .center .top4 img {
+    animation: finishLeaf 0.16s 0.12s forwards;
+}
+
+#loading .center .top3 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: 16px;
+    bottom: 250px;
+}
+
+#loading.finish .center .top3 img {
+    animation: finishLeaf 0.16s 0.12s forwards;
+}
+
+#loading .center .top2 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: 44px;
+    bottom: 212px;
+}
+
+#loading.finish .center .top2 img {
+    animation: finishLeaf 0.16s 0.08s forwards;
+}
+
+#loading .center .top1 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: right bottom;
+    left: 65px;
+    bottom: 161px;
+}
+
+#loading.finish .center .top1 img {
+    animation: finishLeaf 0.16s 0.04s forwards;
+}
+
+#loading .center .rightTopLeaf3 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: left bottom;
+    left: 199px;
+    bottom: 227px;
+}
+
+#loading.finish .center .rightTopLeaf3 img {
+    animation: finishLeaf 0.16s 0.16s forwards;
+}
+
+#loading .center .rightTopLeaf2 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: left bottom;
+    left: 152px;
+    bottom: 216px;
+}
+
+#loading.finish .center .rightTopLeaf2 img {
+    animation: finishLeaf 0.2s 0.04s forwards;
+}
+
+#loading .center .rightTopLeaf1 img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: left bottom;
+    left: 129px;
+    bottom: 161px;
+}
+
+#loading.finish .center .rightTopLeaf1 img {
+    animation: finishLeaf 0.2s forwards;
+}
+
+#loading .center .rightLeaf img {
+    position: relative;
+    transform: scale(0) rotate(-10deg);
+    transform-origin: left bottom;
+    left: 139px;
+    bottom: 46px;
+}
+
+#loading.finish .center .rightLeaf img {
+    animation: finishLeaf 0.2s forwards;
+}
+
+#loading .center .flyLeaf8 img {
+    position: relative;
+    transform: scale(0) rotate(-50deg);
+    left: -182px;
+    bottom: 210px;
+}
+
+#loading.finish .center .flyLeaf8 img {
+    animation: flyLeaf8 0.6s 0.3s forwards linear;
+}
+
+#loading .center .flyLeaf7 img {
+    position: relative;
+    transform: scale(0) rotate(-60deg);
+    left: -123px;
+    bottom: 199px;
+}
+
+#loading.finish .center .flyLeaf7 img {
+    animation: flyLeaf7 0.6s 0.3s forwards linear;
+}
+
+#loading .center .flyLeaf6 img {
+    position: relative;
+    transform: scale(0) rotate(-50deg);
+    left: -113px;
+    bottom: 209px;
+}
+
+#loading.finish .center .flyLeaf6 img {
+    animation: flyLeaf6 0.7s 0.2s forwards linear;
+}
+
+#loading .center .flyLeaf5 img {
+    position: relative;
+    transform: scale(0) rotate(-63deg);
+    left: -124px;
+    bottom: 256px;
+}
+
+#loading.finish .center .flyLeaf5 img {
+    animation: flyLeaf5 0.7s 0.2s forwards linear;
+}
+
+#loading .center .flyLeaf4 img {
+    position: relative;
+    transform: scale(0) rotate(-57deg);
+    left: -119px;
+    bottom: 307px;
+}
+
+#loading.finish .center .flyLeaf4 img {
+    animation: flyLeaf4 0.7s 0.2s forwards linear;
+}
+
+#loading .center .flyLeaf3 img {
+    position: relative;
+    transform: scale(0) rotate(30deg);
+    left: -114px;
+    bottom: 352px;
+}
+
+#loading.finish .center .flyLeaf3 img {
+    animation: flyLeaf3 0.6s 0.2s forwards linear;
+}
+
+#loading .center .flyLeaf2 img {
+    position: relative;
+    transform: scale(0) rotate(-55deg);
+    left: -26px;
+    bottom: 366px;
+}
+
+#loading.finish .center .flyLeaf2 img {
+    animation: flyLeaf2 0.6s 0.3s forwards linear;
+}
+
+#loading .center .flyLeaf1 img {
+    position: relative;
+    transform: scale(0) rotate(-60deg);
+    left: 67px;
+    bottom: 329px;
+}
+
+#loading.finish .center .flyLeaf1 img {
+    animation: flyLeaf1 0.7s 0.2s forwards linear;
+}
+
+#loading .center .round19 img {
+    position: relative;
+    transform: scale(0);
+    left: -65px;
+    bottom: 142px;
+}
+
+#loading.finish .center .round19 img {
+    animation: round19 1.2s 0.4s forwards linear;
+}
+
+#loading .center .round18 img {
+    position: relative;
+    transform: scale(0) rotate(0deg);
+    transform-origin: top right;
+    left: -63px;
+    bottom: 251px;
+}
+
+#loading.finish .center .round18 img {
+    animation: round18 1.1s 0.4s forwards linear;
+}
+
+#loading .center .round17 img {
+    position: relative;
+    transform: scale(0);
+    left: -28px;
+    bottom: 197px;
+}
+
+#loading.finish .center .round17 img {
+    animation: round17 1.1s 0.5s forwards linear;
+}
+
+#loading .center .round16 img {
+    position: relative;
+    transform: scale(0);
+    left: -18px;
+    bottom: 121px;
+}
+
+#loading.finish .center .round16 img {
+    animation: round16 1.4s 0.3s forwards linear;
+}
+
+#loading .center .round15 img {
+    position: relative;
+    transform: scale(0);
+    left: -2px;
+    bottom: 181px;
+}
+
+#loading.finish .center .round15 img {
+    animation: round15 0.5s 0.6s forwards linear;
+}
+
+#loading .center .round14 img {
+    position: relative;
+    transform: scale(0);
+    left: 4px;
+    bottom: 147px;
+}
+
+#loading.finish .center .round14 img {
+    animation: round14 1.4s 0.4s forwards linear;
+}
+
+#loading .center .round13 img {
+    position: relative;
+    transform: scale(0);
+    left: 41px;
+    bottom: 171px;
+}
+
+#loading.finish .center .round13 img {
+    animation: round13 1.2s 0.3s forwards linear;
+}
+
+#loading .center .round12 img {
+    position: relative;
+    transform: scale(0);
+    left: 65px;
+    bottom: 249px;
+}
+
+#loading.finish .center .round12 img {
+    animation: round12 1s 0.2s forwards linear;
+}
+
+#loading .center .round11 img {
+    position: relative;
+    transform: scale(0);
+    left: 88px;
+    bottom: 246px;
+}
+
+#loading.finish .center .round11 img {
+    animation: round11 1.5s 0.2s forwards linear;
+}
+
+#loading .center .round10 img {
+    position: relative;
+    transform: scale(0);
+    left: 105px;
+    bottom: 256px;
+}
+
+#loading.finish .center .round10 img {
+    animation: round10 1.3s 0.4s forwards linear;
+}
+
+#loading .center .round9 img {
+    position: relative;
+    transform: scale(0);
+    left: 106px;
+    bottom: 165px;
+}
+
+#loading.finish .center .round9 img {
+    animation: round9 0.9s 0.8s forwards linear;
+}
+
+#loading .center .round8 img {
+    position: relative;
+    transform: scale(0);
+    left: 120px;
+    bottom: 210px;
+}
+
+#loading.finish .center .round8 img {
+    animation: round8 1.5s 0.2s forwards linear;
+}
+
+#loading .center .round7 img {
+    position: relative;
+    transform: scale(0);
+    left: 123px;
+    bottom: 262px;
+}
+
+#loading.finish .center .round7 img {
+    animation: round7 0.8s 0.9s forwards linear;
+}
+
+#loading .center .round6 img {
+    position: relative;
+    transform: scale(0);
+    left: 127px;
+    bottom: 199px;
+}
+
+#loading.finish .center .round6 img {
+    animation: round6 0.9s 0.8s forwards linear;
+}
+
+#loading .center .round5 img {
+    position: relative;
+    transform: scale(0);
+    left: 132px;
+    bottom: 224px;
+}
+
+#loading.finish .center .round5 img {
+    animation: round5 1s 0.7s forwards linear;
+}
+
+#loading .center .round4 img {
+    position: relative;
+    transform: scale(0);
+    transform-origin: right bottom;
+    left: 132px;
+    bottom: 260px;
+}
+
+#loading.finish .center .round4 img {
+    animation: round4 1.1s 0.3s forwards linear;
+}
+
+#loading .center .round3 img {
+    position: relative;
+    transform: scale(0);
+    left: 157px;
+    bottom: 112px;
+}
+
+#loading.finish .center .round3 img {
+    animation: round3 1.4s 0.3s forwards linear;
+}
+
+#loading .center .round2 img {
+    position: relative;
+    transform: scale(0);
+    left: 154px;
+    bottom: 122px;
+}
+
+#loading.finish .center .round2 img {
+    animation: round2 1.1s 0.6s forwards linear;
+}
+
+#loading .center .round1 img {
+    position: relative;
+    transform: scale(0);
+    left: 185px;
+    bottom: 193px;
+}
+
+#loading.finish .center .round1 img {
+    animation: round1 1.5s 0.2s forwards linear;
+}
+
+#loading .center .light div {
+    position: relative;
+    transform: scale(3);
+    left: 5px;
+    bottom: 100px;
+    height: 130px;
+    width: 150px;
+    /* 写成绝对路径(/loading/...)而不是原站的相对路径:原站 css 与 loading/ 同级,
+       vite 里 css 会被搬到 /assets/ 下,相对路径会解析成 /assets/loading/light.png(404),
+       且构建期只给一句「didn't resolve」警告,很容易漏掉。 */
+    background: url("/loading/light.png") no-repeat;
+    background-position: 0 0;
+}
+
+
+/* ---- 以下两块是本应用追加的,原站没有 ---- */
+
+/* 退场期间放行指针。
+   原站让整层一直吃到 display:none 为止,但此时背景已化到透明(loaded1 的 50% 处),
+   用户看到的已是主界面 —— 再让它吞掉 0.7~1.7s 内的点击,表现就是「点了没反应」。
+   加载阶段(.hide 之前)不放行:那时确实该挡住交互。 */
+#loading.hide {
+    pointer-events: none;
+}
+
+/* 减少动态效果:跳过整段播片(12 片叶弹出 + 8 片飞散 + 19 个光点 + 精灵图光效),
+   只留一次极短淡出。JS 侧配合见 Splash.jsx 的 reduceMotion / exitClass ——
+   reduced 下**不加 .finish**,所以下面那条兜底其实用不上,留着是为了防
+   「以后有人手改类名」时不至于把播片又抖出来。
+   进度条的 transition 不降级:它是「正在加载」的实质信息,与 base.css 对 .spinner 的
+   处置一致(降速不停止)。
+   ⚠️ .3s 与 Splash.jsx 的 EXIT_REDUCED_MS(320ms)是一对,改一处必须同步另一处。 */
+@media (prefers-reduced-motion: reduce) {
+    #loading.hide {
+        animation: loaded1 .3s 0s forwards;
+    }
+    #loading.hide .center:first-child {
+        animation: loaded2 .3s 0s forwards;
+    }
+    /* 兜底:选择器特意比上面那些多带一个 .hide(多一层类),才压得住
+       `#loading.finish .center .flyLeaf1 img` 这类 (1,3,1) 规则;
+       与 `.light div` 那条同特异性,则靠「本块在它之后」取胜 —— 所以这块必须留在
+       上面那些 #loading.finish 规则的下方,不能被搬到文件开头。
+       .light div 要单列:它的光效是元素自身的 background 逐帧,不是 img。 */
+    #loading.finish.hide .center > div img,
+    #loading.finish.hide .light div {
+        animation: none;
+    }
+}
+
+#loading.finish .center .light div {
+    animation: finishLight 0.6s steps(1);
+}
+
+#loading .center .front img {
+    position: relative;
+    left: 33px;
+    bottom: 29px;
+}
+
+@keyframes loaded1 {
+    0% {
+        display: flex;
+        background-color: #1F1F2DFF;
+        backdrop-filter: blur(5px);
+    }
+    25% {
+        display: flex;
+        background-color: #1F1F2DFF;
+        backdrop-filter: blur(5px);
+    }
+    50% {
+        display: flex;
+        background-color: #1F1F2D00;
+        backdrop-filter: blur(0px);
+    }
+    99% {
+        display: flex;
+        background-color: #1F1F2D00;
+        backdrop-filter: blur(0px);
+    }
+    100% {
+        display: none;
+        background-color: #1F1F2D00;
+    }
+}
+
+@keyframes loaded2 {
+    0% {
+        filter: opacity(1);
+    }
+    25% {
+        filter: opacity(1);
+    }
+    50% {
+        filter: opacity(0);
+    }
+    100% {
+        filter: opacity(0);
+    }
+}
+
+@keyframes finishProgress {
+    0% {
+        opacity: 0;
+    }
+    30% {
+        opacity: 1;
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes finishLeaf {
+    0% {
+        transform: scale(0) rotate(-10deg);
+    }
+    50% {
+        transform: scale(1.45) rotate(-5deg);
+    }
+    100% {
+        transform: scale(1.45) rotate(0deg);
+    }
+}
+
+@keyframes finishLight {
+    0% {
+        background-position: 0 0;
+    }
+    5% {
+        background-position: -150px 0;
+    }
+    10% {
+        background-position: -300px 0;
+    }
+    15% {
+        background-position: -450px 0;
+    }
+    20% {
+        background-position: 0 -130px;
+    }
+    25% {
+        background-position: -150px -130px;
+    }
+    30% {
+        background-position: -300px -130px;
+    }
+    35% {
+        background-position: -450px -130px;
+    }
+    40% {
+        background-position: 0 -260px;
+    }
+    45% {
+        background-position: -150px -260px;
+    }
+    50% {
+        background-position: -300px -260px;
+    }
+    55% {
+        background-position: -450px -260px;
+    }
+    60% {
+        background-position: 0 -390px;
+    }
+    65% {
+        background-position: -150px -390px;
+    }
+    70% {
+        background-position: -300px -390px;
+    }
+    75% {
+        background-position: -450px -390px;
+    }
+    80% {
+        background-position: 0 -520px;
+    }
+    85% {
+        background-position: -150px -520px;
+    }
+    90% {
+        background-position: -300px -520px;
+    }
+    95% {
+        background-position: -450px -520px;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+
+@keyframes flyLeaf8 {
+    0% {
+        transform: scale(0) rotate(-50deg);
+        left: -182px;
+        bottom: 210px;
+    }
+    25% {
+        transform: scale(1.5) rotate(-36.3deg);
+        left: -184.5px;
+        bottom: 215px;
+    }
+    50% {
+        transform: scale(1.5) rotate(-22.5deg);
+        left: -187px;
+        bottom: 226px;
+    }
+    75% {
+        transform: scale(1.5) rotate(-8.7deg);
+        left: -190.5px;
+        bottom: 224.5px;
+    }
+    100% {
+        transform: scale(0) rotate(5deg);
+        left: -196px;
+        bottom: 223px;
+    }
+}
+
+@keyframes flyLeaf7 {
+    0% {
+        transform: scale(0) rotate(-60deg);
+        left: -123px;
+        bottom: 199px;
+    }
+    25% {
+        transform: scale(1.4) rotate(-62.5deg);
+        left: -128.5px;
+        bottom: 205.5px;
+    }
+    50% {
+        transform: scale(1.4) rotate(-65deg);
+        left: -134px;
+        bottom: 212px;
+    }
+    75% {
+        transform: scale(1.4) rotate(-67.5deg);
+        left: -144.5px;
+        bottom: 210.5px;
+    }
+    100% {
+        transform: scale(0) rotate(-70deg);
+        left: -155px;
+        bottom: 209px;
+    }
+}
+
+@keyframes flyLeaf6 {
+    0% {
+        transform: scale(0) rotate(-50deg);
+        left: -113px;
+        bottom: 209px;
+    }
+    15% {
+        transform: scale(1.2) rotate(-55.3deg);
+        left: -129.5px;
+        bottom: 212.6px;
+    }
+    70% {
+        transform: scale(1.2) rotate(-80deg);
+        left: -168px;
+        bottom: 221px;
+    }
+    85% {
+        transform: scale(1.2) rotate(-75deg);
+        left: -170px;
+        bottom: 226px;
+    }
+    100% {
+        transform: scale(0) rotate(-70deg);
+        left: -172px;
+        bottom: 231px;
+    }
+}
+
+@keyframes flyLeaf5 {
+    0% {
+        transform: scale(0) rotate(-63deg);
+        left: -124px;
+        bottom: 256px;
+    }
+    25% {
+        transform: scale(1) rotate(-65.7deg);
+        left: -130.5px;
+        bottom: 258px;
+    }
+    50% {
+        transform: scale(1.4) rotate(-68.5deg);
+        left: -137px;
+        bottom: 260px;
+    }
+    75% {
+        transform: scale(1.4) rotate(-71.2deg);
+        left: -143.5px;
+        bottom: 258px;
+    }
+    100% {
+        transform: scale(0) rotate(-74deg);
+        left: -150px;
+        bottom: 256px;
+    }
+}
+
+@keyframes flyLeaf4 {
+    0% {
+        transform: scale(0) rotate(-57deg);
+        left: -119px;
+        bottom: 307px;
+    }
+    33% {
+        transform: scale(2.2) rotate(-53deg);
+        left: -124px;
+        bottom: 312px;
+    }
+    66% {
+        transform: scale(2.2) rotate(-42deg);
+        left: -140px;
+        bottom: 327px;
+    }
+    100% {
+        transform: scale(0) rotate(-38deg);
+        left: -146px;
+        bottom: 339px;
+    }
+}
+
+@keyframes flyLeaf3 {
+    0% {
+        transform: scale(0) rotate(30deg);
+        left: -114px;
+        bottom: 352px;
+    }
+    33% {
+        transform: scale(1.5) rotate(10deg);
+        left: -121px;
+        bottom: 355px;
+    }
+    66% {
+        transform: scale(1.5) rotate(-35deg);
+        left: -140px;
+        bottom: 361px;
+    }
+    100% {
+        transform: scale(0) rotate(-60deg);
+        left: -153px;
+        bottom: 367px;
+    }
+}
+
+@keyframes flyLeaf2 {
+    0% {
+        transform: scale(0) rotate(-55deg);
+        left: -26px;
+        bottom: 366px;
+    }
+    25% {
+        transform: scale(1.2) rotate(-62.5deg);
+        left: -30px;
+        bottom: 369px;
+    }
+    50% {
+        transform: scale(1.2) rotate(-70deg);
+        left: -34px;
+        bottom: 372px;
+    }
+    75% {
+        transform: scale(1.2) rotate(-77.5deg);
+        left: -43px;
+        bottom: 369.5px;
+    }
+    100% {
+        transform: scale(0) rotate(-85deg);
+        left: -52px;
+        bottom: 367px;
+    }
+}
+
+@keyframes flyLeaf1 {
+    0% {
+        transform: scale(0) rotate(-60deg);
+        left: 67px;
+        bottom: 329px;
+    }
+    25% {
+        transform: scale(1.4) rotate(-62.5deg);
+        left: 64.5px;
+        bottom: 335px;
+    }
+    50% {
+        transform: scale(1.4) rotate(-65deg);
+        left: 62px;
+        bottom: 341px;
+    }
+    75% {
+        transform: scale(1.4) rotate(-67.5deg);
+        left: 57px;
+        bottom: 340px;
+    }
+    100% {
+        transform: scale(0) rotate(-70deg);
+        left: 52px;
+        bottom: 339px;
+    }
+}
+
+@keyframes round19 {
+    0% {
+        transform: scale(0);
+        left: -65px;
+        bottom: 142px;
+    }
+    50% {
+        transform: scale(0.8);
+        left: -77px;
+        bottom: 145px;
+    }
+    100% {
+        transform: scale(0);
+        left: -89px;
+        bottom: 148px;
+    }
+}
+
+@keyframes round18 {
+    0% {
+        transform: scale(0) rotate(0deg);
+    }
+    50% {
+        transform: scale(0.3) rotate(-90deg);
+    }
+    100% {
+        transform: scale(0) rotate(-230deg);
+    }
+}
+
+@keyframes round17 {
+    0% {
+        transform: scale(0);
+        left: -28px;
+        bottom: 197px;
+    }
+    50% {
+        transform: scale(0.3);
+        left: -29.5px;
+        bottom: 199.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: -38px;
+        bottom: 202px;
+    }
+}
+
+@keyframes round16 {
+    0% {
+        transform: scale(0);
+        left: -18px;
+        bottom: 121px;
+    }
+    50% {
+        transform: scale(0.4);
+        left: -29.5px;
+        bottom: 116px;
+    }
+    100% {
+        transform: scale(0);
+        left: -41px;
+        bottom: 111px;
+    }
+}
+
+@keyframes round15 {
+    0% {
+        transform: scale(0);
+        left: -2px;
+    }
+    50% {
+        transform: scale(0.2);
+        left: -6px;
+    }
+    100% {
+        transform: scale(0);
+        left: -10px;
+    }
+}
+
+@keyframes round14 {
+    0% {
+        transform: scale(0);
+        left: 4px;
+        bottom: 147px;
+    }
+    50% {
+        transform: scale(0.9);
+        left: -8px;
+        bottom: 145px;
+    }
+    100% {
+        transform: scale(0);
+        left: -20px;
+        bottom: 143px;
+    }
+}
+
+@keyframes round13 {
+    0% {
+        transform: scale(0);
+        left: 41px;
+        bottom: 171px;
+    }
+    50% {
+        transform: scale(0.2);
+        left: 30.5px;
+        bottom: 174.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 20px;
+        bottom: 178px;
+    }
+}
+
+@keyframes round12 {
+    0% {
+        transform: scale(0);
+        left: 68px;
+        bottom: 240px;
+    }
+    50% {
+        transform: scale(0.4);
+        left: 63.5px;
+        bottom: 238.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 59px;
+        bottom: 237px;
+    }
+}
+
+@keyframes round11 {
+    0% {
+        transform: scale(0);
+        left: 88px;
+        bottom: 246px;
+    }
+    50% {
+        transform: scale(0.7);
+        left: 74px;
+        bottom: 248px;
+    }
+    100% {
+        transform: scale(0);
+        left: 60px;
+        bottom: 250px;
+    }
+}
+
+@keyframes round10 {
+    0% {
+        transform: scale(0);
+        left: 105px;
+        bottom: 256px;
+    }
+    50% {
+        transform: scale(0.3);
+        left: 96px;
+        bottom: 258.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 87px;
+        bottom: 261px;
+    }
+}
+
+@keyframes round9 {
+    0% {
+        transform: scale(0);
+        left: 106px;
+        bottom: 165px;
+    }
+    50% {
+        transform: scale(0.9);
+        left: 99.5px;
+        bottom: 168.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 93px;
+        bottom: 172px;
+    }
+}
+
+@keyframes round8 {
+    0% {
+        transform: scale(0);
+        left: 120px;
+        bottom: 210px;
+    }
+    50% {
+        transform: scale(0.4);
+        left: 115px;
+        bottom: 212.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 110px;
+        bottom: 215px;
+    }
+}
+
+@keyframes round7 {
+    0% {
+        transform: scale(0);
+        left: 123px;
+        bottom: 262px;
+    }
+    50% {
+        transform: scale(0.8);
+        left: 118px;
+        bottom: 264.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 113px;
+        bottom: 267px;
+    }
+}
+
+@keyframes round6 {
+    0% {
+        transform: scale(0);
+        left: 127px;
+        bottom: 199px;
+    }
+    50% {
+        transform: scale(0.5);
+        left: 118.5px;
+        bottom: 200.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 110px;
+        bottom: 202px;
+    }
+}
+
+@keyframes round5 {
+    0% {
+        transform: scale(0);
+        left: 132px;
+        bottom: 224px;
+    }
+    50% {
+        transform: scale(0.8);
+        left: 124.5px;
+        bottom: 219px;
+    }
+    100% {
+        transform: scale(0);
+        left: 117px;
+        bottom: 214px;
+    }
+}
+
+@keyframes round4 {
+    0% {
+        transform: scale(0);
+        left: 132px;
+    }
+    50% {
+        transform: scale(0.55);
+        left: 132px;
+    }
+    100% {
+        transform: scale(0);
+        left: 129px;
+    }
+}
+
+@keyframes round3 {
+    0% {
+        transform: scale(0);
+        left: 157px;
+        bottom: 112px;
+    }
+    50% {
+        transform: scale(0.2);
+        left: 139px;
+        bottom: 105px;
+    }
+    100% {
+        transform: scale(0);
+        left: 121px;
+        bottom: 98px;
+    }
+}
+
+@keyframes round2 {
+    0% {
+        transform: scale(0);
+        left: 154px;
+        bottom: 122px;
+    }
+    50% {
+        transform: scale(0.8);
+        left: 144px;
+        bottom: 119.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 134px;
+        bottom: 115px;
+    }
+}
+
+@keyframes round1 {
+    0% {
+        transform: scale(0);
+        left: 185px;
+        bottom: 193px;
+    }
+    50% {
+        transform: scale(0.5);
+        left: 174px;
+        bottom: 199.5px;
+    }
+    100% {
+        transform: scale(0);
+        left: 163px;
+        bottom: 206px;
+    }
+}
+
+/* 缩放分档。0.5 这个基线值只适合手机画布:合成体(叶片最远偏移 ±190px、书 297×407)的
+   **设计尺寸约 364×516px**,0.5 即 182×258 —— 在 390px 宽的手机上占 47% 宽正好,
+   在 1280×820 的桌面上只占 14% 宽,像还没加载完(实测,不是估的)。故按视口分档放大,
+   窄屏(<761px,项目主断点)沿用原站基线,大屏最高 0.92(516×0.92≈475,再大叶片要出屏)。
+   原站这里写的是 `body.rotate #loading .center { scale(0.5) rotate(-90deg) }` —— 配合 JS 把整个
+   body 转 90° 的转屏方案;本应用不转外壳,那 -90° 就没人抵消了,书本会躺倒在竖屏里,故只缩不转。
+   必须放在 #loading .center 之后:选择器特异性相同,靠顺序覆盖(media query 不参与特异性)。 */
+@media (min-width: 761px) and (min-height: 620px) {
+    #loading .center {
+        transform: scale(0.72);
+    }
+}
+
+@media (min-width: 761px) and (min-height: 880px) {
+    #loading .center {
+        transform: scale(0.86);
+    }
+}
+
+@media (min-width: 1500px) and (min-height: 800px) {
+    #loading .center {
+        transform: scale(0.92);
+    }
+}
+
