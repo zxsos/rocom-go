@@ -12,6 +12,21 @@
   --accent: #4c8dff;
   --accent-soft: rgba(76, 141, 255, .14);
   --accent-hi: #5c9aff; /* --accent 亮一档,primary 按钮 hover 用(原硬编码 #5c9aff) */
+  /* 强调色填充块**上面那行字**的颜色 —— 与填充色是一对约束,不能各写各的。
+     起因:全站有十处把「--accent 底上的字」写死成 #fff。这在两套浅色主题下成立
+     (强调色是深蓝 / 深琥珀,白字压得住),但暗色图鉴的强调色必须是**亮金**
+     (深底上够亮才看得见),白字压上去只有 1.86:1,直接不可读。
+     故把这一维抽出来:暗色图鉴给墨色,其余主题给白。
+     ⚠️ 红色填充块(.btn.danger 一类)不在此列:红底白字是通用惯例,只要把暗色主题的
+     --red 定成中深红(白字仍 ≥4.5:1)即可,不为它再造一个令牌。 */
+  --on-accent: #fff;
+  /* 固定浅金素材(金锦带 select.png / 已达成印章 finish.png)上的文字色。
+     这两张素材**恒为浅色**(canvas 取样实测:锦带主色 #f8b040、印章主色 #b0a890),
+     不随主题变,所以它们上面的字也必须**恒为墨色** —— 这与 --on-accent 是两对不同的约束,
+     混用会在某个主题下翻车(浅色图鉴下 --fg 恰好是墨色,看着没事;暗色下就不可读了)。
+     只在此定义,**任何主题块都不得覆写**它(与 --type-ink 同性质:不随主题变的常色)。
+     #241f18 在这两张素材上分别是 8.78:1 与 6.89:1。 */
+  --on-gold: #241f18;
   /* 站名铭牌里「rocom」那半段的暖色(取自 logo 上那只精灵的粉)。
      **随主题换**而不是固定语义色:10.5px 的小字在暗底要够亮、在亮底要够深,
      否则就是一团糊 —— 实测暗色 #ff7a9c 对比 7.8:1、亮色 #c8395c 4.6:1,两档都过 AA。
@@ -232,6 +247,7 @@
   --accent: #2f6fdb;
   --accent-soft: rgba(47, 111, 219, .12);
   --accent-hi: #2559b8; /* 亮色下 hover 用略深的一档(白底上再亮会看不清,同 --red-hi 口径) */
+  --on-accent: #fff; /* 强调色填充块上的字,见 :root 处那组注释 */
   --brand-warm: #c8395c; /* 站名暖色的亮色档(白底上要压深,见暗色处注释) */
   --gold: #b88200;
   --green: #1a7f37;
@@ -253,6 +269,144 @@
   --sw-off-line-hi: #a7aeb6;
   --sw-off-fg-hi: #1f2328;
 
+}
+
+/* 图鉴主题(第三套):html[data-theme="handbook"] 时覆写变量。暖羊皮纸 / 图鉴书的观感 ——
+   纸面做底、卡片是更亮的暖白(像一叠图鉴卡压在书页上)、墨色字、琥珀金强调、图鉴正红收尾。
+   配色取自洛克图鉴(roco.errorawa.dpdns.org),其 style.css 里出现频次最高的一组实测为
+   #e1dbc9 / #fff9e9 / #fff8e6 / #918973 / #242321 / #f8cb43 / #bc2b2b。
+
+   ⚠️ 三条硬约束(违反即静默失效,与 light 块同理):
+   1. 必须是 :root[data-theme=...] 而**不是**又一个 :root —— check-css-vars.mjs 用
+      `rootVars = ...` 逐块赋值,第二个 :root 会把第一个整块顶掉,全站变量都会被判未定义;
+   2. 只做「纯覆写」:本块出现的每个变量都必须在 :root 已定义(check-css-vars 的第 3 条
+      「泄漏」判据查的就是这个)。故本块与 light 块的变量名**逐一对齐** —— 漏一个不会报错,
+      而是在本主题下静默回落到暗色值(比如 #0e1116 的底),这正是
+      scripts/verify-theme-handbook.mjs 要逐名比对的原因;
+   3. 不得收录 --c-* 语义色、--z-* 标度、--dur-* 与 --ease-out、--font-*、--text-h*、
+      --type-ink、--acct-h、--theme-x/y/r。语义色的理由见 :root 处注释(游戏内固定含义,
+      换主题会让玩家误认);--theme-x/y/r 必须在 :root(校验脚本看不出它由 JS 注入)。
+      (写这一条时踩过:CSS 注释里不能出现「星号紧跟斜杠」的序列,它会**提前闭合注释**,
+       后面的文字被当 CSS 解析,postcss 报 Unknown word、整个 dev server 直接 500。)
+
+   配色的两处刻意取舍:
+   - --accent 不照搬参考站的亮金 #f8cb43:羊皮纸是浅底,亮金上压白字不可读,改走深琥珀
+     #8f6a1a(与卡面 #fff9e9 的对比约 6.3:1,过 AA);较亮的 #a98123 留给 --gold,
+     只用在非文字场景(描边、星标)。
+   - --sw-off-* 仍走**严格中性灰**(R≈G≈B),不跟着变暖:开关的关闭态靠「有没有色相」
+     与强调色拉开距离,而不是靠色相差别 —— 见 :root 处那组注释,那里解释了为什么它
+     不能用主题灰。 */
+:root[data-theme="handbook"] {
+  --bg: #e7e1d1;      /* 纸面 */
+  --bg-1: #fff9e9;    /* 卡面:比纸面更亮的暖白 */
+  --bg-2: #eae3d0;    /* 次级面(条纹、hover、输入框底) */
+  --bg-3: #d5cebb;    /* 三级面(再深一档) */
+  --line: #c7c1ad;
+  --line-soft: #dcd6c4;
+  --fg: #242321;      /* 墨字 */
+  /* 弱化字:暖灰,与纸面同源。原 #6f6857 在纸面(--bg)上只有 4.24:1 ——
+     是 2026-09 加对比度守护(verify-theme-handbook 的 [8])时被算出来的,肉眼看不出来。
+     压深一档到 4.86:1(卡面上 6.03:1),仍明显浅于 --fg 的墨色。 */
+  --fg-dim: #665f4e;
+  --accent: #8f6a1a;
+  --accent-soft: rgba(143, 106, 26, .14);
+  --accent-hi: #6f5113; /* 浅底上 hover 要更深,提亮会看不清(同 --red-hi 的口径) */
+  --on-accent: #fff; /* 强调色填充块上的字,见 :root 处那组注释 */
+  --brand-warm: #a6402f; /* 站名那半段暖色:浅底上用朱砂赭红,替掉亮色的玫红 */
+  --gold: #a98123;
+  --green: #4f7a3a;   /* 苔绿 */
+  --red: #bc2b2b;     /* 图鉴正红 */
+  --red-hi: #d20d0d;
+  --danger: #bc2b2b;
+  /* 阴影:参考站是「贴纸感」而不是投影(实测 0 1px 2px black),但纯黑压在米色纸上会发脏,
+     改用墨色 #242321 的低透明 —— 保住贴纸的层次,又不引入灰脏边。 */
+  --shadow: 0 1px 2px rgba(36, 35, 33, .2);
+  --shadow-sm: 0 1px 1px rgba(36, 35, 33, .14);
+  --shadow-lift: 0 2px 6px -2px rgba(36, 35, 33, .26);
+  --bar-bg: rgba(247, 242, 228, .93); /* 顶栏/底栏:磨砂暖纸,像书脊锦带 */
+  --bar-hover: rgba(36, 35, 33, .06);
+  --hero-tint: rgba(143, 106, 26, .1); /* 详情 hero 底衬:浅底上只留极淡一层(同亮色的取舍) */
+  /* 关闭态:严格中性,理由见文件头那组注释 */
+  --sw-off-bg: #efefef;
+  --sw-off-line: #d6d6d6;
+  --sw-off-fg: #8c8c8c;
+  --sw-off-bg-hi: #e4e4e4;
+  --sw-off-line-hi: #a8a8a8;
+  --sw-off-fg-hi: #242321;
+
+  /* 形态:参考站是胶囊感(实测 border-radius 高频为 30 / 50 / 20px),故整体放大一档。
+     ⚠️ 这不是换色而是**换形态** —— 小控件会真正变成胶囊,大卡片四角会明显变圆。
+     改这四个值前,请在四套主题下各看一眼卡片 / 按钮 / 输入框 / 表格行。 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius: 16px;
+  --radius-lg: 24px;
+}
+
+/* ============ 暗色图鉴(handbook-dark)============
+
+   定位不是「把浅色图鉴反相」,而是**同一个物换光照**:浅色版是「白天翻一本旧图鉴」,
+   暗色版是「夜里在烛光下读同一本」。故判断标准不是「够不够暗」,而是把它和浅色图鉴
+   并排放在一起**像不像同一套设计的两面**。三条底线因此不动:
+     · 保留黄褐暖调,不做蓝灰深色;
+     · 保留金线、金锦带、印章三处金元素 —— 金色与深底天然相配,是与浅色版最连贯的桥;
+     · 保留纸纹意象(深底上换成 multiply 混合,见 theme-handbook.css)。
+
+   底色 #1a1712 是**从三套候选里挑出来的**:候选期曾并列「暖黑皮革 #1a1712」、
+   「深棕图鉴 #241a12」、「墨黑微冷 #15161a」三套在真机上切换比对,最后选了第一套 ——
+   它在三者里唯一既真的够暗(深棕在明亮环境里像没切到暗色),又明显带黄褐暖调
+   (墨黑与羊皮纸的血缘太淡,单看就是个通用深色模式)。
+
+   结构上镜像亮色块的**全部**变量(漏一个不会报错,只会静默回落到默认主题的值),
+   另覆写 4 个圆角以延续图鉴家族的胶囊感。层次不靠投影而靠「亮一层」:--bg 最暗、
+   --bg-1(卡面)亮一档、--bg-2/--bg-3 再亮 —— 深色下投影几乎看不见,
+   这与浅色主题「靠底图与描边分层」是同一手法。
+
+   配色权衡(逐对算过 WCAG,见 scripts/verify-theme-handbook.mjs 的 [8] 对比度断言):
+     · 正文用**陈旧米 #ede4ce**,不用纯白 —— 纯白压在暖黑上刺眼,且会与金色强调色抢注意力;
+     · --accent 必须比浅色版**更亮**(浅底上要更深才看得见,深底上刚好相反),随之
+       --on-accent 从白改成墨 —— 这是全套配色里最容易漏的一处配对;
+     · --accent-hi(hover)在深底上是**提亮**,与浅色主题的「更深」方向相反;
+     · --sw-off-* 走纯中性灰(R=G=B),不跟着暖调走(理由见 :root 处那组注释)。 */
+
+/* —— 候选 A · 暖黑皮革 ——
+   带黄褐调的近黑底 + 陈旧米色字。最接近「旧书皮 / 烛光」,与浅色图鉴的血缘最近,
+   个性也最强(它是三套里唯一既不偏红也不偏灰的中间值)。若只挑一套,推荐这套。 */
+:root[data-theme="handbook-dark"] {
+  --bg: #1a1712;
+  --bg-1: #23201a;
+  --bg-2: #2b2620;
+  --bg-3: #35302a;
+  --line: #3d372e;
+  --line-soft: #332e27;
+  --fg: #ede4ce;      /* 陈旧米(14.1:1) */
+  --fg-dim: #a79781;  /* 暖灰褐(6.3:1) */
+  --accent: #d9a93c;  /* 金属金:深底上要够亮(8.3:1) */
+  --accent-soft: rgba(217, 169, 60, .16);
+  --accent-hi: #e8bc57; /* 深底上 hover 是**提亮**(与浅色主题的「更深」相反) */
+  --on-accent: #241f18; /* 墨字压金底(7.6:1)—— 暗色图鉴与浅色图鉴最易漏的一处配对 */
+  --brand-warm: #e08a63;
+  --gold: #d9a93c;
+  --green: #8fae5e;
+  --red: #c8443a;     /* 中深红:白字仍有 4.8:1(见 :root 关于不造 --on-danger 的说明) */
+  --red-hi: #e0574c;
+  --danger: #c8443a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  --shadow-sm: 0 1px 1px rgba(0, 0, 0, .4);
+  --shadow-lift: 0 2px 6px -2px rgba(0, 0, 0, .55);
+  --bar-bg: rgba(30, 27, 22, .93);
+  --bar-hover: rgba(237, 228, 206, .06);
+  --hero-tint: rgba(217, 169, 60, .08);
+  --sw-off-bg: #161616;
+  --sw-off-line: #313131;
+  --sw-off-fg: #7a7a7a;
+  --sw-off-bg-hi: #1f1f1f;
+  --sw-off-line-hi: #484848;
+  --sw-off-fg-hi: #cbcbcb;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius: 16px;
+  --radius-lg: 24px;
 }
 
 /* —— 数字显示字体(自托管,Bricolage Grotesque 700 子集,SIL OFL 1.1)——
@@ -361,7 +515,7 @@ button, input, select { font: inherit; color: inherit; }
    语义分级:primary=主操作(每屏 ≤1 个);danger=危险操作(删数据/放生);
    ghost=次要操作(紧凑,悬停给主色反馈);ghost+danger=弱化危险(列表里的"删除"
    ——红字不铺红底,降低误触压迫感)。默认 .btn=常规次级。 */
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
 .btn.danger:hover { background: var(--red-hi); border-color: var(--red-hi); }
@@ -412,7 +566,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin
 .chip:hover { border-color: var(--accent); color: var(--fg); }
 .chip:active { transform: scale(.97); }
 .chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
-.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .chip.on:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 .pill {
   display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; line-height: 1.5;

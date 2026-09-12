@@ -103,7 +103,7 @@ ok(/Math\.hypot/.test(js), '用 Math.hypot 合成半径')
 
 // —— 6. JS 侧:同步落盘 / 特性检测 / reduced-motion / 清理 ——
 console.log('\n[6] 切换路径的四个必要动作')
-ok(/flushSync\(\(\)\s*=>\s*setTheme\(next\)\)/.test(js), '用 flushSync 保证截快照前已切好主题',
+ok(/flushSync\(\(\)\s*=>\s*setKey\(encode\(next\)\)\)/.test(js), '用 flushSync 保证截快照前已切好主题',
   /flushSync/.test(js) ? '' : 'React 18 批处理会让快照截到旧主题')
 ok(/typeof document\.startViewTransition === 'function'/.test(js), '有 View Transitions 特性检测',
   '老浏览器不支持时会直接抛异常,主题切不了')
@@ -114,11 +114,23 @@ ok(/vt\.ready\.catch\(cleanup\)/.test(js) && /vt\.finished\.then\(cleanup, clean
   'ready/finished 都挂了清理(连续快速点击不留残留)')
 
 // —— 7. 调用点没有把事件丢掉 ——
-console.log('\n[7] 调用点(App.jsx)传的是事件本身')
+console.log('\n[7] 调用点没有把事件丢掉')
+// 两条切主题的路径,**每一环都必须把 click 事件转发下去**(choose 用 e.currentTarget 当扩散圆心):
+//   菜单:选项 onClick → onPick(next, e) → App 的 pickTheme → choose(next, e)
+//   图标:onClick={toggle} → toggle(e) → choose({...}, e)
+// 任何一环写成 `() => f(x)` 都会把事件丢掉,表现是「点哪都瞬间变色、没有扩散」——
+// 功能不受影响,所以只有肉眼能看出来。
 const app = readFileSync(join(ROOT, 'src/App.jsx'), 'utf8')
-ok(/onClick=\{cycleTheme\}/.test(app), 'App.jsx 用 onClick={cycleTheme}',
-  /onClick=\{cycleTheme\}/.test(app) ? '' : '写成 () => cycleTheme() 会丢事件、退化成瞬时切换')
-ok(!/onClick=\{\(\)\s*=>\s*cycleTheme\(\)\}/.test(app), '没有丢事件的包一层箭头写法')
+const menu = readFileSync(join(ROOT, 'src/components/ThemeMenu.jsx'), 'utf8')
+ok(/onClick=\{\(e\) => onPick\(build\(it\.key\), e\)\}/.test(menu), '菜单选项把 click 事件交给 onPick',
+  '写成 () => onPick(...) 会丢事件、退化成瞬时切换')
+ok(/pickTheme = useCallback\(\(next, e\) => \{ choose\(next, e\)/.test(app), 'App 的 pickTheme 把事件转给 choose',
+  '中间接一层箭头而不转发 e,圆心就没了')
+ok(/onClick=\{toggle\}/.test(app), '图标按钮把 click 事件直接交给 toggle',
+  '写成 onClick={() => toggle()} 会丢事件')
+ok(/choose\(\{ fam: theme\.fam, mode: dark \? 'light' : 'dark' \}, e\)/.test(js),
+  'toggle 把事件继续转给 choose', 'toggle 里丢了 e,图标那条路径就没有圆心了')
+ok(!/choose\(next\)/.test(app), '没有只传组合、把事件丢掉的地方')
 
 console.log(fail === 0 ? '\n=== 全部通过 ===' : `\n=== ${fail} 项失败 ===`)
 process.exit(fail === 0 ? 0 : 1)

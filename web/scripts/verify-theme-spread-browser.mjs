@@ -17,7 +17,7 @@
 // 判据取「过渡中途的 clip-path 半径介于 0 与满半径之间」,它同时盖住 1 和 2:
 // 选择器没匹配上时根本没有这条动画,中途取样拿到的会是 none 或满半径。
 //
-// 不依赖后端数据:只点顶栏的主题按钮,壳渲染出来即可。
+// 不依赖后端数据:只点顶栏的**版本号**(主题菜单入口)与主题图标,壳渲染出来即可。
 
 import { chromium } from 'playwright'
 import { createServer } from 'node:http'
@@ -55,30 +55,73 @@ const check = (name, ok, detail) => {
   results.push(ok)
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? '  — ' + detail : ''}`)
 }
+// 等页面真正就绪:**主题按钮出现** + **开屏层已卸载**。
+//
+// 为什么要等开屏:它是全屏覆盖层(z-index 最高),在它退场前:
+//   · [9] 的像素证据采到的是开屏的深蓝底与金色水晶,而不是主题底色 ——
+//     实测就是栽在这里:切换前采到 rgb(31,31,45)(开屏底色),中途采到 rgb(180,165,53)
+//     (淡出中的金色水晶),于是「圆内已是新主题」判失败,而主题本身完全正常;
+//   · 主题按钮虽然可点,但 View Transition 的整屏快照里也带着开屏。
+// 判据用「#loading 消失」而不是等固定时长:开屏在首屏数据就绪后 1.7s 自行卸载,
+// 慢机器上更久;等元素消失既准确,又不会在快机器上白等。
+const pageReady = async (page) => {
+  await page.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
+  await page.waitForFunction(() => !document.getElementById('loading'), null, { timeout: 15000 })
+}
+
+// 切主题是**两步**:先开菜单、再点选项(入口现在弹菜单,不再是点一下就换)。
+// 这里的两次 click 走 Playwright 而不是页面内 btn.click():菜单由 React 渲染,
+// 点完触发按钮得等它挂到 DOM 上才能点里面的选项 —— 页面内同步 click 拿不到刚渲染出来的节点。
+// (帧级取样的那条路径相反,必须留在页面内才能在同一帧读到 --theme-x/y,见 probe。)
+const pickTheme = async (page, label) => {
+  await page.click('.ver-wrap .topbar-ver') // 版本号是唯一的菜单入口(图标是纯切换)
+  // 用 :has-text 而不是 :text-is:选项里有个 <span class="tm-text"> 包着文字,
+  // 而 :text-is 要求「**最小的**含该文本元素」等于它 —— 那个 span 没有 tm-opt 类,
+  // 于是选择器永远匹配不上(实测表现为点击一直等到超时,而不是报找不到选项)。
+  await page.click(`.theme-menu .tm-opt:has-text("${label}")`)
+}
+
 const BASE = `http://localhost:${PORT}/`
 
-// 页面内脚本:点主题按钮,把「点击当下 / 过渡中途 / 过渡结束」三处状态一次采回来。
-// 用 btn.click() 而不是 Playwright 的 locator.click():后者是异步的,
-// 等它返回时 620ms 的过渡早跑完了,抓不到中途那一帧。
+// 页面内脚本:开主题菜单 → 选某一项,把「点击当下 / 过渡中途 / 过渡结束」三处状态一次采回来。
+//
+// ⚠️ 这里必须用页面内 click 而不是 Playwright 的 locator.click():后者是异步的,
+// 等它返回时 620ms 的过渡早跑完了,抓不到中途那一帧。也正因为要留在页面内,
+// 「先开菜单再点选项」得自己轮询等菜单挂上 React 渲染的节点(下面那个 for 循环)。
 //
 // **取样按动画自己的 currentTime 推进,不用墙钟 sleep**:headless 下 rAF 与定时器
 // 都可能被滞后(实测用 rAF 等过渡建立时,整条取样时间轴被推后了几百毫秒,
 // 取到的「中途」其实是动画的第 0 帧 —— 圆半径 0,看着像动画没跑)。
-const probe = async () => {
+const probe = async ({ pick }) => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const root = document.documentElement
-  const btn = [...document.querySelectorAll('.topbar-fs')]
-    .find((b) => b.querySelector('.topbar-theme-icon'))
-  if (!btn) return { error: '找不到主题按钮' }
+  // ⚠️ 菜单入口是**版本号**,不是顶栏那个主题图标 —— 图标现在是纯切换、不弹菜单
+  // (它只动明暗,见 [10])。这里曾点图标去找菜单,失败信息是「菜单里没有「浅色」这个选项」,
+  // 读起来像菜单坏了,其实是探针点错了入口。
+  const entry = document.querySelector('.ver-wrap .topbar-ver')
+  if (!entry) return { error: '找不到主题菜单入口(版本号)' }
 
   const dur = parseFloat(getComputedStyle(root).getPropertyValue('--dur-theme')) || 620
-  const box = btn.getBoundingClientRect()
-  const wantX = box.left + box.width / 2
-  const wantY = box.top + box.height / 2
   const before = root.getAttribute('data-theme')
 
-  btn.click()
-  // ① 点击当下:圆心变量与 class 必须已经注入(拿不到圆心就没法从按钮扩散)
+  // 先开菜单、等选项渲染出来,再点选项。
+  // 扩散圆心应当是被点的那个**选项**的中心 ——
+  // 事件链:选项 onClick → onPick(next, e) → App 的 pickTheme → choose(next, e),
+  // 任一环丢掉 e 都会让圆心退回…没有圆心,这条断言就会先红。
+  entry.click()
+  let opt = null
+  for (let i = 0; i < 200 && !opt; i++) {
+    opt = [...document.querySelectorAll('.theme-menu .tm-opt')]
+      .find((o) => o.textContent.trim() === pick) || null
+    if (!opt) await sleep(10)
+  }
+  if (!opt) return { error: `菜单里没有「${pick}」这个选项`, menu: !!document.querySelector('.theme-menu') }
+  const box = opt.getBoundingClientRect()
+  const wantX = box.left + box.width / 2
+  const wantY = box.top + box.height / 2
+
+  opt.click()
+  // ① 点击当下:圆心变量与 class 必须已经注入(拿不到圆心就没法从选项扩散)
   const at0 = {
     cls: root.classList.contains('theme-spread'),
     x: parseFloat(root.style.getPropertyValue('--theme-x')),
@@ -137,15 +180,15 @@ const probe = async () => {
 const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 try {
   // —— 主路径:支持 View Transitions 的浏览器 ——
-  // 固定初始态:主题存 auto + 浏览器深色 → 生效色是 dark。
-  // 必须这样钉死:若生效色本来就是 light,点一下(→ light)颜色没变,
-  // 走的是「换了模式但颜色不变」的瞬时分支(见下面 [8]),这里就测不到扩散了。
+  // 固定初始态:洛克 + 跟随系统 + 浏览器深色 → 生效色是 handbook-dark。
+  // 必须这样钉死:选的这一项**一定要真的换色**,否则走的是「生效色不变」的瞬时分支
+  // (见下面 [8]),这里就测不到扩散了 —— 故选「浅色」(handbook-dark → handbook)。
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
-  await page.addInitScript(() => localStorage.setItem('theme', '"auto"'))
+  await page.addInitScript(() => localStorage.setItem('theme', '"roco:auto"'))
   await page.goto(BASE, { waitUntil: 'networkidle' })
-  await page.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
+  await pageReady(page)
 
-  const a = await page.evaluate(probe)
+  const a = await page.evaluate(probe, { pick: '浅色' })
   if (a.error) {
     check('找到主题按钮', false, a.error)
   } else if (a.noAnim) {
@@ -155,9 +198,9 @@ try {
     console.log('\n[1] 点击当下:圆心取自按钮')
     check('theme-spread class 已挂上', a.at0.cls)
     // 亚像素容差 1px:注入的是未取整的中心坐标
-    check('--theme-x/y = 按钮中心',
+    check('--theme-x/y = 被点选项的中心',
       Math.abs(a.at0.x - a.wantX) <= 1 && Math.abs(a.at0.y - a.wantY) <= 1,
-      `注入 (${a.at0.x}, ${a.at0.y}) / 按钮中心 (${a.wantX}, ${a.wantY})`)
+      `注入 (${a.at0.x}, ${a.at0.y}) / 选项中心 (${a.wantX}, ${a.wantY})`)
     const need = Math.hypot(Math.max(a.wantX, 1280 - a.wantX), Math.max(a.wantY, 800 - a.wantY))
     check('--theme-r 覆盖到最远角', a.at0.r >= need - 1, `${a.at0.r} ≥ ${need.toFixed(1)}`)
 
@@ -177,15 +220,11 @@ try {
     check('--theme-* 内联变量已清除', !/--theme-[xyr]/.test(a.end.leftover), a.end.leftover || '(空)')
     check('data-theme 变了', a.end.theme !== a.before, `${a.before} → ${a.end.theme}`)
 
-    // —— 连续快速点击:不能留下摘不掉的 class / 变量 ——
-    console.log('\n[5] 连点两次(第二次会抢占第一次的过渡)')
-    await page.evaluate(async () => {
-      const btn = [...document.querySelectorAll('.topbar-fs')]
-        .find((b) => b.querySelector('.topbar-theme-icon'))
-      btn.click()
-      await new Promise((r) => setTimeout(r, 80)) // 过渡还没结束就再点一次
-      btn.click()
-    })
+    // —— 连续快速选两次:不能留下摘不掉的 class / 变量 ——
+    console.log('\n[5] 连选两次(第二次会抢占第一次的过渡)')
+    await pickTheme(page, '深色')
+    await page.waitForTimeout(80) // 过渡还没结束就再选一次
+    await pickTheme(page, '浅色')
     await page.waitForTimeout(1400)
     const after = await page.evaluate(() => ({
       cls: document.documentElement.classList.contains('theme-spread'),
@@ -200,75 +239,67 @@ try {
   console.log('\n[6] 退化:没有 startViewTransition 时仍能切主题')
   const p2 = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
   await p2.addInitScript(() => {
-    localStorage.setItem('theme', '"auto"')
+    localStorage.setItem('theme', '"roco:auto"')
     delete Document.prototype.startViewTransition
   })
   await p2.goto(BASE, { waitUntil: 'networkidle' })
-  await p2.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
-  const b = await p2.evaluate(async () => {
-    const root = document.documentElement
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((el) => el.querySelector('.topbar-theme-icon'))
-    const before = root.getAttribute('data-theme')
-    btn.click()
-    await new Promise((r) => setTimeout(r, 120))
-    return { before, after: root.getAttribute('data-theme'), cls: root.classList.contains('theme-spread') }
-  })
-  check('主题切换成功(无异常)', b.before !== b.after, `${b.before} → ${b.after}`)
+  await pageReady(p2)
+  const bBefore = await p2.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  await pickTheme(p2, '浅色')
+  const b = await p2.evaluate(() => ({
+    after: document.documentElement.getAttribute('data-theme'),
+    cls: document.documentElement.classList.contains('theme-spread'),
+  }))
+  check('主题切换成功(无异常)', bBefore !== b.after, `${bBefore} → ${b.after}`)
   check('没有挂 class(不播动画)', !b.cls)
   await p2.close()
 
   // —— 退化路径 2:用户开了「减少动态效果」——
   console.log('\n[7] 退化:prefers-reduced-motion: reduce')
   const p3 = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce', colorScheme: 'dark' })
-  await p3.addInitScript(() => localStorage.setItem('theme', '"auto"'))
+  await p3.addInitScript(() => localStorage.setItem('theme', '"roco:auto"'))
   await p3.goto(BASE, { waitUntil: 'networkidle' })
-  await p3.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
-  const c = await p3.evaluate(async () => {
-    const root = document.documentElement
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((el) => el.querySelector('.topbar-theme-icon'))
-    const before = root.getAttribute('data-theme')
-    btn.click()
-    await new Promise((r) => setTimeout(r, 120))
-    return { before, after: root.getAttribute('data-theme'),
-      cls: root.classList.contains('theme-spread'), anims: document.getAnimations().length }
-  })
-  check('主题切换成功', c.before !== c.after, `${c.before} → ${c.after}`)
+  await pageReady(p3)
+  const cBefore = await p3.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  await pickTheme(p3, '浅色')
+  const c = await p3.evaluate(() => ({
+    after: document.documentElement.getAttribute('data-theme'),
+    cls: document.documentElement.classList.contains('theme-spread'),
+  }))
+  check('主题切换成功', cBefore !== c.after, `${cBefore} → ${c.after}`)
   check('没有播扩散动画', !c.cls)
   await p3.close()
 
-  // —— 退化路径 3:换了模式但**颜色没变**(浅色浏览器里 auto → light)——
+  // —— 退化路径 3:换了组合但**生效色没变**(亮系统里「洛克·跟随系统」→「洛克·浅色」)——
   // 这时不能为它冻屏 620ms:全程看不到任何变化,观感是「点了没反应」
-  // (过渡期间页面是快照,连按钮图标都要等过渡结束才换)。
-  console.log('\n[8] 退化:生效颜色不变时不冻屏(浅色浏览器 auto → light)')
+  // (过渡期间页面是快照,连菜单都要等过渡结束才更新)。
+  //
+  // ⚠️ 这两档之所以同色,是因为「洛克 + 跟随系统」在亮系统下解析成 handbook,
+  // 而「洛克 + 浅色」也是 handbook —— 换的是**轴的取值**,不是画面。
+  // 改 resolveTheme 或默认风格时要同步这里,否则这条会变成「随手点了个不同色的选项」,
+  // 而它本来要验的东西(瞬时分支)就没人测了。
+  console.log('\n[8] 退化:生效色不变时不冻屏(洛克·跟随系统 → 洛克·浅色)')
   const p4 = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
-  await p4.addInitScript(() => localStorage.setItem('theme', '"auto"'))
+  await p4.addInitScript(() => localStorage.setItem('theme', '"roco:auto"'))
   await p4.goto(BASE, { waitUntil: 'networkidle' })
-  await p4.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
-  const d = await p4.evaluate(async () => {
-    const root = document.documentElement
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((el) => el.querySelector('.topbar-theme-icon'))
-    const before = root.getAttribute('data-theme')
-    btn.click()
-    await new Promise((r) => setTimeout(r, 100))
-    return { before, after: root.getAttribute('data-theme'),
-      cls: root.classList.contains('theme-spread'), mode: localStorage.getItem('theme') }
-  })
+  await pageReady(p4)
+  const dBefore = await p4.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  await pickTheme(p4, '浅色')
+  const d = await p4.evaluate(() => ({
+    after: document.documentElement.getAttribute('data-theme'),
+    cls: document.documentElement.classList.contains('theme-spread'),
+    stored: localStorage.getItem('theme'),
+  }))
   check('生效色不变,故不播扩散', !d.cls)
-  check('但模式确实切过去了', d.mode === '"light"', `theme=${d.mode} / ${d.before} → ${d.after}`)
-  // 再点一次(light → dark,颜色真的变了)必须恢复正常扩散 ——
-  // 上面那条分支不能把后续点击也带成瞬时切换。
-  const again = await p4.evaluate(async () => {
-    const root = document.documentElement
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((el) => el.querySelector('.topbar-theme-icon'))
-    btn.click()
-    await new Promise((r) => setTimeout(r, 60))
-    return { cls: root.classList.contains('theme-spread'), theme: root.getAttribute('data-theme') }
-  })
-  check('下一次点击(颜色真的变)恢复扩散', again.cls, `data-theme=${again.theme}`)
+  check('但组合确实切过去了', d.stored === '"roco:light"', `stored=${d.stored} / ${dBefore} → ${d.after}`)
+  // 再选一次(洛克·浅色 → 洛克·深色,颜色真的变了)必须恢复正常扩散 ——
+  // 上面那条分支不能把后续选择也带成瞬时切换。
+  await pickTheme(p4, '深色')
+  const again = await p4.evaluate(() => ({
+    cls: document.documentElement.classList.contains('theme-spread'),
+    theme: document.documentElement.getAttribute('data-theme'),
+  }))
+  check('下一次选择(颜色真的变)恢复扩散', again.cls, `data-theme=${again.theme}`)
   await p4.close()
 
   // —— 像素证据:过渡中途,圆**内**已经是新主题、圆**外**还是旧主题 ——
@@ -286,17 +317,22 @@ try {
   //    同一坐标在三张图里取色,内容位置不变,故可比(不要求该点是纯背景)。
   console.log('\n[9] 像素证据:圆内是新主题、圆外还是旧主题')
   const p5 = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
-  await p5.addInitScript(() => localStorage.setItem('theme', '"auto"'))
+  await p5.addInitScript(() => localStorage.setItem('theme', '"roco:auto"'))
   await p5.goto(BASE, { waitUntil: 'networkidle' })
-  await p5.waitForSelector('.topbar-theme-icon', { timeout: 10000 })
+  await pageReady(p5)
 
+  // 圆心是**被点的那个选项**(菜单挂在版本号下方),故先开一次菜单量出「浅色」的中心,
+  // 再把 A 取在它下方 150px:6s 拖慢后中途半径约 350px,故 A 稳稳在圆内、B(远角)在圆外。
+  // 量完按 Esc 收起菜单 —— 「切换前」那张图必须是干净页面(菜单本身会挡住取样点)。
+  await p5.click('.ver-wrap .topbar-ver')
   const pts = await p5.evaluate(() => {
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((b) => b.querySelector('.topbar-theme-icon'))
-    const r = btn.getBoundingClientRect()
+    const opt = [...document.querySelectorAll('.theme-menu .tm-opt')]
+      .find((o) => o.textContent.trim() === '浅色')
+    const r = (opt || document.querySelector('.ver-wrap .topbar-ver')).getBoundingClientRect()
     return { A: [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2 + 150)],
       B: [window.innerWidth - 40, window.innerHeight - 40] }
   })
+  await p5.keyboard.press('Escape')
   // 取色:截图交给页面自己画到 canvas 上再读像素(页面内没有解码器,浏览器就是解码器)
   const sample = async () => {
     const b64 = (await p5.screenshot({ animations: 'allow' })).toString('base64')
@@ -314,13 +350,10 @@ try {
     }, { b64, pts })
   }
   const before9 = await sample()
+  await p5.evaluate(() => document.documentElement.style.setProperty('--dur-theme', '6000ms'))
+  await p5.click('.ver-wrap .topbar-ver') // 先开菜单(这两步耗时相对 6s 可忽略)
   const t0 = Date.now()
-  await p5.evaluate(() => {
-    document.documentElement.style.setProperty('--dur-theme', '6000ms')
-    const btn = [...document.querySelectorAll('.topbar-fs')]
-      .find((b) => b.querySelector('.topbar-theme-icon'))
-    btn.click()
-  })
+  await p5.click('.theme-menu .tm-opt:has-text("浅色")') // 选 → 起过渡,此刻才是动画的 0 点
   await p5.waitForTimeout(600) // 6s 里的 10%:圆半径约 350px,A(150)在内、B(~1000)在外
   const mid9 = await sample()
   const midAtMs = Date.now() - t0 // 中途那张图真正落地的时刻(截图本身有耗时)
@@ -339,6 +372,49 @@ try {
   check('中途画面上确实存在新旧分界', !eq(mid9.A, mid9.B),
     `A ${rgb(mid9.A)} vs B ${rgb(mid9.B)}(中途截图于点击后 ${midAtMs}ms)`)
   await p5.close()
+
+  // —— 面板必须落在视口内(两个入口 × 桌面/手机)——
+  // 为什么值得单列一条:面板是贴着触发元素展开的,而两个入口分处顶栏左右,
+  // 手机上「还没有账号」时图标还会被挤到中间 —— 纯 CSS 锚点在这些排布下都会让面板探出视口
+  // (实测:1280px 下版本号那侧探出 99px、390px 下图标那侧探出 26px,而菜单里一半的选项
+  //  因此点不到)。ThemeMenu 里那次量尺 + translateX 就是为此,这条是它的护栏。
+  console.log('\n[10] 面板夹在视口内 + 图标是纯切换')
+  for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    const p6 = await browser.newPage({ viewport: vp })
+    await p6.goto(BASE, { waitUntil: 'networkidle' })
+    await pageReady(p6)
+    // 版本号:唯一的菜单入口,面板必须整块落在视口内(窄屏上它左边还有品牌,最容易被挤出去)
+    await p6.click('.ver-wrap .topbar-ver')
+    const r = await p6.evaluate(() => {
+      const el = document.querySelector('.theme-menu')
+      if (!el) return null
+      const b = el.getBoundingClientRect()
+      return { left: Math.round(b.left), right: Math.round(b.right), vw: window.innerWidth }
+    })
+    check(`${vp.width}px 版本号:面板在视口内`, !!r && r.left >= 0 && r.right <= r.vw,
+      r ? `left=${r.left} right=${r.right} / 视口 ${r.vw}` : '面板没打开')
+    await p6.keyboard.press('Escape')
+    // 图标:不该弹菜单,而且要在**同一风格内**把明暗翻过去
+    const beforeT = await p6.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-theme'),
+      stored: localStorage.getItem('theme'),
+    }))
+    await p6.click('.fs-wrap .topbar-fs, .topbar-fs:has(.topbar-theme-icon)')
+    await p6.waitForTimeout(200)
+    const afterT = await p6.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-theme'),
+      stored: localStorage.getItem('theme'),
+      menu: !!document.querySelector('.theme-menu'),
+    }))
+    check(`${vp.width}px 图标:不弹菜单`, !afterT.menu)
+    check(`${vp.width}px 图标:确实切了明暗`, afterT.theme !== beforeT.theme,
+      `${beforeT.theme} → ${afterT.theme}`)
+    // 风格不变:两边要么都带 handbook,要么一个是 light 一个是 dark(经典族)。
+    const famOf = (t) => (t.startsWith('handbook') ? 'roco' : 'classic')
+    check(`${vp.width}px 图标:只动明暗、风格不变`, famOf(afterT.theme) === famOf(beforeT.theme),
+      `${beforeT.theme} → ${afterT.theme}`)
+    await p6.close()
+  }
 } finally {
   await browser.close()
   server.close()

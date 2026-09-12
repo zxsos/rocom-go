@@ -73,7 +73,7 @@
   background: var(--bg-2); border: 2px solid var(--line);
   color: transparent; font-size: 12px; font-weight: 700;
 }
-.merchant-step.done .merchant-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.merchant-step.done .merchant-step-dot { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .merchant-step.cur .merchant-step-dot {
   border-color: var(--accent); background: var(--accent-soft);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);

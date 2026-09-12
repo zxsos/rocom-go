@@ -44,7 +44,7 @@
   padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
   border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); color: var(--fg-dim);
 }
-.rank-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rank-tabs button.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* 排行列表 */
 .rank-list { display: flex; flex-direction: column; gap: 8px; }

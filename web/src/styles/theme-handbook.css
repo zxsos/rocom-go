@@ -1,0 +1,113 @@
+/* 「图鉴」家族(浅色 handbook + 其暗色版)的**形态层**。令牌层在 base.css 的
+   :root[data-theme="handbook…"] 各块,本文件只放「贴图与质感」。
+
+   每条规则都以 :root[data-theme^="handbook"] 起头 —— 用的是**前缀匹配**而不是逐个列出。
+   两条理由:
+     · 加/删暗色候选时不必改这一层(CSS 里没有第二处要同步的主题清单,少一处漂移源);
+     · 它把「图鉴家族」这个约定写进了选择器:**主题名以 handbook 开头就属于这一族**,
+       将来再加「图鉴·某季」会自动获得同一套质感 —— 这是有意的,不是巧合。
+   代价是主题名不能再叫 handbook 开头却不是图鉴的东西(目前没有,也不该有)。
+   不带这个前缀的规则会漏到跟随系统 / 白天 / 夜间三套主题去。
+
+   为什么单开一个文件,而不是像原计划那样拆进 shell.css / list.css / breeding.css:
+   这套质感横跨三个组件文件,拆开后「第三套主题长什么样」要翻三个文件才看得全,贴图引用也会散落。
+   集中一处便于整体审阅,也让 scripts/verify-theme-handbook.mjs 的「引用的贴图与磁盘清单
+   逐张对应」能在一个文件里查完。代价是选择器要多带一层 [data-theme] 属性选择器 ——
+   特异性 (0,3,0) 压过组件里的 (0,2,0),不依赖引入顺序,这点反而更稳。
+
+   贴图来源见 scripts/fetch-theme-textures.mjs 头部(第三方站的游戏原生贴图,过渡用;
+   后续换成自己解包的产物时,因为引用的是 /theme/handbook/ 这个稳定路径,本文件不必改)。
+
+   ---- 为什么这里没有「硬编码色收敛」那一大段 ----
+   加这套主题前预计的最大代价是「13 个样式表里的硬编码色不跟主题走」,实测做完全量审计后
+   **结论是没有需要收敛的**:全仓 204 处非 var() 颜色字面量逐条看过,全部落在下面几类里 ——
+     · 数据语义色:系别/元素配色、奖牌金(`.rank-medal.r2` 的银 #c8ccd4)、POI 标记、
+       盈亏红绿、品质梯度、图表的 4a9eff/4caf50 —— 按 base.css 的既定原则**本就不该**随主题变;
+     · 阴影里的黑:`rgb(0 0 0 / .25)` 一类。浅色主题下黑影本就该更淡,但那属于「阴影该多重」
+       的问题,不该由主题顺带改掉(参考站自己也是 0 1px 2px black 的贴纸感);
+     · 反色文字:`--accent` 上的 #fff、`--gold` 上的 #1a1400 —— 它们是「底色上的字」,
+       对比度已在两套浅色主题下都过 AA,不是外框色;
+     · 开关旋钮的白 #fff:**故意**不用 --bg-1 —— 暗色主题下 --bg-1 是深色,旋钮变深就废了。
+   唯一一处「与令牌同值的重复」已收敛:map.css 的 rgba(11,14,19,.35) → rgba(var(--tip-bg-rgb), .35)。
+   复核方法(改动色值后可重跑):按行扫 `background|border|box-shadow` 里的颜色字面量,
+   算相对亮度,<0.06 或 >0.92 的即「深/极浅容器」候选;再筛 `color:` 里饱和度 <0.18 的灰调 ——
+   实测后者全仓只剩 1 处(银牌色,语义色)。 */
+
+/* ---- 1. 纸面底纹 ----
+   整幅羊皮纸(265×400,带淡刻线稿)贴满页面。几何参数两套主题共用,只有**混合方式**分家 ——
+   这不是颜色偏好,而是由底色深浅决定的:
+
+   浅色图鉴 · soft-light:贴图与底色都是浅米色,直接叠上去会把整页提亮一档、失去纸感;
+   用 soft-light 只保留线稿的明暗起伏,底色仍由 --bg 说了算(于是换主题时底纹跟着 token 走,
+   而不是被贴图的固有颜色盖住)。
+
+   暗色图鉴 · multiply:深底上**不能**用 soft-light —— 那会把整页悄悄提亮,
+   等于绕过令牌改了 --bg,刚算过的 WCAG 对比度就不是屏幕上真实的数字了(守护脚本会失真)。
+   multiply 只会变暗,于是「令牌算出的对比度」始终是**下界**,守护结论仍成立;
+   线稿以暗纹形式浮出来,观感正是深色皮革的纤维 —— 这也是选它的直接原因。
+
+   480px(约 1.8 倍)与 repeat 是实测值,别改回 cover:265×400 要铺满 1440×900 得放大 5.4 倍,
+   线稿会糊成一片灰斑,空白页上像没擦干净的污渍(试炼页那种大片留白最容易看出来)。
+   background-color 同时是混合对象与兜底(贴图没到/被拦时仍是主题底色,不会白屏)。
+   (background-attachment: fixed 在 iOS Safari 上不可靠,会退化成随页面滚动:
+    视觉上只是纹理跟着动,不影响可读性,故不为它加额外分支。) */
+:root[data-theme^="handbook"] body {
+  background-color: var(--bg);
+  background-image: url("/theme/handbook/texture/SideBar.png");
+  background-position: center top;
+  background-size: 480px auto;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  background-blend-mode: soft-light;
+}
+
+/* 暗色图鉴换 multiply(理由见上)。两条选择器特异性相同((0,2,1)),靠**顺序**覆盖,
+   故这条必须留在上面那条之后;将来若有人把它挪到前面,深底就会恢复成提亮。 */
+:root[data-theme^="handbook-dark"] body {
+  background-blend-mode: multiply;
+}
+
+/* ---- 2. 金锦带 ----
+   select.png 是 133×35 的金色条带(右端带缺口),按元素尺寸拉伸:导航项约 90×34,
+   接近原比例,缺口形态保留得最好 —— 观感像「别在书页上的书签」。
+   用 background 简写(而非 background-image)是刻意的:简写会把原有的
+   background-color 一并重置为透明,否则组件那条 `background: var(--bg-3)` 的底色
+   会从条带的透明区透出来,变成「金色块压在灰块上」。
+   文字色走 --on-gold 而**不是** --fg:条带素材恒为浅金(取样 #f8b040),
+   所以它上面的字必须恒为墨色 —— 浅色图鉴下 --fg 恰好也是墨色,看不出差别;
+   暗色图鉴下 --fg 是米色,用它就不可读了。 */
+:root[data-theme^="handbook"] .navlink.active,
+:root[data-theme^="handbook"] .navgroup.active > .navgroup-btn,
+:root[data-theme^="handbook"] .viewseg-b.on {
+  background: url("/theme/handbook/texture/select.png") center / 100% 100% no-repeat;
+  color: var(--on-gold);
+}
+
+/* ---- 3. 书脊 ----
+   顶栏下缘 / 底栏上缘那道分隔线改走金色:羊皮纸底色与顶栏的 --bar-bg 都是暖米色,
+   相邻时只靠一条浅灰线分不开,页眉会「糊」进正文 —— 换成金线后像书脊压住纸口,
+   也是这套主题里最省的一处「图鉴感」。只改颜色,不动粗细与位置。
+   深色下这道理由更足:暗底与 --bar-bg 几乎同色,没有金线页眉就彻底消失了。 */
+:root[data-theme^="handbook"] .topbar {
+  border-bottom-color: var(--gold);
+}
+
+:root[data-theme^="handbook"] .bottomnav {
+  border-top-color: var(--gold);
+}
+
+/* ---- 4. 「已达成」印章 ----
+   finish.png 是一枚 58×58 的印章(篆刻式「已达成」)。培育线卡片的 done 状态原本只是
+   一行绿字,换成印章后状态一眼可辨 —— 这是整套主题里最「图鉴」的一处。
+   padding 改成 0 并显式给宽高:印章是**方形**素材,而原徽章是 999px 圆角 + 2px 8px 的
+   内边距,直接叠背景会把它裁成一条。文字仍保留(印章本身也刻着字,但小字号下印不清,
+   留文本才能保证可读与可访问)。
+   文字色同样走 --on-gold:印章素材恒为浅色(取样 #b0a890),上面的字必须恒为墨色 ——
+   原来写的是 var(--red),暗色图鉴下会变成亮红压浅金,对比只剩 2:1 出头。 */
+:root[data-theme^="handbook"] .br-status.s-done {
+  background: url("/theme/handbook/texture/finish.png") center / 100% 100% no-repeat;
+  border-color: transparent;
+  color: var(--on-gold);
+  padding: 1px 4px;
+  border-radius: 4px;
+}

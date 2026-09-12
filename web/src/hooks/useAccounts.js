@@ -16,9 +16,13 @@ const unlocked = (acc) =>
 //
 // 这里只管「策略」,不碰 UI:弹窗长什么样由调用方决定。
 // onPinRequired 走 ref,故调用方不必用 useCallback 包裹。
+//
+// loaded:首次账号列表请求已了结(成功或失败都算)。只给开屏动画当「首屏数据到位」的信号用
+// (见 components/Splash.jsx),**不代表账号列表非空** —— 没抓过包的新库本来就是空列表。
 export function useAccounts(onPinRequired) {
   const [accounts, setAccounts] = useState([])
   const [account, setAccount] = useState(getCurrentAccount)
+  const [loaded, setLoaded] = useState(false)
   // 首屏拦截用:默认账号设了 PIN 且本会话未解锁时,由调用方弹窗(不等用户点下拉)。
   const notifyRef = useRef(onPinRequired)
   notifyRef.current = onPinRequired
@@ -42,7 +46,7 @@ export function useAccounts(onPinRequired) {
       if (acc?.hasPin && !unlocked(target)) {
         notifyRef.current?.({ account: target, name: acc.name })
       }
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setLoaded(true))
   }, [])
 
   // 账号在线状态 15s 轮询:状态不会秒变,15s 足够。仅列表非空时才轮询。
@@ -74,5 +78,5 @@ export function useAccounts(onPinRequired) {
   const accountName = accounts.find((a) => a.account === account)?.name || ''
   const current = accounts.find((a) => a.account === account)
 
-  return { accounts, account, current, accountName, requestAccount: request, selectAccount: select, refreshAccounts: refresh }
+  return { accounts, account, current, accountName, loaded, requestAccount: request, selectAccount: select, refreshAccounts: refresh }
 }
