@@ -221,24 +221,21 @@ ok('encode / decode 成对,且 decode 会校验两轴(不校验就会把坏值�
 // 「风格换了、明暗还没换」的中间态被别处读到(刷新时机不巧就闪一下旧风格)。
 ok('存储是单键(原子写入),sanitize 的出口统一是那个字符串',
   /localStorage, 'theme'/.test(js) && /const sanitize = \(v\) => \{/.test(js) && /return encode\(/.test(js))
-// 上一版的五档扁平值必须都能迁移 —— 漏一个,老用户刷新一次就突然换了风格,而他自己什么都没点。
-const legacy = body(js, 'const LEGACY = {')
-// 键可能是字面量(handbook / 'handbook-dark')也可能是**计算属性**([AUTO])——
-// 与 listOf 同一条道理:只认字面量会把 auto 那一行漏掉,报出来却像是「迁移条目少了」。
-const legacyKeys = [...legacy.matchAll(/^\s+(?:\[([A-Z_]\w*)\]|'?([\w-]+)'?):\s*\{/gm)]
+// 上一版的五档扁平值必须都被识别 —— 漏一个,那个人就卡在旧值上:decode 会把非法值
+// **静默**回落默认,看起来"碰巧对了",等哪天默认值一变就露馅。故这里数的是清单本身。
+const legacySrc = /const LEGACY_VALUES = new Set\(\[([^\]]*)\]\)/.exec(js)?.[1] || ''
+// 元素可能是字面量也可能是常量标识符(AUTO)—— 只认字面量会把 auto 漏掉,
+// 报出来却像是「迁移清单少了一项」(这类假警报在第 4 组踩过一次)。
+const legacyVals = [...legacySrc.matchAll(/(?:([A-Z_]\w*)|'([^']+)')/g)]
   .map((m) => (m[1] ? identVal(m[1]) : m[2]))
   .filter(Boolean)
-ok('上一版五个值都有迁移条目(auto / handbook / handbook-dark / light / dark)',
-  ['auto', 'handbook', 'handbook-dark', 'light', 'dark'].every((k) => legacyKeys.includes(k)),
-  `实际 ${legacyKeys.join(', ')}`)
-ok('旧的 auto 迁到洛克(上一版的 auto 正是解析到图鉴家族的)',
-  /\[AUTO\]: \{ fam: 'roco', mode: AUTO \}/.test(js))
-ok('旧的四套主题名按所属风格拆开(handbook→洛克·浅,dark→经典·深)',
-  /['"]?handbook['"]?: \{ fam: 'roco', mode: 'light' \}/.test(js) &&
-  /['"]?handbook-dark['"]?: \{ fam: 'roco', mode: 'dark' \}/.test(js) &&
-  /['"]?light['"]?: \{ fam: 'classic', mode: 'light' \}/.test(js) &&
-  /['"]?dark['"]?: \{ fam: 'classic', mode: 'dark' \}/.test(js),
-  '带连字符的键必须带引号,匹配时要允许 \'handbook-dark\' 这种写法')
+ok('上一版五个扁平值都在迁移清单里(auto / handbook / handbook-dark / light / dark)',
+  ['auto', 'handbook', 'handbook-dark', 'light', 'dark'].every((k) => legacyVals.includes(k)),
+  `实际 ${legacyVals.join(', ')}`)
+// 2026-09-12 的决定:五个老值**一律**回默认,而不是各自保留外观(理由见 useTheme.js 那段注释)。
+// else 分支必须是 decode —— 那是「两轴格式的值不受迁移影响」的唯一证据,别把它简化成 return DEFAULT。
+ok('老值一律回到默认,其余值走 decode 原样解析(新界面下选过的不被翻)',
+  /LEGACY_VALUES\.has\(v\) \? DEFAULT : decode\(v\)/.test(js))
 
 ok('applyTheme 把解析后的真名写进 data-theme',
   /setAttribute\('data-theme', resolveTheme\(t\)\)/.test(js))

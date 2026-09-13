@@ -1,5 +1,6 @@
 import React from 'react'
 import { StatIcon } from '../../components/icons'
+import { pctText } from '../../utils/format'
 
 // 宠物列表的数值可视化元件:六维(卡片小格 / 表格微柱)、百分位标尺、量测行。
 //
@@ -108,9 +109,15 @@ export function Measure({ label, value, unit, min, max, pct }) {
   return (
     <div className="measure" title={hasRange ? `${label} ${min}~${max}${unit}` : undefined}>
       <span className="measure-lb">{label}</span>
-      <b className="measure-v">{value == null ? '-' : Number(value).toFixed(2)}<i>{unit}</i></b>
+      {/* 值走 toFixed(3) 再去尾零:体重原始值就是 0.001 kg 的整数,3 位小数**恰好无损**
+          (126.737 不丢、12.4 不会变成 12.400),且与详情/表格里 StatRange 的原样渲染一致 ——
+          原先这里固定 toFixed(2),同一个 126.737 在卡片上写成 126.74、在详情里写 126.737。 */}
+      <b className="measure-v">{value == null ? '-' : String(+Number(value).toFixed(3))}<i>{unit}</i></b>
       <PctBar pct={pct} />
-      <span className="measure-pct">{pct == null ? '-' : pct.toFixed(1) + '%'}</span>
+      {/* 百分位最多 4 位、去尾零(见 utils/format 的 pctText):位数与判定同精度,少一位就会
+          在边界上「显示 98.000% 却不算大块头」;去尾零则让固定宽度的这一列不必为
+          「100.0000%」多留 5px —— 去掉的只是无意义的 0。 */}
+      <span className="measure-pct">{pct == null ? '-' : pctText(pct)}</span>
     </div>
   )
 }

@@ -5,6 +5,19 @@
 export const voiceHot = (v) => v >= 96 ? 'val-hot-hi' : v <= -96 ? 'val-hot-lo' : undefined
 export const pctHot = (pct) => pct == null ? undefined : pct >= 98 ? 'val-hot-hi' : pct <= 2 ? 'val-hot-lo' : undefined
 
+// pctText 把体形百分位渲染成界面上的写法:最多 4 位小数、**去掉尾零**。null → null(由调用方
+// 决定显示成 '-' 还是整段省略)。
+//
+// 为什么位数是 4:与判定同精度,少一位就会在奖牌边界上「显示 98.000% 却不算大块头」——
+// 从十分位到千分位这条踩过两轮,详见 utils/rules.js 的 round4 与
+// internal/pet/size_percentile_test.go(那条按全量形态数据定的位数)。
+//
+// 为什么去尾零:卡片那一行的百分位列是**固定宽度**(见 list.css 的 .measure-pct),
+// 「100.0000%」这种写法白占 5px 还得为它把列加宽;而去掉的只是无意义的 0 ——
+// 任何一位有效数字都不会丢,「97.9995%」照样是「97.9995%」。
+// 同法也用在体重值上(见 pet-list/metrics.jsx):值本身是 0.001 kg 的整数,3 位恰好无损。
+export const pctText = (v) => (v == null ? null : `${+Number(v).toFixed(4)}%`)
+
 // boxLabel 把盒子位置渲染为 "13-性格1 5-2"(排-格,每盒 5 排 × 6 格,slot 从 0 起)。
 export function boxLabel(box) {
   if (!box) return '-'

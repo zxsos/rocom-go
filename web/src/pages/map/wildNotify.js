@@ -1,5 +1,6 @@
 import { wildTags } from './wildMatch'
 import { chime, rareChime } from '../../utils/audio'
+import { pctText } from '../../utils/format'
 
 // —— 稀有宠出现提醒 ——
 // 通知开关独立存 localStorage(与图层状态分开,不占图层版本号)。开启后,后端推来的实体
@@ -24,7 +25,9 @@ export function fireWildNotify(p, rangeRules = []) {
   const title = `${p.n || '野生宠物'}${tags.length ? ' · ' + tags.join(' ') : ''}`
   const parts = []
   if (p.lv) parts.push('Lv.' + p.lv)
-  if (p.weightPct != null) parts.push(`体重 ${Math.round(p.weightPct * 10) / 10}%`)
+  // 百分位最多 4 位、去尾零(pctText):显示与判定必须同精度(见 utils/rules.js 的 round4),
+  // 否则会出现「通知里写着 98.000% 其实是 97.9995」这种对不上的怪事。
+  if (p.weightPct != null) parts.push(`体重 ${pctText(p.weightPct)}`)
   parts.push(`X${p.x} Y${p.y} Z${p.z}`)
   // 异色/炫彩是全场最稀有,响更尖更醒目的升级音;其余稀有类别(污染/奖牌四件套)响普通提示音。
   const ks = p.kinds || []

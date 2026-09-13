@@ -33,19 +33,24 @@ const decode = (key) => {
   return FAMILIES.includes(fam) && MODES.includes(mode) ? { fam, mode } : DEFAULT
 }
 
-// 上一版存的是五档扁平值,这里做一次性迁移(迁移后立刻按新格式写回,故只会命中一次)。
-// auto 归到 roco —— 上一版的 auto 正是解析到图鉴家族的;四套主题名按所属风格拆开。
-const LEGACY = {
-  [AUTO]: { fam: 'roco', mode: AUTO },
-  handbook: { fam: 'roco', mode: 'light' },
-  'handbook-dark': { fam: 'roco', mode: 'dark' },
-  light: { fam: 'classic', mode: 'light' },
-  dark: { fam: 'classic', mode: 'dark' },
-}
+// 上一版存的是五档扁平值(auto / handbook / handbook-dark / light / dark)。这一版把这五个值
+// **一律**带回当前默认(洛克·跟随系统),而不是各自保留外观 —— 2026-09-12 的产品决定。
+//
+// 为什么不分青红皂白:`useStoredState` 挂载时会把初值写回存储,于是**上一版的默认值
+// 'handbook' 同样躺在从没点过主题的人的存储里**。「值是 handbook」因此既可能是「他选过
+// 图鉴」,也可能只是「当时默认塞给他的」—— 存储里没有「默认给的 / 用户点的」这个区分,
+// 事后也补不出来(回写机制的历史包袱)。既然分不出,就整体带回来。
+//
+// 已知代价与边界,写清楚免得日后被当成 bug:
+//   · 主动选过「经典·夜间」的人也会被翻成洛克·跟随系统,这是这次决定的代价;
+//   · 只有上一版那五个**扁平值**受影响;两轴格式的值(本次改动之后选过的,如 "classic:dark")
+//     一律不动 —— 那是新界面下的明确选择(下面那个 else 分支就是它);
+//   · 迁移是一次性的:sanitize 的返回值会被写回存储,下次读到的已经是 "roco:auto"。
+const LEGACY_VALUES = new Set([AUTO, 'handbook', 'handbook-dark', 'light', 'dark'])
 // sanitize 的返回值必须是**存进 localStorage 的那个字符串**(统一出口,免得状态里
 // 一会儿是对象一会儿是字符串)。无法辨识的值回到默认 —— 与「没存过」同一条出口。
 const sanitize = (v) => {
-  if (typeof v === 'string') return encode(LEGACY[v] || decode(v))
+  if (typeof v === 'string') return encode(LEGACY_VALUES.has(v) ? DEFAULT : decode(v))
   if (v && typeof v === 'object') return encode(decode(encode(v)))
   return encode(DEFAULT)
 }

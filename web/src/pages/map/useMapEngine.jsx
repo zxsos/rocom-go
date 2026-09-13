@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react'
 import { subscribe, getPosition } from '../../api'
+import { pctText } from '../../utils/format'
 import { IconsContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { IconMenu } from '../../components/svg'
@@ -26,7 +27,9 @@ export function wildTitle(p, rangeRules = []) {
   const head = [p.n || '野生宠物']
   if (p.lv) head.push('Lv.' + p.lv)
   head.push(wildTagText(p, rangeRules))
-  const w = p.weightPct != null ? `${Math.round(p.weightPct * 10) / 10}%` : '-'
+  // 百分位最多 4 位、去尾零(pctText):位数一少,边界上就会「写着 98.000% 却没画圈」——
+  // 显示与圈不圈是同一件事的两个投影,必须同精度(见 utils/rules.js 的 round4)。
+  const w = pctText(p.weightPct) ?? '-'
   let s = `${head.join(' ')} W ${w} V ${p.voice}`
   if (p.stale) s += ' (已离开视野)'
   return s
@@ -616,7 +619,7 @@ const WildLayer = React.memo(({ marks, mapPx, wildTip, dist, rangeRules = [] }) 
             {p.glassType > 0 && p.glassValue > 0 && (
               <div className="twg"><GlassChip p={p} className="map-wild-tip-chip" /></div>
             )}
-            <div className="twr">体重 {p.weightPct != null ? Math.round(p.weightPct * 10) / 10 + '%' : '-'} · 嗓音 {p.voice}</div>
+            <div className="twr">体重 {pctText(p.weightPct) ?? '-'} · 嗓音 {p.voice}</div>
             <div className="twc">X {p.x} · Y {p.y} · Z {p.z}</div>
             <div className="twd">距离 {dist != null ? dist : '-'} 米</div>
             {p.stale && <div className="tws">已离开视野</div>}

@@ -23,7 +23,8 @@
 // 后带 weightPct,地图 WildMark 带 weightPct / voice。
 
 // RANGE_DIMS 两个可自定义的维度。min/max 是该维度的**取值域**(不是默认值),
-// step 是输入步进:体重百分位按十分位(与地图显示、滑块同精度),嗓音是整数。
+// step 是输入步进的**滑块粒度**:体重百分位按十分位,嗓音是整数。
+// 注意步进只管「用户能把阈值停在哪儿」,值本身的显示与判定都是万分位(见 round4)。
 export const RANGE_DIMS = [
   { k: 'weightPct', n: '体重', unit: '%', min: 0, max: 100, step: 0.1, color: '#ff5252', hint: '形态内的体重百分位(0~100)' },
   { k: 'voice', n: '声音', unit: '', min: -100, max: 100, step: 1, color: '#40c4ff', hint: '嗓音原值(-100~100)' },
@@ -102,9 +103,25 @@ export function schemeRules(scheme) {
   }))
 }
 
-// round1 取整到十分位。与地图显示(MapPage 的 wildTitle/资料卡)、滑块值同口径 ——
-// 否则 99.6 显示成「100%」的满格个体,阈值 100 时却因 99.6>=100 为假被误筛掉。
+// round1 取整到十分位。**只给滑块用**(见 rangeScale 的反算:滑出的值吸附到 step),
+// 不再参与判定 —— 判定用下面的 round4。
 const round1 = (v) => Math.round(v * 10) / 10
+
+// round4 取整到**万分位**,与后端口径、显示精度三者一致:
+//   - 后端 pet.SizePercentile 保留 4 位(97.9921),库里 weight_pct 也是 4 位;
+//   - 界面显示同样是 4 位(宠物卡片 / 事件页 / 地图提示)。
+// 判定与显示同精度,才不会出现「图上描着环、列表里却筛不到」的自相矛盾 ——
+// 奖牌边界是游戏的**截断**判定(97.9995 不算大块头),放宽一点就会误圈。
+//
+// 位数是被**数据**逼出来的,不是拍脑袋(2026-09-13 连踩两轮):百分位从**整数体重**反算,
+// 只能落在间距 100/(high-low) 的格点上,而奖牌是阈值判定。舍入半径一旦宽过「边界外最近
+// 那个格点到边界的距离」,就会把格点挪过阈值:
+//   2 位(半径 0.005pp)→ 257 条形态跨界;
+//   3 位(0.0005pp)→ 仍有 12 条:迷嶂布莱克 866.361 kg = 97.999505%,舍成 98.000 就是
+//     大块头,可它离真边界(866.362 kg)差 1 克 —— 该形态格点间距只有 0.000495pp;
+//   4 位(0.00005pp)→ 全量 1147 条形态的最紧距离 0.000345pp,余量 6.9 倍。
+// 同一条遍历全量形态的不变量在后端也有一份:internal/pet/size_percentile_test.go。
+const round4 = (v) => Math.round(v * 10000) / 10000
 
 // matchRangeRule 判定一只宠是否落在规则区间内。
 //
@@ -114,9 +131,9 @@ export function matchRangeRule(pet, rule) {
   if (!pet || !rule || rule.on === false) return false
   const v = pet[rule.dim]
   if (v == null) return false
-  const t = round1(v)
-  const lo = round1(Math.min(rule.min, rule.max))
-  const hi = round1(Math.max(rule.min, rule.max))
+  const t = round4(v)
+  const lo = round4(Math.min(rule.min, rule.max))
+  const hi = round4(Math.max(rule.min, rule.max))
   return t >= lo && t <= hi
 }
 

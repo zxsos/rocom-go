@@ -3,7 +3,7 @@ import { getEggs, subscribe, queryEggMatch, setHatchSpeed } from '../../api'
 import { AccountContext } from '../../context'
 import { imgURL } from '../../components/icons'
 import { PetDetailModal } from '../../components/PetDetailModal'
-import { fmtTime, pad2, pctHot, voiceHot } from '../../utils/format'
+import { fmtTime, pad2, pctHot, voiceHot, pctText } from '../../utils/format'
 import { useInterval } from '../../hooks/useAsyncData'
 import { Marks } from '../../components/badges'
 import { hatchProgress, remainRealSecs, effectiveRate, activityRate, MIN_SAMPLE_GAP } from './hatch'
@@ -472,8 +472,10 @@ function EggCard({ egg, now, rate, measured, onPet }) {
                               {/* score 是后端算的 float,原样渲染会出「81.90337105999757」
                                   这种长尾 —— 它只用于排序,精度到小数一位足够。 */}
                               匹配度 {m.score?.toFixed(1) ?? '—'}
+                              {/* 蛋自己的百分位与上面 Row 的显示同口径(pctText,最多 4 位去尾零)
+                                  —— 同一个数在一页里有两种写法,读的人会以为哪边算错了。 */}
                               {m.heightPct != null && m.weightPct != null
-                                ? ` · 百分位 身高${m.heightPct.toFixed(1)}% 体重${m.weightPct.toFixed(1)}%`
+                                ? ` · 百分位 身高${pctText(m.heightPct)} 体重${pctText(m.weightPct)}`
                                 : m.note ? ` · ${m.note}` : ''}
                             </div>
                           </div>
@@ -533,7 +535,7 @@ function Row({ k, v, pct, title, hot }) {
     <div className="egg-row" title={title || ''}>
       <span className="muted egg-row-k">{k}</span>
       <span className={'egg-row-v ' + cls}>{v || '—'}</span>
-      <span className={'egg-row-p ' + cls}>{pct != null ? pct.toFixed(2) + '%' : ''}</span>
+      <span className={'egg-row-p ' + cls}>{pctText(pct) || ''}</span>
     </div>
   )
 }
@@ -555,7 +557,10 @@ function Parents({ p, onPet }) {
           {x.img ? <img src={imgURL(x.img)} alt="" draggable={false} /> : <span className="egg-parent-noimg">🐾</span>}
           <span className="egg-parent-txt">
             {role} {x.name}
-            {x.weightPct != null && <span className={pctHot(x.weightPct)}> W {Math.round(x.weightPct)}%</span>}
+            {/* 与宠物列表/事件页同一口径(pctText,最多 4 位去尾零):原先取整到整数、
+                后来留两位三位,97.9995 都会被写成「98%」「98.00」「98.000」——看着够大块头,
+                实际不命中。 */}
+            {x.weightPct != null && <span className={pctHot(x.weightPct)}> W {pctText(x.weightPct)}</span>}
             {x.voice != null && ` V ${x.voice}`}
             {x.nature ? ` ${x.nature}` : ''}
             {p.ambiguous && role === '♂' && <span className="egg-amb">?</span>}
