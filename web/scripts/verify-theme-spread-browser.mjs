@@ -415,6 +415,49 @@ try {
       `${beforeT.theme} → ${afterT.theme}`)
     await p6.close()
   }
+
+  // —— 老值迁移:上一版的五个扁平值一律回到「洛克·跟随系统」——
+  // 这条为什么必须跑真浏览器:迁移只在**读到存储的那一刻**发生一次,判据(哪个值算老值、
+  // 回落到什么)全在 sanitize 里 —— 静态断言只能证明「那行代码写着什么」,证明不了
+  // 「打开页面后 data-theme 真的是它」。而且老值被 decode 判非法时是**静默**回落默认,
+  // 于是「迁移坏了」与「迁移对了」在**亮系统**下长得一模一样(都得到 handbook)——
+  // 故这里刻意用**暗系统**取样:只有真的走了「跟随系统」才会拿到 handbook-dark。
+  console.log('\n[11] 老值迁移:上一版的扁平值都被带回跟随系统')
+  const MIGRATED = [
+    ['handbook', 'dark', 'handbook-dark', '上一版的默认值(没点过主题的人存储里也是它)'],
+    ['handbook-dark', 'light', 'handbook', '主动选过暗图鉴的人'],
+    ['light', 'dark', 'handbook-dark', '主动选过经典·浅色的人(本次决定的已知代价)'],
+    ['dark', 'light', 'handbook', '主动选过经典·夜间的人(同上)'],
+    ['auto', 'dark', 'handbook-dark', '上一版的跟随系统'],
+  ]
+  for (const [stored, scheme, want, why] of MIGRATED) {
+    const p7 = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: scheme })
+    await p7.addInitScript((v) => localStorage.setItem('theme', JSON.stringify(v)), stored)
+    await p7.goto(BASE, { waitUntil: 'networkidle' })
+    await pageReady(p7)
+    const got = await p7.evaluate(() => ({
+      data: document.documentElement.getAttribute('data-theme'),
+      stored: localStorage.getItem('theme'),
+    }))
+    check(`老值 ${stored}(${scheme} 系统)→ ${want}`, got.data === want,
+      `${got.data},存储已改写为 ${got.stored} — ${why}`)
+    await p7.close()
+  }
+  // 反向:两轴格式的值是**新界面下的明确选择**,不该被这次迁移翻掉。
+  // 没有这条,把 sanitize 写成「一律 DEFAULT」也能让上面五条全绿(它们本来就期望默认)。
+  {
+    const p8 = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
+    await p8.addInitScript(() => localStorage.setItem('theme', JSON.stringify('classic:dark')))
+    await p8.goto(BASE, { waitUntil: 'networkidle' })
+    await pageReady(p8)
+    const got = await p8.evaluate(() => ({
+      data: document.documentElement.getAttribute('data-theme'),
+      stored: localStorage.getItem('theme'),
+    }))
+    check('反向:新格式的值不被翻掉(classic:dark 仍是经典·夜间)', got.data === 'dark',
+      `${got.data},存储保持 ${got.stored}`)
+    await p8.close()
+  }
 } finally {
   await browser.close()
   server.close()

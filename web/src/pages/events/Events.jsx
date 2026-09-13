@@ -9,7 +9,7 @@ import { Avatar } from '../../components/avatar'
 import { Marks, Blood, Gender } from '../../components/badges'
 import { PetDetailModal } from '../../components/PetDetailModal'
 import { TweenNumber } from '../../components/TweenNumber'
-import { fmtTime, voiceHot, pctHot } from '../../utils/format'
+import { fmtTime, voiceHot, pctHot, pctText } from '../../utils/format'
 import LocTag from '../../components/LocTag'
 import { IconTrash, IconChevronDown, IconChevronUp, IconStar } from '../../components/svg'
 import { chime, rareChime } from '../../utils/audio'
@@ -319,7 +319,9 @@ function EventItem({ ev, seq, hl, hits = [], onOpen }) {
         <div className="pet-sub">
           {p?.nature}
           {p?.speciality && p.speciality !== '无' ? ` · ${p.speciality}` : ''}
-          {' · W '}<span className={pctHot(p?.weightPct)}>{p?.weightPct != null ? `${Math.round(p.weightPct)}%` : '-'}</span>
+          {/* 百分位最多 4 位、去尾零(pctText):与判定同精度 —— 原先取整到整数、两位、三位,
+              97.9995 都会被写成「98%」「98.00」「98.000」,看着够大块头却与地图/列表对不上。 */}
+          {' · W '}<span className={pctHot(p?.weightPct)}>{pctText(p?.weightPct) ?? '-'}</span>
           {' · V '}<span className={voiceHot(p?.voice)}>{p?.voice ?? '-'}</span>
           {' · '}<LocTag pet={p} className="" />
         </div>

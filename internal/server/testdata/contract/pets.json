@@ -22,7 +22,7 @@
       "heightM": 1.8,
       "heightMax": 2.18,
       "heightMin": 1.52,
-      "heightPct": 42.42,
+      "heightPct": 42.4242,
       "hp": {
         "nature": 1,
         "talentLv": 9,
@@ -77,7 +77,7 @@
       "weightKg": 92.5,
       "weightMax": 110,
       "weightMin": 90.5,
-      "weightPct": 10.26
+      "weightPct": 10.2564
     },
     {
       "attack": {

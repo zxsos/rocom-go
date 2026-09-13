@@ -249,17 +249,26 @@
   /* 定位元素天然压在静态的首字层之上,不必给 z-index;
      在线小点在本元素之后且同为定位元素,照样压在头像之上。 */
 }
-/* 在线小点:压在徽章右下角外沿,描边用页面底色把小点从徽章上「抠」出来,
-   避免与徽章边缘的亮色描边糊在一起。刻意**不带 .privacy**(见 AccountAvatar.jsx)。 */
+/* 在线小点:压在徽章右下角外沿。刻意**不带 .privacy**(见 AccountAvatar.jsx)。
+   离线态仍用页面底色(--bg-1)当描边,把点从徽章上「抠」出来并避开徽章的亮色描边。 */
 .acct-avatar-dot {
   position: absolute; right: -1px; bottom: -1px;
   width: calc(var(--acct-avatar) * .32); height: calc(var(--acct-avatar) * .32);
   min-width: 7px; min-height: 7px;
   border-radius: 50%; background: var(--fg-dim);
   border: 2px solid var(--bg-1);
-  transition: background .2s ease, box-shadow .2s ease;
+  transition: background .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
-.acct-avatar-dot.on { background: var(--green); box-shadow: 0 0 0 2px rgb(63 185 80 / .22); }
+/* 在线态:绿心 / 深缝 / 白环三层(配色见 base.css 的 --online 处注释)。
+   为什么不再用「绿点 + 同色柔光」:那个点恒压在徽章**暗端**,而同色柔光与徽章同为深色,
+   边界抠不出来 —— 这正是「绿点看不清」的成因,且随主题换色也没用(徽章明度不随主题变)。
+   现改为:border 由页面底色换成深缝(反衬绿心),box-shadow 由同色柔光换成白环
+   (把整点从任意背景上分离)。盒子的宽高与边框宽度都未改动,故尺寸不变。 */
+.acct-avatar-dot.on {
+  background: var(--online);
+  border-color: var(--online-gap);
+  box-shadow: 0 0 0 2px var(--online-ring);
+}
 /* 左下角 PIN 锁:与在线小点(右下)分列两角,各占一角不打架。
    刻意**不做成圆形徽标**(像在线小点那样):锁是方形图标,塞进圆里四角会顶到边;
    给它一点内边距 + 圆角,让底色只在图标外围露出一圈即可。

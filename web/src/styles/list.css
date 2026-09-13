@@ -306,8 +306,11 @@
   border-radius: 50%; background: var(--accent); transform: translateY(-50%);
   box-shadow: 0 0 0 2px var(--bg-1);
 }
-/* 百分位数字:tabular-nums 已全站开启(见 base.css),固定 44px 让两行的数字右对齐成列。 */
-.measure-pct { flex: none; width: 44px; text-align: right; color: var(--fg-dim); }
+/* 百分位数字:tabular-nums 已全站开启(见 base.css),固定宽度让两行的数字右对齐成列。
+   宽度按**最长的那一档**取:「97.9995%」这种 4 位小数要 ~51px,原先的 44px 装不下
+   ——文字会溢出盒子 7px,而那正好撑破 .measure 这一行(容器 480 实测 scrollWidth 220 >
+   clientWidth 213,而整行四项其实只占 213)。尾零已在 pctText 里去掉,故最长就是 8 字符。 */
+.measure-pct { flex: none; width: 52px; text-align: right; color: var(--fg-dim); }
 .measure.val-hot-hi .measure-pct, .measure.val-hot-lo .measure-pct { font-weight: 700; }
 
 .pt-foot {

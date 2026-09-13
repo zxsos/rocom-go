@@ -149,7 +149,7 @@
       "gender": "♂",
       "gid": 1001,
       "heightM": 1.8,
-      "heightPct": 42.42,
+      "heightPct": 42.4242,
       "img": "HeadIcon/3006.webp",
       "name": "小火",
       "nature": "固执",
@@ -157,7 +157,7 @@
       "talentRank": "S",
       "voice": 12,
       "weightKg": 92.5,
-      "weightPct": 10.26
+      "weightPct": 10.2564
     }
   ],
   "mothers": [

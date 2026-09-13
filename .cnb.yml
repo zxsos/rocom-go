@@ -8,6 +8,50 @@
 # ⚠️ 沙盒容器没有 CAP_NET_RAW/NET_ADMIN,**无法实时抓包**(-iface 会报
 # operation not permitted)。在沙盒里请用 -pcap <文件> 离线回放调试。
 
+# 应用镜像(抓包服务,根目录 Dockerfile)的**唯一定义**。两个入口共用它:
+#   · web_trigger —— 仓库页 → 流水线/构建 → 手动触发里点按钮(名字见下);
+#   · api_trigger —— 命令行 / OPENAPI StartBuild:
+#       cnb build start-build --repo <slug> --branch master --event api_trigger
+#     (web_trigger 用命令行发不了:`--event` 必须是 `api_trigger` 或 `api_trigger_*`)
+#
+# 共用而不是复制两份:复制迟早漂移,表现为「按钮打的镜像和命令行打的不是同一个」。
+# 锚点挂在**点号开头**的顶层键上 —— 点号不是分支名,不会被当成触发规则(见官方
+# 《简化配置文件》:锚点/别名只在单个文件内有效)。
+#
+# 不挂 push(2026-09-11 改):这条要跑一整轮 docker build + push(数十秒到数分钟,还占一个
+# docker 服务),而它的产物只是「给外部 docker pull 的那份镜像」——**日常改代码推上来并不需要
+# 重打一次**。原先挂在 push 上(还带一大串 ifModify)的实际后果是几乎每次提交都重建,
+# 甚至要靠 lock 互相取消同一批构建。改成主动触发后:要发镜像时触发一次,平时一次都不跑。
+#
+# 主动触发**不做 ifModify 过滤**:既然是人点的/命令发的,就是要重打一次 ——「代码没变也想重打」
+# 不再需要随便碰一个文件提交(那正是之前唯一的办法)。
+.app-image: &app-image
+  - name: 构建并推送应用镜像
+    services:
+      - docker
+    # 两次构建并发时会**互相覆盖 latest**:慢的那次后推送,把旧镜像顶回 latest
+    # (2026-09-11 实际踩到:一次构建卡在慢速 apk 源上,若不停掉它,新版本推完 latest
+    #  还会被它覆盖)。故同 key 只保留最新一次:正在跑的取消、排队中的取消。
+    lock:
+      key: rocom-go-image
+      cancel-in-progress: true
+      cancel-in-wait: true
+    stages:
+      - name: docker build
+        script: |
+          set -e
+          IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
+          VER="$(tr -d '[:space:]' < VERSION)"
+          # 除了 latest 再打一个 VERSION 标签(v4.2.0):只留 latest 没法回滚到具体版本
+          docker build -t "${IMAGE}:latest" -t "${IMAGE}:v${VER}" -f Dockerfile .
+      - name: docker push
+        script: |
+          set -e
+          IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
+          VER="$(tr -d '[:space:]' < VERSION)"
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:v${VER}"
+
 $: # 兜底匹配所有分支
   vscode:
     - docker:
@@ -29,46 +73,9 @@ $: # 兜底匹配所有分支
         - name: 浏览器
           script: cd web && (npx playwright install chromium || echo "跳过:浏览器已内置或当前离线")
 
-  # 应用镜像(抓包服务,根目录 Dockerfile):**只在页面手动触发**,不随推送自动构建。
-  #   docker.cnb.cool/<组>/<仓库>:latest  ← README「Docker 部署」里 docker pull 的那个
-  #
-  # 为什么不挂 push(2026-09-11 改):这条流水线要跑一整轮 docker build + push(数十秒到数分钟,
-  # 还占一个 docker 服务),而它的产物只是「给外部 docker pull 的那份镜像」——**日常改代码推上来
-  # 并不需要重打一次**。原先挂在 push 上(还带一大串 ifModify)的实际后果是几乎每次提交都重建,
-  # 甚至要靠 lock 互相取消同一批构建。改成手动触发后:要发镜像时点一下,平时一次都不跑。
-  #
-  # 触发入口:仓库页 → 流水线/构建 → 手动触发里选这条(名字见下)。
-  # 想让它出现在自定义按钮里,可另加 .cnb/web_trigger.yml(见 CNB 文档 build/web-trigger.html);
-  # 想用命令行触发则把 web_trigger 换成 api_trigger。
-  #
-  # 手动触发**不做 ifModify 过滤**:既然是人点的,就是要重打一次 ——「代码没变也想重打」
-  # 不再需要随便碰一个文件提交(那正是之前唯一的办法)。
-  web_trigger:
-    - name: 构建并推送应用镜像
-      services:
-        - docker
-      # 两次构建并发时会**互相覆盖 latest**:慢的那次后推送,把旧镜像顶回 latest
-      # (2026-09-11 实际踩到:一次构建卡在慢速 apk 源上,若不停掉它,新版本推完 latest
-      #  还会被它覆盖)。故同 key 只保留最新一次:正在跑的取消、排队中的取消。
-      lock:
-        key: rocom-go-image
-        cancel-in-progress: true
-        cancel-in-wait: true
-      stages:
-        - name: docker build
-          script: |
-            set -e
-            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
-            VER="$(tr -d '[:space:]' < VERSION)"
-            # 除了 latest 再打一个 VERSION 标签(v4.0.6):只留 latest 没法回滚到具体版本
-            docker build -t "${IMAGE}:latest" -t "${IMAGE}:v${VER}" -f Dockerfile .
-        - name: docker push
-          script: |
-            set -e
-            IMAGE="${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}"
-            VER="$(tr -d '[:space:]' < VERSION)"
-            docker push "${IMAGE}:latest"
-            docker push "${IMAGE}:v${VER}"
+  # 应用镜像的两个入口,共用上面 `.app-image` 那一段(要改动请只改那一处)。
+  web_trigger: *app-image # 仓库页「手动触发」里的按钮
+  api_trigger: *app-image # 命令行 / OPENAPI StartBuild
 
 # 重建镜像的流水线:挂在**本仓库的默认分支 master** 上。
 # ⚠️ CNB 的顶层键就是分支名(glob),`main` 只是"名字叫 main 的分支"、并非默认分支别名 ——

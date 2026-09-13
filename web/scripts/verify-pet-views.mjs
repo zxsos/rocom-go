@@ -11,12 +11,13 @@
 // 无位置、无百分位、六维全 0。这三只里任意一只渲染失败,线上就是整个列表白屏。
 //
 // ⚠️ 已做变异测试(改一处、确认测试红):
-//    - pct.toFixed(1) → (0)                    → 「陈列:百分位」失败
+//    - pct.toFixed(4) → toFixed(3)(或 (2)/(1)/(0)) → 「陈列:百分位」失败
 //    - STAT_MAX 500 → 5000                     → 「六维定标条/微柱高度」失败
 //    - <SixBars/> → <span/>                    → 「表格:六维微柱」失败
 //    - {p.name || p.species} → {p.species}     → 「陈列:昵称」失败
 //   断言收紧过一次:原先写 g1.includes('99.2%'),会被百分位游标的内联样式
-//   style="left:99.2%" 命中 —— 数字渲染错了测试照样绿。故一律带 > < 边界。
+//   style="left:99.2%"(游标位置按一位算,它是像素位置不是属性值)命中 ——
+//   数字渲染错了测试照样绿。故一律带 > < 边界。
 import { createServer } from 'vite'
 
 const server = await createServer({
@@ -41,7 +42,7 @@ const full = {
   eggGroups: [{ id: 1, name: '陆上', desc: '陆上组' }],
   heightM: 1.32, weightKg: 24.3,
   heightMin: 1.1, heightMax: 1.5, heightPct: 41.02,
-  weightMin: 20, weightMax: 26, weightPct: 99.2,
+  weightMin: 20, weightMax: 26, weightPct: 99.2424,
   voice: 96, talentRank: '了不起的天分', medal: '飞跃', medalDesc: '体重奖牌', medalIcon: 'm/1.png',
   wearMedalConfId: 5, medalIds: [1, 2], partnerMark: '心仪', partnerMarkIcon: 'p/1.png',
   speciality: '拾荒', specialityId: 7, catchTime: 1758700000,
@@ -133,9 +134,11 @@ const must = [
   ['陈列:昵称', g1.includes('小火花')],
   ['陈列:等级', g1.includes('Lv.42')],
   ['陈列:六维值', g1.includes('118')],
-  // 断言写 >99.2%< 而非 99.2%:后者会被百分位标尺游标的内联样式
+  // 断言写 >99.2424%< 而非 99.2424%:后者会被百分位标尺游标的内联样式
   // style="left:99.2%" 命中 —— 那样即使数字渲染错了测试也是绿的。
-  ['陈列:百分位', g1.includes('>99.2%<')],
+  // 值取**四位**小数(fixture 99.2424):页面上的百分位是 4 位(见 utils/rules.js 的 round4),
+  // 少一位就该在这里报红。
+  ['陈列:百分位', g1.includes('>99.2424%<')],
   // 定标条的实际长度:生命 118 / 上限 500 = 23.6%。数值画成条是这次的核心改动,
   // 只断言"118 出现了"挡不住条长算错(除以 5000 也能过)。
   ['陈列:六维定标条', g1.includes('width:23.6%')],
@@ -158,7 +161,7 @@ const must = [
   ['表格:种类', t1.includes('火花')],
   ['表格:六维微柱', t1.includes('sixbars-b')],
   ['表格:排序态 aria-sort', t1.includes('aria-sort="ascending"')],
-  ['表格:百分位', t1.includes('99.20%') || t1.includes('99.2%')],
+  ['表格:百分位', t1.includes('99.2424%')],
 ]
 console.log('')
 for (const [label, ok] of must) {

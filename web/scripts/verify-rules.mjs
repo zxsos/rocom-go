@@ -49,10 +49,14 @@ console.log('\n[1] 默认预设 ≡ 旧版奖牌判定')
     high: p.voice != null && p.voice >= 96,
     low: p.voice != null && p.voice <= -96,
   })
-  // 覆盖边界内外与典型值:边界值最容易出错(98 该命中、97.9 不该)
+  // 覆盖边界内外与典型值:边界值最容易出错(98 该命中、97.9 不该)。
+  // 97.9995~97.9999 / 2.0001~2.0005 / 95.9995~95.9999 是**舍入敏感区**:判定若按三位
+  // (曾经的 round3)、两位(round2)或十分位(round1)四舍五入,它们会被抬成 98.000 /
+  // 98.00 / 98.0 而误命中 —— 真实案例见 rules.js 里 round4 的注释。后端只推 4 位小数,
+  // 故样本也取 4 位。
   const samples = []
-  for (const w of [0, 1, 2, 2.1, 50, 97.9, 98, 99.6, 100]) samples.push({ weightPct: w, voice: 0 })
-  for (const v of [-100, -96, -95, 0, 95, 96, 99, 100]) samples.push({ weightPct: 50, voice: v })
+  for (const w of [0, 1, 2, 2.0001, 2.0005, 2.1, 50, 97.9, 97.9995, 97.9999, 98, 99.6, 100]) samples.push({ weightPct: w, voice: 0 })
+  for (const v of [-100, -96, -95.9999, -95, 0, 95, 95.9999, 96, 99, 100]) samples.push({ weightPct: 50, voice: v })
   const byId = Object.fromEntries(DEFAULT_RANGE_RULES.map((r) => [r.id, r]))
   let same = true
   for (const p of samples) {
@@ -66,6 +70,53 @@ console.log('\n[1] 默认预设 ≡ 旧版奖牌判定')
     }
   }
   ok(`${samples.length} 个样本的命中结果与旧版逐一相同`, same)
+}
+
+// —— 1b. 舍入敏感区(回归:噼啪鸟 126.737 kg 那次误圈,以及 4 位的由来) ——
+console.log('\n[1b] 舍入敏感区')
+{
+  const big = DEFAULT_RANGE_RULES.find((r) => r.id === 'big')
+  const small = DEFAULT_RANGE_RULES.find((r) => r.id === 'small')
+  // 后端 pet.SizePercentile 的口径:在 [lo,hi] 上的百分位,保留 4 位。
+  const pct4 = (w, lo, hi) => Math.round(((w - lo) / (hi - lo)) * 100 * 10000) / 10000
+
+  // 噼啪鸟:区间 89.500~127.500 kg,1 克 = 0.0026pp,98% 边界 = 126.740 kg
+  eq('噼啪鸟 126.737 kg → 97.9921%(实测那只)', pct4(126737, 89500, 127500), 97.9921)
+  eq('噼啪鸟 126.739 kg(差 1 克)→ 97.9974%', pct4(126739, 89500, 127500), 97.9974)
+  ok('97.9921 不算大块头(差 3 克)', !matchRangeRule({ weightPct: pct4(126737, 89500, 127500) }, big))
+  ok('97.9974 不算大块头(舍到三位/两位都会误判)', !matchRangeRule({ weightPct: pct4(126739, 89500, 127500) }, big))
+  ok('刚好 98 算大块头(126.740 kg = 真边界)', matchRangeRule({ weightPct: pct4(126740, 89500, 127500) }, big))
+
+  // 迷嶂布莱克:区间 668.500~870.400 kg,格点间距只有 0.000495pp —— **3 位就是被它顶穿的**:
+  // 866.361 kg 的 97.9995% 舍到三位成了 98.000,一只离边界 1 克的鸟会被误判成大块头。
+  eq('迷嶂布莱克 866.361 kg → 97.9995%', pct4(866361, 668500, 870400), 97.9995)
+  eq('迷嶂布莱克 866.362 kg(真边界)→ 98%', pct4(866362, 668500, 870400), 98)
+  ok('97.9995 不算大块头(舍到三位会变成 98.000 误判)',
+    !matchRangeRule({ weightPct: pct4(866361, 668500, 870400) }, big))
+  ok('刚好 98 算大块头(866.362 kg)', matchRangeRule({ weightPct: pct4(866362, 668500, 870400) }, big))
+
+  // 下端对称:2.0005 舍到三位会变成 2.000 而误命中「小不点」
+  ok('2.0001 不算小不点(舍到三位会误判)', !matchRangeRule({ weightPct: 2.0001 }, small))
+  ok('刚好 2 算小不点', matchRangeRule({ weightPct: 2 }, small))
+  // 嗓音是整数原值,没有舍入问题 —— 顺带钉住「不做任何放宽」
+  const high = DEFAULT_RANGE_RULES.find((r) => r.id === 'high')
+  ok('95 不算婉转声', !matchRangeRule({ voice: 95 }, high))
+  ok('96 算婉转声', matchRangeRule({ voice: 96 }, high))
+}
+
+// —— 1c. 百分位写法(pctText):最多 4 位、去尾零 ——
+console.log('\n[1c] 百分位写法 pctText')
+{
+  const { pctText } = await server.ssrLoadModule('/src/utils/format.js')
+  eq('整数去掉小数点', pctText(98), '98%')
+  eq('去尾零但保留有效位', pctText(99.2), '99.2%')
+  eq('满格不写成 100.0000', pctText(100), '100%')
+  eq('下端同理', pctText(2), '2%')
+  eq('4 位有效位一个不丢', pctText(97.9995), '97.9995%')
+  eq('缺失给 null(调用方决定显示成 -)', pctText(null), null)
+  // 去尾零**不得**让「够不着阈值」的值看起来像够了 —— 这是它与判定共用精度之外的第二道保险。
+  ok('97.9999 不会写成 98%', pctText(97.9999) !== '98%')
+  ok('2.0001 不会写成 2%', pctText(2.0001) !== '2%')
 }
 
 // —— 2. 区间判定本身 ——

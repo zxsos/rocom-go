@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { IconsContext } from '../context'
 import { InlineIcon } from './icons'
+import { pctText } from '../utils/format'
 
 // 六维/身高体重等数值展示组件。
 
@@ -121,14 +122,16 @@ export function StatRange({ value, min, max, pct, unit, stacked }) {
   const ref = React.useRef(null)
   const [anchor, setAnchor] = React.useState(null) // 悬停时锚点元素的视口矩形
   if (!(max > min)) return <>{text}</>
-  const pctText = pct != null ? `${pct.toFixed(2)}%` : null
-  const content = stacked ? `${min}-${max}` : (pctText ? `${pctText} (${min}-${max})` : `${min}-${max}`)
+  // 最多 4 位小数、去尾零(pctText):位数少一位就会在奖牌边界上显示成「98.000%」
+  // 却不算大块头(见 utils/rules.js 的 round4);去尾零只为读起来干净。
+  const pctStr = pctText(pct)
+  const content = stacked ? `${min}-${max}` : (pctStr ? `${pctStr} (${min}-${max})` : `${min}-${max}`)
   const show = () => { if (ref.current) setAnchor(ref.current.getBoundingClientRect()) }
   const hide = () => setAnchor(null)
   return (
     <span ref={ref} className={stacked ? 'stat-2l' : undefined} onMouseEnter={show} onMouseLeave={hide}>
       {text}
-      {stacked && pctText && <span className="stat-pct">{pctText}</span>}
+      {stacked && pctStr && <span className="stat-pct">{pctStr}</span>}
       {anchor && <Tooltip content={content} anchor={anchor} />}
     </span>
   )
