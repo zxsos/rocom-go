@@ -236,14 +236,12 @@ export async function setHatchSpeed(on) {
 
 // queryEggMatch 查随机蛋(神奇的蛋)可能孵出的物种。
 //
-// **用哪个数据源由服务端配置决定,前端传不了** —— 数据源是对全服生效的运维选项,
-// 若能让请求参数覆盖,任何玩家都能夹带 src=xianyu 去烧第三方额度。想换源只能走
-// 管理面板(见 adminEggSourceSet)。
+// 结果**一律来自服务端本地解包数据**(v4.2.3 移除了原来的第三方源),响应里
+// source 恒为 "local";仍保留该字段是为了标注来源,别拿它做分支。
 //
-// 两个源的响应结构一致,前端不分支:
-//   {source:"local"|"xianyu", total, matches:[{name,img,hatchSecs,score,heightPct,weightPct,confId,note}]}
+//   {source:"local", total, matches:[{name,img,hatchSecs,score,heightPct,weightPct,confId,note}]}
 //
-// img 是**可直接赋给 <img src> 的完整值**:本地给 /img/ 开头的站内路径、第三方给外链,
+// img 是**可直接赋给 <img src> 的完整值**(站内 /img/ 开头路径),
 // 故这里不要再用 imgURL() 去拼(其它接口给的是相对路径,唯独这条不是)。
 //
 // maxSecs 是这颗蛋孵满所需的秒数,本地源拿它当最强的一维约束(见 docs/data.md
@@ -378,13 +376,16 @@ export async function claimBreedingChild(id, gen, childGid) {
   return r.json()
 }
 
-// getMerchant 拉取远行商人数据:后端按当前时间返回营业状态与 4h 槽缓存(本地缓存,令牌在服务端,
-// 见 internal/server/api_merchant.go),只在槽缺失时才回源第三方,避免玩家反复打开页面烧 token。
-// force=true 强制后端回源第三方(烧对方额度,仅管理面板「强制刷新商人数据」按钮用)。
-// 响应结构:{now,day,status:"open|closed|idle",today:[{start,end,label,empty,merchant}],prev:[...]},
-// 其中 merchant 是第三方原始 JSON:{merchant_name,subtitle,fetched_at,round:{...},item_count,
-// items:[{name,kind,image,start_time,end_time,time_label,price,limit}]}。
-// 服务端未配置令牌时抛错(503)。force 回源第三方可能较慢,30s 超时兜底,避免按钮无限转圈。
+// getMerchant 拉取远行商人数据:后端按当前时间返回营业状态与 4h 槽缓存(本地缓存,
+// 见 internal/server/api_merchant.go),只在槽缺失或过了冷却时才去源站抓页面,
+// 避免玩家反复打开页面就打第三方站点。force=true 跳过冷却立即重抓(仅管理面板
+// 「强制刷新商人数据」按钮用)。
+// 响应结构:{now,day,status:"open|closed|idle",source,today:[{start,end,label,empty,merchant}],prev:[...]},
+// 其中 merchant 是后端把源站页面**归一化后**的结构(不是页面原文):
+// {merchant_name,subtitle,fetched_at,round:{...},item_count,
+//  items:[{name,kind,image,start_time,end_time,time_label,price,limit}]}。
+// 该源无需任何服务端配置即可用,故这里没有 503 分支。force 回源要抓页面、可能较慢,
+// 30s 超时兜底,避免按钮无限转圈。
 export const getMerchant = async (force = false) => {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), 30000)
@@ -590,14 +591,6 @@ export const adminPlaySessions = (account = '', limit = 50, offset = 0) =>
       return r.json()
     })
 
-// adminEggStats 查蛋 API(第三方图鉴)使用统计:
-// {keySet,total,todayTotal,todayOK,todayFail,successRate,
-//  daily:[{day,total,ok}], byAccount:[{account,name,total,today}], recent:[{account,name,time,ok,costMs,matches,height,weight}]}。
-export const adminEggStats = () => adminFetch('/api/admin/egg-stats').then(async (r) => {
-  if (!r.ok) throw await adminError(r, '拉取查蛋统计失败')
-  return r.json()
-})
-
 // adminMerchantSubs 远行商人邮箱推送名单:{configured: SMTP 是否已配置, subs:[{email,keywords,created_at}]}。
 export const adminMerchantSubs = () => adminFetch('/api/admin/merchant-subs').then(async (r) => {
   if (!r.ok) throw await adminError(r, '拉取订阅名单失败')
@@ -613,34 +606,10 @@ export function adminMerchantSubDelete(email) {
     })
 }
 
-// adminMerchantSource 远行商人数据源:{source, keySet, sources:[{id, name, needKey}]}。
-// sources 由后端下发(合法标识只有后端能校验),前端只负责展示文案。
-export const adminMerchantSource = () => adminFetch('/api/admin/merchant-source').then(async (r) => {
-  if (!r.ok) throw await adminError(r, '拉取数据源失败')
-  return r.json()
-})
-
-// adminMerchantSourceSet 切换远行商人数据源。
-// 后端切换时会清空当日已缓存货单并按新源重新获取,故这个调用比一般的保存慢一点,
-// 前端要给出「保存中」的状态(见 MerchantSourceCard)。
-export const adminMerchantSourceSet = (source) => postJSON('/api/admin/merchant-source', { source })
-
-// adminEggSource 查蛋数据源:{source, keySet, sources:[{id, name, needKey}]}。
-// sources 由后端下发(合法标识只有后端能校验),前端只负责展示文案。
-export const adminEggSource = () => adminFetch('/api/admin/egg-source').then(async (r) => {
-  if (!r.ok) throw await adminError(r, '拉取数据源失败')
-  return r.json()
-})
-
-// adminEggSourceSet 切换查蛋数据源(本地源 / 咸鱼源)。
-// 与远行商人不同,这里切源**没有代价**:两个源都是每次请求实时算、没有跨源缓存,
-// 故切换立即生效,也不用清任何东西。
-export const adminEggSourceSet = (source) => postJSON('/api/admin/egg-source', { source })
-
-// adminConfig 运行期配置:{writable, path, smtpUser, smtpPassSet, eggKeySet, socks5:{...}}。
+// adminConfig 运行期配置:{writable, path, smtpUser, smtpPassSet, socks5:{...}}。
 //
-// **敏感项只给「是否已设置」**(smtpPassSet / eggKeySet / socks5.passSet),令牌与授权码
-// 原文从不下发 —— 它们能用来发信、能刷第三方图鉴配额,一旦经 API 下来就会出现在
+// **敏感项只给「是否已设置」**(smtpPassSet / socks5.passSet),授权码原文从不下发 ——
+// 它们能用来冒发邮件、能把内置代理当自由出口用,一旦经 API 下来就会出现在
 // 浏览器响应、前端内存与可能的截图里。保存时留空即「不修改」,前端据此渲染占位文案。
 export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) => {
   if (!r.ok) throw await adminError(r, '拉取配置失败')
@@ -651,7 +620,7 @@ export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) 
 //
 // 写入的两条语义(后端保证,前端据此提示):
 //   - 先落盘 /etc/rocom.env 再改内存 —— 故「重启后配置还在」是天然成立的
-//   - 代理(socks5)是热重启的,不影响抓包;邮箱与令牌纯热更
+//   - 代理(socks5)是热重启的,不影响抓包;邮箱纯热更
 export const adminConfigSave = (payload) => postJSON('/api/admin/config', payload)
 
 // —— Web 监听地址(改它要试运行 + 确认,见 internal/server/api_web_addr.go)——

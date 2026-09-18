@@ -134,21 +134,19 @@ gamedata 从 `pets` 里重新取（前端拿不到权威的那份），且「从
 | `POST /api/merchant/sub` | — | ✓ | 订阅/更新（body: `email`, `keywords`） |
 | `DELETE /api/merchant/sub` | — | ✓ | 退订 |
 
-`GET /api/merchant` 顶层多一个 `source` 字段：当前生效的数据源标识（`xianyu` / `haoyou`）。
-**前端不展示它** —— 两个源出自不同第三方，但玩家无从判断该信哪个，标注只会平添困惑；
-该字段是为排查留的（收到「货单不对」的反馈时，`curl` 一下就知道当时是哪个源在供数）。
-两源返回的**货单结构一致**（好游快爆源在服务端归一化了，见 `docs/data.md` 第 6 节）。
-**连商品图都是同一个图床**：两源的 `image` 都是 `patchwiki.biligame.com` 的 https 直链
-（2026-09-03 用咸鱼源真实响应核对过），不存在本地相对路径。前端 `imgSrc` 与订阅邮件
+`GET /api/merchant` 的 `source` 字段恒为 `haoyou`（v4.2.3 移除了原先的第二个源）。
+**前端不展示它** —— 标注的是服务端从哪个第三方拿到数据，玩家无从判断该信哪个；
+该字段是为排查留的（收到「货单不对」的反馈时，`curl` 一下就知道当时供数的是谁）。
+**商品图是外链**：`image` 为 `patchwiki.biligame.com` 的 https 直链（2026-09-03 用真实
+响应核对过），不存在本地相对路径。前端 `imgSrc` 与订阅邮件
 `merchantMailItemImg` 都只认 http(s) 外链，**其余取值一律不显示**（不拼本站路径、也不内嵌）。
 
 > 邮件里的图片是外链，客户端可能默认拦截远程图片（QQ 邮箱 / Outlook 要手动点「显示图片」）。
-> 若哪天第三方改回相对路径，表现是**商品图静默消失**（不报错、发信照成功），
+> 若哪天源站改回相对路径，表现是**商品图静默消失**（不报错、发信照成功），
 > 排查时先看 `items[].image` 的实际取值。
 
-> 第三方令牌与 SMTP 配置在服务端。未配置令牌时：`source` 为 `xianyu` 的接口返回 **503**
-> （前端提示未配置，或建议切到无需令牌的好游快爆源）；`source` 为 `haoyou` 时照常返回 ——
-> 该源抓的是公开页面，不需要令牌。
+> 该源抓的是公开页面，**不需要任何服务端配置**，故本接口没有 503 分支
+> （SMTP 未配置只影响订阅邮件提醒，不影响货单本身）。
 
 ## 账号安全与排行榜
 
@@ -175,7 +173,6 @@ gamedata 从 `pets` 里重新取（前端拿不到权威的那份），且「从
 | `DELETE /api/admin/rules` | admin | 删除规则（`?account=`） |
 | `GET /api/admin/stats` | admin | 全部成员抓捕统计 |
 | `GET /api/admin/play-sessions` | admin | 游玩记录明细分页 + 汇总（`?account=&limit=&offset=`，返回 `total` 为同筛选下总条数） |
-| `GET /api/admin/egg-stats` | admin | 查蛋 API 使用统计 |
 | `GET /api/admin/wild-pets` | admin | 可投放的野生宠物形态 |
 | `GET /api/admin/injects` | admin | 当前注入中的精灵列表 |
 | `POST /api/admin/inject-wild` | admin | 投放稀有野生精灵 |
@@ -184,11 +181,7 @@ gamedata 从 `pets` 里重新取（前端拿不到权威的那份），且「从
 | `GET /api/admin/merchant-subs` | admin | 商人邮件推送名单 |
 | `DELETE /api/admin/merchant-subs` | admin | 删除某邮箱订阅（`?email=`） |
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
-| `GET /api/admin/merchant-source` | admin | 远行商人数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
-| `POST /api/admin/merchant-source` | admin | 切换数据源（body: `source`）；会清空已缓存货单并按新源重抓当前轮 |
-| `GET /api/admin/egg-source` | admin | 查蛋数据源：`{source, keySet, sources:[{id, name, needKey}]}` |
-| `POST /api/admin/egg-source` | admin | 切换查蛋数据源（body: `source`，`local`\|`xianyu`）；立即生效，不清缓存 |
-| `GET /api/admin/config` | admin | 当前运行配置脱敏回显：`{path, writable, smtpUser, smtpPassSet, eggKeySet, socks5, web}` |
+| `GET /api/admin/config` | admin | 当前运行配置脱敏回显：`{path, writable, smtpUser, smtpPassSet, socks5, web}` |
 | `POST /api/admin/config` | admin | 修改运行配置（body 只带要改的项；敏感项留空 = 不修改）。**不含** Web 监听地址 |
 | `POST /api/admin/web-addr` | admin | Web 监听地址**试运行**（body: `addr`）：新地址开始监听，新旧并存、不落盘。返回 `{addr, realAddr, port, deadline, handoff}` |
 | `POST /api/admin/web-addr/confirm` | admin 或 handoff | **确认**试运行：先写入 `ROCOM_ADDR` 再停旧监听。带 `handoff` 时免令牌（见下） |

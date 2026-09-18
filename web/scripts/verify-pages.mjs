@@ -45,7 +45,8 @@ const CONTENT_CHECKS = {
   '/admin': ['管理员'],
   '/debug': ['opcode'],
   // /map 依赖 canvas,jsdom 下画不出底图,只验挂载不报错
-  // /merchant 需要 -egg-api-key(本次环境未配),会显示错误态,只验挂载
+  // /merchant 也只验挂载:它渲染的是当前营业日的轮次,内容随一天四个整点与打烊变化,
+  //   写死内容断言会随时钟飘。(该页已不依赖任何服务端令牌配置,见 api_merchant.go)
 }
 
 // —— 浏览器 API mock ——

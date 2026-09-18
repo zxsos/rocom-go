@@ -29,7 +29,6 @@
 #   ROCOM_SOCKS5_USER / ROCOM_SOCKS5_PASS  SOCKS5 认证
 #   ROCOM_SKIP_SELF_IP  socks5 模式下设 false(默认 true)
 #   ROCOM_SMTP_USER / ROCOM_SMTP_PASS   远行商人订阅邮件的发件邮箱与授权码
-#   ROCOM_EGG_API_KEY   第三方图鉴 API 令牌(查随机蛋可能物种)
 #   ROCOM_EXTRA       其他要透传的参数(如 -ignore-ip)
 #   ROCOM_PCAP        离线回放的 pcap 路径(与 ROCOM_IFACE 二选一)
 #   ROCOM_DB / ROCOM_CERT / ROCOM_KEY   数据库与 TLS 证书路径
@@ -198,10 +197,9 @@ if [[ -n "${ROCOM_SOCKS5_USER:-}" ]]; then
   args+=(-socks5-user "$ROCOM_SOCKS5_USER")
   [[ -n "${ROCOM_SOCKS5_PASS:-}" ]] && args+=(-socks5-pass "$ROCOM_SOCKS5_PASS")
 fi
-# 邮箱与图鉴令牌:管理面板随时可改,启动参数只是初值(改后热更,不必重启)
+# 邮箱:管理面板随时可改,启动参数只是初值(改后热更,不必重启)
 [[ -n "${ROCOM_SMTP_USER:-}" ]]  && args+=(-merchant-smtp-user "$ROCOM_SMTP_USER")
 [[ -n "${ROCOM_SMTP_PASS:-}" ]]  && args+=(-merchant-smtp-pass "$ROCOM_SMTP_PASS")
-[[ -n "${ROCOM_EGG_API_KEY:-}" ]] && args+=(-egg-api-key "$ROCOM_EGG_API_KEY")
 # ROCOM_EXTRA 按空格拆分透传(可含多个 flag)
 read -r -a extra <<< "${ROCOM_EXTRA:-}"
 args+=("${extra[@]}")
@@ -266,8 +264,6 @@ ROCOM_SKIP_SELF_IP=false
 # 远行商人订阅邮件的发件邮箱与 SMTP 授权码(面板可改,热更)
 ROCOM_SMTP_USER=
 ROCOM_SMTP_PASS=
-# 第三方图鉴 API 令牌,查随机蛋可能物种用(面板可改,热更;只存服务端)
-ROCOM_EGG_API_KEY=
 # 其他透传参数(如 -ignore-ip 10.0.0.1)
 ROCOM_EXTRA=
 EOF
@@ -505,7 +501,7 @@ case "$ACTION" in
             # 临时清空 env,逐个解析填充
             ROCOM_IFACE="" ROCOM_PORT="" ROCOM_ADDR="" ROCOM_TLS=""
             ROCOM_SOCKS5_ADDR="" ROCOM_SOCKS5_ALLOW="" ROCOM_SOCKS5_USER="" ROCOM_SOCKS5_PASS=""
-            ROCOM_SOCKS5_BLOCK="" ROCOM_SMTP_USER="" ROCOM_SMTP_PASS="" ROCOM_EGG_API_KEY=""
+            ROCOM_SOCKS5_BLOCK="" ROCOM_SMTP_USER="" ROCOM_SMTP_PASS=""
             ROCOM_SKIP_SELF_IP="" ROCOM_EXTRA=""
 
             # 用空格切,遍历 -key value 对
@@ -523,7 +519,6 @@ case "$ACTION" in
                     -socks5-block)  ROCOM_SOCKS5_BLOCK="$2"; shift 2 ;;
                     -merchant-smtp-user) ROCOM_SMTP_USER="$2"; shift 2 ;;
                     -merchant-smtp-pass) ROCOM_SMTP_PASS="$2"; shift 2 ;;
-                    -egg-api-key)   ROCOM_EGG_API_KEY="$2"; shift 2 ;;
                     -skip-self-ip)  ROCOM_SKIP_SELF_IP="$2"; shift 2 ;;
                     -db|-cert|-key|rocom-go|sudo) shift ;;
                     -socks5-max-conns) shift 2 ;;  # systemd service 用默认值
@@ -552,8 +547,6 @@ ROCOM_SKIP_SELF_IP=${ROCOM_SKIP_SELF_IP:-false}
 # 远行商人订阅邮件(面板可改,热更)
 ROCOM_SMTP_USER=${ROCOM_SMTP_USER:-}
 ROCOM_SMTP_PASS=${ROCOM_SMTP_PASS:-}
-# 第三方图鉴 API 令牌(面板可改,热更)
-ROCOM_EGG_API_KEY=${ROCOM_EGG_API_KEY:-}
 # 其他透传参数
 ROCOM_EXTRA=
 EOF

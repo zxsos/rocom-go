@@ -377,9 +377,9 @@ CREATE TABLE IF NOT EXISTS merchant_notified (
   PRIMARY KEY(slot, email)
 );
 
--- 远行商人数据源配置(单行 id=1,见 store/merchant_src.go):source 是当前生效的源
--- (xianyu / haoyou),空串=未配置、由服务端回退默认源。切换源会清空 merchant_slots
--- (两源货单格式不同,混着读会错乱);本表不做清理,就一行。
+-- 远行商人数据源配置(单行 id=1,见 store/merchant_src.go):历史上用于在多个第三方源
+-- 之间切换。**v4.2.3 起已停止读写** —— 咸鱼源移除后只剩好游快爆一个源,切换端点与面板
+-- 卡片一并删掉,这里只保留表结构(不迁移、不 DROP)。
 CREATE TABLE IF NOT EXISTS merchant_source (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
@@ -387,9 +387,7 @@ CREATE TABLE IF NOT EXISTS merchant_source (
 );
 
 -- 随机蛋「猜猜孵出谁」数据源配置(单行 id=1,范式同 merchant_source,见 store/egg_src.go):
--- source 是当前生效的源(local / xianyu),空串=未配置、由服务端回退默认源。
--- 与远行商人不同,这里切源**不需要清任何缓存**:两个源都是「每次请求实时算」,
--- 没有跨源复用的缓存;本表不做清理,就一行。
+-- 同上,**v4.2.3 起已停止读写**,查蛋只剩本地源。表结构保留。
 CREATE TABLE IF NOT EXISTS egg_source (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
@@ -425,8 +423,9 @@ CREATE TABLE IF NOT EXISTS hatch_speed (
   updated_at INTEGER
 );
 
--- 查蛋 API(第三方图鉴,见 api_egg_query.go)使用统计:每次发起第三方请求记一行,
--- 管理面板据此看今日消耗/成功率/谁在查。量小(一天几十次),不做清理。
+-- 查蛋第三方 API 使用统计:过去每发起一次第三方请求记一行,面板据此看今日消耗/成功率/
+-- 谁在查。**v4.2.3 起已停止写入** —— 咸鱼源移除后查蛋只有本地源,而本地查询不消耗任何
+-- 第三方配额,统计不再有数据来源。表结构与历史行保留(不迁移、不 DROP)。
 CREATE TABLE IF NOT EXISTS egg_queries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   account TEXT NOT NULL DEFAULT '',

@@ -25,14 +25,15 @@ import (
 func TestMerchantFetchEmptyThenCatchup(t *testing.T) {
 	s := newTestServer(t)
 	slotStart := time.Now().Add(-time.Minute)
-	fakeMerchantAPI(t, `{"code":200,"data":{"item_count":0,"items":[]}}`, http.StatusOK)
+	// 空页面:源站还没切换新一轮时就是这个样子(页面里找不到这个档)。
+	fakeHaoyouAPI(t, haoyouPage(), http.StatusOK)
 
-	ok, empty := s.merchantFetch(slotStart, true)
+	ok, empty := s.merchantFetch(slotStart)
 	if !ok {
-		t.Fatal("merchantFetch 失败(假第三方应正常响应)")
+		t.Fatal("merchantFetch 失败(假源站应正常响应)")
 	}
 	if !empty {
-		t.Fatal("第三方返回空时应判定 empty")
+		t.Fatal("源站返回空时应判定 empty")
 	}
 	gotEmpty, _, fetchedAt, ok := s.store.GetMerchantSlot(slotStart.Unix())
 	if !ok {

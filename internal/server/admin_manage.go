@@ -59,21 +59,6 @@ func (s *Server) handleAdminPlaySessions(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, map[string]any{"sessions": sessions, "summary": summary, "total": total})
 }
 
-// handleAdminEggStats 返回查蛋 API(第三方图鉴)使用统计:累计/今日次数、成功率、
-// 近 14 天每日、按账号排行、最近明细。keySet 告知服务端是否配置 -egg-api-key。
-func (s *Server) handleAdminEggStats(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAdmin(w, r) {
-		return
-	}
-	st, err := s.store.EggQueryStats()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	st.KeySet = s.eggAPIKeySetOn()
-	writeJSON(w, st)
-}
-
 // handleAdminRules 列出全部黑白名单规则。
 func (s *Server) handleAdminRules(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
@@ -115,115 +100,6 @@ func (s *Server) handleAdminRuleSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true})
-}
-
-// handleAdminMerchantSource 远行商人数据源:查询与切换。
-//
-//	GET  → {source, keySet, sources:[{id, name, needKey}]}
-//	POST {source} → 切换生效(清槽缓存 + 按新源重抓当前轮,见 merchantSetSource)
-//
-// 切换为什么要清缓存:两个源的货单格式不同,留着另一份会被当成新源的数据显示,
-// 页面顶部的来源标注也在说谎。代价是切源当天「昨日回顾」为空,直到下一个营业日
-// 的档被缓存 —— 前端卡片里写明了这一点。
-func (s *Server) handleAdminMerchantSource(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAdmin(w, r) {
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		type srcJSON struct {
-			ID      string `json:"id"`
-			Name    string `json:"name"`
-			NeedKey bool   `json:"needKey"`
-		}
-		// 源的清单从后端下发而非前端硬编码:合法标识只有后端能校验,
-		// 让前端自己列一份迟早与校验逻辑漂移。
-		sources := []srcJSON{}
-		for _, id := range []string{merchantSrcXianyu, merchantSrcHaoyou} {
-			sources = append(sources, srcJSON{
-				ID: id, Name: merchantSourceName(id), NeedKey: merchantNeedKey(id),
-			})
-		}
-		writeJSON(w, map[string]any{
-			"source":  s.merchantSource(),
-			"keySet":  s.eggAPIKeySetOn(),
-			"sources": sources,
-		})
-	case http.MethodPost:
-		var req struct {
-			Source string `json:"source"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "参数解析失败", http.StatusBadRequest)
-			return
-		}
-		req.Source = strings.TrimSpace(req.Source)
-		if !merchantSourceValid(req.Source) {
-			http.Error(w, "未知的数据源:"+req.Source, http.StatusBadRequest)
-			return
-		}
-		if err := s.merchantSetSource(req.Source); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]any{"ok": true})
-	default:
-		http.Error(w, "不支持的请求方法", http.StatusMethodNotAllowed)
-	}
-}
-
-// handleAdminEggSource 查蛋数据源:查询与切换。
-//
-//	GET  → {source, keySet, sources:[{id, name, needKey}]}
-//	POST {source} → 切换生效(见 eggSetSource)
-//
-// 与远行商人的切源不同,这里**不清任何缓存**:两个源都是每次请求实时算,
-// 没有跨源复用的缓存,故切源立即生效、也没有任何代价。
-func (s *Server) handleAdminEggSource(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAdmin(w, r) {
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		type srcJSON struct {
-			ID      string `json:"id"`
-			Name    string `json:"name"`
-			NeedKey bool   `json:"needKey"`
-		}
-		// 源的清单从后端下发而非前端硬编码:合法标识只有后端能校验,
-		// 让前端自己列一份迟早与校验逻辑漂移。
-		sources := []srcJSON{}
-		for _, id := range []string{eggSrcLocal, eggSrcXianyu} {
-			sources = append(sources, srcJSON{
-				ID: id, Name: eggSourceName(id), NeedKey: eggSourceNeedKey(id),
-			})
-		}
-		writeJSON(w, map[string]any{
-			"source":  s.eggSource(),
-			"keySet":  s.eggAPIKeySetOn(),
-			"sources": sources,
-		})
-	case http.MethodPost:
-		var req struct {
-			Source string `json:"source"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "参数解析失败", http.StatusBadRequest)
-			return
-		}
-		req.Source = strings.TrimSpace(req.Source)
-		if !eggSourceValid(req.Source) {
-			http.Error(w, "未知的数据源:"+req.Source, http.StatusBadRequest)
-			return
-		}
-		if err := s.eggSetSource(req.Source); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]any{"ok": true})
-	default:
-		http.Error(w, "不支持的请求方法", http.StatusMethodNotAllowed)
-	}
 }
 
 // handleAdminRuleDelete 删除一条黑白名单规则(?account=xxx)。

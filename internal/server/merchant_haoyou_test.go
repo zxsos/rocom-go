@@ -13,8 +13,8 @@ import (
 
 // 本文件锁住好游快爆源的解析与归一化。
 //
-// 为什么值得单独测:这个源的形态与咸鱼源完全不同(HTML 页面 vs JSON 接口),
-// 而**下游四处**(有货判定 / 订阅邮件 / 前端 unwrap / 分栏)都只认咸鱼源那一种壳。
+// 为什么值得单独测:源站给的是 HTML 页面,而**下游四处**(有货判定 / 订阅邮件 /
+// 前端 unwrap / 分栏)只认那一种 JSON 壳。两者之间全靠本文件的归一化衔接。
 // 归一化错一点,症状不是报错而是「页面显示成奇怪的样子」或「商品掉进其他时段栏」
 // —— 编译照样过,只有断言抓得住。
 
@@ -285,7 +285,7 @@ func TestHaoyouTimeLabel(t *testing.T) {
 	}
 }
 
-// TestFetchHaoyouPicksRequestedSlot 一次只取请求的那一档,且归一化成咸鱼源同形。
+// TestFetchHaoyouPicksRequestedSlot 一次只取请求的那一档,且归一化成下游约定的壳。
 //
 // 「只取当前轮」是本次定下的口径(见 docs/data.md):页面会给出多个档,但我们一次
 // 只填一个 4h 槽 —— 若把别的档也写进来,就与「已结束的槽永不回源」那条硬规则冲突了
@@ -308,7 +308,7 @@ func TestFetchHaoyouPicksRequestedSlot(t *testing.T) {
 	)
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true)
+	body, ok, _ := s.fetchHaoyou(day.Add(8 * time.Hour))
 	if !ok {
 		t.Fatal("fetchHaoyou 失败(应拿到正常响应)")
 	}
@@ -379,7 +379,7 @@ func TestFetchHaoyouPicksRequestedSlot(t *testing.T) {
 	if med.Kind != "血脉修改道具" {
 		t.Errorf("地系血脉秘药 kind = %q, 期望「血脉修改道具」", med.Kind)
 	}
-	// start_time/end_time 是毫秒,且按北京时间读出来正好是该档(与咸鱼源口径一致)
+	// start_time/end_time 是毫秒,且按北京时间读出来正好是该档(与前端 parseSlots 口径一致)
 	if got := time.UnixMilli(gem.StartTime).In(merchantLoc).Format("15:04"); got != "08:00" {
 		t.Errorf("start_time 读出 %s, 期望 08:00", got)
 	}
@@ -389,7 +389,7 @@ func TestFetchHaoyouPicksRequestedSlot(t *testing.T) {
 
 	// 反向再取一次另一档:只是「挑到了某一档」还不够 —— 直接取页面第一档的实现
 	// 也能过上面的断言。必须证明**请求的那一档**才被取出来。
-	body2, ok, _ := s.fetchHaoyou(day.Add(20*time.Hour), true)
+	body2, ok, _ := s.fetchHaoyou(day.Add(20 * time.Hour))
 	if !ok {
 		t.Fatal("取 20:00 档失败")
 	}
@@ -420,7 +420,7 @@ func TestFetchHaoyouLastSlotLabel(t *testing.T) {
 	})
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok, _ := s.fetchHaoyou(last, true)
+	body, ok, _ := s.fetchHaoyou(last)
 	if !ok {
 		t.Fatal("fetchHaoyou 失败")
 	}
@@ -463,7 +463,7 @@ func TestFetchHaoyouMissingSlotIsEmpty(t *testing.T) {
 	})
 	fakeHaoyouAPI(t, page, http.StatusOK)
 
-	body, ok, _ := s.fetchHaoyou(day.Add(16*time.Hour), true) // 页面没有 16:00 这一档
+	body, ok, _ := s.fetchHaoyou(day.Add(16 * time.Hour)) // 页面没有 16:00 这一档
 	if !ok {
 		t.Fatal("页面缺该档应判为「无货」(ok=true),而不是失败")
 	}
@@ -479,7 +479,7 @@ func TestFetchHaoyouHTTPError(t *testing.T) {
 	day := haoyouDay()
 	fakeHaoyouAPI(t, "", http.StatusInternalServerError)
 
-	if body, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true); ok {
+	if body, ok, _ := s.fetchHaoyou(day.Add(8 * time.Hour)); ok {
 		t.Errorf("HTTP 500 时应返回 ok=false, 实际 ok=true body=%q", body)
 	}
 }
@@ -504,7 +504,7 @@ func TestFetchHaoyouSendsUA(t *testing.T) {
 	haoyouURL = srv.URL
 	t.Cleanup(func() { haoyouURL = old })
 
-	if _, ok, _ := s.fetchHaoyou(day.Add(8*time.Hour), true); !ok {
+	if _, ok, _ := s.fetchHaoyou(day.Add(8 * time.Hour)); !ok {
 		t.Fatal("fetchHaoyou 失败")
 	}
 	if got == "" {

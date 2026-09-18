@@ -1,1 +1,0 @@
-import{j as s,P as e}from"./index-BeqJAod5.js";import{h as o,d as r}from"./vendor-react-Bxabov_C.js";function m(){const{gid:t}=o(),a=r();return s.jsx(e,{gid:t,onClose:()=>a(-1)})}export{m as default};

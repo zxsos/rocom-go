@@ -74,29 +74,3 @@ export const PlayDailyChart = ({ daily }) => {
   )
 }
 
-// EggDailyChart 查蛋 API 近14天每日查询次数 CSS 柱状图:绿色=成功,红色=失败,叠加显示。
-// daily 结构见 api.adminEggStats:[{day,total,ok}]。
-export const EggDailyChart = ({ daily }) => {
-  const max = Math.max(...daily.map((d) => d.total), 1)
-  return (
-    <div className="egg-daily">
-      {daily.map((d) => {
-        const okH = (d.ok / max) * 100
-        const failH = ((d.total - d.ok) / max) * 100
-        return (
-          <div key={d.day} className="egg-daily-col" title={`${d.day}:共 ${d.total} 次,成功 ${d.ok},失败 ${d.total - d.ok}`}>
-            <div className="egg-daily-bar">
-              {d.total > 0 && (
-                <>
-                  <div className="egg-daily-fill ok" style={{ height: `${okH}%` }} />
-                  {failH > 0 && <div className="egg-daily-fill fail" style={{ height: `${failH}%` }} />}
-                </>
-              )}
-            </div>
-            <span className="egg-daily-day">{d.day.slice(5)}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}

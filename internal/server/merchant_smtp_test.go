@@ -46,7 +46,7 @@ func (f *fakeSession) send(m *smtpSender, msg smtpMail) (int, error) {
 //
 // 这是本次删除的**回归闸门**:原先还有一条「本地相对路径 → 读 embed 的 webp →
 // 内嵌成 CID 附件」的分支,已确认是死代码 —— 两个数据源的图都是
-// patchwiki.biligame.com 的 https 直链(2026-09-03 用咸鱼源真实响应核对过)。
+// patchwiki.biligame.com 的 https 直链(2026-09-03 用真实响应核对过)。
 // 若哪天第三方改回相对路径,邮件里会静默没图(不报错、发信照成功),
 // 故这里把「非直链就不显示」钉住,免得将来有人放宽而失去这个信号。
 func TestSMTPMailImageIsExternalURL(t *testing.T) {
