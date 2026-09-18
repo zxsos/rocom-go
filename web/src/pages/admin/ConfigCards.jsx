@@ -131,14 +131,13 @@ export function MailConfigCard({ config, error, onSave }) {
   )
 }
 
-// AdvConfigCard 第三方图鉴令牌 + 内置 SOCKS5 代理(「高级设置」分页)。
+// AdvConfigCard 内置 SOCKS5 代理(「高级设置」分页)。
 // 注意**不含** Web 监听地址 —— 那个改动会把管理员自己断开,走的是另一条
 // 「试运行 → 确认」的链路,见 WebAddrCard。
 export function AdvConfigCard({ config, error, onSave }) {
   const s5 = config?.socks5 ?? {}
   const addr = splitAddr(s5.addr)
   const { value: f, dirty, busy, msg, err, edit, fail, discard, submit } = useConfigForm({
-    eggKey: '',                        // 敏感项:留空 = 不修改
     host: addr.host,
     port: addr.port,
     allow: s5.allow ?? '',
@@ -160,7 +159,6 @@ export function AdvConfigCard({ config, error, onSave }) {
       return fail('已填监听 IP,端口不能留空(不启用请两个都留空)')
     }
     return submit({
-      eggKey: f.eggKey,
       socks5: {
         addr: joinAddr(host, port),
         allow: f.allow,
@@ -175,7 +173,7 @@ export function AdvConfigCard({ config, error, onSave }) {
   if (error || !config) {
     return (
       <div className="admin-card admin-wide">
-        <h3>令牌与代理</h3>
+        <h3>代理</h3>
         {error ? <p className="admin-error">{error}</p> : <p className="admin-hint">加载中…</p>}
       </div>
     )
@@ -183,31 +181,15 @@ export function AdvConfigCard({ config, error, onSave }) {
 
   return (
     <div className="admin-card admin-wide">
-      <h3>令牌与代理</h3>
+      <h3>代理</h3>
       <p className="admin-hint">
-        改动会写入 <code>{config.path}</code> 并立即生效:令牌纯热更,代理热重启(不影响抓包)。
+        改动会写入 <code>{config.path}</code> 并立即生效:代理热重启(不影响抓包)。
         HTTPS 与抓包网卡属启动项,改它们需要编辑该文件后执行
         {' '}<code>systemctl restart rocom-go</code>;Web 监听地址可在下方「Web 服务」卡片里改。
       </p>
 
       {!config.writable ? <Readonly path={config.path} /> : (
         <>
-          <div className="admin-config-group">
-            <h4>第三方图鉴令牌</h4>
-            <label className="admin-field">
-              <span>API 令牌</span>
-              <input
-                type="password" value={f.eggKey} autoComplete="new-password"
-                placeholder={config.eggKeySet ? '已设置,留空表示不修改' : '未设置'}
-                onChange={(e) => edit({ eggKey: e.target.value })}
-              />
-            </label>
-            <p className="admin-hint">
-              查「神奇的蛋」可能物种、远行商人货单用。只存服务端、不下发前端,故此处不显示原文。
-              {config.eggKeySet ? ' 已设置,留空则不改动。' : ' 未设置,相关查询不可用。'}
-            </p>
-          </div>
-
           <div className="admin-config-group">
             <h4>内置 SOCKS5 代理</h4>
             <p className="admin-hint">

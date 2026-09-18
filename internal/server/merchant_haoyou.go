@@ -1,13 +1,13 @@
 package server
 
 // 远行商人「好游快爆源」:抓 onebiji(好游快爆 / 快爆工具箱的远行商人页面),
-// 解析出**请求的那一档**的商品,归一化成与咸鱼源同形的 envelope 交给 merchantFetch 入库。
+// 解析出**请求的那一档**的商品,归一化成下游约定的那个 JSON 壳交给 merchantFetch 入库。
 //
-// 为什么必须归一化:库表 merchant_slots.data 存的是第三方原始 JSON,而
+// 为什么必须归一化:库表 merchant_slots.data 存的是一个结构化响应体,而
 // merchantBodyHasItems(有货判定)、merchantNotify(订阅邮件)与前端 format.js 的
-// unwrap 都按 `code∈{0,200} && data.items` 这一种壳来读。让两种格式并存的话这四处
-// 都要分支判断,漏掉任何一处都是静默错乱(编译能过、页面看着也像那么回事)。
-// 故这里产出与咸鱼源同形的 JSON,换取下游四处零改动 —— 归一化是本次唯一新增的复杂度。
+// unwrap 都按 `code∈{0,200} && data.items` 这一种壳来读。页面本身是 HTML,与这层壳
+// 毫无相似之处 —— 不在这里收口的话,那四处都得各自解析页面,漏掉任何一处都是静默
+// 错乱(编译能过、页面看着也像那么回事)。归一化是本源唯一新增的复杂度,换来下游零分支。
 //
 // 页面语义(2026-09-02 整点实测,结论与原始时间线已沉淀进 docs/data.md):
 //   - 页面一次给出**一个营业日**的若干档:每个商品条目所在的档由 data-time 标定,
@@ -16,10 +16,11 @@ package server
 //   - 换天发生在开市整点(8:00)后约 30~60 秒,期间页面解析为 0 件,是正常的切换过程
 //     (由 merchantFetch 的「空响应保留旧货单」保护兜住,**不要**当成站点改版去告警)。
 //
-// 与咸鱼源相比:无需 token、公开可抓。商品图与类别**都有**(图是 biligame patchwiki
-// 的 100px 缩略图外链,类别是中文原样),字段并不比咸鱼源少 —— 少的只有「本轮倒计时」
-// 与商人名等少数几项。商品的文字描述页面也给了(showShopinfo 第 4 个参数),但
-// merchantItem 没有对应字段,暂不落库。
+// 本源的取值能力:公开页面、无需任何鉴权或令牌。商品图与类别**都有**(图是 biligame
+// patchwiki 的 100px 缩略图外链,类别是中文原样)。给不出的只有「本轮倒计时」与商人
+// 名等少数几项 —— 页面本身就没有这些信息,不是解析遗漏。
+// 商品的文字描述页面也给了(showShopinfo 第 4 个参数),但 merchantItem 没有对应字段,
+// 暂不落库。
 
 import (
 	"encoding/json"
@@ -34,7 +35,7 @@ import (
 
 const (
 	// haoyouTimeout 抓取超时。页面较大(实测百 KB ~ 1MB 量级,随当天商品数浮动),
-	// 比咸鱼源那个 JSON 接口(10s)略放宽。
+	// 页面比一个 JSON 接口重得多,故比常见的 10s 上限略放宽。
 	haoyouTimeout = 15 * time.Second
 	haoyouMaxBody = 16 << 20 // 响应体上限,防异常大页把内存吃光
 )
@@ -214,7 +215,7 @@ func haoyouItem(g haoyouGood, start, end time.Time) merchantItem {
 		Price:     haoyouPrice(g.price),
 		Limit:     haoyouLimit(g.limit),
 		TimeLabel: haoyouTimeLabel(start, end),
-		StartTime: start.UnixMilli(), // 毫秒(真实 Unix 毫秒),与咸鱼源口径一致
+		StartTime: start.UnixMilli(), // 毫秒(真实 Unix 毫秒),与前端 parseSlots 的毫秒口径一致
 		EndTime:   end.UnixMilli(),
 		Image:     haoyouImageURL(g.image),
 	}
@@ -236,7 +237,7 @@ func haoyouImageURL(raw string) string {
 	return s
 }
 
-// haoyouEnvelope 归一化后的响应体:与咸鱼源同形,故下游判定/邮件/前端均可直接读。
+// haoyouEnvelope 归一化后的响应体:即下游约定的那个壳,故判定/邮件/前端均可直接读。
 type haoyouEnvelope struct {
 	Code int `json:"code"`
 	Data struct {
@@ -264,17 +265,14 @@ func haoyouEnvelopeJSON(goods []haoyouGood, start, end time.Time) (string, error
 	return string(b), nil
 }
 
-// fetchHaoyou 抓取页面并返回归一化后的响应体。签名与 fetchXianyu 一致,
-// 供 merchantFetch 按当前源分派。
+// fetchHaoyou 抓取页面并返回归一化后的响应体(body, ok, 各阶段耗时)。
 //
-// refresh 参数对 HTML 页面无意义:页面不带缓存参数,每次请求拿到的就是它当前的内容,
-// 且它自带的 data-time 时间戳本身就是权威的档期标识(等价于强制回源),故忽略。
+// 每次抓取拿到的就是页面当前的内容 —— 它没有「绕过缓存」这类参数可调,而它自带的
+// data-time 时间戳本身就是权威的档期标识,故「强制刷新」在这里等价于「立即再抓一次」。
 //
 // 返回 (body, ok):ok=false 表示抓取失败(网络/HTTP/归一化出错),调用方按
 // 「第三方不可用」处理、不写库;ok=true 时 body 一定可被下游解析(可能是空货单)。
-func (s *Server) fetchHaoyou(slotStart time.Time, refresh bool) (string, bool, merchantTiming) {
-	_ = refresh
-
+func (s *Server) fetchHaoyou(slotStart time.Time) (string, bool, merchantTiming) {
 	page, tm, err := haoyouFetchPage()
 	if err != nil {
 		log.Printf("merchantFetch 好游快爆源抓取失败: %v", err)

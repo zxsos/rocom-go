@@ -78,14 +78,12 @@ func TestConfigGetFallsBackToEnv(t *testing.T) {
 	s, envPath := newConfigTestServer(t)
 	// 内存为空,只写 env(模拟手动跑二进制、未经 run.sh 转 flag)
 	s.smtp.setCredentials("", "")
-	s.eggAPIKeySet("")
 	f, err := envfile.Load(envPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.Set(envSMTPUser, "from-env@qq.com")
 	f.Set(envSMTPPass, "env-pass")
-	f.Set(envEggAPIKey, "env-key")
 	if err := f.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,11 +99,11 @@ func TestConfigGetFallsBackToEnv(t *testing.T) {
 	if got.SMTPUser != "from-env@qq.com" {
 		t.Errorf("smtpUser = %q,期望回退到 env 的 from-env@qq.com", got.SMTPUser)
 	}
-	if !got.SMTPPassSet || !got.EggKeySet {
-		t.Errorf("env 里有值时标志位应为 true: smtpPass=%v eggKey=%v", got.SMTPPassSet, got.EggKeySet)
+	if !got.SMTPPassSet {
+		t.Errorf("env 里有授权码时 smtpPassSet 应为 true, got %v", got.SMTPPassSet)
 	}
 	// 仍不能泄露原文
-	if strings.Contains(rr.Body.String(), "env-pass") || strings.Contains(rr.Body.String(), "env-key") {
+	if strings.Contains(rr.Body.String(), "env-pass") {
 		t.Error("回退 env 时泄露了密钥原文")
 	}
 }
@@ -141,11 +139,10 @@ func TestConfigRequiresAdmin(t *testing.T) {
 
 // TestConfigGetNoSecrets 守不变量 1:敏感项绝不回显原文。
 // 这些凭据一旦经 API 下发,就会出现在浏览器响应、前端内存、可能的截图里 ——
-// 而它们能用来发信、能用来刷第三方图鉴配额。
+// 而它们能用来冒发邮件、能把内置代理当自由出口用。
 func TestConfigGetNoSecrets(t *testing.T) {
 	s, _ := newConfigTestServer(t)
 	s.smtp.setCredentials("sender@qq.com", "super-secret-auth-code")
-	s.eggAPIKeySet("super-secret-egg-key")
 	if err := os.WriteFile(s.envPath, []byte("ROCOM_SOCKS5_PASS=proxy-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +152,7 @@ func TestConfigGetNoSecrets(t *testing.T) {
 		t.Fatalf("GET: %d %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	for _, secret := range []string{"super-secret-auth-code", "super-secret-egg-key", "proxy-secret"} {
+	for _, secret := range []string{"super-secret-auth-code", "proxy-secret"} {
 		if strings.Contains(body, secret) {
 			t.Errorf("响应泄露了密钥 %q:\n%s", secret, body)
 		}
@@ -168,9 +165,9 @@ func TestConfigGetNoSecrets(t *testing.T) {
 	if got.SMTPUser != "sender@qq.com" {
 		t.Errorf("smtpUser = %q,邮箱不算敏感应回显", got.SMTPUser)
 	}
-	if !got.SMTPPassSet || !got.EggKeySet || !got.Socks5.PassSet {
-		t.Errorf("已设置的敏感项应报 true: smtpPass=%v eggKey=%v socks5Pass=%v",
-			got.SMTPPassSet, got.EggKeySet, got.Socks5.PassSet)
+	if !got.SMTPPassSet || !got.Socks5.PassSet {
+		t.Errorf("已设置的敏感项应报 true: smtpPass=%v socks5Pass=%v",
+			got.SMTPPassSet, got.Socks5.PassSet)
 	}
 }
 
@@ -178,7 +175,7 @@ func TestConfigGetNoSecrets(t *testing.T) {
 func TestConfigPostHotApplies(t *testing.T) {
 	s, envPath := newConfigTestServer(t)
 
-	rr := s.doConfig(t, http.MethodPost, `{"smtpUser":"a@qq.com","smtpPass":"newpass","eggKey":"newkey"}`)
+	rr := s.doConfig(t, http.MethodPost, `{"smtpUser":"a@qq.com","smtpPass":"newpass"}`)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("POST: %d %s", rr.Code, rr.Body.String())
 	}
@@ -189,9 +186,6 @@ func TestConfigPostHotApplies(t *testing.T) {
 	if !s.smtp.configured() {
 		t.Error("configured() 应在改完后立即为 true")
 	}
-	if s.eggAPIKeyGet() != "newkey" {
-		t.Errorf("图鉴令牌未热更: %q", s.eggAPIKeyGet())
-	}
 	// 且落了盘(重启后仍在)
 	f, err := envfile.Load(envPath)
 	if err != nil {
@@ -200,8 +194,8 @@ func TestConfigPostHotApplies(t *testing.T) {
 	if v, _ := f.Get(envSMTPUser); v != "a@qq.com" {
 		t.Errorf("env 未落盘 smtpUser: %q", v)
 	}
-	if v, _ := f.Get(envEggAPIKey); v != "newkey" {
-		t.Errorf("env 未落盘 eggKey: %q", v)
+	if v, _ := f.Get(envSMTPPass); v != "newpass" {
+		t.Errorf("env 未落盘 smtpPass: %q", v)
 	}
 }
 
@@ -210,7 +204,6 @@ func TestConfigPostHotApplies(t *testing.T) {
 func TestConfigPostBlankKeepsExisting(t *testing.T) {
 	s, _ := newConfigTestServer(t)
 	s.smtp.setCredentials("old@qq.com", "keep-me")
-	s.eggAPIKeySet("keep-key")
 
 	rr := s.doConfig(t, http.MethodPost, `{"smtpUser":"new@qq.com"}`)
 	if rr.Code != http.StatusOK {
@@ -219,9 +212,6 @@ func TestConfigPostBlankKeepsExisting(t *testing.T) {
 	user, pass := s.smtp.credentials()
 	if user != "new@qq.com" || pass != "keep-me" {
 		t.Errorf("留空应保留原密码: user=%q pass=%q", user, pass)
-	}
-	if s.eggAPIKeyGet() != "keep-key" {
-		t.Errorf("留空应保留原令牌: %q", s.eggAPIKeyGet())
 	}
 }
 
@@ -326,7 +316,6 @@ func TestConfigSocks5Restart(t *testing.T) {
 func TestConfigSaveFailureDoesNotHotApply(t *testing.T) {
 	s, envPath := newConfigTestServer(t)
 	s.smtp.setCredentials("old@qq.com", "old-pass")
-	s.eggAPIKeySet("old-key")
 	before, err := os.ReadFile(envPath)
 	if err != nil {
 		t.Fatal(err)
@@ -335,16 +324,13 @@ func TestConfigSaveFailureDoesNotHotApply(t *testing.T) {
 	envfile.SetTestBeforeRename(func() error { return errors.New("注入: 保存失败") })
 	defer envfile.SetTestBeforeRename(nil)
 
-	rr := s.doConfig(t, http.MethodPost, `{"smtpUser":"new@qq.com","smtpPass":"new-pass","eggKey":"new-key"}`)
+	rr := s.doConfig(t, http.MethodPost, `{"smtpUser":"new@qq.com","smtpPass":"new-pass"}`)
 	if rr.Code == http.StatusOK {
 		t.Fatal("保存失败时应返回错误,实际 200(注入未生效?)")
 	}
 	// 内存必须原封不动
 	if user, pass := s.smtp.credentials(); user != "old@qq.com" || pass != "old-pass" {
 		t.Errorf("落盘失败却改了内存: user=%q pass=%q", user, pass)
-	}
-	if s.eggAPIKeyGet() != "old-key" {
-		t.Errorf("落盘失败却改了令牌: %q", s.eggAPIKeyGet())
 	}
 	// 文件也不能被写坏
 	after, _ := os.ReadFile(envPath)

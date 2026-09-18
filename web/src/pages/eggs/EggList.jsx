@@ -338,12 +338,9 @@ function EggCard({ egg, now, rate, measured, onPet }) {
   const name = tidyEggName(egg.name)
   // 随机蛋(神奇的蛋)的「猜猜孵出谁」。
   //
-  // **用哪个数据源由服务端配置决定**(管理面板切换,见 EggSourceCard):前端传不了,
-  // 也不该能传 —— 数据源是对全服生效的运维选项,若能让请求参数覆盖,任何玩家都能
-  // 夹带 src=xianyu 去烧第三方额度(10 次/分钟)。
+  // 结果**一律来自服务端本地解包数据**(v4.2.3 起只有一个源),不烧任何第三方额度。
   //
   // 查询结果按身高体重+时长缓存(localStorage),刷新页面时立即恢复、不闪空白。
-  // 只缓存**本地源**的结果:咸鱼源要烧额度,不进缓存,故每次点都会真去问第三方。
   const guessKey = [egg.heightM, egg.weightKg, egg.maxSecs].map((v) => v ?? '').join('|')
   const [match, setMatch] = useState(() => {
     if (!egg.random) return null
@@ -354,26 +351,17 @@ function EggCard({ egg, now, rate, measured, onPet }) {
     setMatch({ loading: true, error: '', data: null })
     queryEggMatch(egg.heightM, egg.weightKg, egg.maxSecs)
       .then((d) => {
-        // 只缓存本地源:咸鱼源每次都要烧额度,缓存它等于偷偷替管理员决定「这份结果
-        // 可以复用多久」—— 那是他的令牌,不该由前端做主。
-        if (d.source === 'local') writeEggGuessCache(guessKey, d)
+        writeEggGuessCache(guessKey, d)
         setMatch({ loading: false, error: '', data: d })
       })
       .catch((e) => {
-        const msg = e.message || '查询失败'
-        if (/429|请求过于频繁/.test(msg)) {
-          // 限流只可能发生在咸鱼源:不占卡片位置,弹自制 toast 提醒(不阻塞页面)
-          setMatch(null)
-          toast('喂喂喂,当我Token不要钱吗,等会再查啊魂淡')
-        } else {
-          setMatch({ loading: false, error: msg, data: null })
-        }
+        setMatch({ loading: false, error: e.message || '查询失败', data: null })
       })
   }, [egg.heightM, egg.weightKg, egg.maxSecs, guessKey])
 
-  // 恢复出来的缓存可能是**另一个源**给的(管理员在面板切过源之后,localStorage 还在)。
-  // 故挂载后静默重查一次校正:本地源是内存查表,这次请求几乎不要钱;咸鱼源不写缓存,
-  // 走不到这条路(它的缓存值只可能来自上一次本地源查询,正是要被校正掉的那种)。
+  // 缓存的是**上一个游戏版本**算出来的结果:候选由 PET_EGG_CONF 决定,版本更新后
+  // 区间和物种都可能变,而 localStorage 不会自己失效。故挂载后静默重查一次校正 ——
+  // 本地查询是内存查表,这次请求几乎不要钱,不值得为了省它把过期答案留在页面上。
   // 依赖写 [query] 而非 []:query 的依赖全是原始值,引用稳定,效果等同挂载一次,
   // 如此写是为了让 lint 能验证闭包没捕获到过期变量。
   const restoredRef = useRef(match?.data != null)
@@ -384,8 +372,7 @@ function EggCard({ egg, now, rate, measured, onPet }) {
   }, [query])
 
   const openQuery = () => {
-    // 咸鱼源的结果不进缓存,故命中缓存的一定是本地源的 —— 先立即渲染它(不闪空白),
-    // 再由上面那次静默刷新校正。
+    // 命中缓存就先立即渲染(不闪空白),再由上面那次静默刷新校正成当前版本的结果。
     const hit = readEggGuessCache(guessKey)
     if (hit) setMatch({ loading: false, error: '', data: hit })
     query()
@@ -455,7 +442,7 @@ function EggCard({ egg, now, rate, measured, onPet }) {
                   <>
                     <div className="muted egg-guess-line">
                       匹配 {match.data.total} 条
-                      {match.data.source === 'xianyu' ? ',来源 示例玩家' : ',来源 本地解包数据'}
+                      ',来源 本地解包数据'
                     </div>
                     <div className="egg-guess-list">
                       {/* 后端已按匹配度排好序,这里不再重排。 */}

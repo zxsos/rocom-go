@@ -49,24 +49,7 @@ type Server struct {
 	adminMu    sync.Mutex
 	adminToken string // 管理员会话令牌;服务重启后失效需重新登录
 
-	// eggAPIKey:第三方图鉴 API 令牌(-egg-api-key),查随机蛋可能物种用;空=不启用。
-	// 现在可被管理面板在运行期修改,而读取方有 HTTP 请求与 merchantLoop 两个 goroutine,
-	// 故经 eggAPIKey()/setEggAPIKey() 访问 —— 直接读写字段会构成数据竞争。
-	// 对外只暴露「是否已设置」(keySet),令牌原文不下发前端(见 New 的注释)。
-	eggAPIKey   string
-	eggAPIKeyMu sync.Mutex
-
 	merchantMu sync.Mutex // 远行商人回源互斥:并发请求/定时任务同时缺缓存时,只放行一次回源(见 merchant.go)
-
-	// 当前生效的远行商人数据源(见 merchant.go 的源常量):启动时从库载入,
-	// 切源时更新。它几乎不变而被频繁读取(每次请求与每个 tick),故存内存镜像。
-	merchantSrc   string
-	merchantSrcMu sync.Mutex
-
-	// 当前生效的查蛋数据源(见 api_egg_query.go 的源常量):启动时从库载入,
-	// 切源时更新。同上,存内存镜像。
-	eggSrc   string
-	eggSrcMu sync.Mutex
 
 	// 家园查询缓存:uid -> 最近一次回源的原始响应(见 api_home_query.go)。
 	// 按 uid 而非按账号存:查的是别人的家园,与请求方账号无关。
@@ -119,12 +102,12 @@ type iconMeta struct {
 	PartnerFrame  string            `json:"partnerFrame,omitempty"` // 搭档标记徽章橙色外框底(img_collect)
 }
 
-// New 创建 HTTP 服务。eggAPIKey 是查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌,
-// 只在服务端持有;空字符串 = 孵蛋页不提供查询(前端会提示未配置)。
-// smtpUser/smtpPass 是远行商人订阅邮件提醒的发件 QQ 邮箱与授权码,空 = 订阅提醒不可用。
-// New 创建 HTTP 服务。socks5Mgr 为 nil 时自建一个(测试与纯 Web 场景)。
-func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPass string, socks5Mgr *socks5.Manager) *Server {
-	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals(), eggAPIKey: eggAPIKey}
+// New 创建 HTTP 服务。smtpUser/smtpPass 是远行商人订阅邮件提醒的发件 QQ 邮箱与授权码,
+// 空 = 订阅提醒不可用。socks5Mgr 为 nil 时自建一个(测试与纯 Web 场景)。
+//
+// 只装配状态、不启动后台循环 —— 循环要显式调 Start(原因见 Start 的注释)。
+func New(st *store.Store, hub *Hub, db *gamedata.DB, smtpUser, smtpPass string, socks5Mgr *socks5.Manager) *Server {
+	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
 	s.snap = newSnapshotStore()
 	s.medalIDs = map[string][]uint32{}
 	s.injects = map[string][]*injectEntry{}
@@ -137,17 +120,6 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 		s.socks5Mgr = socks5Mgr
 	} else {
 		s.socks5Mgr = socks5.NewManager()
-	}
-	// 远行商人数据源:库里没配置(老库/首次)或值非法时回退默认源。
-	// 读取失败按「未配置」处理(表是后加的,老库没有这一行属正常),同样回退。
-	s.merchantSrc = merchantSrcDefault
-	if v := st.MerchantSource(); merchantSourceValid(v) {
-		s.merchantSrc = v
-	}
-	// 查蛋数据源:同上,库里没配置或值非法时回退默认(本地)源。
-	s.eggSrc = eggSrcDefault
-	if v := st.EggSource(); eggSourceValid(v) {
-		s.eggSrc = v
 	}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)
@@ -170,10 +142,21 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, eggAPIKey, smtpUser, smtpPa
 		PartnerFrame:  db.StaticIcon("partner_frame"),
 	}
 	s.routes()
+	return s
+}
+
+// Start 拉起三个后台循环(注入精灵生命周期、远行商人回源、排行榜结算)。
+//
+// 为什么不放在 New() 里:New 只负责装配状态,启动副作用交给调用方,这样单元测试构造出的
+// Server 不会自动开始跑循环 —— 否则每个测试都会真去请求第三方货单页面(见 merchantLoop),
+// 且测试之间改写包级 URL 变量会与上一个测试尚未退出的循环构成数据竞争(-race 必挂)。
+//
+// 调用时机也修正了一处竞态:main 是先 New 再 SetWebServer 注入监听的,原先循环在 New 里就起,
+// 于是启动瞬间这些 goroutine 可能读到 s.web == nil;现在 Start 排在注入之后。
+func (s *Server) Start() {
 	go s.sweepInjects()        // 注入精灵生命周期:玩家靠近 10 秒后自动消失
 	go s.merchantLoop()        // 远行商人:按 4h 槽定时回源第三方并缓存(见 api_merchant.go)
 	go s.startRankSettlement() // 排行榜称号:每晚 00:05 结算,启动时补结算(见 api_rank.go)
-	return s
 }
 
 // Hub 返回广播中心。
@@ -278,11 +261,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("DELETE /api/admin/merchant-subs", s.handleAdminMerchantSubs)
 	s.mux.HandleFunc("POST /api/admin/merchant-test-mail", s.handleAdminMerchantTestMail)
-	s.mux.HandleFunc("GET /api/admin/merchant-source", s.handleAdminMerchantSource)
-	s.mux.HandleFunc("POST /api/admin/merchant-source", s.handleAdminMerchantSource)
-	s.mux.HandleFunc("GET /api/admin/egg-stats", s.handleAdminEggStats)
-	s.mux.HandleFunc("GET /api/admin/egg-source", s.handleAdminEggSource)
-	s.mux.HandleFunc("POST /api/admin/egg-source", s.handleAdminEggSource)
 	s.mux.HandleFunc("GET /api/admin/config", s.handleAdminConfig)
 	s.mux.HandleFunc("POST /api/admin/config", s.handleAdminConfig)
 	// Web 监听地址(改它要试运行 + 确认,见 api_web_addr.go)

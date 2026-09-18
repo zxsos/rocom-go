@@ -64,33 +64,6 @@
 .admin-test-form textarea { grid-column: 1 / -1; resize: vertical; font-family: inherit; line-height: 1.5; }
 .admin-test-form .btn { white-space: nowrap; }
 
-/* —— 远行商人数据源 —— */
-.admin-source-row {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--bg-2);
-}
-.admin-source-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-/* 卡片内的按钮默认撑满(见 .admin-card .btn),这里它在标题行内,只需按内容宽 */
-.admin-source-head .btn { width: auto; margin-left: auto; padding: 6px 14px; }
-.admin-source-tag {
-  padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
-  color: var(--accent); border: 1px solid var(--accent);
-}
-.admin-error-inline { color: var(--danger); }
-
-/* —— 查蛋 API 统计 —— */
-.egg-fail { color: var(--danger); font-size: 13px; }
-.egg-daily { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 8px; }
-.egg-daily-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-.egg-daily-bar {
-  width: 100%; max-width: 26px; height: 96px; border-radius: 4px;
-  background: var(--bg-1); display: flex; flex-direction: column-reverse; overflow: hidden;
-}
-.egg-daily-fill { width: 100%; }
-.egg-daily-fill.ok { background: var(--green); }
-.egg-daily-fill.fail { background: var(--danger); }
-.egg-daily-day { font-size: 11px; color: var(--muted); }
 .admin-rule-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-rule-list li {
   display: flex; align-items: center; gap: 10px;
@@ -290,7 +263,7 @@
   .admin-field > span { width: auto; }
 }
 
-/* —— 运行配置(ConfigCards:发件邮箱 / 令牌与代理)—— */
+/* —— 运行配置(ConfigCards:发件邮箱 / 代理)—— */
 /* 三组配置各有各的生效代价,分组是为了让人一眼看出「改这个会不会断东西」。 */
 .admin-config-group {
   margin: 12px 0; padding: 10px 12px;

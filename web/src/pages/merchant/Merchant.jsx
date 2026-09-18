@@ -10,9 +10,9 @@ import { STATUS, count, unwrap } from './format'
 import { RoundSteps, MerchantTurn } from './components'
 import SubCard from './SubCard'
 
-// 远行商人页:展示后端缓存的 4h 轮次数据(令牌在服务端,缓存 2 天,见
+// 远行商人页:展示后端缓存的 4h 轮次数据(源站页面由后端抓取并归一化,缓存 2 天,见
 // internal/server/api_merchant.go)。
-// 刷新按钮只是重拉后端缓存(不烧 token);强制刷新(绕缓存回源第三方)已移到管理面板。
+// 刷新按钮只是重拉后端缓存(不打源站);强制刷新(跳过冷却立即重抓)已移到管理面板。
 // 纯展示逻辑见 format.js,展示组件见 components.jsx,订阅卡片见 SubCard.jsx。
 export default function Merchant() {
   const account = useContext(AccountContext) // 当前登录账号 key(账号下拉切换后自动跟随)
@@ -23,7 +23,7 @@ export default function Merchant() {
   const [busyRank, setBusyRank] = useState(false)
   const [rankErr, setRankErr] = useState('')
 
-  // 远行商人数据:第三方令牌在服务端且回源较慢,故只在挂载时重取,失败不自动重试。
+  // 远行商人数据:回源要抓第三方页面、较慢,故只在挂载时重取,失败不自动重试。
   const { data: raw, loading, error, refresh } = useAsyncData(useCallback(() => getMerchant(false), []))
   // 出错时不展示上一次的陈旧数据:营业状态/货单会误导(显示「营业中」其实早打烊了)。
   const d = error ? null : raw

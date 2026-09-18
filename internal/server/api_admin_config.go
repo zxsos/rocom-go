@@ -13,18 +13,18 @@ import (
 	"github.com/zxsos/rocom-go/internal/socks5"
 )
 
-// 管理面板的运行期配置:改邮箱 SMTP / 图鉴令牌 / 内置 SOCKS5 代理,不必重启服务。
+// 管理面板的运行期配置:改邮箱 SMTP / 内置 SOCKS5 代理,不必重启服务。
 //
 // ## 为什么分三档,而不是「都改完重启」
 //
 // 重启会打断正在解密的游戏连接(见 store/merchant_src.go 文件头的说明),代价实打实。
 // 而这几项配置的生效代价并不一样,一律重启纯属浪费:
 //
-//	T1 邮箱 SMTP、图鉴令牌   —— 完全热更:每次使用时读内存,换掉即可
-//	T2 SOCKS5 代理           —— 独立重启:它是独立 goroutine + 独立 listener,
-//	                            重开它不影响 Web 服务、不影响抓包
-//	T3 Web 监听地址 / TLS    —— 必须重启进程,**本轮不做**(改它是「让正在处理你
-//	                            请求的服务器当场消失」,失败即远端失联,须另配防变砖保护)
+//	T1 邮箱 SMTP           —— 完全热更:每次使用时读内存,换掉即可
+//	T2 SOCKS5 代理         —— 独立重启:它是独立 goroutine + 独立 listener,
+//	                          重开它不影响 Web 服务、不影响抓包
+//	T3 Web 监听地址 / TLS  —— 必须重启进程,**本轮不做**(改它是「让正在处理你
+//	                          请求的服务器当场消失」,失败即远端失联,须另配防变砖保护)
 //
 // ## 落盘策略
 //
@@ -37,16 +37,14 @@ import (
 //
 // ## 敏感项
 //
-// SMTP 授权码、代理密码、图鉴令牌的 GET **不返回原文**,只给「是否已设置」。
-// 前端把留空当作「不修改」。这与 -egg-api-key「只在服务端持有、不下发前端」
-// 的既有约定一致。
+// SMTP 授权码、代理密码的 GET **不返回原文**,只给「是否已设置」。
+// 前端把留空当作「不修改」。
 
 const (
 	// envSMTPUser / 等:配置项在 /etc/rocom.env 里的键名,与 deploy.sh 生成的模板一致。
 	// 新增键要同时改 scripts/deploy.sh 的 write_env(否则重启后这项不生效)。
 	envSMTPUser    = "ROCOM_SMTP_USER"
 	envSMTPPass    = "ROCOM_SMTP_PASS"
-	envEggAPIKey   = "ROCOM_EGG_API_KEY"
 	envSocks5Addr  = "ROCOM_SOCKS5_ADDR"
 	envSocks5Allow = "ROCOM_SOCKS5_ALLOW"
 	envSocks5Block = "ROCOM_SOCKS5_BLOCK"
@@ -75,7 +73,6 @@ type configJSON struct {
 
 	SMTPUser    string `json:"smtpUser"`    // 发件邮箱(非敏感,可回显)
 	SMTPPassSet bool   `json:"smtpPassSet"` // 授权码:只给是否已设置
-	EggKeySet   bool   `json:"eggKeySet"`   // 图鉴令牌:只给是否已设置
 
 	Socks5 socks5JSON `json:"socks5"`
 	Web    webJSON    `json:"web"`
@@ -138,13 +135,8 @@ func (s *Server) configGet(w http.ResponseWriter) {
 	if pass == "" && f != nil {
 		pass, _ = f.Get(envSMTPPass)
 	}
-	eggKey := s.eggAPIKeyGet()
-	if eggKey == "" && f != nil {
-		eggKey, _ = f.Get(envEggAPIKey)
-	}
 	out.SMTPUser = user
 	out.SMTPPassSet = pass != ""
-	out.EggKeySet = eggKey != ""
 
 	out.Socks5 = s.socks5CfgFromEnv()
 	if s.socks5Mgr != nil {
@@ -189,7 +181,6 @@ func (s *Server) socks5CfgFromEnv() socks5JSON {
 type configReq struct {
 	SMTPUser string `json:"smtpUser"`
 	SMTPPass string `json:"smtpPass"` // 留空=不改
-	EggKey   string `json:"eggKey"`   // 留空=不改
 
 	Socks5 *socks5Req `json:"socks5"` // 不传=不改代理
 }
@@ -219,7 +210,7 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// —— T1:邮箱与令牌 ——
+	// —— T1:邮箱 ——
 	smtpUser := strings.TrimSpace(req.SMTPUser)
 	smtpPass := req.SMTPPass
 	if smtpPass == "" { // 留空=不修改:沿用现有授权码
@@ -232,15 +223,6 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 	if smtpUser != "" && smtpPass == "" {
 		http.Error(w, "已填发件邮箱但未填授权码", http.StatusBadRequest)
 		return
-	}
-
-	eggKey := req.EggKey
-	if eggKey == "" { // 留空=不修改
-		if cur := s.eggAPIKeyGet(); cur != "" {
-			eggKey = cur
-		} else if v, _ := f.Get(envEggAPIKey); v != "" {
-			eggKey = v
-		}
 	}
 
 	// —— T2:代理 ——
@@ -276,7 +258,6 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 	}
 	put(envSMTPUser, smtpUser)
 	put(envSMTPPass, smtpPass)
-	put(envEggAPIKey, eggKey)
 	if nextSocks != nil {
 		put(envSocks5Addr, nextSocks.Addr)
 		put(envSocks5Allow, nextSocks.Allow)
@@ -297,7 +278,6 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 
 	// —— 内存热更 ——
 	s.smtp.setCredentials(smtpUser, smtpPass)
-	s.eggAPIKeySet(eggKey)
 
 	restarted := false
 	if nextSocks != nil && s.socks5Mgr != nil {
@@ -310,7 +290,7 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 		}
 		restarted = true
 	}
-	log.Printf("管理面板更新配置: smtp=%v eggKey=%v socks5重启=%v", smtpUser != "", eggKey != "", restarted)
+	log.Printf("管理面板更新配置: smtp=%v socks5重启=%v", smtpUser != "", restarted)
 	writeJSON(w, map[string]any{"ok": true, "socks5Restarted": restarted})
 }
 

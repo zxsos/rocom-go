@@ -33,7 +33,6 @@ func main() {
 	socks5User := flag.String("socks5-user", "", "SOCKS5 认证用户名(空=无认证)。建议配合 -socks5-allow 白名单使用;RFC 1929 密码为明文传输,公网直连时配合加密隧道更稳")
 	socks5Pass := flag.String("socks5-pass", "", "SOCKS5 认证密码(空=无认证;-socks5-user 非空时必填)")
 	socks5Block := flag.String("socks5-block", "google.com,example.com", "SOCKS5 屏蔽的目标域名(逗号分隔,精确或子域匹配;默认含手机系统连通性探测常用域名 google.com/example.com,可覆盖。空=不屏蔽)")
-	eggAPIKey := flag.String("egg-api-key", "", "查询随机蛋(神奇的蛋)可能物种的第三方图鉴 API 令牌(只在服务端持有,不下发前端;空=孵蛋页不提供查询)")
 	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
 	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
 	flag.Parse()
@@ -59,7 +58,7 @@ func main() {
 	// (重启会打断正在解密的游戏连接)。原 serveSocks5 的校验与拆分逻辑已并入
 	// socks5.Config.Validate / Manager.Start。
 	socks5Mgr := socks5.NewManager()
-	srv := server.New(st, server.NewHub(), db, *eggAPIKey, *smtpUser, *smtpPass, socks5Mgr)
+	srv := server.New(st, server.NewHub(), db, *smtpUser, *smtpPass, socks5Mgr)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 	for s := range strings.SplitSeq(*ignoreIPs, ",") {
@@ -87,6 +86,8 @@ func main() {
 	}
 	web := server.NewWebServer(srv.Handler(), tlsCfg)
 	srv.SetWebServer(web)
+	// 后台循环必须在 SetWebServer 之后再起:循环里会读 s.web,提前启动会撞上 nil(见 Server.Start)。
+	srv.Start()
 
 	pl := pipeline.New(st, db, srv)
 	go pl.Run(eng)

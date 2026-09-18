@@ -8,12 +8,9 @@ import {
 import AdminLoginCard from './AdminLoginCard'
 import CatchStatsCard from './CatchStatsCard'
 import PlaySessionsCard from './PlaySessionsCard'
-import EggStatsCard from './EggStatsCard'
 import RulesCard from './RulesCard'
 import { InjectWildCard, InjectFlowerCard } from './InjectCards'
 import MerchantSubsCard from './MerchantSubsCard'
-import MerchantSourceCard from './MerchantSourceCard'
-import EggSourceCard from './EggSourceCard'
 import PinCard from './PinCard'
 import { MailConfigCard, AdvConfigCard } from './ConfigCards'
 import WebAddrCard from './WebAddrCard'
@@ -21,8 +18,8 @@ import WebAddrCard from './WebAddrCard'
 // 三个分页按**动作代价**递增排,不是按功能类别分 —— 管理员最容易犯的错是
 // 「以为自己只是看看,结果改了全局」,顺序本身就是提示:
 //   信息查询  只读,翻遍了也不会动到任何东西
-//   普通设置  改展示层:数据源、黑白名单、邮件提醒,改错了随时能改回来
-//   高级设置  改服务端自身:代理监听、第三方令牌、向玩家投放假数据
+//   普通设置  改展示与通知:邮件提醒、订阅名单、黑白名单,改错了随时能改回来
+//   高级设置  改服务端自身:代理监听、向玩家投放假数据
 const TABS = [
   { id: 'query', label: '信息查询' },
   { id: 'basic', label: '普通设置' },
@@ -224,7 +221,6 @@ export default function Admin() {
           <div className="admin-section-title">数据统计</div>
           <CatchStatsCard onUnauthed={kickIfUnauthed} />
           <PlaySessionsCard accounts={accounts} onUnauthed={kickIfUnauthed} />
-          <EggStatsCard onUnauthed={kickIfUnauthed} />
         </>
       )}
 
@@ -233,10 +229,6 @@ export default function Admin() {
           <div className="admin-section-title">邮件提醒</div>
           <MailConfigCard config={config} error={configError} onSave={saveConfig} />
           <MerchantSubsCard onUnauthed={kickIfUnauthed} />
-
-          <div className="admin-section-title">数据源</div>
-          <MerchantSourceCard onUnauthed={kickIfUnauthed} />
-          <EggSourceCard onUnauthed={kickIfUnauthed} />
 
           <div className="admin-section-title">账号与规则</div>
           <RulesCard onUnauthed={kickIfUnauthed} />

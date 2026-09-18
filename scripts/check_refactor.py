@@ -69,6 +69,10 @@ REFACTORS = {
 # 连同其文档注释与函数体一并从期望中剔除(否则它们会被报成「丢失」)。
 ALLOWED_REMOVED_FUNCS = {
     "handleAdminPlaceholder": "孤儿路由,前端已删唯一调用者",
+    # feat:移除咸鱼源(第三方图鉴 API,2026-09-02 起实测 401)。该处理器读的是
+    # store.EggQueryStats —— 那张表只在「向咸鱼源发起请求」时才写,源没了就没有任何
+    # 数据来源,面板上的用量卡片与日线图一并删除。egg_queries 表按决定保留(不迁移)。
+    "handleAdminEggStats": "feat:移除咸鱼源,第三方用量统计随之失去数据来源",
     # fix:第三方滞后补货。缓存判定由「是否有记录」升级为「是否该回源」,该函数被
     # merchantShouldFetch 取代(多了进行中窗口/冷却两个维度,不是原地改写)。
     "merchantCached": "fix:被 merchantShouldFetch 取代(当前槽需按冷却重查)",
@@ -158,6 +162,10 @@ ALLOWED_LINE_PATTERNS = [
     # fix:第三方滞后补货导致整轮漏商品(2026-08-30 实测)。常量 merchantFetchURL 由 const
     # 改为 var —— 单元测试要用 httptest 把它换掉,const 换不了,不换就会真打到线上烧 token。
     r"merchantFetchURL=\"https://apii\.xianyuw\.cn/api/v1/rocom-merchant\"",
+    # feat:移除咸鱼源。文件头那行是基线残留的**残余内容**(它描述的是 merchantLoc 之前那个
+    # 常量块),改写会触发行守恒,故登记。新文案改成「第三方货单页面(好游快爆 onebiji)」。
+    # 注:norm() 会剥掉全部空白,所以 pattern 必须写成无空白形式并转义括号(照上一条抄)。
+    r"//远行商人:第三方API\(https://apii\.xianyuw\.cn/api/v1/rocom-merchant\)的本地缓存代理。",
     # 同上那个 fix:文件头业务模型注释里被改写的 5 行(旧描述「命中缓存不再回源」已不成立)。
     # 只挑不含正则元字符的片段,免得满屏转义。
     r"命中缓存不再回源,防止反复烧第三方token;",

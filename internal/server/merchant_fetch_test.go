@@ -7,23 +7,25 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-// 本文件守住远行商人的**回源时机**:什么时候该回源、什么时候必须不回源,以及第三方
+// 本文件守住远行商人的**回源时机**:什么时候该回源、什么时候必须不回源,以及源站
 // 瞬时返回空时不能把已有货单清掉。
 //
-// 存在理由(2026-08-30 线上故障):原实现是「每槽只回源一次」,而第三方自己有缓存,
-// 轮次开始后新上架的商品要滞后才出现在它的响应里 —— 当晚 20:00 开轮,第三方那份快照
+// 存在理由(2026-08-30 线上故障):原实现是「每槽只回源一次」,而源站自己有缓存,
+// 轮次开始后新上架的商品要滞后才出现在它的页面里 —— 当晚 20:00 开轮,那份快照
 // 到 20:56 才补全魔力果/火系粉尘/萌系粉尘,页面整整一轮只显示了 4 件全天货,
 // 只有管理员点「强制刷新」才补得回来。
 //
-// 但反过来也不能放开重查:merchantFetch 是按「现在时刻」问第三方的,拿回来的是当前货单,
+// 但反过来也不能放开重查:merchantFetch 是按「现在时刻」问源站的,拿回来的是当前货单,
 // 往已结束的历史槽里写一发就是**伪造历史数据**。所以这里同时守住两个方向的约束。
+//
+// 假桩统一走 fakeHaoyouAPI(见 merchant_haoyou_test.go):商人现在只有一个源,
+// 它抓的是 HTML 页面而非 JSON 接口,故这里喂的也是页面。
 
 // testDay 造一个营业日(0 = 今天,-1 = 昨天)。
 //
@@ -35,59 +37,52 @@ func testDay(off int) time.Time {
 	return merchantDayStart(time.Now()).AddDate(0, 0, off)
 }
 
-// fakeMerchantAPI 把第三方接口换成 httptest 假服务,返回请求次数。
+// haoyouPageForSlot 造一份「该槽有这些货」的页面。
 //
-// 必须挡住真实请求:merchantFetch 打的是线上地址,单元测试跑一次就烧一次 token,
-// 而且返回什么取决于第三方当时的货单,断言根本没法写。
-func fakeMerchantAPI(t *testing.T, body string, status int) *int {
-	t.Helper()
-	hits := new(int)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*hits++
-		if status != http.StatusOK {
-			w.WriteHeader(status)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, body)
-	}))
-	t.Cleanup(srv.Close)
-	old := merchantFetchURL
-	merchantFetchURL = srv.URL
-	t.Cleanup(func() { merchantFetchURL = old })
-	return hits
+// 必须把 block 的 end 设成 slotStart + 4h:fetchHaoyou 是按 start 相等挑槽的
+// (见 merchant_haoyou.go),而页面只标结束时刻。end 给错的话页面里就没有这个槽,
+// 回源会「成功但空货」——看着像被测逻辑坏了,其实是夹具对不上。
+func haoyouPageForSlot(slotStart time.Time, names ...string) string {
+	goods := make([]haoyouGood, 0, len(names))
+	for _, n := range names {
+		goods = append(goods, haoyouGood{name: n, image: "a.png"})
+	}
+	return haoyouPage(haoyouBlock{end: slotStart.Add(merchantSlotStep).Unix(), goods: goods})
 }
 
 // TestMerchantFetchLogsEveryAttempt 同一轮内连续回源,日志必须逐次给出递增的尝试
 // 序号,且每个出口(空 / 有货)都留下一条。
 //
-// 存在理由:整点后第三方滞后约 1 分钟才切到新一轮,于是切换窗口内前几次回源**必然
+// 存在理由:整点后源站滞后约 1 分钟才切到新一轮,于是切换窗口内前几次回源**必然
 // 拿到空**。日志里若没有递增序号,「第 4 次才拿到」与「一次命中」长得一模一样 ——
-// 而那正是区分「第三方慢」与「我们压根没去查」的唯一依据。序号不递增,这条线索就没了。
+// 而那正是区分「源站慢」与「我们压根没去查」的唯一依据。序号不递增,这条线索就没了。
 //
 // 断言日志文本而非返回值:回源结果本身(ok/empty)已被其它用例覆盖,这里守的是
 // 「日志能否把一整轮的获取过程还原出来」—— 光有返回值正确、日志看不出过程,照样排查不了。
 func TestMerchantFetchLogsEveryAttempt(t *testing.T) {
-	const emptyBody = `{"code":200,"data":{"item_count":0,"items":[]}}`
-	const goodsBody = `{"code":200,"data":{"item_count":2,"items":` +
-		`[{"name":"残缺魔镜"},{"name":"适格钥匙"}]}}`
-
 	s := newTestServer(t)
-	// 按调用次序返回:前两次空,第三次起有货(模拟整点后第三方滞后切换)。
+	slot := merchantDaySlots(testDay(-1))[1]
+	emptyPage := haoyouPageForSlot(slot)
+	goodsPage := haoyouPageForSlot(slot, "残缺魔镜", "适格钥匙")
+
+	// 按调用次序返回:前两次空,第三次起有货(模拟整点后源站滞后切换)。
+	var mu sync.Mutex
 	var n int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		n++
-		w.Header().Set("Content-Type", "application/json")
-		if n <= 2 {
-			_, _ = io.WriteString(w, emptyBody)
-			return
+		body := emptyPage
+		if n > 2 {
+			body = goodsPage
 		}
-		_, _ = io.WriteString(w, goodsBody)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, body)
 	}))
-	defer srv.Close()
-	oldURL := merchantFetchURL
-	merchantFetchURL = srv.URL
-	defer func() { merchantFetchURL = oldURL }()
+	t.Cleanup(srv.Close)
+	old := haoyouURL
+	haoyouURL = srv.URL
+	t.Cleanup(func() { haoyouURL = old })
 
 	// 接管 log 输出以断言文本内容(不改动全局 logger 之外的状态)。
 	var buf bytes.Buffer
@@ -96,15 +91,12 @@ func TestMerchantFetchLogsEveryAttempt(t *testing.T) {
 	log.SetFlags(0)
 	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-	// 槽取昨天且避开今天 8:00(已让给订阅测试,见 testDay 的说明)。
-	slot := merchantDaySlots(testDay(-1))[1]
-	if ok, empty := s.merchantFetch(slot, true); !ok || !empty {
-		t.Fatalf("第 1 次应回源成功且为空, 实际 ok=%v empty=%v", ok, empty)
+	for i := 1; i <= 2; i++ {
+		if ok, empty := s.merchantFetch(slot); !ok || !empty {
+			t.Fatalf("第 %d 次应回源成功且为空, 实际 ok=%v empty=%v", i, ok, empty)
+		}
 	}
-	if ok, empty := s.merchantFetch(slot, true); !ok || !empty {
-		t.Fatalf("第 2 次应回源成功且为空, 实际 ok=%v empty=%v", ok, empty)
-	}
-	if ok, empty := s.merchantFetch(slot, true); !ok || empty {
+	if ok, empty := s.merchantFetch(slot); !ok || empty {
 		t.Fatalf("第 3 次应回源成功且有货, 实际 ok=%v empty=%v", ok, empty)
 	}
 
@@ -123,6 +115,10 @@ func TestMerchantFetchLogsEveryAttempt(t *testing.T) {
 	// 阶段耗时必须真的打出来:只有序号没有耗时,还是看不出慢在哪一段。
 	if !strings.Contains(got, "总计=") {
 		t.Errorf("日志缺少各阶段耗时:\n%s", got)
+	}
+	// 源站固定是好游快爆:日志里的来源标注要能被 grep 出来,否则多实例排查时分不清谁抓的。
+	if !strings.Contains(got, "源="+merchantSrcHaoyou) {
+		t.Errorf("日志缺少来源标注 源=%s:\n%s", merchantSrcHaoyou, got)
 	}
 }
 
@@ -167,11 +163,14 @@ func TestMerchantShouldFetch(t *testing.T) {
 	}
 }
 
-// TestMerchantFetchKeepsGoodsOnEmptyResponse 重查撞上第三方瞬时返回空时,
+// TestMerchantFetchKeepsGoodsOnEmptyResponse 重查撞上源站瞬时返回空时,
 // 库里已有的好货单必须**保留** —— 覆盖成空会让页面上明明还有的货单整片消失。
 //
 // 同时要求把回源时刻推到当前:不推的话重查冷却立刻失效,下一 tick 又判定该重查,
-// 于是一路回源到窗口结束,白烧 token。
+// 于是一路回源到窗口结束,白打源站。
+//
+// 这条比其它回源用例更好写:断言的是**播种进去的那份**原样留在库里(保护分支根本不
+// 碰数据),所以可以逐字节精确比对,不必管归一化产物的字段顺序。
 func TestMerchantFetchKeepsGoodsOnEmptyResponse(t *testing.T) {
 	s := newTestServer(t)
 	slot := merchantDaySlots(testDay(0))[1]
@@ -183,9 +182,9 @@ func TestMerchantFetchKeepsGoodsOnEmptyResponse(t *testing.T) {
 	if !ok {
 		t.Fatal("播种失败: 读不到刚写的槽缓存")
 	}
-	fakeMerchantAPI(t, `{"code":200,"data":{"item_count":0,"items":[]}}`, http.StatusOK)
+	fakeHaoyouAPI(t, haoyouPageForSlot(slot), http.StatusOK) // 该槽无货
 
-	ok, empty := s.merchantFetch(slot, true)
+	ok, empty := s.merchantFetch(slot)
 
 	if !ok || !empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, true)", ok, empty)
@@ -195,25 +194,27 @@ func TestMerchantFetchKeepsGoodsOnEmptyResponse(t *testing.T) {
 		t.Fatal("槽缓存记录消失了")
 	}
 	if gotEmpty {
-		t.Error("第三方返回空却把槽标记成 empty, 页面货单会整片消失")
+		t.Error("源站返回空却把槽标记成 empty, 页面货单会整片消失")
 	}
 	if gotData != goods {
-		t.Errorf("第三方返回空却覆盖了既有货单:\n got = %s\nwant = %s", gotData, goods)
+		t.Errorf("源站返回空却覆盖了既有货单:\n got = %s\nwant = %s", gotData, goods)
 	}
 	if after <= before {
-		t.Errorf("保留旧货单后未把回源时刻推前(%d → %d): 冷却失效会导致反复回源, 白烧 token", before, after)
+		t.Errorf("保留旧货单后未把回源时刻推前(%d → %d): 冷却失效会导致反复回源", before, after)
 	}
 }
 
 // TestMerchantFetchStillWritesEmptyWhenNoGoods 保护逻辑不能过头:库里本来就没货时,
 // 空响应必须照常写成 empty,否则「该轮确实无货」永远记不下来。
+//
+// 不比对存储原文:落库的是归一化后的响应体,字段集合由归一化层决定,逐字节比会把
+// 断言绑在实现细节上。这里要守的只有两件事 —— 记了 empty,且确实没有商品。
 func TestMerchantFetchStillWritesEmptyWhenNoGoods(t *testing.T) {
 	s := newTestServer(t)
 	slot := merchantDaySlots(testDay(0))[2]
-	const none = `{"code":200,"data":{"item_count":0,"items":[]}}`
-	fakeMerchantAPI(t, none, http.StatusOK)
+	fakeHaoyouAPI(t, haoyouPageForSlot(slot), http.StatusOK)
 
-	ok, empty := s.merchantFetch(slot, true)
+	ok, empty := s.merchantFetch(slot)
 
 	if !ok || !empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, true)", ok, empty)
@@ -222,24 +223,25 @@ func TestMerchantFetchStillWritesEmptyWhenNoGoods(t *testing.T) {
 	if !ok2 || !gotEmpty {
 		t.Errorf("无货时未写成 empty: ok=%v empty=%v", ok2, gotEmpty)
 	}
-	if gotData != none {
-		t.Errorf("无货时应把第三方原始响应一并存下(供事后排查):\n got = %s\nwant = %s", gotData, none)
+	if merchantBodyHasItems(gotData) {
+		t.Errorf("无货却存进了带商品的响应: %s", gotData)
 	}
 }
 
 // TestMerchantFetchRefetchUpdatesGoods 重查拿到更全的货单时要**覆盖**写库 ——
 // 这正是修的那个故障:20:56 那份快照多出 3 件,必须能盖掉 20:0x 那份不完整的。
+//
+// 比对解析后的商品而非原文:库里存的是归一化产物,与播种进去的那份字符串本来就不同形。
 func TestMerchantFetchRefetchUpdatesGoods(t *testing.T) {
 	s := newTestServer(t)
 	slot := merchantDaySlots(testDay(0))[3]
 	const first = `{"code":200,"data":{"item_count":4,"items":[{"name":"残缺魔镜"}]}}`
-	const later = `{"code":200,"data":{"item_count":7,"items":[{"name":"残缺魔镜"},{"name":"魔力果"}]}}`
 	if err := s.store.PutMerchantSlotAt(slot.Unix(), false, first, time.Now().Add(-time.Hour).Unix()); err != nil {
 		t.Fatalf("播种首查货单: %v", err)
 	}
-	hits := fakeMerchantAPI(t, later, http.StatusOK)
+	hits := fakeHaoyouAPI(t, haoyouPageForSlot(slot, "残缺魔镜", "魔力果"), http.StatusOK)
 
-	ok, empty := s.merchantFetch(slot, true)
+	ok, empty := s.merchantFetch(slot)
 
 	if !ok || empty {
 		t.Fatalf("merchantFetch = (%v, %v), 期望 (true, false)", ok, empty)
@@ -247,8 +249,12 @@ func TestMerchantFetchRefetchUpdatesGoods(t *testing.T) {
 	if *hits != 1 {
 		t.Errorf("回源 %d 次, 期望 1 次", *hits)
 	}
-	if _, got, _, _ := s.store.GetMerchantSlot(slot.Unix()); got != later {
-		t.Errorf("重查未覆盖旧货单:\n got = %s\nwant = %s", got, later)
+	_, got, _, _ := s.store.GetMerchantSlot(slot.Unix())
+	if n := merchantBodyItemCount(got); n != 2 {
+		t.Errorf("重查后库里有 %d 件商品, 期望 2 件(未覆盖旧货单?): %s", n, got)
+	}
+	if !strings.Contains(got, "魔力果") {
+		t.Errorf("重查拿到的新商品「魔力果」没进库(旧货单未被覆盖): %s", got)
 	}
 }
 
@@ -258,9 +264,8 @@ func TestMerchantFetchRefetchUpdatesGoods(t *testing.T) {
 // 更早的轮连被评估的机会都没有(cur 之前的下标一律不看),而即便被评估,它们也已结束、
 // merchantShouldFetch 必然返回 false。两条独立成立,互为兜底。
 //
-// 抽成纯函数测而不是走 merchantEnsure,是为了避开数据竞争:merchantEnsure 要求
-// eggAPIKey 非空才回源,而 New() 起的 merchantLoop goroutine 会读同一个字段,
-// 测试再写就与那次读取无序(-race 必报)。纯函数没有这个负担。
+// 抽成纯函数测而不是走 merchantEnsure:回源要打到源站,那需要额外的假桩,而这里想验的
+// 只是「哪个下标是当前轮」这一条时间换算 —— 纯函数能精确地只测它。
 func TestMerchantCurrentSlot(t *testing.T) {
 	day := testDay(-1)
 	slots := merchantDaySlots(day)
@@ -294,106 +299,54 @@ func TestMerchantCurrentSlot(t *testing.T) {
 	}
 }
 
-// TestMerchantFetchSendsRefresh 回源必须带 refresh=true —— 这条光读代码看不出来
-// (参数拼在 URL 查询串里),但它是「准点拿到新货单」的关键。
+// TestMerchantEnsureFetchesCurrentSlot 走**真实调用链**验证回源确实发生:
+// merchantEnsure → merchantShouldFetch / force → merchantFetch → fetchHaoyou。
 //
-// 为什么必须强制第三方回源:它自己有缓存,带 refresh=false 时返回的可能是上一轮
-// 甚至更早的**旧快照** —— 那时无论我们重查多少次,拿回的始终是同一份陈旧数据,
-// 「轮次开始后滞后补全」这件事永远追不上(2026-08-30 实测滞后 56 分钟)。
-// 带 refresh=true 才会真正回源,准点后约 1 分钟即可拿到新货单。
-//
-// 同时也钉住其余必填参数:key 与 format=json 缺一不可。
-func TestMerchantFetchSendsRefresh(t *testing.T) {
+// 为什么要有它:直接调 merchantFetch 的用例绕过了 merchantEnsure 里的判定与选槽逻辑,
+// 那条路径坏了(比如 force 参数没透传、当前槽算错)照样全绿。这里钉的是「玩家点刷新
+// 或 merchantEnsure 判定该查时,请求真的打到源站,且写进了对应槽」。
+func TestMerchantEnsureFetchesCurrentSlot(t *testing.T) {
 	s := newTestServer(t)
-	s.eggAPIKeySet("test-key")              // merchantFetch 的必填查询参数;真 token 不在测试里出现
-	slot := merchantDaySlots(testDay(0))[5] // 避开别处占用的槽
-	const goods = `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`
-
-	// 收集**所有**请求而非只记最后一次:New() 起的 merchantLoop 后台 goroutine 也会
-	// 回源打到这个假服务(见 server.go),只记最后一次的话可能读到后台的请求 ——
-	// 那会让断言「碰巧正确」(假绿灯)。改成收集全部并断言全部,后台请求反而
-	// 变成额外的验证样本。
-	var mu sync.Mutex
-	var queries []url.Values
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		queries = append(queries, r.URL.Query())
-		mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, goods)
-	}))
-	t.Cleanup(srv.Close)
-	old := merchantFetchURL
-	merchantFetchURL = srv.URL
-	t.Cleanup(func() { merchantFetchURL = old })
-
-	if ok, _ := s.merchantFetch(slot, true); !ok {
-		t.Fatal("merchantFetch 失败(应拿到正常响应)")
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	if len(queries) == 0 {
-		t.Fatal("没有捕到任何回源请求")
-	}
-	for i, q := range queries {
-		if got := q.Get("refresh"); got != "true" {
-			t.Errorf("第 %d 次请求 refresh = %q, 期望 \"true\"(不强制回源会拿到第三方陈旧快照,重查等同空转)", i+1, got)
-		}
-		if got := q.Get("format"); got != "json" {
-			t.Errorf("第 %d 次请求 format = %q, 期望 \"json\"", i+1, got)
-		}
-		if got := q.Get("key"); got == "" {
-			t.Errorf("第 %d 次请求 key 缺失(第三方必填)", i+1)
-		}
-	}
-}
-
-// TestMerchantEnsureForcesRefresh 走**真实调用链**验证强制刷新生效:
-// merchantEnsure → merchantShouldForceRefresh → merchantFetch。
-//
-// 为什么要有它:TestMerchantFetchSendsRefresh 直接调 merchantFetch(slot, true),
-// 绕过了策略函数 —— 变异测试证明,把 merchantShouldForceRefresh 改成恒返回 false
-// 时那条用例**照样通过**(假绿灯)。真正决定线上行为的是 merchantEnsure 里的调用,
-// 故必须在这里钉死。
-func TestMerchantEnsureForcesRefresh(t *testing.T) {
-	s := newTestServer(t)
-	s.eggAPIKeySet("test-key")
 	// 用昨天的一个进行中槽(避开别处占用的):把 now 设在槽开始后 30 分钟
 	slot := merchantDaySlots(testDay(-1))[1]
 	now := slot.Add(30 * time.Minute)
 
 	var mu sync.Mutex
-	var queries []url.Values
+	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		queries = append(queries, r.URL.Query())
+		hits++
 		mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"code":200,"data":{"item_count":1,"items":[{"name":"残缺魔镜"}]}}`)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, haoyouPageForSlot(slot, "残缺魔镜"))
 	}))
 	t.Cleanup(srv.Close)
-	old := merchantFetchURL
-	merchantFetchURL = srv.URL
-	t.Cleanup(func() { merchantFetchURL = old })
+	old := haoyouURL
+	haoyouURL = srv.URL
+	t.Cleanup(func() { haoyouURL = old })
 
-	// force=true:前端「强制刷新」路径
+	// ① force=true:前端「强制刷新」路径,必须立即回源当前轮
 	s.merchantEnsure(now, true)
+	mu.Lock()
+	forced := hits
+	mu.Unlock()
+	if forced == 0 {
+		t.Fatal("force=true 时 merchantEnsure 没有发起回源")
+	}
+	if _, _, _, ok := s.store.GetMerchantSlot(slot.Unix()); !ok {
+		t.Error("force=true 回源后当前槽没有缓存")
+	}
 
-	// 常规路径(shouldFetch 判定要回源):同样必须带 refresh=true —— 重查的目的
-	// 就是追第三方滞后,拿它的缓存快照等于空转。
-	s.merchantEnsure(now) // 此时该槽刚回源过(冷却内),换个槽触发常规首查
+	// ② 常规路径:一个没查过的进行中槽,shouldFetch 判定要查,同样得真打到源站
 	slot2 := merchantDaySlots(testDay(-1))[2]
 	s.merchantEnsure(slot2.Add(30 * time.Minute))
-
 	mu.Lock()
-	defer mu.Unlock()
-	if len(queries) == 0 {
-		t.Fatal("merchantEnsure 没有发起回源")
+	total := hits
+	mu.Unlock()
+	if total <= forced {
+		t.Errorf("常规首查没有回源(累计 %d 次,force 后已是 %d 次)", total, forced)
 	}
-	for i, q := range queries {
-		if got := q.Get("refresh"); got != "true" {
-			t.Errorf("第 %d 次回源 refresh = %q, 期望 \"true\"(拿缓存快照的重查等同空转)", i+1, got)
-		}
+	if _, _, _, ok := s.store.GetMerchantSlot(slot2.Unix()); !ok {
+		t.Error("常规首查后该槽没有缓存")
 	}
 }

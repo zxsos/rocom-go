@@ -33,11 +33,22 @@ func newTestServer(t *testing.T) *Server {
 	if err != nil {
 		t.Fatalf("打开数据库: %v", err)
 	}
-	// 收尾前必须关库:Server 的后台 goroutine(merchantLoop / 排行榜结算)与 store 自己的
-	// checkpointLoop 无从停止,不关连接池的话 t.TempDir() 清理时会 “directory not empty”
-	// —— 用例随机失败,且与被测逻辑无关。见 store.Close 的说明。
+	// 收尾前必须关库:store 自己的 checkpointLoop 无从停止,不关连接池的话 t.TempDir()
+	// 清理时会 “directory not empty” —— 用例随机失败,且与被测逻辑无关。见 store.Close 的说明。
+	// (Server 的后台循环已经不在了:它们在 Start() 里才起,而测试不调 Start,见 Server.Start。)
 	t.Cleanup(func() { _ = st.Close() })
-	return New(st, NewHub(), db, "", "", "", nil) // 测试不涉及查蛋/邮件,三个令牌留空
+	return New(st, NewHub(), db, "", "", nil) // 测试不涉及邮件,SMTP 留空
+}
+
+// newTestServerFrom 用既有的库另起一个 Server(模拟「服务重启」):验证某项配置确实
+// 落到了库里、而不是只活在内存镜像中。同样不调 Start(),故不会拉起后台循环。
+func newTestServerFrom(t *testing.T, st *store.Store) *Server {
+	t.Helper()
+	db, err := gamedata.Load()
+	if err != nil {
+		t.Fatalf("加载名称库: %v", err)
+	}
+	return New(st, NewHub(), db, "", "", nil)
 }
 
 // grid 经 HTTP 接口取某张覆盖位图(顺带验一遍 base64 编码),返回位图与边长(格)。

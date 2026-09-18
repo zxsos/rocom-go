@@ -34,8 +34,8 @@ page.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
 // 两个坑,都踩过:
 //   1. 只取首列(玩家名+UID)不行 —— 单账号数据下每行的首列完全相同,
 //      两页比对必然「全部重复」,断言形同虚设。故取整行(含上/下线时间与时长)。
-//   2. 必须限定在「游玩记录」卡片内:.admin-play-table 是共用表格样式,查蛋统计卡片
-//      (EggStatsCard) 也用它,直接全局选会把那边的行一起数进来,条数断言就失准了。
+//   2. 必须限定在「游玩记录」卡片内:.admin-play-table 是共用表格样式,订阅名单卡片
+//      (MerchantSubsCard) 也用它,直接全局选会把那边的行一起数进来,条数断言就失准了。
 const rows = () => page.evaluate(() => {
   const card = [...document.querySelectorAll('.admin-card')]
     .find((c) => (c.querySelector('h3')?.textContent || '').includes('游玩记录'))

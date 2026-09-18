@@ -50,7 +50,7 @@ func newTestPipeline(t *testing.T) (*Pipeline, *server.Server) {
 	}
 	// 不 Close 的话 SQLite 句柄一直占着文件,Windows 上 TempDir 清理必然失败
 	t.Cleanup(func() { _ = st.Close() })
-	srv := server.New(st, server.NewHub(), db, "", "", "", nil)
+	srv := server.New(st, server.NewHub(), db, "", "", nil)
 	p := New(st, db, srv)
 	// 关掉登录后的家园快照预热(见 Pipeline.prefetchHome):它是真连 rocodex.org 的,
 	// 开着的话每个用例的 login() 都会起一个打外网的 goroutine —— 慢、依赖网络、刷日志。

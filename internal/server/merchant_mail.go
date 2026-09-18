@@ -289,7 +289,7 @@ func fmtDuration(d time.Duration) string {
 // 其余取值返回空串(不显示图片,商品行照常输出)。
 //
 // 为什么不放宽:**两个数据源的商品图都是 patchwiki.biligame.com 的 https 直链**
-// (2026-09-03 用咸鱼源真实响应核对过;好游快爆源是同一个图床)。早先这里还有一条
+// (2026-09-03 用真实响应核对过,好游快爆页面给的正是 biligame 那同一个图床)。早先这里还有一条
 // 「本地相对路径 → 读 embed 的 webp → 内嵌成 CID 附件」的分支,那是死代码:
 // 没有任何源会产出相对路径,故一并删除 —— 连带 merchantMailImg 类型与
 // merchantMailMessage 里的 multipart/related + base64 附件。

@@ -171,7 +171,7 @@ if ! has "-socks5-pass"; then
     v=$(env_get ROCOM_SOCKS5_PASS)
     [ -z "$v" ] || set -- "$@" -socks5-pass "$v"
 fi
-# 邮箱与图鉴令牌:面板随时可改(热更),这里的初值只是「容器重建后不至于丢」。
+# 邮箱:面板随时可改(热更),这里的初值只是「容器重建后不至于丢」。
 if ! has "-merchant-smtp-user"; then
     v=$(env_get ROCOM_SMTP_USER)
     [ -z "$v" ] || set -- "$@" -merchant-smtp-user "$v"
@@ -179,10 +179,6 @@ fi
 if ! has "-merchant-smtp-pass"; then
     v=$(env_get ROCOM_SMTP_PASS)
     [ -z "$v" ] || set -- "$@" -merchant-smtp-pass "$v"
-fi
-if ! has "-egg-api-key"; then
-    v=$(env_get ROCOM_EGG_API_KEY)
-    [ -z "$v" ] || set -- "$@" -egg-api-key "$v"
 fi
 
 # ---- 校验:必须二选一 ----
