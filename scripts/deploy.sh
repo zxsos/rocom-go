@@ -28,6 +28,9 @@
 #   ROCOM_HY2_PASS     hysteria2 认证密码(隧道内传输,非明文)
 #   ROCOM_HY2_ALLOW    hysteria2 客户端白名单(逗号分隔 IP/CIDR;公网部署必填)
 #   ROCOM_HY2_UP / ROCOM_HY2_DOWN   带宽(Mbps),重启进程才生效
+#   ROCOM_HY2_ADVERTISE  对外可达地址(host[:port],两部分都可省),**只用于生成导入链接**:
+#                        监听地址没有主机,而端口还可能被 NAT/云映射改掉。
+#                        它不是启动参数,故 run.sh 不组装它 —— 面板出链接时现读。
 #   ROCOM_SKIP_SELF_IP  启用代理时设 false(默认 true;不显式指定会自动改)
 #   ROCOM_SMTP_USER / ROCOM_SMTP_PASS   远行商人订阅邮件的发件邮箱与授权码
 #   ROCOM_EXTRA       其他要透传的参数(如 -ignore-ip)
@@ -263,6 +266,9 @@ ROCOM_HY2_BLOCK=
 ROCOM_HY2_MAX_CONNS=
 ROCOM_HY2_UP=
 ROCOM_HY2_DOWN=
+# 对外可达地址(host[:port],可只写 :端口),仅用于管理面板生成手机导入链接。
+# 监听地址本身没有主机信息,而端口可能被 NAT/云映射改掉,两者不能混为一谈。
+ROCOM_HY2_ADVERTISE=
 ROCOM_SKIP_SELF_IP=false
 # 远行商人订阅邮件的发件邮箱与 SMTP 授权码(面板可改,热更)
 ROCOM_SMTP_USER=

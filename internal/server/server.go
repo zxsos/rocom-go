@@ -80,6 +80,11 @@ type Server struct {
 	envPath string
 	// hy2Mgr 管理内嵌 hysteria2 代理的启停。改代理配置不必重启进程,也就不打断抓包。
 	hy2Mgr *hy2.Manager
+	// gamePort 是抓包引擎盯着的游戏端口(-port),配置订阅里的分流规则要用它
+	// (见 api_sub.go:那条规则写错端口,抓包就一条数据也没有)。
+	// 由 main 启动时注入;0 表示未注入,生成配置时回落到 hy2.DefaultGamePort。
+	// 改它是启动项,不在运行期可变之列,故无需加锁。
+	gamePort int
 	// web 托管 Web 服务的监听,使监听地址也能在运行期改(试运行→确认,见 web_listen.go)。
 	// main 启动时注入;为空时改地址的端点返回 503(单元测试与只用到 Handler 的场景)。
 	web *webServer
@@ -165,6 +170,10 @@ func (s *Server) Hub() *Hub { return s.hub }
 // SetWebServer 注入 Web 监听托管,使管理面板能在运行期改监听地址。
 // main 在开始监听之前调用(见 cmd/rocom-go/main.go)。
 func (s *Server) SetWebServer(w *webServer) { s.web = w }
+
+// SetGamePort 注入抓包引擎正在盯的游戏端口(-port),供配置订阅生成分流规则。
+// main 在开始监听之前调用;不调也不会出错(生成时回落到 hy2.DefaultGamePort)。
+func (s *Server) SetGamePort(p int) { s.gamePort = p }
 
 // OpcodeName 返回 opcode 的可读名称。
 func (s *Server) OpcodeName(op uint16) string {
@@ -263,6 +272,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/admin/merchant-test-mail", s.handleAdminMerchantTestMail)
 	s.mux.HandleFunc("GET /api/admin/config", s.handleAdminConfig)
 	s.mux.HandleFunc("POST /api/admin/config", s.handleAdminConfig)
+	s.mux.HandleFunc("GET /api/admin/hy2/link", s.handleHy2Link)
+	// 配置订阅:客户端(Clash / 小火箭)定时回来拉的整份配置,故不走管理员会话,
+	// 鉴权在路径令牌里(见 api_sub.go)。**不在 /api/ 下**是有意的:它是给客户端吃的
+	// 纯文本/ YAML,不是本面板的 JSON 接口。
+	s.mux.HandleFunc("GET /sub/{token}", s.handleSub)
 	// Web 监听地址(改它要试运行 + 确认,见 api_web_addr.go)
 	s.mux.HandleFunc("POST /api/admin/web-addr", s.handleAdminWebAddr)
 	s.mux.HandleFunc("POST /api/admin/web-addr/confirm", s.handleAdminWebAddrConfirm)

@@ -252,11 +252,15 @@ func pollStats(tp *afpacket.TPacket, e *Engine) {
 	var lastPackets, lastDrops uint
 	selfCheckWarned := false
 	for range tick.C {
-		s, _, err := tp.SocketStats()
+		s, s3, err := tp.SocketStats()
 		if err != nil {
 			continue
 		}
-		pkts, drops := s.Packets(), s.Drops()
+		// 两个版本的内核计数都要读:带 OptBlockSize/OptNumBlocks 时 gopacket 以
+		// **TPACKET_V3** 激活环,包数落在 V3 结构里,而 V1 那个会永远是 0。只读 V1 的
+		// 后果是「收到 0 个包」长挂零 —— 而依赖 PacketSeen 的 -skip-self-ip 自检
+		// (下面 selfCheckMin)因此永不触发,等于把唯一的兜底也弄丢了。
+		pkts, drops := sumStats(s, s3)
 		// 计数器溢出回绕时差值会异常大,跳过这次采样免得记出巨数
 		if pkts >= lastPackets && drops >= lastDrops {
 			recordStats(pkts-lastPackets, drops-lastDrops)
@@ -279,6 +283,15 @@ func pollStats(tp *afpacket.TPacket, e *Engine) {
 				"若确为单臂网关,请回头确认网卡是否选错(见启动时的网卡日志)", e.SkipDropped())
 		}
 	}
+}
+
+// sumStats 合并 TPacket V1 与 V3 两份内核计数。
+//
+// gopacket 只把 getsockopt(PACKET_STATISTICS) 的结果累加进**与激活版本相符**的那个
+// 结构,另一个保持零值 —— 而调用方事先不该关心用的是哪个版本(它由选项组合决定,
+// 带 OptBlockSize/OptNumBlocks 就是 V3)。两边都读再相加,V1/V3 下都对。
+func sumStats(s afpacket.SocketStats, s3 afpacket.SocketStatsV3) (packets, drops uint) {
+	return s.Packets() + s3.Packets(), s.Drops() + s3.Drops()
 }
 
 // ignoreSelfIPs 把网卡自身的单播 IP 登记进忽略集(单臂 NAT 去重,见 RunLive)。

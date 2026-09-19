@@ -623,6 +623,20 @@ export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) 
 //   - 代理(hy2)热更:改密码/白名单直接换参数,改端口才重启,都不影响抓包;邮箱纯热更
 export const adminConfigSave = (payload) => postJSON('/api/admin/config', payload)
 
+// adminHy2Link 生成手机可直接导入的 hysteria2 链接。
+//
+// ⚠ 返回值里带着**明文代理密码**(链接不含它就没法一键导入),故这个接口挂管理员鉴权
+// 且回 no-store;前端也不要把它写进 console、日志或 URL。
+// host 是可选参数:手机上实际打的地址(浏览器把自己地址栏的主机传过去当默认值),
+// 服务端配了「对外地址」时以配置为准。
+export const adminHy2Link = (host) => {
+  const q = host ? '?host=' + encodeURIComponent(host) : ''
+  return adminFetch('/api/admin/hy2/link' + q).then(async (r) => {
+    if (!r.ok) throw await adminError(r, '生成导入链接失败')
+    return r.json()
+  })
+}
+
 // —— Web 监听地址(改它要试运行 + 确认,见 internal/server/api_web_addr.go)——
 //
 // 它不能像其它配置那样「保存即生效」:改的是管理员正用来改它的那条连接的另一端,

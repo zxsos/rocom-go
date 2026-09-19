@@ -51,6 +51,9 @@ const (
 	envHy2Block = "ROCOM_HY2_BLOCK"
 	envHy2Max   = "ROCOM_HY2_MAX_CONNS"
 	envHy2Pass  = "ROCOM_HY2_PASS"
+	// envHy2Advertise 是「对外可达地址」(host[:port],两部分都可省),只喂给导入链接
+	// 的生成,不参与监听 —— 故 run.sh 不需要为它组装 flag,读配置时现取即可。
+	envHy2Advertise = "ROCOM_HY2_ADVERTISE"
 )
 
 // 已废弃的 SOCKS5 键名。SOCKS5 已被 hysteria2 取代(理由见 internal/hy2 的包注释),
@@ -100,13 +103,14 @@ type webJSON struct {
 // 而同一端口「先起新后停旧」必然撞 address already in use —— 给一个点了不生效的
 // 开关不如不给(详见 internal/hy2/manager.go 的 Start 注释)。
 type hy2JSON struct {
-	Addr     string `json:"addr"`
-	Allow    string `json:"allow"`
-	Block    string `json:"block"`
-	MaxConns int    `json:"maxConns"`
-	PassSet  bool   `json:"passSet"`
-	Running  bool   `json:"running"`  // 当前是否在运行
-	RealAddr string `json:"realAddr"` // 实际监听地址(端口填 0 时为内核分配的真实端口)
+	Addr      string `json:"addr"`
+	Allow     string `json:"allow"`
+	Block     string `json:"block"`
+	MaxConns  int    `json:"maxConns"`
+	Advertise string `json:"advertise"` // 对外可达地址(host[:port]),仅用于导入链接
+	PassSet   bool   `json:"passSet"`
+	Running   bool   `json:"running"`  // 当前是否在运行
+	RealAddr  string `json:"realAddr"` // 实际监听地址(端口填 0 时为内核分配的真实端口)
 }
 
 // handleAdminConfig 配置读取与保存。
@@ -178,6 +182,7 @@ func (s *Server) hy2CfgFromEnv() hy2JSON {
 	out.Addr, _ = f.Get(envHy2Addr)
 	out.Allow, _ = f.Get(envHy2Allow)
 	out.Block, _ = f.Get(envHy2Block)
+	out.Advertise, _ = f.Get(envHy2Advertise)
 	if p, ok := f.Get(envHy2Pass); ok {
 		out.PassSet = p != ""
 	}
@@ -218,11 +223,12 @@ type configReq struct {
 }
 
 type hy2Req struct {
-	Addr     string `json:"addr"` // 空=不启用
-	Allow    string `json:"allow"`
-	Block    string `json:"block"`
-	MaxConns int    `json:"maxConns"`
-	Pass     string `json:"pass"` // 留空=不改
+	Addr      string `json:"addr"` // 空=不启用
+	Allow     string `json:"allow"`
+	Block     string `json:"block"`
+	MaxConns  int    `json:"maxConns"`
+	Advertise string `json:"advertise"` // 对外地址,仅用于导入链接;空=不固定(可留空)
+	Pass      string `json:"pass"`      // 留空=不改
 }
 
 func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
@@ -258,6 +264,9 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 
 	// —— T2:代理 ——
 	var nextHy2 *hy2.Config
+	// advNext 与代理配置一起提交,但**不进** hy2.Config:它不参与监听,只喂导入链接。
+	// 混进 Config 会让「Start 收了这个字段却什么也没做」变成下一个人踩的坑。
+	advNext := ""
 	if req.Hy2 != nil {
 		cfg := hy2.Config{
 			Addr:     strings.TrimSpace(req.Hy2.Addr),
@@ -277,6 +286,13 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		// 对外地址同样要先验:它不进 hy2.Config(只喂导入链接),故 Validate 管不到它。
+		adv := strings.TrimSpace(req.Hy2.Advertise)
+		if _, err := hy2.ParseAdvertise(adv); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		advNext = adv
 		nextHy2 = &cfg
 	}
 
@@ -293,6 +309,7 @@ func (s *Server) configPost(w http.ResponseWriter, r *http.Request) {
 		put(envHy2Allow, nextHy2.Allow)
 		put(envHy2Block, nextHy2.Block)
 		put(envHy2Pass, nextHy2.Password)
+		put(envHy2Advertise, advNext)
 		put(envHy2Max, strconv.Itoa(nextHy2.MaxConns))
 		// 顺手清掉废弃的 SOCKS5 键:面板这次保存已经把代理整体换成 hy2,
 		// 留着旧键只会让下次启动继续打废弃告警。

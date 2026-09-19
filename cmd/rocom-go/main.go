@@ -81,6 +81,10 @@ func main() {
 	// (重启会打断正在解密的游戏连接)。校验与启动逻辑都在 hy2.Config / Manager.Start 里。
 	hy2Mgr := hy2.NewManager()
 	srv := server.New(st, server.NewHub(), db, *smtpUser, *smtpPass, hy2Mgr)
+	// 同一个端口值喂两处:抓包引擎按它认游戏流,配置订阅按它生成分流规则。
+	// 两处必须一致,否则手机会把流量送进代理、而本机不认这个端口 —— 表象同样是
+	// 「连上了却没有任何数据」,故在这里接一次而不是各自写死默认值。
+	srv.SetGamePort(*port)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 	for s := range strings.SplitSeq(*ignoreIPs, ",") {
