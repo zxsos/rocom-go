@@ -52,6 +52,10 @@ type Manager struct {
 	mu   sync.Mutex
 	cur  *inst
 	cert atomic.Pointer[tls.Certificate]
+	// pass 记下当前**生效**的密码,只为生成导入链接服务。
+	// 单看 env 不够:手动跑二进制(没有 /etc/rocom.env)时密码只在内存里,
+	// 照 env 取会生成出一条没有认证段的链接 —— 导入必连不上,却看不出哪里错了。
+	pass string
 }
 
 // inst 是一个在跑的实例。stopped 在调用 Close() **之前**关闭,
@@ -132,6 +136,7 @@ func (m *Manager) Start(cfg Config) error {
 			up, down = m.cur.up, m.cur.down
 		}
 		m.cur.srv.SetParams(p)
+		m.pass = cfg.Password
 		log.Printf("hy2 配置已更新(监听地址不变): %s", cfg.Addr)
 		return nil
 	}
@@ -144,6 +149,7 @@ func (m *Manager) Start(cfg Config) error {
 	}
 	it := &inst{srv: next, addr: cfg.Addr, up: up, down: down,
 		stopC: make(chan struct{}), done: make(chan struct{})}
+	m.pass = cfg.Password // 放在 New 成功之后:失败时旧实例还在跑,密码也仍是旧的
 	go func() {
 		defer close(it.done)
 		if err := next.Serve(); err != nil {
@@ -199,6 +205,17 @@ func (m *Manager) Running() (addr string, ok bool) {
 		return "", false
 	}
 	return m.cur.srv.Addr().String(), true
+}
+
+// Password 返回当前生效配置里的认证密码,供管理面板生成导入链接。
+//
+// 这是全项目唯一会把该密码原文交出去的路径,因此调用方(那个端点)必须挂管理员鉴权
+// 并回 no-store —— 面板的配置回显刻意只给「是否已设置」,不是为了防自己人,
+// 而是为了让日常截图里不出现密码。
+func (m *Manager) Password() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.pass
 }
 
 // parsedAddr 返回当前实例的**内核解析后**地址(仅测试用:它与请求原文常常不等,

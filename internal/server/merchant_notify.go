@@ -259,5 +259,3 @@ func merchantSubMatch(keywords string, news []merchantItem) bool {
 	}
 	return false
 }
-
-// 发件人显示名(收件端显示「远哥来了 <sender@example.com>」),RFC 2047 编码支持中文。

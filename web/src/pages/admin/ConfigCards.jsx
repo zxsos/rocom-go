@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { splitAddr, joinAddr, validatePort } from '../../utils/netaddr'
+import { adminHy2Link } from '../../api'
+import { copyText } from '../../utils/clipboard'
 
 // 运行配置的两半:**发件邮箱**(普通设置)与**令牌 + hysteria2 代理**(高级设置)。
 //
@@ -144,8 +146,37 @@ export function AdvConfigCard({ config, error, onSave }) {
     allow: hy.allow ?? '',
     block: hy.block ?? '',
     maxConns: hy.maxConns ?? 0,
+    advertise: hy.advertise ?? '',
     pass: '',                          // 敏感项:留空 = 不修改
   })
+
+  // 导入链接由服务端拼:密码、实际端口、证书能不能验,三样都只在服务端齐。
+  // 主机这一项它猜不到,所以先取浏览器地址栏(从哪打开就连哪),再让「对外地址」压过它。
+  const adv = splitAddr(hy.advertise)
+  const [hostBox, setHostBox] = useState('')   // 编辑中
+  const [applied, setApplied] = useState('')   // 已提交(失焦/回车)—— 避免每敲一个字符打一次接口
+  const effHost = applied.trim() || adv.host || globalThis.location?.hostname || ''
+  const [link, setLink] = useState(null)
+  const [linkErr, setLinkErr] = useState('')
+  const [copiedSub, setCopiedSub] = useState('')   // 订阅地址的复制结果
+
+  // deps 用 config 本身:面板保存成功后 Admin 会重新拉配置(新对象),这里就跟着重算。
+  // 「改了端口链接也同步」靠的是这个,而不是让人记得手动点一次。
+  useEffect(() => {
+    if (!config?.hy2?.running || !effHost) {
+      setLink(null); setLinkErr(''); return
+    }
+    let dead = false
+    adminHy2Link(effHost)
+      .then((d) => { if (!dead) { setLink(d); setLinkErr('') } })
+      .catch((e) => { if (!dead) { setLink(null); setLinkErr(e.message || '生成失败') } })
+    return () => { dead = true }
+  }, [config, effHost])
+
+  const copySub = async () => {
+    if (!link?.sub) return
+    setCopiedSub((await copyText(link.sub)) ? '已复制' : '复制失败,请手动选中')
+  }
 
   // 端口先自己验一遍再交给后端:后端是先落盘再起监听(见 api_admin_config.go),
   // bind 失败时 /etc/rocom.env 里已经是这份坏配置了 —— 服务**下次重启**就起不来,
@@ -164,6 +195,7 @@ export function AdvConfigCard({ config, error, onSave }) {
         allow: f.allow,
         block: f.block,
         maxConns: Number(f.maxConns) || 0,
+        advertise: String(f.advertise).trim(),
         pass: f.pass,
       },
     }, onSave)
@@ -240,6 +272,14 @@ export function AdvConfigCard({ config, error, onSave }) {
                 onChange={(e) => edit({ pass: e.target.value })}
               />
             </label>
+            <label className="admin-field">
+              <span>对外地址</span>
+              <input
+                type="text" value={f.advertise}
+                placeholder="host 或 host:端口;只填 :端口 表示仅改端口;留空 = 不固定"
+                onChange={(e) => edit({ advertise: e.target.value })}
+              />
+            </label>
             <p className="admin-hint">
               ⚠ 公网暴露时务必填白名单。hy2 的密码在隧道内部传输(不像 SOCKS5 那样明文),
               但这只挡得住「连进来」,挡不住扫描器把 UDP 端口打满或拿它当跳板 ——
@@ -249,9 +289,97 @@ export function AdvConfigCard({ config, error, onSave }) {
             </p>
           </div>
 
+          <Hy2LinkCard
+            running={!!hy.running}
+            using={effHost}
+            hostBox={hostBox}
+            onHost={(e) => setHostBox(e.target.value)}
+            onCommit={() => setApplied(hostBox)}
+            link={link}
+            error={linkErr}
+            copiedSub={copiedSub}
+            onCopySub={copySub}
+          />
+
           <Actions busy={busy} dirty={dirty} msg={msg} err={err} onSave={save} onDiscard={discard} />
         </>
       )}
+    </div>
+  )
+}
+
+// Hy2LinkCard 手机导入用的订阅地址(整份配置,不只是节点)。
+//
+// 为什么值得单独做:配置里三样东西容易填错 —— 密码(要不要转义)、端口
+// (监听值与被 NAT 映射后的对外值可能不是一个)、要不要跳过证书校验。
+// 三样分别散落在配置文件、运行中的监听地址与证书 SAN 里,让人照文档手拼迟早拼错,
+// 而拼错的表象是「手机连不上」,看不出是哪儿错。故一律由服务端算好,这里只展示。
+//
+// 也只给订阅、不再给「只含节点」的单条链接:抓包成立的前提是游戏那一条 TCP 流量被
+// 送进代理,而那取决于客户端的**分流规则** —— 规则塞不进一条 node 链接里。只导入 node
+// 的人会得到「手机连上了、游戏也能玩、面板上一条数据都没有」,且几乎无法自查。
+// 留两条并列,被选错的那条所坑的正是这一点,故只留不会错的那一条。
+//
+// 它只读、不参与保存流程,所以刻意不混进上面那套 useConfigForm 的编辑状态机。
+function Hy2LinkCard({ running, using, hostBox, onHost, onCommit, link, error, copiedSub, onCopySub }) {
+  const placeholder = using || '例如 2002666.xyz'
+  if (!running) {
+    return (
+      <div className="admin-config-group">
+        <h4>导入配置</h4>
+        <p className="admin-hint">代理未运行,没有可导入的配置。填好端口启用后这里会自动出现。</p>
+      </div>
+    )
+  }
+  return (
+    <div className="admin-config-group">
+      <h4>导入配置</h4>
+      <p className="admin-hint">
+        手机 / 电脑上的 Clash Meta、FlClash、小火箭、Hiddify 直接导入即可。端口取的是
+        <b>实际监听值</b>,在上面改了端口保存后,地址不变、内容自动跟着变。
+      </p>
+      <label className="admin-field">
+        <span>手机要打的地址</span>
+        <input
+          type="text" value={hostBox} placeholder={placeholder + '(默认:当前面板地址)'}
+          onChange={onHost} onBlur={onCommit}
+          onKeyDown={(e) => { if (e.key === 'Enter') onCommit() }}
+        />
+      </label>
+      {error && <p className="admin-error">{error}</p>}
+      {link && (link.sub ? (
+        <>
+          <label className="admin-field">
+            <span>订阅地址</span>
+            <input
+              className="admin-link" type="text" readOnly value={link.sub}
+              onFocus={(e) => e.target.select()}
+            />
+          </label>
+          <div className="admin-config-actions">
+            <button className="btn" type="button" onClick={onCopySub}>复制订阅地址</button>
+          </div>
+          <p className="admin-hint">
+            Clash Meta / FlClash / Mihomo:配置 → 从 URL 导入;小火箭:配置 → 添加配置;
+            Hiddify:配置 → 添加配置。同一个地址会按客户端自动给出对应格式
+            (Clash YAML / .conf / sing-box JSON),导入后记得<b>切换启用新配置</b>。
+          </p>
+          <p className="admin-hint">
+            当前指向 <code>{link.host}:{link.port}</code>
+            {link.secure
+              ? ' —— 主机在证书里,客户端可校验证书'
+              : ' —— 证书里没有这个主机名,客户端会跳过校验(按 IP 连时属正常)'}
+            {copiedSub && <> · {copiedSub}</>}
+          </p>
+          <p className="admin-hint">
+            ⚠ 地址里带着明文密码,别截图、别贴到群里。换密码后旧地址立即失效,需要重新复制一条。
+          </p>
+        </>
+      ) : (
+        <p className="admin-hint">
+          先在下面填一个代理密码并保存,才会生成订阅地址 —— 没有密码就没有可下发的节点。
+        </p>
+      ))}
     </div>
   )
 }

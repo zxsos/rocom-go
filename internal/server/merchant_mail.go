@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// 发件人显示名(收件端显示「远哥来了 <sender@example.com>」),RFC 2047 编码支持中文。
 const merchantMailFromName = "远哥来了"
 
 // merchantMailHTMLTpl 邮件正文模板:纯白背景 + 浅色卡片 + 金色标题栏。
