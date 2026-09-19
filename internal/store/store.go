@@ -462,6 +462,33 @@ CREATE TABLE IF NOT EXISTS handbook_glass (
   glass_value INTEGER NOT NULL,
   PRIMARY KEY(account, pet_base_id, glass_type, glass_value)
 );
+
+-- 订阅设备令牌(见 store/sub_token.go):一台设备/一个朋友一枚,替代早先那个由 hy2 密码
+-- 派生的单一令牌 —— 派生令牌把「踢掉一个人」和「换密码」焊死了,换成每设备一枚之后
+-- 吊销就只是这一行的事。expires_at=0 表示长期(默认:靠手动吊销,不靠过期);
+-- revoked_at>0 表示已吊销。吊销只挡「下次拉订阅」,要让对方再也连不上得换 hy2 密码。
+CREATE TABLE IF NOT EXISTS sub_tokens (
+  token TEXT PRIMARY KEY,
+  label TEXT NOT NULL DEFAULT '',      -- 备注名(朋友/设备),只给人看
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL DEFAULT 0,
+  revoked_at INTEGER NOT NULL DEFAULT 0,
+  last_seen_at INTEGER NOT NULL DEFAULT 0, -- 最后一次成功拉取(Unix 秒,0=从未)
+  last_ua TEXT NOT NULL DEFAULT '',        -- 最后一次的 User-Agent:据此看出对方用的什么客户端
+  last_format TEXT NOT NULL DEFAULT '',    -- 最后一次实发的格式
+  hits INTEGER NOT NULL DEFAULT 0
+);
+
+-- 订阅短链(见 store/sub_token.go):短码 → 令牌。分开是为了让**已经发出去的二维码
+-- 永远有效** —— 后台可以给同一个短码换令牌,人和二维码都不用动。
+CREATE TABLE IF NOT EXISTS sub_links (
+  code TEXT PRIMARY KEY,               -- 8 位短码,字母表剔除了 0/O/1/I/L
+  token TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0,
+  revoked_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_sub_links_token ON sub_links(token);
 `)
 	if err != nil {
 		return err

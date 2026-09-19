@@ -637,6 +637,48 @@ export const adminHy2Link = (host) => {
   })
 }
 
+// —— 订阅设备(一人一枚令牌 + 一条短链,见 internal/server/api_sub_device.go)——
+//
+// 与 adminHy2Link 那条的差别:那条给的是**当前密码派生的**旧地址(换密码即全部失效),
+// 这一组给的是可单独吊销的设备令牌。新发的链接一律走这里。
+
+// adminSubDevices 列表:{devices:[{token,label,code,subUrl,createdAt,expiresAt,revokedAt,
+// lastSeenAt,lastUa,lastFormat,hits,usable}]}。
+export const adminSubDevices = () => adminFetch('/api/admin/sub-devices').then(async (r) => {
+  if (!r.ok) throw await adminError(r, '拉取订阅设备失败')
+  return r.json()
+})
+
+// adminSubDeviceCreate 新建一台设备;label 是备注名(写朋友/设备名,日后好认)。
+// 返回 {device:{...}},前端拿到即可直接画二维码,不必再拉一次列表。
+export const adminSubDeviceCreate = (label) => postJSON('/api/admin/sub-devices', { label })
+
+// adminSubDeviceRevoke 吊销(软删,行保留)。语义只到「下次拉订阅被拒」为止 ——
+// 对方本地那份配置里的密码还在,要让他再也连不上得换 hy2 密码(见 docs/deploy.md)。
+// purge=true 时改为真删(后端只接受已吊销的设备,在用设备删不掉)。
+export function adminSubDeviceRevoke(token, purge = false) {
+  const q = '?token=' + encodeURIComponent(token) + (purge ? '&purge=1' : '')
+  return adminFetch('/api/admin/sub-devices' + q, { method: 'DELETE' })
+    .then(async (r) => {
+      if (!r.ok) throw await adminError(r, purge ? '删除失败' : '吊销失败')
+      return r.json()
+    })
+}
+
+// adminSubDeviceRestore 恢复被吊销的设备。误点一行就吊销了,没有恢复入口的话
+// 只能删掉重建 —— 而重建会换新短码,已发出的二维码和链接全部作废。
+export const adminSubDeviceRestore = (token) =>
+  postJSON('/api/admin/sub-devices/restore', { token })
+
+// adminSubDeviceRename 改备注名。
+export const adminSubDeviceRename = (token, label) =>
+  postJSON('/api/admin/sub-devices/rename', { token, label })
+
+// subIntro 引导页状态查询(不验管理员会话:短码本身就是秘密)。
+// {ok,label,revoked,expired,gamePort}。
+export const subIntro = (code) =>
+  fetch('/api/sub/intro?code=' + encodeURIComponent(code)).then((r) => r.json())
+
 // —— Web 监听地址(改它要试运行 + 确认,见 internal/server/api_web_addr.go)——
 //
 // 它不能像其它配置那样「保存即生效」:改的是管理员正用来改它的那条连接的另一端,

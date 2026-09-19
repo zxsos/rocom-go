@@ -18,6 +18,9 @@ const HandbookGlasses = lazy(() => import('./pages/handbook/HandbookGlasses'))
 const HomeQuery = lazy(() => import('./pages/home/HomeQuery'))
 const Leaderboard = lazy(() => import('./pages/leaderboard/Leaderboard'))
 const Admin = lazy(() => import('./pages/admin/Admin'))
+// 订阅引导页:朋友点开短链后落到的那一页。**不进首屏 bundle** —— 它只在有人点链接
+// 时才被需要,而首屏多一个分包会拖慢真正每天都在用的宠物列表。
+const SubImport = lazy(() => import('./pages/SubImport'))
 // 样式按「基础 → 壳 → 共用面板/部件 → 各页」顺序引入(同名选择器的层叠顺序有意义)。
 import './styles/base.css'
 import './styles/dropdown.css'
@@ -41,6 +44,7 @@ import './styles/handbook.css'
 import './styles/home.css'
 import './styles/leaderboard.css'
 import './styles/admin.css'
+import './styles/sub.css'
 import './styles/pin.css'
 import './styles/rules.css'
 // 开屏动画:放最后。它靠 #loading 这个 id 选择器,不与其余规则争夺同名类,
@@ -66,6 +70,9 @@ createRoot(document.getElementById('root')).render(
     <HashRouter>
       <Suspense fallback={<PageLoading />}>
         <Routes>
+          {/* 引导页刻意放在 App 壳**外面**:它是给朋友看的,不该带本站的顶栏/底栏
+              —— 那些导航会把「这是一次性导入页」变成「这好像是个网站」,让人到处乱点。 */}
+          <Route path="i/:code" element={<SubImport />} />
           <Route element={<App />}>
             <Route index element={<Navigate to="/pets" replace />} />
             <Route path="pets" element={<PetList />} />

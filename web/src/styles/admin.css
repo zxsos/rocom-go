@@ -299,3 +299,45 @@
 }
 .admin-trial .admin-hint { margin: 0 0 8px; }
 .admin-trial .admin-config-actions { margin-top: 8px; }
+
+/* —— 订阅设备(一人一条链接,见 pages/admin/SubDeviceCard.jsx)——
+   与 .admin-rule-list 同形:一列卡片,每张一条链接。区别在于行内要塞下
+   「链接 + 三个操作 + 展开的二维码」,故用纵向堆叠而不是横向一行。 */
+.sub-device-form { display: flex; gap: 8px; margin: 10px 0 4px; }
+.sub-device-form > input {
+  flex: 1; min-width: 0;
+  padding: 5px 8px; font-size: 13px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.sub-device-form > input:focus { outline: none; border-color: var(--accent); }
+.sub-device-form > .btn { flex: none; white-space: nowrap; }
+
+.sub-device-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sub-device-list li {
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+}
+/* 已吊销的整块压暗:它是「留着看记录」的行,不该还在视觉上争当可点目标。 */
+.sub-device-list li.off { opacity: .55; }
+.sub-device-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.sub-device-head > b { font-size: 13px; color: var(--fg); }
+/* 末次拉取/UA/格式那一串:排障时第一眼要看的东西,故单独一行且不截断。 */
+.sub-device-meta { font-size: 11px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.sub-device-tag {
+  padding: 1px 6px; font-size: 11px; border-radius: 999px;
+  color: var(--fg-dim); background: var(--bg-3); border: 1px solid var(--line);
+}
+.sub-device-tag.bad { color: var(--red); border-color: var(--red); background: rgba(248, 81, 73, .1); }
+.sub-device-list .admin-config-actions { margin-top: 8px; }
+.sub-device-qr {
+  margin-top: 10px; padding: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  /* 码盘固定白底:**不跟主题走**。二维码要的是「深码浅底」的高对比,
+     深色主题下若按 --bg-1 铺深底、--fg 画浅码,不少扫码器(尤其手机相机)
+     直接认不出来 —— 而扫不出来,整条一键导入链路就断在第一步。 */
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+}
+/* 码色同理写死深色:亮/暗主题都用同一组,扫得出来比配色一致重要。 */
+.qrcode { color: #0b0e13; display: flex; }
