@@ -288,6 +288,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/admin/sub-devices", s.handleAdminSubDevices)
 	s.mux.HandleFunc("DELETE /api/admin/sub-devices", s.handleAdminSubDevices)
 	s.mux.HandleFunc("POST /api/admin/sub-devices/rename", s.handleAdminSubDeviceRename)
+	s.mux.HandleFunc("POST /api/admin/sub-devices/restore", s.handleAdminSubDeviceRestore)
 	// Web 监听地址(改它要试运行 + 确认,见 api_web_addr.go)
 	s.mux.HandleFunc("POST /api/admin/web-addr", s.handleAdminWebAddr)
 	s.mux.HandleFunc("POST /api/admin/web-addr/confirm", s.handleAdminWebAddrConfirm)
