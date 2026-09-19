@@ -24,10 +24,11 @@
 #   ROCOM_PORT        游戏端口(默认 8195)
 #   ROCOM_ADDR        Web 监听地址(默认 :4939)
 #   ROCOM_TLS         启用 HTTPS(设 1 启用)
-#   ROCOM_SOCKS5_ADDR SOCKS5 监听地址(如 :1080;空=不启用)
-#   ROCOM_SOCKS5_ALLOW SOCKS5 客户端白名单(逗号分隔 IP/CIDR)
-#   ROCOM_SOCKS5_USER / ROCOM_SOCKS5_PASS  SOCKS5 认证
-#   ROCOM_SKIP_SELF_IP  socks5 模式下设 false(默认 true)
+#   ROCOM_HY2_ADDR     hysteria2 代理的 UDP 监听地址(如 :11443;空=不启用)
+#   ROCOM_HY2_PASS     hysteria2 认证密码(隧道内传输,非明文)
+#   ROCOM_HY2_ALLOW    hysteria2 客户端白名单(逗号分隔 IP/CIDR;公网部署必填)
+#   ROCOM_HY2_UP / ROCOM_HY2_DOWN   带宽(Mbps),重启进程才生效
+#   ROCOM_SKIP_SELF_IP  启用代理时设 false(默认 true;不显式指定会自动改)
 #   ROCOM_SMTP_USER / ROCOM_SMTP_PASS   远行商人订阅邮件的发件邮箱与授权码
 #   ROCOM_EXTRA       其他要透传的参数(如 -ignore-ip)
 #   ROCOM_PCAP        离线回放的 pcap 路径(与 ROCOM_IFACE 二选一)
@@ -38,7 +39,8 @@
 # 方式的配置文件可互换 —— 新增键时两边都要改,只改一边会让「同一份配置换环境就失效」。
 #
 # 除抓包网卡/端口/监听地址这类**启动即固定**的项(改了须 systemctl restart),
-# 邮箱、令牌、SOCKS5 那几项都可以在 Web 管理面板(设置)里改,改完立即生效。
+# 邮箱、令牌、hysteria2 代理那几项都可以在 Web 管理面板(设置)里改,改完立即生效
+# (代理的带宽是例外:它建连时就固定了,改它要 systemctl restart)。
 #
 set -euo pipefail
 
@@ -185,18 +187,17 @@ args=(
 [[ -n "${ROCOM_PORT:-}" ]] && args+=(-port "$ROCOM_PORT")
 [[ -n "${ROCOM_ADDR:-}" ]] && args+=(-addr "$ROCOM_ADDR")
 [[ -n "${ROCOM_TLS:-}" ]] && args+=(-tls)
-if [[ -n "${ROCOM_SOCKS5_ADDR:-}" ]]; then
-  args+=(-socks5-addr "$ROCOM_SOCKS5_ADDR")
+if [[ -n "${ROCOM_HY2_ADDR:-}" ]]; then
+  args+=(-hy2-addr "$ROCOM_HY2_ADDR")
   # Go flag.Bool 不接受空格分开的 true/false,必须用 =false 形式
   args+=(-skip-self-ip="${ROCOM_SKIP_SELF_IP:-false}")
 fi
-[[ -n "${ROCOM_SOCKS5_ALLOW:-}" ]] && args+=(-socks5-allow "$ROCOM_SOCKS5_ALLOW")
-[[ -n "${ROCOM_SOCKS5_BLOCK:-}" ]] && args+=(-socks5-block "$ROCOM_SOCKS5_BLOCK")
-[[ -n "${ROCOM_SOCKS5_MAX_CONNS:-}" ]] && args+=(-socks5-max-conns "$ROCOM_SOCKS5_MAX_CONNS")
-if [[ -n "${ROCOM_SOCKS5_USER:-}" ]]; then
-  args+=(-socks5-user "$ROCOM_SOCKS5_USER")
-  [[ -n "${ROCOM_SOCKS5_PASS:-}" ]] && args+=(-socks5-pass "$ROCOM_SOCKS5_PASS")
-fi
+[[ -n "${ROCOM_HY2_PASS:-}" ]] && args+=(-hy2-pass "$ROCOM_HY2_PASS")
+[[ -n "${ROCOM_HY2_ALLOW:-}" ]] && args+=(-hy2-allow "$ROCOM_HY2_ALLOW")
+[[ -n "${ROCOM_HY2_BLOCK:-}" ]] && args+=(-hy2-block "$ROCOM_HY2_BLOCK")
+[[ -n "${ROCOM_HY2_MAX_CONNS:-}" ]] && args+=(-hy2-max-conns "$ROCOM_HY2_MAX_CONNS")
+[[ -n "${ROCOM_HY2_UP:-}" ]] && args+=(-hy2-up "$ROCOM_HY2_UP")
+[[ -n "${ROCOM_HY2_DOWN:-}" ]] && args+=(-hy2-down "$ROCOM_HY2_DOWN")
 # 邮箱:管理面板随时可改,启动参数只是初值(改后热更,不必重启)
 [[ -n "${ROCOM_SMTP_USER:-}" ]]  && args+=(-merchant-smtp-user "$ROCOM_SMTP_USER")
 [[ -n "${ROCOM_SMTP_PASS:-}" ]]  && args+=(-merchant-smtp-pass "$ROCOM_SMTP_PASS")
@@ -214,7 +215,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# 环境变量从 /etc/rocom.env 读取(IFACE / SOCKS5 等,见 deploy.sh 注释)
+# 环境变量从 /etc/rocom.env 读取(IFACE / HY2 等,见 deploy.sh 注释)
 EnvironmentFile=-/etc/rocom.env
 # 数据库与证书放在 /var/lib/rocom 下,更新二进制不动数据
 ExecStart=$RUN_SCRIPT
@@ -252,14 +253,16 @@ ROCOM_PORT=8195
 ROCOM_ADDR=:4939
 # 启用 HTTPS(设 1 启用,首次自动生成自签证书)
 ROCOM_TLS=
-# SOCKS5 代理(云端部署时用;留空=不启用)
-# 这几项也可在管理面板(设置)里改,改完自动生效、不必重启
-ROCOM_SOCKS5_ADDR=
-ROCOM_SOCKS5_ALLOW=
-ROCOM_SOCKS5_BLOCK=
-ROCOM_SOCKS5_MAX_CONNS=
-ROCOM_SOCKS5_USER=
-ROCOM_SOCKS5_PASS=
+# hysteria2 代理(云端部署时用;留空=不启用)
+# 注意:它是 UDP 端口,防火墙/云安全组要放行 UDP 而非 TCP
+# 这几项也可在管理面板(设置)里改,改完自动生效、不必重启(带宽除外,它是启动项)
+ROCOM_HY2_ADDR=
+ROCOM_HY2_PASS=
+ROCOM_HY2_ALLOW=
+ROCOM_HY2_BLOCK=
+ROCOM_HY2_MAX_CONNS=
+ROCOM_HY2_UP=
+ROCOM_HY2_DOWN=
 ROCOM_SKIP_SELF_IP=false
 # 远行商人订阅邮件的发件邮箱与 SMTP 授权码(面板可改,热更)
 ROCOM_SMTP_USER=
@@ -500,9 +503,11 @@ case "$ACTION" in
         if [[ -n "$OLD_ARGS" ]]; then
             # 临时清空 env,逐个解析填充
             ROCOM_IFACE="" ROCOM_PORT="" ROCOM_ADDR="" ROCOM_TLS=""
-            ROCOM_SOCKS5_ADDR="" ROCOM_SOCKS5_ALLOW="" ROCOM_SOCKS5_USER="" ROCOM_SOCKS5_PASS=""
-            ROCOM_SOCKS5_BLOCK="" ROCOM_SMTP_USER="" ROCOM_SMTP_PASS=""
+            ROCOM_HY2_ADDR="" ROCOM_HY2_ALLOW="" ROCOM_HY2_BLOCK="" ROCOM_HY2_PASS=""
+            ROCOM_HY2_MAX_CONNS="" ROCOM_HY2_UP="" ROCOM_HY2_DOWN=""
+            ROCOM_SMTP_USER="" ROCOM_SMTP_PASS=""
             ROCOM_SKIP_SELF_IP="" ROCOM_EXTRA=""
+            LEGACY_SOCKS5=0
 
             # 用空格切,遍历 -key value 对
             set -- $OLD_ARGS
@@ -512,16 +517,21 @@ case "$ACTION" in
                     -port)          ROCOM_PORT="$2"; shift 2 ;;
                     -addr)          ROCOM_ADDR="$2"; shift 2 ;;
                     -tls)           ROCOM_TLS=1; shift ;;
-                    -socks5-addr)   ROCOM_SOCKS5_ADDR="$2"; shift 2 ;;
-                    -socks5-allow)  ROCOM_SOCKS5_ALLOW="$2"; shift 2 ;;
-                    -socks5-user)   ROCOM_SOCKS5_USER="$2"; shift 2 ;;
-                    -socks5-pass)   ROCOM_SOCKS5_PASS="$2"; shift 2 ;;
-                    -socks5-block)  ROCOM_SOCKS5_BLOCK="$2"; shift 2 ;;
+                    -hy2-addr)      ROCOM_HY2_ADDR="$2"; shift 2 ;;
+                    -hy2-allow)     ROCOM_HY2_ALLOW="$2"; shift 2 ;;
+                    -hy2-block)     ROCOM_HY2_BLOCK="$2"; shift 2 ;;
+                    -hy2-pass)      ROCOM_HY2_PASS="$2"; shift 2 ;;
+                    -hy2-max-conns) ROCOM_HY2_MAX_CONNS="$2"; shift 2 ;;
+                    -hy2-up)        ROCOM_HY2_UP="$2"; shift 2 ;;
+                    -hy2-down)      ROCOM_HY2_DOWN="$2"; shift 2 ;;
                     -merchant-smtp-user) ROCOM_SMTP_USER="$2"; shift 2 ;;
                     -merchant-smtp-pass) ROCOM_SMTP_PASS="$2"; shift 2 ;;
                     -skip-self-ip)  ROCOM_SKIP_SELF_IP="$2"; shift 2 ;;
                     -db|-cert|-key|rocom-go|sudo) shift ;;
-                    -socks5-max-conns) shift 2 ;;  # systemd service 用默认值
+                    # 旧 SOCKS5 参数:内置 SOCKS5 已被 hysteria2 取代,参数**无法自动映射**
+                    # (传输 TCP → UDP、且 hy2 不再需要用户名),故只记一笔、留给下面提示重配。
+                    # 仍然消费掉它的值,免得把值当成下一条参数。
+                    -socks5-*)      LEGACY_SOCKS5=1; shift 2 ;;
                     *) shift ;;
                 esac
             done
@@ -537,12 +547,14 @@ ROCOM_PORT=${ROCOM_PORT:-8195}
 ROCOM_ADDR=${ROCOM_ADDR:-:4939}
 # 启用 HTTPS(1=启用)
 ROCOM_TLS=${ROCOM_TLS:-}
-# SOCKS5 代理(留空=不启用)
-ROCOM_SOCKS5_ADDR=${ROCOM_SOCKS5_ADDR:-}
-ROCOM_SOCKS5_ALLOW=${ROCOM_SOCKS5_ALLOW:-}
-ROCOM_SOCKS5_USER=${ROCOM_SOCKS5_USER:-}
-ROCOM_SOCKS5_PASS=${ROCOM_SOCKS5_PASS:-}
-ROCOM_SOCKS5_BLOCK=${ROCOM_SOCKS5_BLOCK:-}
+# hysteria2 代理(留空=不启用;它是 UDP 端口,防火墙/云安全组要放行 UDP 而非 TCP)
+ROCOM_HY2_ADDR=${ROCOM_HY2_ADDR:-}
+ROCOM_HY2_ALLOW=${ROCOM_HY2_ALLOW:-}
+ROCOM_HY2_BLOCK=${ROCOM_HY2_BLOCK:-}
+ROCOM_HY2_PASS=${ROCOM_HY2_PASS:-}
+ROCOM_HY2_MAX_CONNS=${ROCOM_HY2_MAX_CONNS:-}
+ROCOM_HY2_UP=${ROCOM_HY2_UP:-}
+ROCOM_HY2_DOWN=${ROCOM_HY2_DOWN:-}
 ROCOM_SKIP_SELF_IP=${ROCOM_SKIP_SELF_IP:-false}
 # 远行商人订阅邮件(面板可改,热更)
 ROCOM_SMTP_USER=${ROCOM_SMTP_USER:-}
@@ -553,6 +565,14 @@ EOF
             chmod 600 "$ENV_FILE"
             ENV_AUTO=1
             echo "已从旧进程参数生成 $ENV_FILE"
+            if [[ "$LEGACY_SOCKS5" -eq 1 ]]; then
+                echo "" >&2
+                echo "警告: 旧进程用的是已废弃的 SOCKS5 代理参数 —— 内置 SOCKS5 已被 hysteria2 取代," >&2
+                echo "      这些参数无法自动迁移(传输从 TCP 变为 UDP,且 hy2 不再需要用户名)。" >&2
+                echo "      请编辑 $ENV_FILE 重新配置 ROCOM_HY2_ADDR / ROCOM_HY2_PASS / ROCOM_HY2_ALLOW," >&2
+                echo "      并在防火墙/云安全组放行 UDP 端口;手机端改用支持 hysteria2 的客户端" >&2
+                echo "      (可直接导入 deploy/rocom-clash.yaml)。" >&2
+            fi
         fi
 
         # 安装二进制

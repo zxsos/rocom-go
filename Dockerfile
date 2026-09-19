@@ -69,6 +69,9 @@ VOLUME /data
 # Web 服务默认端口。抓包场景常用 network_mode: host,那时本行不生效、
 # 端口直接由 -addr 决定,保留它仅为 bridge 模式下的文档与 -p 映射。
 EXPOSE 4939
+# 内嵌 hysteria2 代理的端口 —— **UDP**。bridge 模式下要 -p 11443:11443/udp;
+# host 模式无需映射。云安全组同样要放行 UDP 而非 TCP。
+EXPOSE 11443/udp
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

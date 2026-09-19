@@ -168,22 +168,25 @@ sudo ./rocom-go -iface auto -tls
 
 浏览器打开 `http://localhost:4939`。
 
-**云端 SOCKS5 模式**（本机同时当代理与抓包机，适合有公网 IP 的 VPS）：
+**云端 hysteria2 代理模式**（本机同时当代理与抓包机，适合有公网 IP 的 VPS）：
 
 ```bash
-sudo ./rocom-go -iface eth0 -socks5-addr :1080 -skip-self-ip=false \
-  -socks5-allow 1.2.3.4 -socks5-user rocom -socks5-pass 换成强密码 -tls
+sudo ./rocom-go -iface eth0 -hy2-addr :11443 -skip-self-ip=false \
+  -hy2-allow 1.2.3.4 -hy2-pass 换成强密码 -tls
 # 把 1.2.3.4 换成手机当前公网出口 IP；手机 IP 变了要更新参数重启。
 ```
 
-> ⚠️ **公网部署必须设 `-socks5-allow` 白名单。** 不设的话几分钟内就会被全网扫描器找到并
-> 滥用（日志里会冒出一堆陌生 IP），且会耗尽 fd / goroutine 把同进程的 Web 服务一起拖垮。
-> `-socks5-user/pass` 是 RFC 1929 的**明文**认证，公网直连请「白名单 + 认证」双保险，
-> 或干脆走 tailscale 之类的加密隧道。
+> ⚠️ **公网部署必须设 `-hy2-allow` 白名单。** hy2 的密码在 QUIC 隧道**内部**传输（不像
+> RFC 1929 那样明文），但那只挡得住「连进来」，挡不住扫描器把 UDP 端口打满 —— 白名单才是
+> 把攻击面缩到手机出口 IP 的那道防线。
 >
-> `-skip-self-ip=false` 在启用 socks5 时必须：代理进程以本机 IP 出站的游戏流量，
+> **防火墙 / 云安全组放行的是 UDP 11443，不是 TCP。** 手机端须用支持 hysteria2 的客户端
+> （Clash Meta / 小火箭 / sing-box），可直接导入 `deploy/rocom-clash.yaml`；证书复用 Web 那份
+> 自签证书，客户端记得 `skip-cert-verify: true`。
+>
+> `-skip-self-ip=false` 在启用 hy2 时必须：代理进程以本机 IP 出站的游戏流量，
 > 若按默认的去重逻辑会被**两个方向全部丢弃**——表现是「手机能正常玩、包数在涨，
-> 却一条数据都解析不出来」，极难自查。启用 `-socks5-addr` 且你没显式指定时，
+> 却一条数据都解析不出来」，极难自查。启用 `-hy2-addr` 且你没显式指定时，
 > 程序会自动改成 `false` 并在日志里说明。
 
 **使用顺序**：先启动本工具，确保抓到 `0x1002 ACK` 里的会话密钥；再进游戏**打开宠物仓库**
@@ -206,7 +209,7 @@ sudo ./rocom-go -iface eth0 -socks5-addr :1080 -skip-self-ip=false \
 # 服务器上已装 go 时的标准流程（首次和更新都用这一条）：git pull + go build + 部署，数据不动
 sudo ./scripts/deploy.sh --build
 
-sudo vim /etc/rocom.env            # 首次跑完后填 ROCOM_SOCKS5_ADDR / USER / PASS 等
+sudo vim /etc/rocom.env            # 首次跑完后填 ROCOM_HY2_ADDR / PASS / ALLOW 等
 sudo systemctl restart rocom-go && sudo systemctl status rocom-go
 journalctl -u rocom-go -f          # 看日志
 
@@ -245,7 +248,7 @@ docker build -t rocom-go .                             # 其它架构（ARM 等�
 ```
 
 先选一种方式：**A. 局域网网关**（家里软路由/旁路由，手机流量必经它）用 `-iface <网卡>`；
-**B. 云端 socks5**（有公网 IP 的 VPS，手机用 Clash 把游戏流量代理过去）在 A 之上多加
+**B. 云端 hy2 代理**（有公网 IP 的 VPS，手机用 Clash 把游戏流量代理过去）在 A 之上多加
 `-skip-self-ip=false`（通常还要 `-tls`）。
 
 ```bash
@@ -255,7 +258,7 @@ docker run -d --name rocom-go --restart unless-stopped \
   -e TZ=Asia/Shanghai -v rocom-data:/data \
   docker.cnb.cool/bangbang222/roco:latest -iface auto
 
-# B 云端 socks5
+# B 云端 hy2 代理（放行 UDP 11443；bridge 模式需 -p 11443:11443/udp,host 模式不必）
 docker run -d --name rocom-go --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW --network host \
   -e TZ=Asia/Shanghai -v rocom-data:/data \
@@ -265,7 +268,7 @@ docker run -d --name rocom-go --restart unless-stopped \
 `-iface auto` 读默认路由选网卡，`--network host` 下容器与宿主机共享路由表所以算得出来。
 仍想手填：VPS 网卡很少叫 `eth0`（常见 `ens17` / `ens33` / `enp1s0`），用
 `ip route get 8.8.8.8` 看 `dev` 后面那个最准。填错时日志会**列出候选网卡与默认路由**，
-不再只报一句 `no such device`。其余参数（`-db`/`-cert`/`-addr`/socks5）都有默认值，
+不再只报一句 `no such device`。其余参数（`-db`/`-cert`/`-addr`/`-hy2-addr` 等）都有默认值，
 或启动后在管理面板改。
 
 更新镜像（数据在卷里，不丢历史）：
@@ -292,10 +295,10 @@ docker run --rm -v rocom-data:/data <镜像> sh -c 'sqlite3 /data/rocom.db ".bac
 | 单臂网关（一张网卡做 SNAT 转发） | `true`（默认） | 去 SNAT 重复副本：同一条流会在同一网卡上出现两次（NAT 前 + 源改成本机 IP 的副本），不去重会被解析两次 |
 | 旁路镜像 / SPAN 端口 | `true` | 只收镜像流量，本机不参与转发 |
 | 透明网桥 | `true` | 转发但不改源 IP |
-| **云端 socks5 代理** | **`false`** | 代理进程以本机 IP 为源出站，回包目的也是本机 → 设 `true` 会**两个方向全丢**，一个包都抓不到 |
+| **云端 hy2 代理** | **`false`** | 代理进程以本机 IP 为源出站，回包目的也是本机 → 设 `true` 会**两个方向全丢**，一个包都抓不到 |
 | 本机跑安卓模拟器 | `false` | 模拟器流量源 IP 就是本机 |
 
-**多数情况不用自己算**：启用 `-socks5-addr` 且没有显式传 `-skip-self-ip` 时，程序会自动改用
+**多数情况不用自己算**：启用 `-hy2-addr` 且没有显式传 `-skip-self-ip` 时，程序会自动改用
 `false` 并打日志说明（Docker 下改这项要重启容器，自动判定最省事）。
 
 设错的后果都不好排查：该 `false` 却用 `true` 时，手机代理连得上、游戏能玩，但**一条包都解析
@@ -315,7 +318,7 @@ docker logs rocom-go 2>&1 | tail -12                  # 期望看到下面这段
 ```
 ==================== 抓包配置 ====================
 网卡      ens17 (172.16.0.29)  自动选中(默认路由)
-模式      socks5 代理(监听 :1080)   -skip-self-ip=false
+模式      hysteria2 代理(监听 UDP :11443)   -skip-self-ip=false
 端口      游戏 8195    Web https://<本机IP>:4939
 数据库    /data/rocom.db
 =================================================
@@ -333,7 +336,7 @@ docker logs rocom-go 2>&1 | tail -12                  # 期望看到下面这段
 
 > ⚠️ **公网部署记得放通端口。** 若网卡上是内网 IP（如 `172.16.x.x`）而公网 IP 是云厂商的
 > 弹性 IP / NAT 映射，那么**系统内防火墙只是第二道**，主要关卡在**云控制台安全组** —— 需要在
-> 那里放行 Web 与 socks5 两个端口。
+> 那里放行 Web(TCP 4939)与 hy2(**UDP** 11443)两个端口。
 
 ### 配置文件与热更范围
 
@@ -351,7 +354,7 @@ systemd 版是 `/etc/rocom.env`），可用 `-e ROCOM_ENV_FILE=/某路径` 改�
 
 | 项 | 生效 |
 | --- | --- |
-| socks5 地址 / 白名单 / 账号密码 / 连接数上限 | ✅ **立即**（代理热重启，抓包不中断） |
+| hy2 地址 / 白名单 / 屏蔽域名 / 密码 / 连接数上限 | ✅ **立即**（改端口才热重启，抓包不中断；**带宽是启动项**，改它要 restart） |
 | SMTP 邮箱 | ✅ 立即 |
 | Web 监听地址 | ✅ 面板内「试运行 → 确认」，不用 restart |
 | **抓包网卡 / 游戏端口 / HTTPS / `-skip-self-ip`** | ❌ **必须重启进程** |

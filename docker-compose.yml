@@ -57,10 +57,10 @@ services:
     #   -db /data/rocom.db 放挂载卷里,更新镜像不丢数据
     #   -tls               启用 HTTPS(手机经局域网访问时「屏幕常亮」需要 secure context);
     #                      自签证书自动生成在 /data 下,信任一次后重建容器仍复用
-    #   -socks5-addr :1080 内置代理,供手机把游戏流量代理到本机(云部署)
-    #                      启用时会自动改用 -skip-self-ip=false,不必手写
-    #   -socks5-allow <IP> 客户端白名单。带公网 IP 时**必填**:无认证代理几分钟内
-    #                      会被全网扫描器找上,耗尽 fd 把同进程的 Web 服务拖垮
+    #   -hy2-addr :11443   内嵌 hysteria2 代理,供手机把游戏流量代理到本机(云部署)。
+    #                      它是 **UDP** 端口;启用时会自动改用 -skip-self-ip=false,不必手写
+    #   -hy2-allow <IP>    hy2 客户端白名单。带公网 IP 时**必填**:密码挡不住扫描器打满
+    #                      UDP 端口,耗尽 fd 会把同进程的 Web 服务一起拖垮
     command:
       [
         "-iface", "auto",

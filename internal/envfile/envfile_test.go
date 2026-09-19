@@ -19,10 +19,10 @@ ROCOM_IFACE=eth0
 # Web 监听地址(默认 :4939)
 ROCOM_ADDR=:4939
 
-# SOCKS5 代理(云端部署时用;留空=不启用)
-ROCOM_SOCKS5_ADDR=
-ROCOM_SOCKS5_USER=
-ROCOM_SOCKS5_PASS=
+# hysteria2 代理(云端部署时用;留空=不启用)
+ROCOM_HY2_ADDR=
+ROCOM_HY2_PASS=
+ROCOM_HY2_ALLOW=
 `
 
 func writeSample(t *testing.T) string {
@@ -43,8 +43,8 @@ func TestLoadGet(t *testing.T) {
 		t.Errorf("ROCOM_IFACE = %q,%v; 期望 eth0,true", v, ok)
 	}
 	// 模板里留空的键:值应为空字符串且「存在」(区别于「没有这个键」)
-	if v, ok := f.Get("ROCOM_SOCKS5_ADDR"); !ok || v != "" {
-		t.Errorf("ROCOM_SOCKS5_ADDR = %q,%v; 期望 \"\",true", v, ok)
+	if v, ok := f.Get("ROCOM_HY2_ADDR"); !ok || v != "" {
+		t.Errorf("ROCOM_HY2_ADDR = %q,%v; 期望 \"\",true", v, ok)
 	}
 	if _, ok := f.Get("ROCOM_NOPE"); ok {
 		t.Error("不存在的键应返回 ok=false")
@@ -57,7 +57,7 @@ func TestSetExistingKeepsComments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Set("ROCOM_SOCKS5_ADDR", ":1080"); err != nil {
+	if err := f.Set("ROCOM_HY2_ADDR", ":11443"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Save(); err != nil {
@@ -72,9 +72,9 @@ func TestSetExistingKeepsComments(t *testing.T) {
 		"# rocom-go 运行参数(改后执行: systemctl restart rocom-go)",
 		"# 抓包网卡(默认 eth0)",
 		"ROCOM_IFACE=eth0",
-		"# SOCKS5 代理(云端部署时用;留空=不启用)",
-		"ROCOM_SOCKS5_ADDR=:1080",
-		"ROCOM_SOCKS5_USER=",
+		"# hysteria2 代理(云端部署时用;留空=不启用)",
+		"ROCOM_HY2_ADDR=:11443",
+		"ROCOM_HY2_PASS=",
 	}
 	for _, w := range want {
 		if !strings.Contains(string(got), w) {
@@ -86,8 +86,8 @@ func TestSetExistingKeepsComments(t *testing.T) {
 		t.Errorf("注释被吃掉: 只剩 %d 个 '#',原文件有 3 行注释", n)
 	}
 	// 就地替换:行数不该变多(若是「追加新行 + 留着旧的」就会出现两行 ADDR)
-	if n := strings.Count(string(got), "ROCOM_SOCKS5_ADDR="); n != 1 {
-		t.Errorf("ROCOM_SOCKS5_ADDR 出现 %d 次,期望 1(应就地替换)", n)
+	if n := strings.Count(string(got), "ROCOM_HY2_ADDR="); n != 1 {
+		t.Errorf("ROCOM_HY2_ADDR 出现 %d 次,期望 1(应就地替换)", n)
 	}
 }
 

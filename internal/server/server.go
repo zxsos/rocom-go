@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/rocom-go/internal/socks5"
+	"github.com/zxsos/rocom-go/internal/hy2"
 	"github.com/zxsos/rocom-go/internal/store"
 )
 
@@ -78,8 +78,8 @@ type Server struct {
 	// 内存里的值只是「不必重启的加速」—— 故任何改动都必须先落盘再改内存,
 	// 两者顺序反了就会「重启后配置丢失」。
 	envPath string
-	// socks5Mgr 管理内置代理的启停。改代理配置不必重启进程,也就不打断抓包。
-	socks5Mgr *socks5.Manager
+	// hy2Mgr 管理内嵌 hysteria2 代理的启停。改代理配置不必重启进程,也就不打断抓包。
+	hy2Mgr *hy2.Manager
 	// web 托管 Web 服务的监听,使监听地址也能在运行期改(试运行→确认,见 web_listen.go)。
 	// main 启动时注入;为空时改地址的端点返回 503(单元测试与只用到 Handler 的场景)。
 	web *webServer
@@ -103,10 +103,10 @@ type iconMeta struct {
 }
 
 // New 创建 HTTP 服务。smtpUser/smtpPass 是远行商人订阅邮件提醒的发件 QQ 邮箱与授权码,
-// 空 = 订阅提醒不可用。socks5Mgr 为 nil 时自建一个(测试与纯 Web 场景)。
+// 空 = 订阅提醒不可用。hy2Mgr 为 nil 时自建一个(测试与纯 Web 场景)。
 //
 // 只装配状态、不启动后台循环 —— 循环要显式调 Start(原因见 Start 的注释)。
-func New(st *store.Store, hub *Hub, db *gamedata.DB, smtpUser, smtpPass string, socks5Mgr *socks5.Manager) *Server {
+func New(st *store.Store, hub *Hub, db *gamedata.DB, smtpUser, smtpPass string, hy2Mgr *hy2.Manager) *Server {
 	s := &Server{store: st, hub: hub, mux: http.NewServeMux(), db: db, opcodeNames: db.OpcodeNames(), medals: db.AllMedals()}
 	s.snap = newSnapshotStore()
 	s.medalIDs = map[string][]uint32{}
@@ -116,10 +116,10 @@ func New(st *store.Store, hub *Hub, db *gamedata.DB, smtpUser, smtpPass string, 
 	s.accounts = newAcctResolver(s.online, st)
 	s.smtp = newSMTPSender(smtpUser, smtpPass)
 	s.envPath = configEnvPath()
-	if socks5Mgr != nil {
-		s.socks5Mgr = socks5Mgr
+	if hy2Mgr != nil {
+		s.hy2Mgr = hy2Mgr
 	} else {
-		s.socks5Mgr = socks5.NewManager()
+		s.hy2Mgr = hy2.NewManager()
 	}
 	for _, m := range s.medals {
 		s.medalIDs[m.Name] = append(s.medalIDs[m.Name], m.ID)

@@ -1,14 +1,23 @@
 package server
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"errors"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zxsos/rocom-go/internal/envfile"
 )
@@ -23,7 +32,7 @@ func newConfigTestServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	s := newTestServer(t)
 	envPath := filepath.Join(t.TempDir(), "rocom.env")
-	if err := os.WriteFile(envPath, []byte("# rocom-go 运行参数\nROCOM_IFACE=eth0\nROCOM_SOCKS5_ADDR=\n"), 0o600); err != nil {
+	if err := os.WriteFile(envPath, []byte("# rocom-go 运行参数\nROCOM_IFACE=eth0\nROCOM_HY2_ADDR=\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s.setEnvPath(envPath)
@@ -143,7 +152,7 @@ func TestConfigRequiresAdmin(t *testing.T) {
 func TestConfigGetNoSecrets(t *testing.T) {
 	s, _ := newConfigTestServer(t)
 	s.smtp.setCredentials("sender@qq.com", "super-secret-auth-code")
-	if err := os.WriteFile(s.envPath, []byte("ROCOM_SOCKS5_PASS=proxy-secret\n"), 0o600); err != nil {
+	if err := os.WriteFile(s.envPath, []byte("ROCOM_HY2_PASS=proxy-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,9 +174,9 @@ func TestConfigGetNoSecrets(t *testing.T) {
 	if got.SMTPUser != "sender@qq.com" {
 		t.Errorf("smtpUser = %q,邮箱不算敏感应回显", got.SMTPUser)
 	}
-	if !got.SMTPPassSet || !got.Socks5.PassSet {
-		t.Errorf("已设置的敏感项应报 true: smtpPass=%v socks5Pass=%v",
-			got.SMTPPassSet, got.Socks5.PassSet)
+	if !got.SMTPPassSet || !got.Hy2.PassSet {
+		t.Errorf("已设置的敏感项应报 true: smtpPass=%v hy2Pass=%v",
+			got.SMTPPassSet, got.Hy2.PassSet)
 	}
 }
 
@@ -224,15 +233,15 @@ func TestConfigPostValidatesBeforeWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 有用户名无密码
-	rr := s.doConfig(t, http.MethodPost, `{"socks5":{"addr":":1080","user":"u"}}`)
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("非法配置应 400,实际 %d: %s", rr.Code, rr.Body.String())
-	}
 	// 白名单格式错误
-	rr = s.doConfig(t, http.MethodPost, `{"socks5":{"addr":":1080","allow":"not-an-ip"}}`)
+	rr := s.doConfig(t, http.MethodPost, `{"hy2":{"addr":":11443","allow":"not-an-ip"}}`)
 	if rr.Code != http.StatusBadRequest {
-		t.Errorf("非法白名单应 400,实际 %d", rr.Code)
+		t.Errorf("非法白名单应 400,实际 %d: %s", rr.Code, rr.Body.String())
+	}
+	// 并发上限为负
+	rr = s.doConfig(t, http.MethodPost, `{"hy2":{"addr":":11443","maxConns":-1}}`)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("负并发上限应 400,实际 %d", rr.Code)
 	}
 	after, _ := os.ReadFile(envPath)
 	if string(before) != string(after) {
@@ -274,36 +283,91 @@ func TestConfigNotWritableIsReadOnly(t *testing.T) {
 	}
 }
 
-// TestConfigSocks5Restart 守 T2:改代理配置会重启代理(或按新配置启动)。
-func TestConfigSocks5Restart(t *testing.T) {
+// hy2TestCert 生成一张一次性自签证书。hy2 必须跑在 TLS 上,没有证书连启动都过不去。
+func hy2TestCert(t *testing.T) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rocom-go test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHy2Cert = tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
+// testHy2Cert 由 hy2TestCert 填充,供需要启动代理的用例使用。
+var testHy2Cert tls.Certificate
+
+// TestConfigHy2Restart 守 T2:改代理配置会重启代理(或按新配置启动)。
+func TestConfigHy2Restart(t *testing.T) {
 	s, envPath := newConfigTestServer(t)
+	hy2TestCert(t)
+	s.hy2Mgr.SetCert(testHy2Cert)
 
 	rr := s.doConfig(t, http.MethodPost,
-		`{"socks5":{"addr":"127.0.0.1:0","maxConns":8,"user":"u1","pass":"p1"}}`)
+		`{"hy2":{"addr":"127.0.0.1:0","maxConns":8,"pass":"p1"}}`)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("POST: %d %s", rr.Code, rr.Body.String())
 	}
-	if addr, ok := s.socks5Mgr.Running(); !ok {
+	if addr, ok := s.hy2Mgr.Running(); !ok {
 		t.Fatalf("代理未启动: %v", addr)
 	}
 	// 改密码:地址不变,应只换参数、不重建监听(重建会撞 address already in use)
 	rr = s.doConfig(t, http.MethodPost,
-		`{"socks5":{"addr":"127.0.0.1:0","maxConns":8,"user":"u1","pass":"p2"}}`)
+		`{"hy2":{"addr":"127.0.0.1:0","maxConns":8,"pass":"p2"}}`)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("改密码失败(同端口不应重建监听): %d %s", rr.Code, rr.Body.String())
 	}
 	// 关掉:addr 留空
-	rr = s.doConfig(t, http.MethodPost, `{"socks5":{"addr":""}}`)
+	rr = s.doConfig(t, http.MethodPost, `{"hy2":{"addr":""}}`)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("禁用代理失败: %d %s", rr.Code, rr.Body.String())
 	}
-	if _, ok := s.socks5Mgr.Running(); ok {
+	if _, ok := s.hy2Mgr.Running(); ok {
 		t.Error("addr 为空时代理应已停止")
 	}
 	// 且写进了 env(重启后不会自己又起来)
 	f, _ := envfile.Load(envPath)
-	if v, _ := f.Get(envSocks5Addr); v != "" {
+	if v, _ := f.Get(envHy2Addr); v != "" {
 		t.Errorf("env 里代理地址应已清空,实际 %q", v)
+	}
+}
+
+// TestConfigHy2ClearsDeprecatedKeys 守升级路径:保存 hy2 配置时顺手清掉废弃的
+// ROCOM_SOCKS5_* 键,否则下次启动还会一直打废弃告警。
+func TestConfigHy2ClearsDeprecatedKeys(t *testing.T) {
+	s, envPath := newConfigTestServer(t)
+	hy2TestCert(t)
+	s.hy2Mgr.SetCert(testHy2Cert)
+	if err := os.WriteFile(envPath,
+		[]byte("# 旧代理配置\nROCOM_SOCKS5_ADDR=:1080\nROCOM_SOCKS5_PASS=old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := s.doConfig(t, http.MethodPost, `{"hy2":{"addr":"127.0.0.1:0","pass":"p1"}}`)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST: %d %s", rr.Code, rr.Body.String())
+	}
+	f, err := envfile.Load(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range deprecatedSocks5Keys {
+		if v, ok := f.Get(k); ok && v != "" {
+			t.Errorf("废弃键 %s 应已清除,实际 %q", k, v)
+		}
+	}
+	if v, _ := f.Get(envHy2Addr); v != "127.0.0.1:0" {
+		t.Errorf("env 未落盘 hy2 地址: %q", v)
 	}
 }
 

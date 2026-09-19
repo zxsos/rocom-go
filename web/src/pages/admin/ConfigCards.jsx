@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { splitAddr, joinAddr, validatePort } from '../../utils/netaddr'
 
-// 运行配置的两半:**发件邮箱**(普通设置)与**令牌 + SOCKS5 代理**(高级设置)。
+// 运行配置的两半:**发件邮箱**(普通设置)与**令牌 + hysteria2 代理**(高级设置)。
 //
 // 它们改的是同一个 POST 接口的两组字段(见 Admin 的 saveConfig),界面上之所以拆开,
 // 是因为**改错的代价不在一个量级**:
@@ -12,7 +12,8 @@ import { splitAddr, joinAddr, validatePort } from '../../utils/netaddr'
 //
 // 生效代价也各不相同,界面上分别写清,不笼统一句「保存后重启」:
 //   - 邮箱 / 令牌   改完**立即生效**(纯内存热更)
-//   - SOCKS5 代理   改完**立即热重启**(它是独立 goroutine,不影响抓包与 Web 服务)
+//   - hysteria2 代理 改完**立即生效**(它是独立 goroutine;改密码/白名单连重启都不用,
+//                    只有改端口才热重启,且不影响抓包与 Web 服务)
 //   - Web 监听地址  **不在此处** —— 改它等于让正在处理你请求的服务器当场消失,
 //                   故走 WebAddrCard 那套「试运行 → 确认」,不落进这张卡
 //
@@ -131,19 +132,18 @@ export function MailConfigCard({ config, error, onSave }) {
   )
 }
 
-// AdvConfigCard 内置 SOCKS5 代理(「高级设置」分页)。
+// AdvConfigCard 内嵌 hysteria2 代理(「高级设置」分页)。
 // 注意**不含** Web 监听地址 —— 那个改动会把管理员自己断开,走的是另一条
 // 「试运行 → 确认」的链路,见 WebAddrCard。
 export function AdvConfigCard({ config, error, onSave }) {
-  const s5 = config?.socks5 ?? {}
-  const addr = splitAddr(s5.addr)
+  const hy = config?.hy2 ?? {}
+  const addr = splitAddr(hy.addr)
   const { value: f, dirty, busy, msg, err, edit, fail, discard, submit } = useConfigForm({
     host: addr.host,
     port: addr.port,
-    allow: s5.allow ?? '',
-    block: s5.block ?? '',
-    maxConns: s5.maxConns ?? 0,
-    user: s5.user ?? '',
+    allow: hy.allow ?? '',
+    block: hy.block ?? '',
+    maxConns: hy.maxConns ?? 0,
     pass: '',                          // 敏感项:留空 = 不修改
   })
 
@@ -159,12 +159,11 @@ export function AdvConfigCard({ config, error, onSave }) {
       return fail('已填监听 IP,端口不能留空(不启用请两个都留空)')
     }
     return submit({
-      socks5: {
+      hy2: {
         addr: joinAddr(host, port),
         allow: f.allow,
         block: f.block,
         maxConns: Number(f.maxConns) || 0,
-        user: f.user,
         pass: f.pass,
       },
     }, onSave)
@@ -183,19 +182,20 @@ export function AdvConfigCard({ config, error, onSave }) {
     <div className="admin-card admin-wide">
       <h3>代理</h3>
       <p className="admin-hint">
-        改动会写入 <code>{config.path}</code> 并立即生效:代理热重启(不影响抓包)。
-        HTTPS 与抓包网卡属启动项,改它们需要编辑该文件后执行
-        {' '}<code>systemctl restart rocom-go</code>;Web 监听地址可在下方「Web 服务」卡片里改。
+        改动会写入 <code>{config.path}</code> 并立即生效:密码/白名单等直接换参数,
+        改端口才热重启(都不影响抓包)。带宽与 HTTPS、抓包网卡一样属**启动项**,
+        改它们需要编辑该文件后执行{' '}<code>systemctl restart rocom-go</code>;
+        Web 监听地址可在下方「Web 服务」卡片里改。
       </p>
 
       {!config.writable ? <Readonly path={config.path} /> : (
         <>
           <div className="admin-config-group">
-            <h4>内置 SOCKS5 代理</h4>
+            <h4>内嵌 hysteria2 代理(UDP)</h4>
             <p className="admin-hint">
-              {s5.running
-                ? <>当前运行中,实际监听 <code>{s5.realAddr}</code>。改端口会热重启,改其它项不中断连接。</>
-                : '当前未启用。填端口即可开启(如 1080);留空 = 不启用。'}
+              {hy.running
+                ? <>当前运行中,实际监听 <code>{hy.realAddr}</code>。改端口会热重启,改其它项不中断连接。</>
+                : '当前未启用。填端口即可开启(如 11443);留空 = 不启用。'}
             </p>
             <label className="admin-field">
               <span>监听 IP</span>
@@ -207,7 +207,7 @@ export function AdvConfigCard({ config, error, onSave }) {
             <label className="admin-field">
               <span>端口</span>
               <input
-                type="number" min="0" max="65535" value={f.port} placeholder="如 1080;0 = 随机分配"
+                type="number" min="0" max="65535" value={f.port} placeholder="如 11443;0 = 随机分配"
                 onChange={(e) => edit({ port: e.target.value })}
               />
             </label>
@@ -233,23 +233,19 @@ export function AdvConfigCard({ config, error, onSave }) {
               />
             </label>
             <label className="admin-field">
-              <span>认证用户名</span>
-              <input
-                type="text" value={f.user} placeholder="留空 = 无认证"
-                onChange={(e) => edit({ user: e.target.value })}
-              />
-            </label>
-            <label className="admin-field">
               <span>认证密码</span>
               <input
                 type="password" value={f.pass} autoComplete="new-password"
-                placeholder={s5.passSet ? '已设置,留空表示不修改' : '未设置'}
+                placeholder={hy.passSet ? '已设置,留空表示不修改' : '未设置'}
                 onChange={(e) => edit({ pass: e.target.value })}
               />
             </label>
             <p className="admin-hint">
-              ⚠ 公网暴露时务必填白名单:RFC 1929 的密码是明文传输的,挡得住扫描器,
-              挡不住任何能碰到这段流量的人。
+              ⚠ 公网暴露时务必填白名单。hy2 的密码在隧道内部传输(不像 SOCKS5 那样明文),
+              但这只挡得住「连进来」,挡不住扫描器把 UDP 端口打满或拿它当跳板 ——
+              白名单才是把攻击面缩到手机出口 IP 的那道防线。
+              另:手机端须用支持 hysteria2 的客户端(Clash Meta / 小火箭 / sing-box),
+              防火墙与云安全组放行的是 <b>UDP</b> 而非 TCP。
             </p>
           </div>
 

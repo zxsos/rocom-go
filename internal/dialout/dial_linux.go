@@ -1,15 +1,25 @@
 //go:build linux
 
-package socks5
+package dialout
 
 import (
 	"net"
 	"syscall"
 )
 
+// TuneTCP 给一条出站 TCP 连接套上低延迟选项。游戏流量是高频小包的请求-响应式
+// (指令/心跳/回包),这两项都是为它准备的。
+func TuneTCP(c net.Conn) {
+	tc, ok := c.(*net.TCPConn)
+	if !ok {
+		return
+	}
+	setQuickAck(tc)
+	setNotsentLowat(tc)
+}
+
 // setQuickAck 为 TCP 连接启用 TCP_QUICKACK:收到数据立即回 ACK,跳过 delayed ACK
-// 的 40ms 等待。游戏流量是高频小包的请求-响应式(指令/心跳/回包),代理两端
-// (客户端连接与上游连接)都启用可削减每个交互周期内的感知延迟。
+// 的 40ms 等待。代理两端(客户端连接与上游连接)都启用可削减每个交互周期内的感知延迟。
 func setQuickAck(c *net.TCPConn) {
 	rc, err := c.SyscallConn()
 	if err != nil {

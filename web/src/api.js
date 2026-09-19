@@ -606,9 +606,9 @@ export function adminMerchantSubDelete(email) {
     })
 }
 
-// adminConfig 运行期配置:{writable, path, smtpUser, smtpPassSet, socks5:{...}}。
+// adminConfig 运行期配置:{writable, path, smtpUser, smtpPassSet, hy2:{...}}。
 //
-// **敏感项只给「是否已设置」**(smtpPassSet / socks5.passSet),授权码原文从不下发 ——
+// **敏感项只给「是否已设置」**(smtpPassSet / hy2.passSet),授权码原文从不下发 ——
 // 它们能用来冒发邮件、能把内置代理当自由出口用,一旦经 API 下来就会出现在
 // 浏览器响应、前端内存与可能的截图里。保存时留空即「不修改」,前端据此渲染占位文案。
 export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) => {
@@ -620,7 +620,7 @@ export const adminConfig = () => adminFetch('/api/admin/config').then(async (r) 
 //
 // 写入的两条语义(后端保证,前端据此提示):
 //   - 先落盘 /etc/rocom.env 再改内存 —— 故「重启后配置还在」是天然成立的
-//   - 代理(socks5)是热重启的,不影响抓包;邮箱纯热更
+//   - 代理(hy2)热更:改密码/白名单直接换参数,改端口才重启,都不影响抓包;邮箱纯热更
 export const adminConfigSave = (payload) => postJSON('/api/admin/config', payload)
 
 // —— Web 监听地址(改它要试运行 + 确认,见 internal/server/api_web_addr.go)——

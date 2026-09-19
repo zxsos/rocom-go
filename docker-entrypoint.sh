@@ -135,41 +135,47 @@ if ! has "-tls"; then
     [ -z "$v" ] || set -- "$@" -tls
 fi
 
-# socks5 相关。顺序与 run.sh 保持一致。
-if ! has "-socks5-addr"; then
-    v=$(env_get ROCOM_SOCKS5_ADDR)
-    [ -z "$v" ] || set -- "$@" -socks5-addr "$v"
+# hysteria2 代理相关。顺序与 run.sh 保持一致。
+# 注:旧的 ROCOM_SOCKS5_* 已废弃(SOCKS5 被 hy2 取代),这里不再读取 ——
+# 老配置文件里残留的旧键不会转换成启动参数,也就不会让新版启动失败。
+if ! has "-hy2-addr"; then
+    v=$(env_get ROCOM_HY2_ADDR)
+    [ -z "$v" ] || set -- "$@" -hy2-addr "$v"
 fi
-# -skip-self-ip:启用 socks5 时**必须** false,否则代理进程以本机 IP 出站的流量
+# -skip-self-ip:启用代理时**必须** false,否则代理进程以本机 IP 出站的流量
 # 会被单臂去重逻辑丢弃(表现是「代理连上了但抓不到任何包」)。这是最容易踩的坑,
-# 故 run.sh 在启用 socks5 时默认 false;这里照办,显式配置优先。
+# 故 run.sh 在启用代理时默认 false;这里照办,显式配置优先。
 if ! has "-skip-self-ip"; then
     v=$(env_get ROCOM_SKIP_SELF_IP)
-    if [ -z "$v" ] && { has "-socks5-addr" || [ -n "$(env_get ROCOM_SOCKS5_ADDR)" ]; }; then
+    if [ -z "$v" ] && { has "-hy2-addr" || [ -n "$(env_get ROCOM_HY2_ADDR)" ]; }; then
         v=false
     fi
     # Go 的 bool flag 不接受空格分开的 true/false,必须用 = 形式
     [ -z "$v" ] || set -- "$@" "-skip-self-ip=$v"
 fi
-if ! has "-socks5-allow"; then
-    v=$(env_get ROCOM_SOCKS5_ALLOW)
-    [ -z "$v" ] || set -- "$@" -socks5-allow "$v"
+if ! has "-hy2-pass"; then
+    v=$(env_get ROCOM_HY2_PASS)
+    [ -z "$v" ] || set -- "$@" -hy2-pass "$v"
 fi
-if ! has "-socks5-block"; then
-    v=$(env_get ROCOM_SOCKS5_BLOCK)
-    [ -z "$v" ] || set -- "$@" -socks5-block "$v"
+if ! has "-hy2-allow"; then
+    v=$(env_get ROCOM_HY2_ALLOW)
+    [ -z "$v" ] || set -- "$@" -hy2-allow "$v"
 fi
-if ! has "-socks5-max-conns"; then
-    v=$(env_get ROCOM_SOCKS5_MAX_CONNS)
-    [ -z "$v" ] || set -- "$@" -socks5-max-conns "$v"
+if ! has "-hy2-block"; then
+    v=$(env_get ROCOM_HY2_BLOCK)
+    [ -z "$v" ] || set -- "$@" -hy2-block "$v"
 fi
-if ! has "-socks5-user"; then
-    v=$(env_get ROCOM_SOCKS5_USER)
-    [ -z "$v" ] || set -- "$@" -socks5-user "$v"
+if ! has "-hy2-max-conns"; then
+    v=$(env_get ROCOM_HY2_MAX_CONNS)
+    [ -z "$v" ] || set -- "$@" -hy2-max-conns "$v"
 fi
-if ! has "-socks5-pass"; then
-    v=$(env_get ROCOM_SOCKS5_PASS)
-    [ -z "$v" ] || set -- "$@" -socks5-pass "$v"
+if ! has "-hy2-up"; then
+    v=$(env_get ROCOM_HY2_UP)
+    [ -z "$v" ] || set -- "$@" -hy2-up "$v"
+fi
+if ! has "-hy2-down"; then
+    v=$(env_get ROCOM_HY2_DOWN)
+    [ -z "$v" ] || set -- "$@" -hy2-down "$v"
 fi
 # 邮箱:面板随时可改(热更),这里的初值只是「容器重建后不至于丢」。
 if ! has "-merchant-smtp-user"; then
