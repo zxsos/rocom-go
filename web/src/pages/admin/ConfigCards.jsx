@@ -360,9 +360,14 @@ function Hy2LinkCard({ running, using, hostBox, onHost, onCommit, link, error, c
             <button className="btn" type="button" onClick={onCopySub}>复制订阅地址</button>
           </div>
           <p className="admin-hint">
-            Clash Meta / FlClash / Mihomo:配置 → 从 URL 导入;小火箭:配置 → 添加配置;
-            Hiddify:配置 → 添加配置。同一个地址会按客户端自动给出对应格式
-            (Clash YAML / .conf / sing-box JSON),导入后记得<b>切换启用新配置</b>。
+            Clash Meta / FlClash / Mihomo:配置 → 从 URL 导入;小火箭:配置 → 添加配置。
+            导入后记得<b>切换启用新配置</b>。
+          </p>
+          <p className="admin-hint">
+            ⚠ <b>Hiddify 请改用 Clash 系客户端。</b>它是 sing-box 内核,分流由它自己的
+            「路由」决定,**不采纳**这份配置里的规则 —— 游戏服务器是国内 IP,会被它放回直连,
+            表现就是「手机连上了、游戏也能玩、这里一条数据都没有」。它支持按端口配规则
+            (设置 → 路由),但那是客户端侧的一次性动作;Clash 系客户端则是一次导入即完成。
           </p>
           <p className="admin-hint">
             当前指向 <code>{link.host}:{link.port}</code>
