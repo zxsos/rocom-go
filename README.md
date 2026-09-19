@@ -39,17 +39,25 @@ sudo ./rocom-go -iface auto             # auto = 自动选默认路由所在的�
 | 方式 | 适用 | 关键参数 |
 | --- | --- | --- |
 | **局域网网关** | 软路由 / 旁路由 / 开热点的机器，手机流量必经它 | `-iface <网卡>` |
-| **云端 SOCKS5** | 有公网 IP 的 VPS，手机用 Clash 把游戏流量代理过来 | 再加 `-skip-self-ip=false -tls` |
+| **云端代理** | 有公网 IP 的 VPS，手机用 Clash 把游戏流量代理过来 | 再加 `-skip-self-ip=false -tls` |
 
 ```bash
-# 云端模式的完整形态
-sudo ./rocom-go -iface auto -socks5-addr :1080 -skip-self-ip=false \
-  -socks5-allow <手机公网IP> -socks5-user rocom -socks5-pass <强密码> -tls
+# 云端模式的完整形态(代理是内嵌的 hysteria2,走 UDP)
+sudo ./rocom-go -iface auto -hy2-addr :11443 -skip-self-ip=false \
+  -hy2-allow <手机公网IP> -hy2-pass <强密码> -tls
 ```
 
-> 云端模式**必须**设 `-socks5-allow` 白名单：无白名单的公开代理几分钟内就会被全网扫描器找上
-> 并滥用，且耗尽 fd / goroutine 会连同进程的 Web 服务一起拖垮。密码认证（RFC 1929）是**明文**
-> 传输的，只能当第二道防线。若 VPS 有云安全组，那里也要放行端口 —— 机器内的防火墙只是第二道。
+> 云端模式**必须**设 `-hy2-allow` 白名单：密码挡得住「连进来」，挡不住扫描器把 UDP 端口打满
+> 或拿它当跳板，耗尽 fd / goroutine 会连同进程的 Web 服务一起拖垮。
+>
+> 三点容易踩的：**①** 防火墙与云安全组放行的是 **UDP** 11443，不是 TCP；
+> **②** 手机端须用支持 hysteria2 的客户端（Clash Meta / 小火箭 / sing-box），
+> `deploy/rocom-clash.yaml` 有一份可直接导入的配置；**③** 证书复用 Web 那份自签证书，
+> 客户端记得 `skip-cert-verify: true`。
+>
+> 换 hysteria2 而不是 SOCKS5 的理由见 [internal/hy2](internal/hy2/server.go) 的包注释：
+> 公网上的 SOCKS5 明文认证与开放代理特征无法靠配置弥补。抓包侧则完全不变 ——
+> 流量到本机后仍以本机 IP 出站，`-skip-self-ip=false` 照旧。
 
 ## 架构
 
@@ -70,7 +78,8 @@ Go 后端 + React 前端，构建为**单个二进制**（前端经 `embed` 内�
 | `internal/pipeline` | 消息分发与落库 |
 | `internal/store` | SQLite 存储与筛选查询 |
 | `internal/server` | REST + SSE + 内嵌前端 |
-| `internal/socks5` | 内置 SOCKS5 代理（云端模式），支持运行期重启而不打断抓包 |
+| `internal/hy2` | 内嵌 hysteria2 代理（云端模式，UDP），支持运行期改配置而不打断抓包 |
+| `internal/dialout` | 代理出站侧的共用能力：白名单、DNS 缓存、happy-eyeballs 拨号 |
 | `web` | React + Vite 前端 |
 | `scripts` | 解包与代码生成、抓包、契约校验脚本 |
 
@@ -119,7 +128,7 @@ cd .. && go vet ./... && go test ./...
    由此导致的**账号封禁或其他后果由使用者自行承担**，作者不提供任何豁免或支持。
 2. **本仓库内嵌了第三方素材与数据。** `internal/gamedata/data/` 下的图片与名称表由游戏客户端
    资源包解包生成，**版权归游戏方所有**；随仓库分发这些文件未必构成合法的再分发。
-3. **手机流量会经过部署它的机器。** 云端 SOCKS5 模式下确实如此 —— 请把这台风控视为你需要
+3. **手机流量会经过部署它的机器。** 云端 hysteria2 代理模式下确实如此 —— 请把这台风控视为你需要
    负责的网络出口，并务必配置白名单与认证。
 4. 本项目按「现状」提供，**不含任何明示或暗示的保证**。
 

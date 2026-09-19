@@ -10,9 +10,9 @@ import (
 
 	"github.com/zxsos/rocom-go/internal/capture"
 	"github.com/zxsos/rocom-go/internal/gamedata"
+	"github.com/zxsos/rocom-go/internal/hy2"
 	"github.com/zxsos/rocom-go/internal/pipeline"
 	"github.com/zxsos/rocom-go/internal/server"
-	"github.com/zxsos/rocom-go/internal/socks5"
 	"github.com/zxsos/rocom-go/internal/store"
 )
 
@@ -20,31 +20,54 @@ func main() {
 	pcapPath := flag.String("pcap", "", "离线 pcap 文件路径(回放模式)")
 	iface := flag.String("iface", "", "实时抓包网卡名;填 auto 则自动选默认路由所在的那张(容器里也能算,推荐)")
 	ignoreIPs := flag.String("ignore-ip", "", "额外忽略的 IP(逗号分隔;两端命中即丢包)。实时抓包已自动忽略网卡自身 IP,此项用于离线回放或多网关等场景")
-	skipSelf := flag.Bool("skip-self-ip", true, "忽略网卡自身 IP(单臂网关去重)。socks5/云代理模式下本机进程出站的游戏流量以本机 IP 为源,须设 false 才抓得到(启用 -socks5-addr 且未显式指定本项时会自动用 false)")
+	skipSelf := flag.Bool("skip-self-ip", true, "忽略网卡自身 IP(单臂网关去重)。hy2/云代理模式下本机进程出站的游戏流量以本机 IP 为源,须设 false 才抓得到(启用 -hy2-addr 且未显式指定本项时会自动用 false)")
 	port := flag.Int("port", 8195, "游戏服务器端口")
 	addr := flag.String("addr", ":4939", "Web 服务监听地址")
 	dbPath := flag.String("db", "rocom.db", "SQLite 数据库路径")
 	useTLS := flag.Bool("tls", false, "启用 HTTPS(自签证书;手机经局域网访问以满足屏幕常亮等需 secure context 的 API)")
 	certPath := flag.String("cert", "rocom-cert.pem", "TLS 证书路径(-tls 时不存在则自动生成自签证书)")
 	keyPath := flag.String("key", "rocom-key.pem", "TLS 私钥路径(-tls 时不存在则自动生成)")
-	socks5Addr := flag.String("socks5-addr", "", "内置 SOCKS5 代理监听地址(如 :1080;空=不启用)。手机把游戏流量代理到本机后,整网卡抓包即可见代理进程出站连接,须配合 -skip-self-ip=false")
-	socks5Allow := flag.String("socks5-allow", "", "SOCKS5 客户端 IP 白名单(逗号分隔,支持 IP 或 CIDR 网段;空=不限制)。带公网 IP 部署时必填,否则几分钟内会被全网扫描器滥用")
-	socks5Max := flag.Int("socks5-max-conns", 128, "SOCKS5 同时处理的最大连接数(超限直接拒绝;0=不限制),防连接风暴拖垮同进程 Web 服务。多人共用或手机配了全局代理(其它 App 流量也走这里)时按需调大")
-	socks5User := flag.String("socks5-user", "", "SOCKS5 认证用户名(空=无认证)。建议配合 -socks5-allow 白名单使用;RFC 1929 密码为明文传输,公网直连时配合加密隧道更稳")
-	socks5Pass := flag.String("socks5-pass", "", "SOCKS5 认证密码(空=无认证;-socks5-user 非空时必填)")
-	socks5Block := flag.String("socks5-block", "google.com,example.com", "SOCKS5 屏蔽的目标域名(逗号分隔,精确或子域匹配;默认含手机系统连通性探测常用域名 google.com/example.com,可覆盖。空=不屏蔽)")
+	hy2Addr := flag.String("hy2-addr", "", "内嵌 hysteria2 代理的 UDP 监听地址(如 :11443;空=不启用)。手机端须用支持 hy2 的客户端(Clash Meta / 小火箭 / sing-box);防火墙与云安全组放行的是 **UDP** 而非 TCP。流量到本机后整网卡抓包即可见代理进程出站连接,须配合 -skip-self-ip=false")
+	hy2Pass := flag.String("hy2-pass", "", "hysteria2 认证密码(隧道内传输,非明文)。公网部署时请与 -hy2-allow 白名单搭配使用")
+	hy2Allow := flag.String("hy2-allow", "", "hysteria2 客户端 IP 白名单(逗号分隔,支持 IP 或 CIDR 网段;空=不限制)。带公网 IP 部署时必填:密码挡不住扫描器打满 UDP 端口")
+	hy2Max := flag.Int("hy2-max-conns", 128, "hysteria2 同时处理的最大连接数(超限直接拒绝;0=不限制),防连接风暴拖垮同进程 Web 服务")
+	hy2Block := flag.String("hy2-block", "google.com,example.com", "hysteria2 屏蔽的目标域名(逗号分隔,精确或子域匹配;默认含手机系统连通性探测常用域名 google.com/example.com,可覆盖。空=不屏蔽)")
+	hy2Up := flag.Int("hy2-up", hy2.DefaultUpMbps, "hysteria2 上行带宽(Mbps),供拥塞控制用;**重启进程才生效**(详见 internal/hy2 的注释)")
+	hy2Down := flag.Int("hy2-down", hy2.DefaultDownMbps, "hysteria2 下行带宽(Mbps),供拥塞控制用;**重启进程才生效**")
+	// 以下 -socks5-* 已废弃:内置 SOCKS5 被 hysteria2 取代(理由见 internal/hy2 的包注释)。
+	// 仍然**保留定义**只有一个原因:Go 的 flag 包遇到未定义参数会直接 os.Exit(2),
+	// 而 deploy.sh 生成的 /etc/rocom.env 不会自动删键 —— 老机器升级后残留的
+	// ROCOM_SOCKS5_* 会被组装成启动参数,届时进程起不来,配合 systemd 的
+	// Restart=on-failure 就是崩溃循环。故这里照单收下、不使用、只告警。
+	// 返回值一律丢弃:它们只读进 flag 表里占个位,任何地方都不该再使用。
+	flag.String("socks5-addr", "", "已废弃(SOCKS5 已被 hysteria2 取代):仍可解析但不生效,请改用 -hy2-addr")
+	flag.String("socks5-allow", "", "已废弃:请改用 -hy2-allow")
+	flag.Int("socks5-max-conns", 128, "已废弃:请改用 -hy2-max-conns")
+	flag.String("socks5-user", "", "已废弃:hysteria2 只需密码,不再需要用户名")
+	flag.String("socks5-pass", "", "已废弃:请改用 -hy2-pass")
+	flag.String("socks5-block", "", "已废弃:请改用 -hy2-block")
 	smtpUser := flag.String("merchant-smtp-user", "", "远行商人订阅提醒的发件 QQ 邮箱地址(需开启 SMTP 并配合 -merchant-smtp-pass 授权码;空=订阅提醒不可用)")
 	smtpPass := flag.String("merchant-smtp-pass", "", "远行商人订阅提醒的发件 QQ 邮箱 SMTP 授权码(QQ 邮箱设置里生成,非登录密码;空=订阅提醒不可用)")
 	flag.Parse()
 
 	// -skip-self-ip 是否被**显式**指定过:flag.Visit 只遍历命令行里真正出现过的 flag。
-	// 用于下面的「socks5 自动置 false」—— 显式传了就尊重用户的选择,不再自作主张。
+	// 用于下面的「hy2 自动置 false」—— 显式传了就尊重用户的选择,不再自作主张。
 	skipSelfSet := false
+	// 同时收集被显式设置的**废弃** flag,好给出明确的迁移提示。
+	var deprecated []string
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "skip-self-ip" {
 			skipSelfSet = true
 		}
+		if len(f.Name) >= 6 && f.Name[:6] == "socks5" {
+			deprecated = append(deprecated, "-"+f.Name)
+		}
 	})
+	if len(deprecated) > 0 {
+		log.Printf("警告: %v 已废弃(内置 SOCKS5 被 hysteria2 取代),这些参数**不生效**;"+
+			"请改用 -hy2-addr/-hy2-pass/-hy2-allow,并从 /etc/rocom.env 删掉 ROCOM_SOCKS5_*",
+			deprecated)
+	}
 
 	db, err := gamedata.Load()
 	if err != nil {
@@ -55,10 +78,9 @@ func main() {
 		log.Fatalf("打开数据库失败: %v", err)
 	}
 	// 代理交给 Manager 管理生命周期:面板改代理配置时能只重启它,不必重启整个进程
-	// (重启会打断正在解密的游戏连接)。原 serveSocks5 的校验与拆分逻辑已并入
-	// socks5.Config.Validate / Manager.Start。
-	socks5Mgr := socks5.NewManager()
-	srv := server.New(st, server.NewHub(), db, *smtpUser, *smtpPass, socks5Mgr)
+	// (重启会打断正在解密的游戏连接)。校验与启动逻辑都在 hy2.Config / Manager.Start 里。
+	hy2Mgr := hy2.NewManager()
+	srv := server.New(st, server.NewHub(), db, *smtpUser, *smtpPass, hy2Mgr)
 	eng := capture.NewEngine(*port)
 	eng.Keys = st // 会话密钥持久化:抓包服务重启后继续解密仍存活的连接
 	for s := range strings.SplitSeq(*ignoreIPs, ",") {
@@ -76,13 +98,16 @@ func main() {
 	// 管理面板要在运行期改监听地址,必须能「先起新的、成功后再停旧的」——
 	// 那要求有人持有并管理监听器,见 internal/server/web_listen.go。
 	// 证书只在这里准备一次,换地址时复用同一份(它是 -tls 的产物,与监听地址无关)。
+	// hy2 是它的第二个使用方:hy2 必须跑在 TLS 上,故启用代理时也必须有证书 ——
+	// 复用同一份自签证书(客户端 skip-cert-verify 即可),不必再多维护一套。
 	var tlsCfg *tls.Config
-	if *useTLS {
+	if *useTLS || *hy2Addr != "" {
 		cert, err := loadOrCreateCert(*certPath, *keyPath)
 		if err != nil {
 			log.Fatalf("准备 TLS 证书失败: %v", err)
 		}
 		tlsCfg = &tls.Config{Certificates: []tls.Certificate{cert}}
+		hy2Mgr.SetCert(cert)
 	}
 	web := server.NewWebServer(srv.Handler(), tlsCfg)
 	srv.SetWebServer(web)
@@ -94,24 +119,25 @@ func main() {
 	if err := web.Listen(*addr); err != nil {
 		log.Fatalf("Web 服务失败: %v", err)
 	}
-	if *socks5Addr != "" {
+	if *hy2Addr != "" {
 		if !skipSelfSet && *skipSelf {
-			// 启用 socks5 却留着 skip-self-ip=true:代理进程以本机 IP 出站的流量会**两个
+			// 启用代理却留着 skip-self-ip=true:代理进程以本机 IP 出站的流量会**两个
 			// 方向全被丢**,表现是手机能玩、包数在涨,却一条数据都解析不出来(极难自查)。
 			// 这种组合几乎必然是配置疏忽,故在用户没显式指定时直接替他改掉并说明。
-			log.Printf("已启用 socks5 代理,自动改用 -skip-self-ip=false(代理以本机 IP 出站,设 true 会一个包都抓不到);" +
+			log.Printf("已启用 hysteria2 代理,自动改用 -skip-self-ip=false(代理以本机 IP 出站,设 true 会一个包都抓不到);" +
 				"如确要保留请显式传 -skip-self-ip=true")
 			*skipSelf = false
 		}
-		if err := socks5Mgr.Start(socks5.Config{
-			Addr:     *socks5Addr,
-			Allow:    *socks5Allow,
-			Block:    *socks5Block,
-			MaxConns: *socks5Max,
-			User:     *socks5User,
-			Pass:     *socks5Pass,
+		if err := hy2Mgr.Start(hy2.Config{
+			Addr:     *hy2Addr,
+			Password: *hy2Pass,
+			Allow:    *hy2Allow,
+			Block:    *hy2Block,
+			MaxConns: *hy2Max,
+			UpMbps:   *hy2Up,
+			DownMbps: *hy2Down,
 		}); err != nil {
-			log.Fatalf("SOCKS5 服务启动失败: %v", err)
+			log.Fatalf("hysteria2 服务启动失败: %v", err)
 		}
 	}
 
@@ -147,7 +173,7 @@ func main() {
 		if info.Warn != "" {
 			log.Printf("警告: %s", info.Warn)
 		}
-		printBanner(*port, *addr, *dbPath, *socks5Addr, *skipSelf, *useTLS, info)
+		printBanner(*port, *addr, *dbPath, *hy2Addr, *skipSelf, *useTLS, info)
 		// 定期摘要:RunLive 阻塞,故在它之前起。丢包由 capture 包在采样到增量时
 		// 立即告警,这里只做周期性汇总 —— 让人不查日志也知道当前是否在丢。
 		go func() {
@@ -172,10 +198,10 @@ func main() {
 // 为什么要它:容器部署下用户只看 `docker logs`,而「网卡选错」与「skip-self-ip 设错」
 // 这两类问题的表现都很安静(前者容器反复重启、后者数据永远为空),不看 README 就不知道该
 // 核对什么。把决定行为的几项一次打全,`docker logs | tail` 一眼就能确认。
-func printBanner(port int, addr, dbPath, socks5Addr string, skipSelf, useTLS bool, en capture.IfaceInfo) {
+func printBanner(port int, addr, dbPath, hy2Addr string, skipSelf, useTLS bool, en capture.IfaceInfo) {
 	mode := "单臂网关 / 旁路镜像"
-	if socks5Addr != "" {
-		mode = "socks5 代理(监听 " + socks5Addr + ")"
+	if hy2Addr != "" {
+		mode = "hysteria2 代理(监听 UDP " + hy2Addr + ")"
 	}
 	via := "显式指定"
 	if en.Auto {
@@ -201,6 +227,7 @@ func printBanner(port int, addr, dbPath, socks5Addr string, skipSelf, useTLS boo
 	log.Printf("=================================================")
 }
 
-// 内置 SOCKS5 代理(仅 TCP CONNECT)供手机把游戏流量代理到本机,整网卡抓包即可看到
-// 代理进程以本机 IP 出站的连接(须配合 -skip-self-ip=false)。
-// 启停与参数变更走 socks5.Manager(见 main 里的 socks5Mgr),管理面板可在运行期改。
+// 内嵌 hysteria2 代理供手机把游戏流量代理到本机,整网卡抓包即可看到代理进程以本机 IP
+// 出站的连接(须配合 -skip-self-ip=false)。它取代了原先的内置 SOCKS5 —— 后者在公网上的
+// 明文认证与开放代理特征无法靠配置弥补(理由见 internal/hy2 的包注释)。
+// 启停与参数变更走 hy2.Manager(见 main 里的 hy2Mgr),管理面板可在运行期改。

@@ -20,7 +20,7 @@ import (
 var dockerDefaultBridge = netip.MustParsePrefix("172.17.0.0/16")
 
 // 环形缓冲区大小。默认约 8MB(blockSize 64KB × 128 块),在开了 NoCopy 的串行
-// 处理下不够:处理慢 → 帧无法释放 → 新包写不进来被丢弃。多人同时挂 socks5 时
+// 处理下不够:处理慢 → 帧无法释放 → 新包写不进来被丢弃。多人同时挂 hy2 代理时
 // 包量成倍增长,故显式放大到 32MB。
 //
 // 约束:blockSize 必须是 frameSize 的整数倍,且是页大小的整数倍;numBlocks ×
@@ -202,7 +202,7 @@ func joinAddrs(ips []netip.Addr) string {
 }
 
 // RunLive 在指定网卡上用 AF_PACKET 被动抓包(无需 libpcap)。阻塞运行。
-// skipSelf 为 true 时忽略网卡自身 IP(单臂网关去重);socks5/云代理模式下本机进程
+// skipSelf 为 true 时忽略网卡自身 IP(单臂网关去重);hy2/云代理模式下本机进程
 // 出站的游戏流量正是以本机 IP 为源,必须传 false 才抓得到(见 cmd/rocom-go -skip-self-ip)。
 func (e *Engine) RunLive(iface string, skipSelf bool) error {
 	if skipSelf {
@@ -275,7 +275,7 @@ func pollStats(tp *afpacket.TPacket, e *Engine) {
 		if !selfCheckWarned && e.SkipDropped() > selfCheckMin && e.Emitted() == 0 {
 			selfCheckWarned = true
 			log.Printf("警告: 已有 %d 个包因「本机 IP」被丢弃,且尚未解析出任何游戏消息 —— "+
-				"若你是 socks5/云代理部署(手机把游戏流量代理到本机),请设 -skip-self-ip=false 后重启;"+
+				"若你是 hy2/云代理部署(手机把游戏流量代理到本机),请设 -skip-self-ip=false 后重启;"+
 				"若确为单臂网关,请回头确认网卡是否选错(见启动时的网卡日志)", e.SkipDropped())
 		}
 	}

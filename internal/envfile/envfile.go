@@ -9,10 +9,10 @@
 // 两条硬约束:
 //
 //  1. **必须保留注释与未知键**。deploy.sh 生成的 env 文件里带着「改后执行 systemctl restart」
-//     这类运维提示,注释掉了的键(如 ROCOM_SOCKS5_ADDR=)也是有意留的空位。用 map 读一遍再
+//     这类运维提示,注释掉了的键(如 `# ROCOM_IFACE=eth0`)也是有意留的空位。用 map 读一遍再
 //     整个重写会把这些全抹掉 —— 那份文件是给人在服务器上用 vi 看的,不是纯数据。
 //     故这里按**行**处理:认得的键就地替换值,不认得的原样保留。
-//  2. **必须原子写**。文件里存着 SMTP 授权码与 socks5 密码;写一半崩了会留下截断的文件,
+//  2. **必须原子写**。文件里存着 SMTP 授权码与 hy2 代理密码;写一半崩了会留下截断的文件,
 //     而 systemd 的 EnvironmentFile= 遇到语法错误会让服务起不来 —— 那等于把面板改崩了。
 //     故写临时文件 + rename,并保持 0600。
 package envfile
@@ -180,6 +180,31 @@ func (f *File) Set(key, value string) error {
 		}
 	}
 	f.entries = append(f.entries, entry{key: key, value: value})
+	return nil
+}
+
+// Unset 删除某个键及其紧贴其上的注释行(若有);键不存在时是空操作。
+//
+// 为什么要连注释一起删:键的注释是「这个键是干什么的」,键没了注释就成了悬空的
+// 说明文字,下次有人看 env 文件会被误导。而只删键不删注释的实现最常见,故写死在这里。
+// 用途是清理**已废弃**的键(如被 hysteria2 取代的 ROCOM_SOCKS5_*),
+// 留着它们只会让启动日志一直打废弃告警。
+func (f *File) Unset(key string) error {
+	if !validKey(key) {
+		return fmt.Errorf("envfile: 非法键名 %q", key)
+	}
+	for i := range f.entries {
+		if f.entries[i].key != key {
+			continue
+		}
+		// 前一行是注释且紧贴本行时一并删掉
+		from := i
+		if i > 0 && f.entries[i-1].key == "" && strings.HasPrefix(strings.TrimSpace(f.entries[i-1].raw), "#") {
+			from = i - 1
+		}
+		f.entries = append(f.entries[:from], f.entries[i+1:]...)
+		return nil
+	}
 	return nil
 }
 

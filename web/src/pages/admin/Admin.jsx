@@ -93,7 +93,7 @@ export default function Admin() {
   //
   // **必须回带 smtpUser**:后端对 POST 的每一项是「给了就写」,而 smtpUser 是普通文本、
   // 没有「留空 = 不修改」的语义(它是唯一能被用户主动清空的那一项)。若代理那块只提交
-  // socks5,后端会把 smtpUser 写空 —— 邮件配置被无声抹掉,而保存回报还是「已生效」。
+  // hy2,后端会把 smtpUser 写空 —— 邮件配置被无声抹掉,而保存回报还是「已生效」。
   // 故默认带上当前值,除非本次就是要改它。
   const saveConfig = useCallback(async (patch) => {
     try {

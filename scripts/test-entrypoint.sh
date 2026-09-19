@@ -127,8 +127,8 @@ teardown
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
-ROCOM_SOCKS5_ADDR=
-ROCOM_SOCKS5_PASS=
+ROCOM_HY2_ADDR=
+ROCOM_HY2_PASS=
 EOF
 check "只配部分项不误退" "-iface=ens17
 $DEFAULTS"
@@ -138,51 +138,75 @@ teardown
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
-ROCOM_SOCKS5_ADDR=:1080
-ROCOM_SOCKS5_USER=rocom
-ROCOM_SOCKS5_PASS=hello world 123
+ROCOM_HY2_ADDR=:11443
+ROCOM_HY2_PASS=hello world 123
 EOF
 check "含空格的密码不分家" "-iface=ens17
--socks5-addr=:1080
--socks5-user=rocom
--socks5-pass=hello world 123
+-hy2-addr=:11443
+-hy2-pass=hello world 123
 -skip-self-ip=false
 $DEFAULTS"
 teardown
 
-# --- 6. socks5 启用时 -skip-self-ip 默认 false ---
+# --- 5b. hy2 全套键都要能组装成启动参数 ---
+# 守「新增键两边都改」:任何一种 hy2 键漏在 entrypoint 之外,都会变成
+# 「面板里改了、重启后不生效」这种最难查的偏差。
+setup
+cat > "$ROCOM_ENV_FILE" <<'EOF'
+ROCOM_IFACE=ens17
+ROCOM_HY2_ADDR=:11443
+ROCOM_HY2_PASS=p
+ROCOM_HY2_ALLOW=1.2.3.4,10.0.0.0/8
+ROCOM_HY2_BLOCK=google.com,example.com
+ROCOM_HY2_MAX_CONNS=8
+ROCOM_HY2_UP=30
+ROCOM_HY2_DOWN=40
+EOF
+check "hy2 全套键组装" "-iface=ens17
+-hy2-addr=:11443
+-hy2-pass=p
+-hy2-allow=1.2.3.4,10.0.0.0/8
+-hy2-block=google.com,example.com
+-hy2-max-conns=8
+-hy2-up=30
+-hy2-down=40
+-skip-self-ip=false
+$DEFAULTS"
+teardown
+
+# --- 6. hy2 启用时 -skip-self-ip 默认 false ---
 # 这是最容易踩的坑:不设 false,代理进程以本机 IP 出站的流量被单臂去重丢掉,
 # 表现是「代理连上了但一个包都抓不到」。
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
-ROCOM_SOCKS5_ADDR=:1080
+ROCOM_HY2_ADDR=:11443
 EOF
-check "socks5 模式默认 -skip-self-ip=false" "-iface=ens17
--socks5-addr=:1080
+check "hy2 模式默认 -skip-self-ip=false" "-iface=ens17
+-hy2-addr=:11443
 -skip-self-ip=false
 $DEFAULTS"
 teardown
 
-# --- 7. 显式配置优先于 socks5 的 false 默认值 ---
+# --- 7. 显式配置优先于 hy2 的 false 默认值 ---
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
-ROCOM_SOCKS5_ADDR=:1080
+ROCOM_HY2_ADDR=:11443
 ROCOM_SKIP_SELF_IP=true
 EOF
 check "显式 SKIP_SELF_IP 优先" "-iface=ens17
--socks5-addr=:1080
+-hy2-addr=:11443
 -skip-self-ip=true
 $DEFAULTS"
 teardown
 
-# --- 8. 非 socks5 场景不加 -skip-self-ip(沿用二进制默认 true) ---
+# --- 8. 非 hy2 场景不加 -skip-self-ip(沿用二进制默认 true) ---
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
 EOF
-check "非 socks5 不加 skip-self-ip" "-iface=ens17
+check "非 hy2 不加 skip-self-ip" "-iface=ens17
 $DEFAULTS"
 teardown
 
@@ -221,10 +245,10 @@ teardown
 setup
 cat > "$ROCOM_ENV_FILE" <<'EOF'
 ROCOM_IFACE=ens17
-ROCOM_SOCKS5_PASS="quoted pass"
+ROCOM_HY2_PASS="quoted pass"
 EOF
 check "去首尾配对引号" "-iface=ens17
--socks5-pass=quoted pass
+-hy2-pass=quoted pass
 $DEFAULTS"
 teardown
 

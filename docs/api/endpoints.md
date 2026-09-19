@@ -181,7 +181,7 @@ gamedata 从 `pets` 里重新取（前端拿不到权威的那份），且「从
 | `GET /api/admin/merchant-subs` | admin | 商人邮件推送名单 |
 | `DELETE /api/admin/merchant-subs` | admin | 删除某邮箱订阅（`?email=`） |
 | `POST /api/admin/merchant-test-mail` | admin | 发测试邮件验证 SMTP |
-| `GET /api/admin/config` | admin | 当前运行配置脱敏回显：`{path, writable, smtpUser, smtpPassSet, socks5, web}` |
+| `GET /api/admin/config` | admin | 当前运行配置脱敏回显：`{path, writable, smtpUser, smtpPassSet, hy2, web}`（hy2 为内嵌 hysteria2 代理配置，密码只给「是否已设置」） |
 | `POST /api/admin/config` | admin | 修改运行配置（body 只带要改的项；敏感项留空 = 不修改）。**不含** Web 监听地址 |
 | `POST /api/admin/web-addr` | admin | Web 监听地址**试运行**（body: `addr`）：新地址开始监听，新旧并存、不落盘。返回 `{addr, realAddr, port, deadline, handoff}` |
 | `POST /api/admin/web-addr/confirm` | admin 或 handoff | **确认**试运行：先写入 `ROCOM_ADDR` 再停旧监听。带 `handoff` 时免令牌（见下） |

@@ -45,20 +45,21 @@ proxies:
     udp: false
     skip-cert-verify: true   # 自签证书;挂域名+正规证书后改 false 并加 sni
 
-  - name: "SOCKS5 通道"
-    type: socks5
+  # 非游戏流量想也走这台机器时,用第二条 hy2 通道(换个端口即可)。
+  # 服务端已不再提供 SOCKS5 入站 —— 它在公网上的明文认证与开放代理特征
+  # 无法靠配置弥补,已被 hysteria2 取代(见 internal/hy2 的包注释)。
+  - name: "ROCOM hy2(代理通道)"
+    type: hysteria2
     server: "203.0.113.10"
-    port: 10809
-    udp: false          # 服务端支持 UDP associate 时可改 true(QUIC/DNS 需要)
-    username: "改成你的用户名"
+    port: 11444
     password: "改成你的密码"
+    udp: false
+    skip-cert-verify: true
 
-    # ⚠ 公网暴露时必看:RFC 1929 认证是**明文传输**的(TCP 上裸奔),
-    #   有密码只能挡住不抓包的扫描器,挡不住任何能碰到这段流量的人。
-    #   服务端务必加来源 IP 限制,例如:
-    #     -socks5-allow "1.2.3.4,10.0.0.0/8"
-    #   更稳的做法是只监听内网/VPN IP(如 -socks5-addr 100.64.0.1:10809),
-    #   公网完全访问不到。
+    # ⚠ 公网暴露时必看:服务端务必加来源 IP 白名单,例如:
+    #     -hy2-allow "1.2.3.4,10.0.0.0/8"
+    #   更稳的做法是只监听内网/VPN IP(如 -hy2-addr 100.64.0.1:11443),
+    #   公网完全访问不到。密码挡得住「连进来」,挡不住扫描器打满 UDP 端口。
 
 proxy-groups:
   - name: "抓包通道"
@@ -70,7 +71,7 @@ proxy-groups:
   - name: "代理通道"
     type: select
     proxies:
-      - "SOCKS5 通道"
+      - "ROCOM hy2(代理通道)"
       - DIRECT
 
 rules:
@@ -126,7 +127,7 @@ rules:
   - MATCH,DIRECT
 
   # 「代理通道」默认不接任何流量(未出现在上面的规则里)。
-  # 想让非游戏流量走 socks5 时,把上面 MATCH,DIRECT 改成 MATCH,代理通道。
+  # 想让非游戏流量也走这台机器时,把上面 MATCH,DIRECT 改成 MATCH,代理通道。
   # 也可按域名细分,例如:
   #   - DOMAIN-SUFFIX,github.com,代理通道
   #   - DOMAIN-SUFFIX,google.com,代理通道
