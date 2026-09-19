@@ -1,0 +1,96 @@
+/* 订阅引导页(pages/SubImport.jsx):朋友点开短链后看到的那一页。
+   —— 移动优先,以 390px 宽为基准;这一页几乎只会在手机上看。
+   它不在 App 壳里,没有顶栏底栏,故自己管居中与安全区。 */
+
+.sub-import {
+  min-height: 100vh;
+  display: flex; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(120% 60% at 50% -10%, var(--accent-soft), transparent 70%),
+    var(--bg);
+}
+.sub-import-card {
+  width: 100%; max-width: 420px;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 20px 18px 24px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow);
+  animation: sub-import-in var(--dur-slow, 320ms) var(--ease-out, cubic-bezier(.32, .72, 0, 1));
+}
+@keyframes sub-import-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.sub-import-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sub-import-title { margin: 0; font-size: 20px; font-weight: 600; color: var(--fg); line-height: 1.3; }
+.sub-import-badge {
+  padding: 2px 8px; font-size: 12px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--fg-dim); background: var(--bg-2);
+}
+.sub-import-badge.good { color: var(--green); border-color: var(--green); background: rgba(63, 185, 80, .1); }
+.sub-import-badge.bad { color: var(--red); border-color: var(--red); background: rgba(248, 81, 73, .1); }
+
+/* 一句话说清「连上它有什么用」:朋友多半不知道自己为什么要装这个,
+   不说清他就没有动力走完后面三步。 */
+.sub-import-lead { margin: 0; font-size: 14px; line-height: 1.6; color: var(--fg-dim); }
+.sub-import-h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; color: var(--fg); }
+.sub-import-muted { margin: 0; font-size: 12px; color: var(--fg-dim); line-height: 1.6; }
+
+/* 警示块:吊销/过期、深链没跳转都用它。左色条是为了在快速滑动的一屏里
+   也能被当成「要紧的话」—— 只靠红字在小屏上常常被忽略。 */
+.sub-import-warn {
+  margin: 0; padding: 10px 12px;
+  font-size: 13px; line-height: 1.6; color: var(--red);
+  background: rgba(248, 81, 73, .08);
+  border: 1px solid var(--red); border-left-width: 3px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* 码盘:与面板里那块同理 —— 固定深码浅底,不跟主题走。 */
+.sub-import-qr {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 16px; background: #fff;
+  border: 1px solid var(--line); border-radius: var(--radius-md, 8px);
+}
+
+.sub-import-url { display: flex; gap: 8px; }
+.sub-import-url > input {
+  flex: 1; min-width: 0;
+  padding: 8px 10px; font-size: 12px;
+  font-family: ui-monospace, monospace;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: var(--radius-sm, 6px);
+}
+.sub-import-url > input:focus { outline: none; border-color: var(--accent); }
+.sub-import-url > .btn { flex: none; white-space: nowrap; }
+
+/* 客户端按钮:整块可点,主名 + 一行小字说明。小字是「点这里一键导入」而不是
+   技术名词 —— 朋友不该被 scheme、订阅这些词拦住。 */
+.sub-import-actions { display: flex; flex-direction: column; gap: 8px; }
+.sub-import-client {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 11px 14px; text-align: left; width: 100%;
+}
+.sub-import-client > b { font-size: 14px; color: var(--fg); }
+.sub-import-client > span { font-size: 12px; color: var(--fg-dim); }
+.sub-import-client:hover { border-color: var(--accent); background: var(--accent-soft); }
+.sub-import-client:hover > b { color: var(--accent); }
+.sub-import-client:active { transform: scale(.985); }
+
+.sub-import-more {
+  padding: 10px 12px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+}
+.sub-import-more > summary { cursor: pointer; font-size: 13px; color: var(--fg); }
+.sub-import-more > ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.sub-import-more > ul li { font-size: 12px; color: var(--fg-dim); line-height: 1.6; }
+.sub-import-more > ul b { color: var(--fg); }
+
+.sub-import-checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.sub-import-checks li { font-size: 13px; line-height: 1.6; color: var(--fg-dim); }
+.sub-import-checks b { color: var(--fg); }

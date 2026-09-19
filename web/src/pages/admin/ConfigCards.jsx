@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { splitAddr, joinAddr, validatePort } from '../../utils/netaddr'
 import { adminHy2Link } from '../../api'
 import { copyText } from '../../utils/clipboard'
+import SubDeviceCard from './SubDeviceCard'
 
 // 运行配置的两半:**发件邮箱**(普通设置)与**令牌 + hysteria2 代理**(高级设置)。
 //
@@ -300,6 +301,10 @@ export function AdvConfigCard({ config, error, onSave }) {
             copiedSub={copiedSub}
             onCopySub={copySub}
           />
+
+          {/* 一人一条链接的新入口。旧那条(密码派生)留着:早期已导入的地址还能拉,
+              且它「换密码即失效」的语义在排障时仍然有用。 */}
+          <SubDeviceCard />
 
           <Actions busy={busy} dirty={dirty} msg={msg} err={err} onSave={save} onDiscard={discard} />
         </>
