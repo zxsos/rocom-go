@@ -3,7 +3,6 @@ package hy2
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -233,90 +232,9 @@ rules:
   - MATCH,DIRECT
 `
 
-// ---- sing-box JSON(Hiddify 等 sing-box 内核客户端)----
-
-// singboxProxyTag 是出站的名字。它同时是客户端界面上显示的节点名,故取个能认出来的。
-const singboxProxyTag = "rocom-hy2"
-
-// singboxConfig 是下发给 sing-box 内核客户端的配置。
-//
-// 为什么单开一路:这类客户端(Hiddify 是典型)自己的路由表说了算,**不采用** Clash 配置里的
-// rules / proxy-groups。实测把 Clash YAML 导进 Hiddify 后,订阅里那条分流规则不生效,
-// 游戏流量照旧按「国内直连」走,一个包都到不了本机 —— 表象与「没导入」完全一样。
-// 而 route.rules 是 sing-box 原生认得的东西,故换一种格式下发。
-//
-// 刻意**不带 inbounds**:监听(TUN / 系统代理)是客户端的「服务模式」,由它按平台自己生成,
-// 写死一份进去会把它盖掉,結果是 VPN 起不来 —— 那是比规则不生效更难查的故障。
-type singboxConfig struct {
-	Outbounds []singboxOutbound `json:"outbounds"`
-	Route     singboxRoute      `json:"route"`
-}
-
-type singboxOutbound struct {
-	Type       string      `json:"type"`
-	Tag        string      `json:"tag"`
-	Server     string      `json:"server,omitempty"`
-	ServerPort int         `json:"server_port,omitempty"`
-	Password   string      `json:"password,omitempty"`
-	TLS        *singboxTLS `json:"tls,omitempty"`
-}
-
-type singboxTLS struct {
-	Enabled    bool   `json:"enabled"`
-	Insecure   bool   `json:"insecure,omitempty"`
-	ServerName string `json:"server_name,omitempty"`
-}
-
-type singboxRoute struct {
-	Rules []singboxRouteRule `json:"rules"`
-	Final string             `json:"final"`
-}
-
-type singboxRouteRule struct {
-	Port     []int  `json:"port"`
-	Outbound string `json:"outbound"`
-}
-
-// SubscriptionSingbox 渲染一份 sing-box 原生 JSON 配置。
-//
-// 用 json.Marshal 而不是拼模板:密码里的引号/反斜杠在 JSON 里同样能破坏结构,
-// 交给编码器就没这回事(与 Clash 那份用 strconv.Quote 是同一个理由)。
-func SubscriptionSingbox(p SubParams) (string, error) {
-	p, err := p.normalize()
-	if err != nil {
-		return "", err
-	}
-	tls := &singboxTLS{Enabled: true}
-	if p.Secure {
-		// 主机能在证书里验上:正常验签,顺带把 SNI 指过去。
-		tls.ServerName = p.Host
-	} else {
-		tls.Insecure = true
-	}
-	cfg := singboxConfig{
-		Outbounds: []singboxOutbound{
-			{
-				Type:       "hysteria2",
-				Tag:        singboxProxyTag,
-				Server:     p.Host,
-				ServerPort: p.Port,
-				Password:   p.Password,
-				TLS:        tls,
-			},
-			{Type: "direct", Tag: "direct"},
-		},
-		Route: singboxRoute{
-			// 只把游戏端口送进代理,其余直连 —— 与另两份格式同一个取舍(见本文件顶部)。
-			Rules: []singboxRouteRule{{Port: []int{p.GamePort}, Outbound: singboxProxyTag}},
-			Final: "direct",
-		},
-	}
-	b, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("hy2: 渲染 sing-box 配置失败: %w", err)
-	}
-	return string(b) + "\n", nil
-}
+// 曾有第三路:sing-box 原生 JSON(给 Hiddify),2026-09-19 实测无效后删除。
+// 理由写在 internal/server/api_sub.go 分发的那一处 —— 别急着加回来:Clash YAML 与
+// sing-box JSON 都试过、都没通,说明瓶颈在客户端侧而不是格式。
 
 // srTmpl 是小火箭的 .conf 模板。段落结构与键名取自小火箭导出的配置,
 // 只保留这份用途真正需要的最小集合。
