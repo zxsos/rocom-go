@@ -238,12 +238,16 @@ rules:
 
 // srTmpl 是小火箭的 .conf 模板。段落结构与键名取自小火箭导出的配置,
 // 只保留这份用途真正需要的最小集合。
+//
+// 规则指向 [Proxy Group] 而不是直接指向节点:小火箭两侧都收,但能查到的官方与
+// 社区示例一律走策略组这一层,且组里能一眼看出「当前选的是哪个」——
+// 抓包失败的典型原因之一就是这里被选成了 DIRECT,留着这一层便于当场核对。
 var srTmpl = template.Must(template.New("shadowrocket").Parse(srTmplText))
 
 const srTmplText = `# rocom-go 配置订阅 —— 由服务端按当前运行状态生成,别手改:改了下次刷新就被覆盖。
 #
 # 小火箭(Shadowrocket):配置 → 添加配置 → 填本页那条订阅地址。
-# 导入后确认规则页里 DST-PORT {{.GamePort}} 指向的是 ROCOM hy2(不是 DIRECT)。
+# 导入后确认「抓包通道」这个策略组选中的是 ROCOM hy2(不是 DIRECT)。
 #
 # 只把游戏端口 {{.GamePort}} 的流量送进代理,其余直连。
 # 游戏服务器是国内 IP:一旦被 GEOIP,CN,DIRECT 或 FINAL 先放行,流量就走了直连,
@@ -259,8 +263,11 @@ skip-proxy = 127.0.0.1, localhost, *.local, 192.168.0.0/16, 10.0.0.0/8, 172.16.0
 [Proxy]
 ROCOM hy2 = hysteria2, {{.Host}}, {{.Port}}, password={{.Password}}{{if .SkipCert}}, skip-cert-verify=true{{end}}
 
+[Proxy Group]
+抓包通道 = select, ROCOM hy2, DIRECT
+
 [Rule]
-DST-PORT,{{.GamePort}},ROCOM hy2
+DST-PORT,{{.GamePort}},抓包通道
 IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
 IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
 IP-CIDR,172.16.0.0/12,DIRECT,no-resolve

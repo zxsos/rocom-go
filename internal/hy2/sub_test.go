@@ -192,11 +192,17 @@ func TestSubscriptionShadowrocket(t *testing.T) {
 	if !strings.Contains(out, want) {
 		t.Fatalf("Proxy 行格式不符,期望含:\n%s\n实际:\n%s", want, out)
 	}
-	if !strings.Contains(out, "DST-PORT,8195,ROCOM hy2") {
+	// 策略组:规则指向组而非节点。小火箭两侧都收,但组这一层能当场看出
+	// 「现在选的是谁」——抓包失败最常见的原因就是这儿被选成了 DIRECT。
+	group := "[Proxy Group]\n抓包通道 = select, ROCOM hy2, DIRECT\n"
+	if !strings.Contains(out, group) {
+		t.Fatalf("策略组格式不符,期望含:\n%s\n实际:\n%s", group, out)
+	}
+	if !strings.Contains(out, "DST-PORT,8195,抓包通道") {
 		t.Fatalf("缺少把游戏端口送进代理的规则:\n%s", out)
 	}
 	// 同 Clash 那条:注释里也有一处 GEOIP,CN,DIRECT,故取最后一次出现(即规则行)。
-	rule := strings.LastIndex(out, "DST-PORT,8195,ROCOM hy2")
+	rule := strings.LastIndex(out, "DST-PORT,8195,抓包通道")
 	geo := strings.LastIndex(out, "GEOIP,CN,DIRECT")
 	if rule < 0 || geo < 0 || rule > geo {
 		t.Fatalf("规则顺序不对,游戏流量会被放回直连:\n%s", out)
