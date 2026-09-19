@@ -1,12 +1,25 @@
-# rocom-go 客户端代理配置
-# 服务端:203.0.113.10:11443 (hysteria2)
+# rocom-go 客户端代理配置（hysteria2）
+#
+# 这是**模板**：里面的服务器地址与密码都是占位符，真值放你自己的副本里，
+# 别把填好的版本提交进仓库。
 #
 # 使用前必看:
 #   1. 需开启 TUN/增强模式,否则抓不到游戏流量(iOS 小火箭本身即 VPN,无需设置)
-#   2. 防火墙放行 UDP 11443(不是 TCP)
-#   3. 服务端 rocom-go 必须加 -skip-self-ip=false,否则抓不到包
+#   2. 防火墙 / 云安全组放行的是 **UDP** 11443,不是 TCP
+#   3. 服务端无需手动加 -skip-self-ip:启用 -hy2-addr 时 run.sh 会自动带
+#      `-skip-self-ip=false`(见 scripts/deploy.sh 的 hy2 块)
 #   4. PACKAGE-NAME / PROCESS-NAME 仅 Android + PC 有效;
 #      iOS 沙盒限制拿不到包名,小火箭导入时会自动降级为只用 DST-PORT,属正常
+#
+# 与旧版 SOCKS5 的差异(排障时容易误判,先记下):
+#   - 密码在 hy2 隧道**内部**传输,不再是 RFC1929 明文;但白名单仍然必要 ——
+#     密码只挡「连进来」,挡不住扫描器把 UDP 端口打满。
+#   - 服务端已关闭 UDP 转发(游戏只用 TCP 8195),故本文件 `udp: false` 是**必须**的,
+#     改成 true 会连不上而不是变快。
+#   - 不支持多用户:整个内嵌 hy2 只有**一把**密码,多台设备共用它。要单独吊销某台,
+#     只能换密码并让所有设备重新导入配置。
+#   - 不支持 masquerade(伪装站点)。被探测时就是裸露的 hy2 端点特征,
+#     这是相对独立 hysteria 部署的能力退化,不是配置漏填。
 
 port: 7890
 socks-port: 7891
@@ -39,27 +52,24 @@ dns:
 proxies:
   - name: "ROCOM hy2"
     type: hysteria2
-    server: "203.0.113.10"
+    server: "203.0.113.10"        # ← 改成你的服务器地址
     port: 11443
-    password: "改成你的密码"
-    udp: false
-    skip-cert-verify: true   # 自签证书;挂域名+正规证书后改 false 并加 sni
-
-  # 非游戏流量想也走这台机器时,用第二条 hy2 通道(换个端口即可)。
-  # 服务端已不再提供 SOCKS5 入站 —— 它在公网上的明文认证与开放代理特征
-  # 无法靠配置弥补,已被 hysteria2 取代(见 internal/hy2 的包注释)。
-  - name: "ROCOM hy2(代理通道)"
-    type: hysteria2
-    server: "203.0.113.10"
-    port: 11444
-    password: "改成你的密码"
-    udp: false
+    password: "改成你的密码"        # ← 对应服务端 ROCOM_HY2_PASS / -hy2-pass
+    udp: false                    # 服务端 DisableUDP=true,必须保持 false
+    # 服务端复用 Web 那份证书(LE 签发,SAN 只有域名、没有 IP)。
+    # 按 IP 连 → 只能 skip-cert-verify: true;
+    # 按域名连 → 可改 skip-cert-verify: false 并加 sni: <你的域名>。
     skip-cert-verify: true
 
-    # ⚠ 公网暴露时必看:服务端务必加来源 IP 白名单,例如:
-    #     -hy2-allow "1.2.3.4,10.0.0.0/8"
-    #   更稳的做法是只监听内网/VPN IP(如 -hy2-addr 100.64.0.1:11443),
-    #   公网完全访问不到。密码挡得住「连进来」,挡不住扫描器打满 UDP 端口。
+# ⚠️ 这里曾经有第二条「代理通道」(11444)。它**连不上**,已删除:
+#    内嵌 hy2 的 Config 只有一个 Addr 字段、服务端只有一个 -hy2-addr flag,
+#    单个进程无法同时监听两个 UDP 端口。想要第二条独立通道,只能
+#    再跑一个 rocom-go 实例(另配端口与数据路径),而不是在这份文件里改个数字。
+#
+# 公网暴露的加固顺序(从省事到最稳):
+#   1) 服务端 -hy2-allow "1.2.3.4,..."          只放行手机出口 IP,IP 变了要改
+#   2) -hy2-max-conns 64                        限制并发,防连接风暴打垮同进程 Web
+#   3) -hy2-addr <内网/VPN IP>:11443           公网根本扫不到,最稳
 
 proxy-groups:
   - name: "抓包通道"
@@ -68,53 +78,24 @@ proxy-groups:
       - "ROCOM hy2"
       - DIRECT
 
-  - name: "代理通道"
-    type: select
-    proxies:
-      - "ROCOM hy2(代理通道)"
-      - DIRECT
-
 rules:
   # 按包名/进程名精确匹配 —— 需 Clash.Meta / fclash 支持 AND 与 PACKAGE-NAME。
-
   # 当前客户端不支持,已全部注释;换用支持的分流客户端可放开。
-
-
-
+  #
   # # Windows
-
   # - AND,((PROCESS-NAME,nrc-win64-shipping.exe),(DST-PORT,8195)),抓包通道
-
-
-
   # # macOS PlayCover(包名与安卓相同)
-
   # - AND,((PROCESS-NAME,com.tencent.nrc),(DST-PORT,8195)),抓包通道
-
-
-
   # # Android
-
   # - AND,((PACKAGE-NAME,com.tencent.nrc),(DST-PORT,8195)),抓包通道
-
-
-
   # # PC 模拟器(需客户端开启「进程名识别」)
-
   # - AND,((PROCESS-NAME,dnplayer.exe),(DST-PORT,8195)),抓包通道     # 雷电
-
   # - AND,((PROCESS-NAME,MEmu.exe),(DST-PORT,8195)),抓包通道         # 逍遥
-
   # - AND,((PROCESS-NAME,MuMuPlayer.exe),(DST-PORT,8195)),抓包通道   # MuMu
-
   # - AND,((PROCESS-NAME,Nox.exe),(DST-PORT,8195)),抓包通道          # 夜神
-
   # - AND,((PROCESS-NAME,HD-Player.exe),(DST-PORT,8195)),抓包通道    # 蓝叠
 
-
-
   # 核心:游戏流量走抓包通道(全客户端通用,别删)
-
   - DST-PORT,8195,抓包通道
 
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
@@ -125,9 +106,3 @@ rules:
   - IP-CIDR,224.0.0.0/4,DIRECT,no-resolve
   - GEOIP,CN,DIRECT
   - MATCH,DIRECT
-
-  # 「代理通道」默认不接任何流量(未出现在上面的规则里)。
-  # 想让非游戏流量也走这台机器时,把上面 MATCH,DIRECT 改成 MATCH,代理通道。
-  # 也可按域名细分,例如:
-  #   - DOMAIN-SUFFIX,github.com,代理通道
-  #   - DOMAIN-SUFFIX,google.com,代理通道
