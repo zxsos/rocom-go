@@ -360,9 +360,16 @@ function Hy2LinkCard({ running, using, hostBox, onHost, onCommit, link, error, c
             <button className="btn" type="button" onClick={onCopySub}>复制订阅地址</button>
           </div>
           <p className="admin-hint">
-            Clash Meta / FlClash / Mihomo:配置 → 从 URL 导入;小火箭:配置 → 添加配置;
-            Hiddify:配置 → 添加配置。同一个地址会按客户端自动给出对应格式
-            (Clash YAML / .conf / sing-box JSON),导入后记得<b>切换启用新配置</b>。
+            Clash Meta / FlClash / Mihomo:配置 → 从 URL 导入;小火箭:配置 → 添加配置。
+          </p>
+          <p className="admin-hint">
+            ⚠ 导入后**必须切换启用新配置** —— 这类客户端能同时存好几份,导入不等于启用;
+            旧的(没有分流规则的那份)要停用,否则互相盖。
+          </p>
+          <p className="admin-hint">
+            用 Hiddify 时还要多看一眼:它自带「路由」(设置 → 路由),可能仍按自己的表把游戏
+            流量放回直连(游戏服务器是国内 IP)。它支持按端口配规则 —— 加一条「端口 8195 → 代理」
+            并排在宽泛规则之前;改完要断开重连一次,否则长连接会沿用旧隧道。
           </p>
           <p className="admin-hint">
             当前指向 <code>{link.host}:{link.port}</code>
