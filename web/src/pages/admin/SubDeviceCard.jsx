@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { adminSubDeviceCreate, adminSubDeviceRevoke, adminSubDevices } from '../../api'
+import {
+  adminSubDeviceCreate, adminSubDeviceRestore, adminSubDeviceRevoke, adminSubDevices,
+} from '../../api'
 import { copyText } from '../../utils/clipboard'
+import { confirmDialog } from '../../components/confirm'
 import QrCode from '../../components/QrCode'
 
 // SubDeviceCard 订阅设备管理:一人(一台设备)一枚令牌 + 一条短链。
@@ -47,22 +50,66 @@ export default function SubDeviceCard() {
     }
   }
 
+  // 确认框一律走 confirmDialog(见 components/confirm.jsx):样式跟主题,
+  // 且原生弹窗在全屏/PWA 下会打断沉浸模式。文案只说**不可逆的那部分**,
+  // 「三层吊销」那套解释放在卡片底部常驻 —— 塞进弹窗里没人会读完。
   async function revoke(d) {
-    // 把三档后果说清再让人确认:吊销本身只挡「下次更新」,这是最容易被误解的一点 ——
-    // 管理员点完会以为对方已经断线,而实际上他还在线上玩着。
-    const ok = window.confirm(
-      `吊销「${d.label || d.token.slice(0, 8)}」?\n\n` +
-      '吊销后:对方下次刷新订阅会被拒绝(403),已装在他手机上的配置暂时还能用。\n' +
-      '要让他立刻连不上:去上面的代理设置里换一次 hy2 密码(热更,不影响别人在线)。'
-    )
+    const name = d.label || d.token.slice(0, 8)
+    const ok = await confirmDialog({
+      message: `吊销「${name}」?对方下次刷新订阅会被拒绝,但已装在他手机上的配置暂时还能用。`,
+      okText: '吊销', danger: true,
+    })
     if (!ok) return
     setBusy(true); setErr(''); setMsg('')
     try {
       await adminSubDeviceRevoke(d.token)
-      setMsg('已吊销。')
+      setMsg('已吊销。对方还能用手机上的旧配置,要立刻断掉就去换一次 hy2 密码。')
       await load()
     } catch (ex) {
       setErr(ex.message || '吊销失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 恢复:误点一行就吊销了,没有它只能删掉重建 —— 而重建会换新短码,
+  // 已发出去的二维码和链接全部作废。
+  async function restore(d) {
+    const name = d.label || d.token.slice(0, 8)
+    const ok = await confirmDialog({
+      message: `恢复「${name}」?这条链接可以重新拉到配置了。`,
+      okText: '恢复',
+    })
+    if (!ok) return
+    setBusy(true); setErr(''); setMsg('')
+    try {
+      await adminSubDeviceRestore(d.token)
+      setMsg('已恢复。')
+      await load()
+    } catch (ex) {
+      setErr(ex.message || '恢复失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 删除:只给已吊销的行(按钮不出现),后端也只接受已吊销的 ——
+  // 在用设备的拉取记录是排障时唯一能回答「他到底有没有来拉过」的东西。
+  async function purge(d) {
+    const name = d.label || d.token.slice(0, 8)
+    const ok = await confirmDialog({
+      message: `彻底删除「${name}」?这条链接的记录会一起消失,不可恢复。`,
+      okText: '删除', danger: true,
+    })
+    if (!ok) return
+    setBusy(true); setErr(''); setMsg('')
+    try {
+      await adminSubDeviceRevoke(d.token, true)
+      setMsg('已删除。')
+      if (qrOf === d.token) setQrOf('')
+      await load()
+    } catch (ex) {
+      setErr(ex.message || '删除失败')
     } finally {
       setBusy(false)
     }
@@ -125,8 +172,15 @@ export default function SubDeviceCard() {
                 >
                   {qrOf === d.token ? '收起二维码' : '二维码'}
                 </button>
-                {d.usable && (
+                {d.usable ? (
                   <button className="btn ghost danger" type="button" onClick={() => revoke(d)}>吊销</button>
+                ) : (
+                  // 吊销后的行给「恢复」和「删除」两条出路:没有它们,一个误点就只能
+                  // 删掉重建 —— 而重建会换新短码,已发出的二维码和链接全部作废。
+                  <>
+                    <button className="btn ghost" type="button" onClick={() => restore(d)}>恢复</button>
+                    <button className="btn ghost danger" type="button" onClick={() => purge(d)}>删除</button>
+                  </>
                 )}
               </div>
 
@@ -143,6 +197,12 @@ export default function SubDeviceCard() {
         </ul>
       )}
 
+      {/* 三层吊销的常驻说明。放在这里而不是确认框里:弹窗里塞三行没人会读完,
+          而这句话恰恰是点完吊销之后最需要再确认一次的东西。 */}
+      <p className="admin-hint">
+        ⚠ 吊销有三层,别误会第一层:吊销只挡「下次刷新订阅」;要让他立刻连不上,
+        去上面的代理设置换一次 hy2 密码(热更,不影响别人在线);换端口才会把所有人都踢掉。
+      </p>
       <p className="admin-hint">
         ⚠ 链接等于钥匙:拿到它的人能拿到节点密码。别发群里,一对一发。
       </p>

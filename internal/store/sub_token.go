@@ -130,6 +130,50 @@ func (s *Store) RevokeSubDevice(token string) error {
 	return nil
 }
 
+// RestoreSubDevice 恢复一台被吊销的设备(清掉吊销标记)。
+//
+// 为什么必须有它:误点一行就吊销了,而**没有恢复入口时唯一的补救是删掉重建** ——
+// 重建会换一个新短码,已经发出去的二维码和链接全部作废,还得让人重新扫一次。
+// 恢复的代价则几乎为零:密码没动过,清掉标记即可,对其它设备零影响。
+//
+// 短链必须跟着恢复:codeOfToken 只认 revoked_at=0 的短链,不一起清的话短码会在
+// 列表里凭空消失 —— 看着像数据丢了,其实就是两个表的标记不一致。
+func (s *Store) RestoreSubDevice(token string) error {
+	res, err := s.db.Exec(`UPDATE sub_tokens SET revoked_at=0 WHERE token=? AND revoked_at>0`, token)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err == nil && n == 0 {
+		return fmt.Errorf("store: 令牌不存在或未吊销")
+	}
+	if _, err := s.db.Exec(`UPDATE sub_links SET revoked_at=0 WHERE token=? AND revoked_at>0`, token); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteSubDevice 真删一台设备(连同它的短链)。
+//
+// **只接受已吊销的设备**:在用设备的拉取记录是排障时唯一能回答「他到底有没有来拉过」
+// 的东西,抹掉它没有任何收益。这条约束放在后端,即便前端哪天漏了判断也删不掉。
+func (s *Store) DeleteSubDevice(token string) error {
+	var revoked int64
+	if err := s.rdb.QueryRow(`SELECT revoked_at FROM sub_tokens WHERE token=?`, token).Scan(&revoked); err != nil {
+		return fmt.Errorf("store: 令牌不存在")
+	}
+	if revoked == 0 {
+		return fmt.Errorf("store: 先吊销再删除 —— 在用设备的拉取记录不该被抹掉")
+	}
+	if _, err := s.db.Exec(`DELETE FROM sub_links WHERE token=?`, token); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`DELETE FROM sub_tokens WHERE token=?`, token); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RenameSubDevice 改设备备注名。
 func (s *Store) RenameSubDevice(token, label string) error {
 	_, err := s.db.Exec(`UPDATE sub_tokens SET label=? WHERE token=?`, label, token)

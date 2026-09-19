@@ -653,15 +653,22 @@ export const adminSubDevices = () => adminFetch('/api/admin/sub-devices').then(a
 // 返回 {device:{...}},前端拿到即可直接画二维码,不必再拉一次列表。
 export const adminSubDeviceCreate = (label) => postJSON('/api/admin/sub-devices', { label })
 
-// adminSubDeviceRevoke 吊销。语义只到「下次拉订阅被拒」为止 —— 对方本地那份配置里的
-// 密码还在,要让他再也连不上得换 hy2 密码(见 docs/deploy.md 的三层吊销)。
-export function adminSubDeviceRevoke(token) {
-  return adminFetch('/api/admin/sub-devices?token=' + encodeURIComponent(token), { method: 'DELETE' })
+// adminSubDeviceRevoke 吊销(软删,行保留)。语义只到「下次拉订阅被拒」为止 ——
+// 对方本地那份配置里的密码还在,要让他再也连不上得换 hy2 密码(见 docs/deploy.md)。
+// purge=true 时改为真删(后端只接受已吊销的设备,在用设备删不掉)。
+export function adminSubDeviceRevoke(token, purge = false) {
+  const q = '?token=' + encodeURIComponent(token) + (purge ? '&purge=1' : '')
+  return adminFetch('/api/admin/sub-devices' + q, { method: 'DELETE' })
     .then(async (r) => {
-      if (!r.ok) throw await adminError(r, '吊销失败')
+      if (!r.ok) throw await adminError(r, purge ? '删除失败' : '吊销失败')
       return r.json()
     })
 }
+
+// adminSubDeviceRestore 恢复被吊销的设备。误点一行就吊销了,没有恢复入口的话
+// 只能删掉重建 —— 而重建会换新短码,已发出的二维码和链接全部作废。
+export const adminSubDeviceRestore = (token) =>
+  postJSON('/api/admin/sub-devices/restore', { token })
 
 // adminSubDeviceRename 改备注名。
 export const adminSubDeviceRename = (token, label) =>

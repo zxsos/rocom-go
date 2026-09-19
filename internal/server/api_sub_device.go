@@ -93,11 +93,49 @@ func (s *Server) revokeSubDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "缺少 token", http.StatusBadRequest)
 		return
 	}
+	// 同一路径两种语义:默认软吊销(留着行,看得见最后一次来拉的时间),
+	// 带 purge=1 才是真删。放一起是因为它们作用在同一个东西上,
+	// 分成两个路径反而让人以为「删除」是常规操作。
+	if r.URL.Query().Get("purge") == "1" {
+		if err := s.store.DeleteSubDevice(token); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Printf("订阅设备已删除: 来源=%s", r.RemoteAddr)
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"ok": true})
+		return
+	}
 	if err := s.store.RevokeSubDevice(token); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Printf("订阅设备已吊销: 来源=%s", r.RemoteAddr)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// handleAdminSubDeviceRestore 恢复被吊销的设备。
+func (s *Server) handleAdminSubDeviceRestore(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "请求体解析失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Token == "" {
+		http.Error(w, "缺少 token", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.RestoreSubDevice(req.Token); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Printf("订阅设备已恢复: 来源=%s", r.RemoteAddr)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"ok": true})
 }
