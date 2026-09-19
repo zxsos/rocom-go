@@ -184,6 +184,11 @@ sudo ./rocom-go -iface eth0 -hy2-addr :11443 -skip-self-ip=false \
 > （Clash Meta / 小火箭 / sing-box），可直接导入 `deploy/rocom-clash.yaml`；证书复用 Web 那份
 > 自签证书，客户端记得 `skip-cert-verify: true`。
 >
+> 复用归复用，**Web 走不走 HTTPS 仍然只看 `-tls`**：hy2 协议本身必须有证书（QUIC 上跑
+> TLS 1.3，没有明文模式），所以启用它就得准备一份；但那只喂给 hy2，不会再连带把 Web
+> 翻成 HTTPS（4.3.1 起；此前 `-hy2-addr` 一设，Web 就静默转 HTTPS，经 nginx 反代的部署
+> 会被这手牵连得上游协议对不上）。经 nginx 终结 TLS 的话，后端这一跳保持明文反而省事。
+>
 > `-skip-self-ip=false` 在启用 hy2 时必须：代理进程以本机 IP 出站的游戏流量，
 > 若按默认的去重逻辑会被**两个方向全部丢弃**——表现是「手机能正常玩、包数在涨，
 > 却一条数据都解析不出来」，极难自查。启用 `-hy2-addr` 且你没显式指定时，

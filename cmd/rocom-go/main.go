@@ -100,14 +100,18 @@ func main() {
 	// 证书只在这里准备一次,换地址时复用同一份(它是 -tls 的产物,与监听地址无关)。
 	// hy2 是它的第二个使用方:hy2 必须跑在 TLS 上,故启用代理时也必须有证书 ——
 	// 复用同一份自签证书(客户端 skip-cert-verify 即可),不必再多维护一套。
+	// 但「有证书」不等于「Web 走 HTTPS」:Web 的协议只由 -tls 决定。经 nginx 反代
+	// 的部署里 TLS 在边缘终结,后端这一跳走明文反而少一份自签证书的信任问题。
 	var tlsCfg *tls.Config
 	if *useTLS || *hy2Addr != "" {
 		cert, err := loadOrCreateCert(*certPath, *keyPath)
 		if err != nil {
 			log.Fatalf("准备 TLS 证书失败: %v", err)
 		}
-		tlsCfg = &tls.Config{Certificates: []tls.Certificate{cert}}
 		hy2Mgr.SetCert(cert)
+		if *useTLS {
+			tlsCfg = &tls.Config{Certificates: []tls.Certificate{cert}}
+		}
 	}
 	web := server.NewWebServer(srv.Handler(), tlsCfg)
 	srv.SetWebServer(web)
