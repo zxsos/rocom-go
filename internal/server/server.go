@@ -277,6 +277,17 @@ func (s *Server) routes() {
 	// 鉴权在路径令牌里(见 api_sub.go)。**不在 /api/ 下**是有意的:它是给客户端吃的
 	// 纯文本/ YAML,不是本面板的 JSON 接口。
 	s.mux.HandleFunc("GET /sub/{token}", s.handleSub)
+	// 带格式后缀那一支是给二维码用的:码里写死后缀,就不必指望客户端的 UA 说实话。
+	s.mux.HandleFunc("GET /sub/{token}/{format}", s.handleSub)
+	// 短链:人来给引导页、客户端来给配置(见 handleSubCode)。
+	s.mux.HandleFunc("GET /i/{code}", s.handleSubCode)
+	// 引导页的状态查询。放在 /api/ 下是因为它给的是 JSON;短码本身即秘密,不验会话。
+	s.mux.HandleFunc("GET /api/sub/intro", s.handleSubIntro)
+	// 订阅设备管理(管理员):一人一枚令牌,可单独吊销。
+	s.mux.HandleFunc("GET /api/admin/sub-devices", s.handleAdminSubDevices)
+	s.mux.HandleFunc("POST /api/admin/sub-devices", s.handleAdminSubDevices)
+	s.mux.HandleFunc("DELETE /api/admin/sub-devices", s.handleAdminSubDevices)
+	s.mux.HandleFunc("POST /api/admin/sub-devices/rename", s.handleAdminSubDeviceRename)
 	// Web 监听地址(改它要试运行 + 确认,见 api_web_addr.go)
 	s.mux.HandleFunc("POST /api/admin/web-addr", s.handleAdminWebAddr)
 	s.mux.HandleFunc("POST /api/admin/web-addr/confirm", s.handleAdminWebAddrConfirm)
