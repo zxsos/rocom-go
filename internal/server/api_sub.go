@@ -90,21 +90,22 @@ func (s *Server) handleSub(w http.ResponseWriter, r *http.Request) {
 		GamePort: s.gamePort,
 	}
 
-	// 按 User-Agent 选格式:三种客户端的配置格式互不通用(Clash 系 YAML、
-	// 小火箭 .conf、sing-box 内核用原生 JSON),而订阅地址是同一个 ——
-	// 让服务端按来访者挑,用户就只需记一条 URL。
+	// 按 User-Agent 选格式:两种客户端的配置格式互不通用(Clash 系 YAML、小火箭 .conf),
+	// 而订阅地址是同一个 —— 让服务端按来访者挑,用户就只需记一条 URL。
 	//
-	// 单开 sing-box 那一路不是为了好看:这类客户端不采用 Clash 配置里的 rules,
-	// 用 YAML 喂它等于把分流规则丢掉,抓包一定不成立(见 hy2.SubscriptionSingbox)。
+	// 认不出来的一律给 Clash YAML:它覆盖面最广(Clash Meta / FlClash / Mihomo / Stash),
+	// 而且那几家都按 YAML 里的 rules / proxy-groups 分流,下发的规则能真正落地。
+	//
+	// 曾有第三路 —— sing-box 原生 JSON(给 Hiddify),2026-09-19 删除。理由值得留下:
+	// 实测它对 Hiddify 无效。该客户端先后拿到过 Clash YAML 与 sing-box JSON,**两次都没
+	// 抓到游戏流量**。两种格式都失败,说明瓶颈在客户端侧(新导入的配置有没有被切换启用、
+	// 它自带的路由有没有把国内 IP 放回直连),而不是服务端发什么格式。继续维护一路没人
+	// 验证过的格式,只会让人误以为「换个格式能解决」,把排查方向带偏。
 	var body, ctype, format string
-	switch ua := r.UserAgent(); {
-	case isShadowrocket(ua):
+	if isShadowrocket(r.UserAgent()) {
 		body, err = hy2.SubscriptionShadowrocket(params)
 		ctype, format = "text/plain; charset=utf-8", "shadowrocket"
-	case isSingbox(ua):
-		body, err = hy2.SubscriptionSingbox(params)
-		ctype, format = "application/json; charset=utf-8", "sing-box"
-	default:
+	} else {
 		body, err = hy2.SubscriptionClash(params)
 		ctype, format = "text/yaml; charset=utf-8", "clash"
 	}
@@ -129,17 +130,6 @@ func (s *Server) handleSub(w http.ResponseWriter, r *http.Request) {
 // 认不出来的一律给 Clash YAML —— 那是覆盖面最广的一种(Clash Meta / FlClash / Mihomo / Stash)。
 func isShadowrocket(ua string) bool {
 	return strings.Contains(strings.ToLower(ua), "shadowrocket")
-}
-
-// isSingbox 判断来访者是不是 sing-box 内核的客户端(Hiddify 是主要的那个)。
-//
-// Hiddify 的 UA 形如 "HiddifyNext/4.1.1 (android) like ClashMeta v2ray sing-box" ——
-// 它自称 like ClashMeta,但那是「能读 Clash 的节点列表」,分流仍由它自己的路由表说了算。
-// 故这里的判断必须**排在 Clash 兜底之前**:否则它会拿到一份规则根本不生效的 YAML,
-// 而症状(游戏能玩、面板没数据)与没配置一模一样。
-func isSingbox(ua string) bool {
-	ua = strings.ToLower(ua)
-	return strings.Contains(ua, "hiddify") || strings.Contains(ua, "sing-box") || strings.Contains(ua, "singbox")
 }
 
 // hostOnly 从 Host 头里剥掉端口,得到能写进配置的主机名。

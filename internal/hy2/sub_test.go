@@ -1,7 +1,6 @@
 package hy2
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -204,92 +203,6 @@ func TestSubscriptionShadowrocket(t *testing.T) {
 	}
 	if !strings.Contains(out, "FINAL,DIRECT") {
 		t.Fatalf("FINAL 应为 DIRECT:\n%s", out)
-	}
-}
-
-func TestSubscriptionSingbox(t *testing.T) {
-	const pass = `a"b\c`
-	out, err := SubscriptionSingbox(SubParams{Host: "1.2.3.4", Port: 11443, Password: pass, GamePort: 8195})
-	if err != nil {
-		t.Fatalf("生成失败: %v", err)
-	}
-	var doc struct {
-		Outbounds []struct {
-			Type       string `json:"type"`
-			Tag        string `json:"tag"`
-			Server     string `json:"server"`
-			ServerPort int    `json:"server_port"`
-			Password   string `json:"password"`
-			TLS        *struct {
-				Enabled  bool `json:"enabled"`
-				Insecure bool `json:"insecure"`
-			} `json:"tls"`
-		} `json:"outbounds"`
-		Route struct {
-			Rules []struct {
-				Port     []int  `json:"port"`
-				Outbound string `json:"outbound"`
-			} `json:"rules"`
-			Final string `json:"final"`
-		} `json:"route"`
-	}
-	if err := json.Unmarshal([]byte(out), &doc); err != nil {
-		t.Fatalf("生成的 JSON 解不开: %v\n%s", err, out)
-	}
-	if len(doc.Outbounds) != 2 {
-		t.Fatalf("应有「代理 + direct」两个出站,得到 %d", len(doc.Outbounds))
-	}
-	proxy := doc.Outbounds[0]
-	if proxy.Type != "hysteria2" || proxy.Tag != singboxProxyTag || proxy.Server != "1.2.3.4" || proxy.ServerPort != 11443 {
-		t.Fatalf("出站字段不符: %+v", proxy)
-	}
-	// 密码同样要经编码器走一遍,含引号与反斜杠也不能破结构。
-	if proxy.Password != pass {
-		t.Fatalf("密码没原样保留: 期望 %q,得到 %q", pass, proxy.Password)
-	}
-	if proxy.TLS == nil || !proxy.TLS.Enabled || !proxy.TLS.Insecure {
-		t.Fatalf("按 IP 连必须开 TLS 且跳过校验,否则内核直接拒连: %+v", proxy.TLS)
-	}
-	// 分流规则是这一路存在的**唯一理由**(见 sub.go 里 SubscriptionSingbox 的注释)。
-	if len(doc.Route.Rules) != 1 {
-		t.Fatalf("应有一条分流规则,得到 %d", len(doc.Route.Rules))
-	}
-	r := doc.Route.Rules[0]
-	if len(r.Port) != 1 || r.Port[0] != 8195 || r.Outbound != singboxProxyTag {
-		t.Fatalf("分流规则不符: %+v", r)
-	}
-	if doc.Route.Final != "direct" {
-		t.Fatalf("兜底应为 direct,得到 %q", doc.Route.Final)
-	}
-	// 不带 inbounds:监听由客户端按平台自己生成,写死一份会把它盖掉(见结构体注释)。
-	var raw map[string]any
-	_ = json.Unmarshal([]byte(out), &raw)
-	if _, ok := raw["inbounds"]; ok {
-		t.Fatal("不该带 inbounds:会覆盖客户端自己的监听设置")
-	}
-}
-
-func TestSubscriptionSingboxSecureUsesSNI(t *testing.T) {
-	out, err := SubscriptionSingbox(SubParams{Host: "example.com", Port: 443, Password: "p", Secure: true})
-	if err != nil {
-		t.Fatalf("生成失败: %v", err)
-	}
-	var doc struct {
-		Outbounds []struct {
-			TLS struct {
-				Insecure   bool   `json:"insecure"`
-				ServerName string `json:"server_name"`
-			} `json:"tls"`
-		} `json:"outbounds"`
-	}
-	if err := json.Unmarshal([]byte(out), &doc); err != nil {
-		t.Fatalf("解不开: %v", err)
-	}
-	if doc.Outbounds[0].TLS.Insecure {
-		t.Fatal("主机能验签时不该跳过校验")
-	}
-	if doc.Outbounds[0].TLS.ServerName != "example.com" {
-		t.Fatalf("应把证书里的主机名作为 SNI,得到 %q", doc.Outbounds[0].TLS.ServerName)
 	}
 }
 
