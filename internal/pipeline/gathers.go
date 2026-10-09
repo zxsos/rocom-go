@@ -7,7 +7,7 @@ import (
 
 	"github.com/zxsos/rocom-go/internal/scene"
 	"github.com/zxsos/rocom-go/internal/server"
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
+	"github.com/zxsos/rocom-go-parse/wire"
 )
 
 // ---- 实时地图的采集物图层(花/草/菌/矿/果树)----

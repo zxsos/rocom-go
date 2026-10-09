@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
+	"github.com/zxsos/rocom-go-parse/wire"
 )
 
 // 精灵蛋相关 opcode(ZoneSvrCmd)。

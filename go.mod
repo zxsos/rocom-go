@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/apernet/hysteria/core/v2 v2.12.2
 	github.com/google/gopacket v1.1.19
-	github.com/zxsos/rocom-go-parse V1.0.0
+	github.com/zxsos/rocom-go-parse v1.0.0
 	google.golang.org/protobuf v1.36.11
 	modernc.org/sqlite v1.53.0
 )

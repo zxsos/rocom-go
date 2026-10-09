@@ -5,9 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/capture"
+	"github.com/zxsos/rocom-go-parse/capture"
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
+	"github.com/zxsos/rocom-go-parse/gcp"
 	"github.com/zxsos/rocom-go/internal/server"
 	"github.com/zxsos/rocom-go/internal/trial"
 )
