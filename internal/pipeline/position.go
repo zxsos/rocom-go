@@ -4,9 +4,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/capture"
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
 	"github.com/zxsos/rocom-go/internal/scene"
 	"github.com/zxsos/rocom-go/internal/server"
 	"github.com/zxsos/rocom-go/internal/store"

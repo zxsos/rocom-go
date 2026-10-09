@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/rocom-go/internal/wire"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
 )
 
 // 草系试炼 opcode(来自 ZoneSvrCmd,见 names.json opcodes / pbdesc 的 opmsg.json)。

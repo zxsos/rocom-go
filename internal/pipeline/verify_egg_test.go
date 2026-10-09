@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
 	"github.com/zxsos/rocom-go/internal/pet"
 )
 
