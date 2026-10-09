@@ -29,9 +29,6 @@ jobs:
         run: |
           cd web && npm install && npm run build
       
-      - name: Tidy modules
-        run: go mod tidy
-      
       - name: Build Linux binary
         run: CGO_ENABLED=1 go build -o rocom-go-linux-amd64 ./cmd/rocom-go
       
