@@ -30,7 +30,10 @@ func ImageFS() fs.FS {
 
 // DB 是只读名称查找库。
 type DB struct {
-	species      map[string]string
+	species map[string]string
+	// models 是 MODEL_CONF 的模型 id 全集。模型表**没有名字字段**,故光看 species
+	// 分不清「model 指到表外」与「模型存在、但该形态没有名字」—— 见 egg_test.go。
+	models       map[string]bool
 	nature       map[string]string
 	skillDamType map[string]string
 	talentRate   map[string]string
@@ -93,6 +96,7 @@ type DB struct {
 func Load() (*DB, error) {
 	var raw struct {
 		Species        map[string]string            `json:"species"`
+		Models         map[string]bool              `json:"models"`
 		Nature         map[string]string            `json:"nature"`
 		SkillDamType   map[string]string            `json:"skill_dam_type"`
 		TalentRate     map[string]string            `json:"talent_rate"`
@@ -361,6 +365,7 @@ func Load() (*DB, error) {
 		gatherByR:      gatherByR,
 		zones:          raw.Zones,
 		species:        raw.Species,
+		models:         raw.Models,
 		nature:         raw.Nature,
 		skillDamType:   raw.SkillDamType,
 		talentRate:     raw.TalentRate,

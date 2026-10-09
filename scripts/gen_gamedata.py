@@ -125,6 +125,15 @@ species.update({k: v["name"] for k, v in rows("PET_CONF.json").items() if v.get(
 _petbase = rows("PETBASE_CONF.json")
 _model = rows("MODEL_CONF.json")
 
+# models: MODEL_CONF 的全部模型 id(**只有 id/path/胶囊等参数,没有名字字段**)。
+#   落表的原因是 PET_EGG_CONF.model_id 指的是「模型 id」,与「形态 id」不是同一空间:
+#   实测 2026-10 版新增的护主犬(3870002)、公平鸽(3872002),其蛋配置的 model_id 是
+#   3870001/3872001 —— 这两个 id 只在 MODEL_CONF 有行,PET_CONF 里没有对应形态行
+#   (游戏侧尚未补出基础形态,与 gen_skills 的「未匹配」名单是同一批)。
+#   于是「model 指到表外」与「model 存在但该形态查不到名字」必须能分开判断,
+#   否则 egg_test 会把这 4 条新物种的蛋误判成回归。Go 侧见 DB.models / egg_test.go。
+models = {k: True for k in _model}
+
 # images: petbase_id -> {h:小头像 b:大头像 p:全身图 ps:全身缩略}(全身图去掉 JL_ 前缀省字节)。
 #   异色变体 sh/sb/sps(头像形如 3010_1,全身图形如 JL_<拼音>_yise)仅在与普通版不同时收录;
 #   多数宠物异色复用普通美术(shiny_icon==icon、无 JL_shiny_res),不会产生 sh/sb/sps。
@@ -847,6 +856,9 @@ size_medals = _size_medals()
 
 data = {
     "species": species,
+    # 模型 id 全集(MODEL_CONF):与 species 分开落,因为模型表没有名字 ——
+    # 用于判断 PET_EGG_CONF.model_id 是「模型不存在」还是「模型在、形态没名字」。
+    "models": models,
     # 蛋组: id -> {name:社区流行名, desc:官方描述}。petbase[].eg 引用这些 id。
     "egg_group": egg_group,
     # 场景名与大地图投影参数(见上)。底图 webp 由 gen_bigmap.py 生成,文件名即 scene_res_cfg_id

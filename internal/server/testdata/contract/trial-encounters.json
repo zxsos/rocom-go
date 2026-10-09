@@ -211,12 +211,6 @@
           "seen": false
         },
         {
-          "base": 3028,
-          "img": "HeadIcon/3028.webp",
-          "name": "冬羽雀_本来的样子",
-          "seen": false
-        },
-        {
           "base": 3029,
           "img": "HeadIcon/3029.webp",
           "name": "奇丽草",
@@ -309,7 +303,7 @@
         {
           "base": 3070,
           "img": "HeadIcon/3070.webp",
-          "name": "护主犬",
+          "name": "护主犬_本来的样子",
           "seen": false
         },
         {
@@ -697,6 +691,72 @@
           "seen": false
         },
         {
+          "base": 3280,
+          "img": "HeadIcon/3280.webp",
+          "name": "雪绒鸟_夏天的样子",
+          "seen": false
+        },
+        {
+          "base": 3281,
+          "img": "HeadIcon/3281.webp",
+          "name": "雪绒鸟_秋天的样子",
+          "seen": false
+        },
+        {
+          "base": 3282,
+          "img": "HeadIcon/3282.webp",
+          "name": "冬羽雀_春天的样子",
+          "seen": false
+        },
+        {
+          "base": 3283,
+          "img": "HeadIcon/3283.webp",
+          "name": "冬羽雀_夏天的样子",
+          "seen": false
+        },
+        {
+          "base": 3284,
+          "img": "HeadIcon/3284.webp",
+          "name": "冬羽雀_秋天的样子",
+          "seen": false
+        },
+        {
+          "base": 3297,
+          "img": "HeadIcon/3297.webp",
+          "name": "蹦蹦种子_彩玉球形态",
+          "seen": false
+        },
+        {
+          "base": 3298,
+          "img": "HeadIcon/3298.webp",
+          "name": "蹦蹦种子_短毛球形态",
+          "seen": false
+        },
+        {
+          "base": 3299,
+          "img": "HeadIcon/3299.webp",
+          "name": "蹦蹦种子_象牙球形态",
+          "seen": false
+        },
+        {
+          "base": 3300,
+          "img": "HeadIcon/3300.webp",
+          "name": "蹦蹦草_彩玉球形态",
+          "seen": false
+        },
+        {
+          "base": 3301,
+          "img": "HeadIcon/3301.webp",
+          "name": "蹦蹦草_短毛球形态",
+          "seen": false
+        },
+        {
+          "base": 3302,
+          "img": "HeadIcon/3302.webp",
+          "name": "蹦蹦草_象牙球形态",
+          "seen": false
+        },
+        {
           "base": 3307,
           "img": "HeadIcon/3307.webp",
           "name": "矿晶虫",
@@ -877,9 +937,51 @@
           "seen": false
         },
         {
+          "base": 3440,
+          "img": "HeadIcon/3440.webp",
+          "name": "梦游_穿星星睡衣的样子",
+          "seen": false
+        },
+        {
+          "base": 3442,
+          "img": "HeadIcon/3442.webp",
+          "name": "小星光_月光能量的样子",
+          "seen": false
+        },
+        {
+          "base": 3467,
+          "img": "HeadIcon/3467.webp",
+          "name": "小狮鹫_高山地的样子",
+          "seen": false
+        },
+        {
+          "base": 3468,
+          "img": "HeadIcon/3468.webp",
+          "name": "神圣狮鹫_高山地的样子",
+          "seen": false
+        },
+        {
           "base": 3473,
           "img": "HeadIcon/3473.webp",
           "name": "布瓜蝌",
+          "seen": false
+        },
+        {
+          "base": 3475,
+          "img": "HeadIcon/3475.webp",
+          "name": "海盔虫_磨损的样子",
+          "seen": false
+        },
+        {
+          "base": 3476,
+          "img": "HeadIcon/3476.webp",
+          "name": "刺盔虫_磨损的样子",
+          "seen": false
+        },
+        {
+          "base": 3481,
+          "img": "HeadIcon/3481.webp",
+          "name": "暗影灵面_闭眼的样子",
           "seen": false
         },
         {
@@ -907,6 +1009,18 @@
           "seen": false
         },
         {
+          "base": 3497,
+          "img": "HeadIcon/3497.webp",
+          "name": "蓬叶虫_枯叶的样子",
+          "seen": false
+        },
+        {
+          "base": 3500,
+          "img": "HeadIcon/3106.webp",
+          "name": "石肤蜥_球球尾巴的样子",
+          "seen": false
+        },
+        {
           "base": 3506,
           "img": "HeadIcon/3506.webp",
           "name": "花怨鳗",
@@ -925,6 +1039,30 @@
           "seen": false
         },
         {
+          "base": 3511,
+          "img": "HeadIcon/3511.webp",
+          "name": "波波螺_被污染的样子",
+          "seen": false
+        },
+        {
+          "base": 3512,
+          "img": "HeadIcon/3512.webp",
+          "name": "消波螺_被污染的样子",
+          "seen": false
+        },
+        {
+          "base": 3516,
+          "img": "HeadIcon/3055.webp",
+          "name": "板板壳_蜕皮时的样子",
+          "seen": false
+        },
+        {
+          "base": 3517,
+          "img": "HeadIcon/3056.webp",
+          "name": "咔咔壳_蜕皮时的样子",
+          "seen": false
+        },
+        {
           "base": 3529,
           "img": "HeadIcon/3529.webp",
           "name": "号儿鱼",
@@ -934,6 +1072,12 @@
           "base": 3531,
           "img": "HeadIcon/3531.webp",
           "name": "小雪人",
+          "seen": false
+        },
+        {
+          "base": 3533,
+          "img": "HeadIcon/3533.webp",
+          "name": "雪绒鸟_本来的样子",
           "seen": false
         },
         {
@@ -949,6 +1093,18 @@
           "seen": false
         },
         {
+          "base": 3539,
+          "img": "HeadIcon/3539.webp",
+          "name": "乌达_极夜的样子",
+          "seen": false
+        },
+        {
+          "base": 3540,
+          "img": "HeadIcon/3540.webp",
+          "name": "迷你乌_极夜的样子",
+          "seen": false
+        },
+        {
           "base": 3545,
           "img": "HeadIcon/3545.webp",
           "name": "圣剑侍从",
@@ -958,6 +1114,12 @@
           "base": 3550,
           "img": "HeadIcon/3550.webp",
           "name": "棋棋_白子",
+          "seen": false
+        },
+        {
+          "base": 3555,
+          "img": "HeadIcon/3555.webp",
+          "name": "棋棋_黑子",
           "seen": false
         },
         {
@@ -988,6 +1150,12 @@
           "base": 3582,
           "img": "HeadIcon/3584.webp",
           "name": "刺轮砣_上弦的样子",
+          "seen": false
+        },
+        {
+          "base": 3584,
+          "img": "HeadIcon/3582.webp",
+          "name": "刺轮砣_下弦的样子",
           "seen": false
         },
         {
@@ -1118,7 +1286,7 @@
         }
       ],
       "seen": 2,
-      "total": 182
+      "total": 210
     },
     {
       "boss": [
@@ -1329,12 +1497,6 @@
           "seen": false
         },
         {
-          "base": 3028,
-          "img": "HeadIcon/3028.webp",
-          "name": "冬羽雀_本来的样子",
-          "seen": false
-        },
-        {
           "base": 3030,
           "img": "HeadIcon/3030.webp",
           "name": "奇丽叶",
@@ -1368,6 +1530,12 @@
           "base": 3035,
           "img": "HeadIcon/3035.webp",
           "name": "魔草巫灵",
+          "seen": false
+        },
+        {
+          "base": 3036,
+          "img": "HeadIcon/3036.webp",
+          "name": "鸭吉吉_紧实的样子",
           "seen": false
         },
         {
@@ -1481,13 +1649,13 @@
         {
           "base": 3070,
           "img": "HeadIcon/3070.webp",
-          "name": "护主犬",
+          "name": "护主犬_本来的样子",
           "seen": false
         },
         {
           "base": 3071,
           "img": "HeadIcon/3071.webp",
-          "name": "音速犬",
+          "name": "音速犬_本来的样子",
           "seen": false
         },
         {
@@ -1929,6 +2097,78 @@
           "seen": false
         },
         {
+          "base": 3282,
+          "img": "HeadIcon/3282.webp",
+          "name": "冬羽雀_春天的样子",
+          "seen": false
+        },
+        {
+          "base": 3283,
+          "img": "HeadIcon/3283.webp",
+          "name": "冬羽雀_夏天的样子",
+          "seen": false
+        },
+        {
+          "base": 3284,
+          "img": "HeadIcon/3284.webp",
+          "name": "冬羽雀_秋天的样子",
+          "seen": false
+        },
+        {
+          "base": 3285,
+          "img": "HeadIcon/3285.webp",
+          "name": "岚鸟_春天的样子",
+          "seen": false
+        },
+        {
+          "base": 3286,
+          "img": "HeadIcon/3286.webp",
+          "name": "岚鸟_夏天的样子",
+          "seen": false
+        },
+        {
+          "base": 3287,
+          "img": "HeadIcon/3287.webp",
+          "name": "岚鸟_秋天的样子",
+          "seen": false
+        },
+        {
+          "base": 3300,
+          "img": "HeadIcon/3300.webp",
+          "name": "蹦蹦草_彩玉球形态",
+          "seen": false
+        },
+        {
+          "base": 3301,
+          "img": "HeadIcon/3301.webp",
+          "name": "蹦蹦草_短毛球形态",
+          "seen": false
+        },
+        {
+          "base": 3302,
+          "img": "HeadIcon/3302.webp",
+          "name": "蹦蹦草_象牙球形态",
+          "seen": false
+        },
+        {
+          "base": 3303,
+          "img": "HeadIcon/3303.webp",
+          "name": "蹦蹦花_彩玉球形态",
+          "seen": false
+        },
+        {
+          "base": 3304,
+          "img": "HeadIcon/3304.webp",
+          "name": "蹦蹦花_短毛球形态",
+          "seen": false
+        },
+        {
+          "base": 3305,
+          "img": "HeadIcon/3305.webp",
+          "name": "蹦蹦花_象牙球形态",
+          "seen": false
+        },
+        {
           "base": 3307,
           "img": "HeadIcon/3307.webp",
           "name": "矿晶虫",
@@ -2163,6 +2403,24 @@
           "seen": false
         },
         {
+          "base": 3431,
+          "img": "HeadIcon/3432.webp",
+          "name": "海枝枝_杏黄百合",
+          "seen": false
+        },
+        {
+          "base": 3432,
+          "img": "HeadIcon/3433.webp",
+          "name": "海枝枝_洋红沙丁",
+          "seen": false
+        },
+        {
+          "base": 3433,
+          "img": "HeadIcon/3431.webp",
+          "name": "海枝枝_翠绿纶布",
+          "seen": false
+        },
+        {
           "base": 3434,
           "img": "HeadIcon/3434.webp",
           "name": "小电企鹅",
@@ -2199,9 +2457,69 @@
           "seen": false
         },
         {
+          "base": 3440,
+          "img": "HeadIcon/3440.webp",
+          "name": "梦游_穿星星睡衣的样子",
+          "seen": false
+        },
+        {
+          "base": 3441,
+          "img": "HeadIcon/3441.webp",
+          "name": "梦悠悠_穿星星睡衣的样子",
+          "seen": false
+        },
+        {
+          "base": 3442,
+          "img": "HeadIcon/3442.webp",
+          "name": "小星光_月光能量的样子",
+          "seen": false
+        },
+        {
+          "base": 3443,
+          "img": "HeadIcon/3443.webp",
+          "name": "星光狮_月光能量的样子",
+          "seen": false
+        },
+        {
           "base": 3444,
           "img": "HeadIcon/3444.webp",
           "name": "噼啪鸟",
+          "seen": false
+        },
+        {
+          "base": 3448,
+          "img": "HeadIcon/3448.webp",
+          "name": "晶石蜗_莲花刚玉的样子",
+          "seen": false
+        },
+        {
+          "base": 3449,
+          "img": "HeadIcon/3449.webp",
+          "name": "晶石蜗_星彩榴石的样子",
+          "seen": false
+        },
+        {
+          "base": 3450,
+          "img": "HeadIcon/3450.webp",
+          "name": "晶石蜗_火山琉璃的样子",
+          "seen": false
+        },
+        {
+          "base": 3451,
+          "img": "HeadIcon/3451.webp",
+          "name": "晶石蜗_蓝锥矿的样子",
+          "seen": false
+        },
+        {
+          "base": 3452,
+          "img": "HeadIcon/3452.webp",
+          "name": "鸭吉吉_急急急鸭",
+          "seen": false
+        },
+        {
+          "base": 3453,
+          "img": "HeadIcon/3453.webp",
+          "name": "鸭吉吉_等一等鸭",
           "seen": false
         },
         {
@@ -2211,9 +2529,87 @@
           "seen": false
         },
         {
+          "base": 3458,
+          "img": "HeadIcon/3463.webp",
+          "name": "圣代甜甜_樱桃草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3459,
+          "img": "HeadIcon/3460.webp",
+          "name": "圣代甜甜_樱桃抹茶口味",
+          "seen": false
+        },
+        {
+          "base": 3460,
+          "img": "HeadIcon/3458.webp",
+          "name": "圣代甜甜_蓝莓巧克力口味",
+          "seen": false
+        },
+        {
+          "base": 3461,
+          "img": "HeadIcon/3464.webp",
+          "name": "圣代甜甜_蓝莓草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3462,
+          "img": "HeadIcon/3461.webp",
+          "name": "圣代甜甜_蓝莓抹茶口味",
+          "seen": false
+        },
+        {
+          "base": 3463,
+          "img": "HeadIcon/3459.webp",
+          "name": "圣代甜甜_杨桃巧克力口味",
+          "seen": false
+        },
+        {
+          "base": 3464,
+          "img": "HeadIcon/3465.webp",
+          "name": "圣代甜甜_杨桃草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3465,
+          "img": "HeadIcon/3462.webp",
+          "name": "圣代甜甜_杨桃抹茶口味",
+          "seen": false
+        },
+        {
           "base": 3466,
           "img": "HeadIcon/3466.webp",
           "name": "星云旅者",
+          "seen": false
+        },
+        {
+          "base": 3468,
+          "img": "HeadIcon/3468.webp",
+          "name": "神圣狮鹫_高山地的样子",
+          "seen": false
+        },
+        {
+          "base": 3469,
+          "img": "HeadIcon/3469.webp",
+          "name": "皇家狮鹫_高山地的样子",
+          "seen": false
+        },
+        {
+          "base": 3470,
+          "img": "HeadIcon/3470.webp",
+          "name": "化蝶_幽冥眼的样子",
+          "seen": false
+        },
+        {
+          "base": 3471,
+          "img": "HeadIcon/3471.webp",
+          "name": "化蝶_喵喵的样子",
+          "seen": false
+        },
+        {
+          "base": 3472,
+          "img": "HeadIcon/3472.webp",
+          "name": "化蝶_奇丽花的样子",
           "seen": false
         },
         {
@@ -2229,6 +2625,30 @@
           "seen": false
         },
         {
+          "base": 3476,
+          "img": "HeadIcon/3476.webp",
+          "name": "刺盔虫_磨损的样子",
+          "seen": false
+        },
+        {
+          "base": 3477,
+          "img": "HeadIcon/3477.webp",
+          "name": "千棘盔_磨损的样子",
+          "seen": false
+        },
+        {
+          "base": 3481,
+          "img": "HeadIcon/3481.webp",
+          "name": "暗影灵面_闭眼的样子",
+          "seen": false
+        },
+        {
+          "base": 3482,
+          "img": "HeadIcon/3482.webp",
+          "name": "幽冥眼_闭眼的样子",
+          "seen": false
+        },
+        {
           "base": 3483,
           "img": "HeadIcon/3483.webp",
           "name": "蓬叶虫_金黄的样子",
@@ -2238,6 +2658,12 @@
           "base": 3485,
           "img": "HeadIcon/3485.webp",
           "name": "落陨星兔",
+          "seen": false
+        },
+        {
+          "base": 3486,
+          "img": "HeadIcon/3486.webp",
+          "name": "晶石蜗_烧蓝黄金的样子",
           "seen": false
         },
         {
@@ -2271,9 +2697,27 @@
           "seen": false
         },
         {
+          "base": 3497,
+          "img": "HeadIcon/3497.webp",
+          "name": "蓬叶虫_枯叶的样子",
+          "seen": false
+        },
+        {
+          "base": 3498,
+          "img": "HeadIcon/3498.webp",
+          "name": "风滚暮虫_枯叶的样子",
+          "seen": false
+        },
+        {
           "base": 3499,
           "img": "HeadIcon/3499.webp",
-          "name": "公平鸽",
+          "name": "公平鸽_本来的样子",
+          "seen": false
+        },
+        {
+          "base": 3502,
+          "img": "HeadIcon/3108.webp",
+          "name": "石冠王蜥_球球尾巴的样子",
           "seen": false
         },
         {
@@ -2298,6 +2742,30 @@
           "base": 3510,
           "img": "HeadIcon/3510.webp",
           "name": "嗜波螺_本来的样子",
+          "seen": false
+        },
+        {
+          "base": 3512,
+          "img": "HeadIcon/3512.webp",
+          "name": "消波螺_被污染的样子",
+          "seen": false
+        },
+        {
+          "base": 3513,
+          "img": "HeadIcon/3513.webp",
+          "name": "嗜波螺_被污染的样子",
+          "seen": false
+        },
+        {
+          "base": 3517,
+          "img": "HeadIcon/3056.webp",
+          "name": "咔咔壳_蜕皮时的样子",
+          "seen": false
+        },
+        {
+          "base": 3518,
+          "img": "HeadIcon/3057.webp",
+          "name": "水泡壳_蜕皮时的样子",
           "seen": false
         },
         {
@@ -2349,6 +2817,18 @@
           "seen": false
         },
         {
+          "base": 3540,
+          "img": "HeadIcon/3540.webp",
+          "name": "迷你乌_极夜的样子",
+          "seen": false
+        },
+        {
+          "base": 3541,
+          "img": "HeadIcon/3541.webp",
+          "name": "乌拉塔_极夜的样子",
+          "seen": false
+        },
+        {
           "base": 3545,
           "img": "HeadIcon/3545.webp",
           "name": "圣剑侍从",
@@ -2388,6 +2868,36 @@
           "base": 3554,
           "img": "HeadIcon/3554.webp",
           "name": "棋祈督_白子",
+          "seen": false
+        },
+        {
+          "base": 3555,
+          "img": "HeadIcon/3555.webp",
+          "name": "棋棋_黑子",
+          "seen": false
+        },
+        {
+          "base": 3556,
+          "img": "HeadIcon/3556.webp",
+          "name": "棋骑士_黑子",
+          "seen": false
+        },
+        {
+          "base": 3557,
+          "img": "HeadIcon/3557.webp",
+          "name": "棋绮后_黑子",
+          "seen": false
+        },
+        {
+          "base": 3558,
+          "img": "HeadIcon/3558.webp",
+          "name": "棋齐垒_黑子",
+          "seen": false
+        },
+        {
+          "base": 3559,
+          "img": "HeadIcon/3559.webp",
+          "name": "棋祈督_黑子",
           "seen": false
         },
         {
@@ -2454,6 +2964,18 @@
           "base": 3583,
           "img": "HeadIcon/3585.webp",
           "name": "月亮砣_上弦的样子",
+          "seen": false
+        },
+        {
+          "base": 3584,
+          "img": "HeadIcon/3582.webp",
+          "name": "刺轮砣_下弦的样子",
+          "seen": false
+        },
+        {
+          "base": 3585,
+          "img": "HeadIcon/3583.webp",
+          "name": "月亮砣_下弦的样子",
           "seen": false
         },
         {
@@ -2625,6 +3147,18 @@
           "seen": false
         },
         {
+          "base": 3742,
+          "img": "HeadIcon/3742.webp",
+          "name": "鸭吉吉_起来鸭",
+          "seen": false
+        },
+        {
+          "base": 3743,
+          "img": "HeadIcon/3743.webp",
+          "name": "加油蟹_单只海葵的样子",
+          "seen": false
+        },
+        {
           "base": 3745,
           "img": "HeadIcon/3745.webp",
           "name": "雅丹鬃",
@@ -2668,7 +3202,7 @@
         }
       ],
       "seen": 1,
-      "total": 256
+      "total": 317
     },
     {
       "boss": [
@@ -2881,6 +3415,12 @@
           "seen": false
         },
         {
+          "base": 3036,
+          "img": "HeadIcon/3036.webp",
+          "name": "鸭吉吉_紧实的样子",
+          "seen": false
+        },
+        {
           "base": 3037,
           "img": "HeadIcon/3037.webp",
           "name": "岚鸟_本来的样子",
@@ -2949,7 +3489,7 @@
         {
           "base": 3071,
           "img": "HeadIcon/3071.webp",
-          "name": "音速犬",
+          "name": "音速犬_本来的样子",
           "seen": false
         },
         {
@@ -3175,6 +3715,42 @@
           "seen": false
         },
         {
+          "base": 3285,
+          "img": "HeadIcon/3285.webp",
+          "name": "岚鸟_春天的样子",
+          "seen": false
+        },
+        {
+          "base": 3286,
+          "img": "HeadIcon/3286.webp",
+          "name": "岚鸟_夏天的样子",
+          "seen": false
+        },
+        {
+          "base": 3287,
+          "img": "HeadIcon/3287.webp",
+          "name": "岚鸟_秋天的样子",
+          "seen": false
+        },
+        {
+          "base": 3303,
+          "img": "HeadIcon/3303.webp",
+          "name": "蹦蹦花_彩玉球形态",
+          "seen": false
+        },
+        {
+          "base": 3304,
+          "img": "HeadIcon/3304.webp",
+          "name": "蹦蹦花_短毛球形态",
+          "seen": false
+        },
+        {
+          "base": 3305,
+          "img": "HeadIcon/3305.webp",
+          "name": "蹦蹦花_象牙球形态",
+          "seen": false
+        },
+        {
           "base": 3308,
           "img": "HeadIcon/3243.webp",
           "name": "晶石蜗_西瓜碧玺的样子",
@@ -3313,6 +3889,24 @@
           "seen": false
         },
         {
+          "base": 3431,
+          "img": "HeadIcon/3432.webp",
+          "name": "海枝枝_杏黄百合",
+          "seen": false
+        },
+        {
+          "base": 3432,
+          "img": "HeadIcon/3433.webp",
+          "name": "海枝枝_洋红沙丁",
+          "seen": false
+        },
+        {
+          "base": 3433,
+          "img": "HeadIcon/3431.webp",
+          "name": "海枝枝_翠绿纶布",
+          "seen": false
+        },
+        {
           "base": 3435,
           "img": "HeadIcon/3435.webp",
           "name": "电企鹅",
@@ -3331,9 +3925,57 @@
           "seen": false
         },
         {
+          "base": 3441,
+          "img": "HeadIcon/3441.webp",
+          "name": "梦悠悠_穿星星睡衣的样子",
+          "seen": false
+        },
+        {
+          "base": 3443,
+          "img": "HeadIcon/3443.webp",
+          "name": "星光狮_月光能量的样子",
+          "seen": false
+        },
+        {
           "base": 3444,
           "img": "HeadIcon/3444.webp",
           "name": "噼啪鸟",
+          "seen": false
+        },
+        {
+          "base": 3448,
+          "img": "HeadIcon/3448.webp",
+          "name": "晶石蜗_莲花刚玉的样子",
+          "seen": false
+        },
+        {
+          "base": 3449,
+          "img": "HeadIcon/3449.webp",
+          "name": "晶石蜗_星彩榴石的样子",
+          "seen": false
+        },
+        {
+          "base": 3450,
+          "img": "HeadIcon/3450.webp",
+          "name": "晶石蜗_火山琉璃的样子",
+          "seen": false
+        },
+        {
+          "base": 3451,
+          "img": "HeadIcon/3451.webp",
+          "name": "晶石蜗_蓝锥矿的样子",
+          "seen": false
+        },
+        {
+          "base": 3452,
+          "img": "HeadIcon/3452.webp",
+          "name": "鸭吉吉_急急急鸭",
+          "seen": false
+        },
+        {
+          "base": 3453,
+          "img": "HeadIcon/3453.webp",
+          "name": "鸭吉吉_等一等鸭",
           "seen": false
         },
         {
@@ -3343,9 +3985,81 @@
           "seen": false
         },
         {
+          "base": 3458,
+          "img": "HeadIcon/3463.webp",
+          "name": "圣代甜甜_樱桃草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3459,
+          "img": "HeadIcon/3460.webp",
+          "name": "圣代甜甜_樱桃抹茶口味",
+          "seen": false
+        },
+        {
+          "base": 3460,
+          "img": "HeadIcon/3458.webp",
+          "name": "圣代甜甜_蓝莓巧克力口味",
+          "seen": false
+        },
+        {
+          "base": 3461,
+          "img": "HeadIcon/3464.webp",
+          "name": "圣代甜甜_蓝莓草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3462,
+          "img": "HeadIcon/3461.webp",
+          "name": "圣代甜甜_蓝莓抹茶口味",
+          "seen": false
+        },
+        {
+          "base": 3463,
+          "img": "HeadIcon/3459.webp",
+          "name": "圣代甜甜_杨桃巧克力口味",
+          "seen": false
+        },
+        {
+          "base": 3464,
+          "img": "HeadIcon/3465.webp",
+          "name": "圣代甜甜_杨桃草莓口味",
+          "seen": false
+        },
+        {
+          "base": 3465,
+          "img": "HeadIcon/3462.webp",
+          "name": "圣代甜甜_杨桃抹茶口味",
+          "seen": false
+        },
+        {
           "base": 3466,
           "img": "HeadIcon/3466.webp",
           "name": "星云旅者",
+          "seen": false
+        },
+        {
+          "base": 3469,
+          "img": "HeadIcon/3469.webp",
+          "name": "皇家狮鹫_高山地的样子",
+          "seen": false
+        },
+        {
+          "base": 3470,
+          "img": "HeadIcon/3470.webp",
+          "name": "化蝶_幽冥眼的样子",
+          "seen": false
+        },
+        {
+          "base": 3471,
+          "img": "HeadIcon/3471.webp",
+          "name": "化蝶_喵喵的样子",
+          "seen": false
+        },
+        {
+          "base": 3472,
+          "img": "HeadIcon/3472.webp",
+          "name": "化蝶_奇丽花的样子",
           "seen": false
         },
         {
@@ -3355,9 +4069,27 @@
           "seen": false
         },
         {
+          "base": 3477,
+          "img": "HeadIcon/3477.webp",
+          "name": "千棘盔_磨损的样子",
+          "seen": false
+        },
+        {
+          "base": 3482,
+          "img": "HeadIcon/3482.webp",
+          "name": "幽冥眼_闭眼的样子",
+          "seen": false
+        },
+        {
           "base": 3485,
           "img": "HeadIcon/3485.webp",
           "name": "落陨星兔",
+          "seen": false
+        },
+        {
+          "base": 3486,
+          "img": "HeadIcon/3486.webp",
+          "name": "晶石蜗_烧蓝黄金的样子",
           "seen": false
         },
         {
@@ -3379,9 +4111,21 @@
           "seen": false
         },
         {
+          "base": 3498,
+          "img": "HeadIcon/3498.webp",
+          "name": "风滚暮虫_枯叶的样子",
+          "seen": false
+        },
+        {
           "base": 3499,
           "img": "HeadIcon/3499.webp",
-          "name": "公平鸽",
+          "name": "公平鸽_本来的样子",
+          "seen": false
+        },
+        {
+          "base": 3502,
+          "img": "HeadIcon/3108.webp",
+          "name": "石冠王蜥_球球尾巴的样子",
           "seen": false
         },
         {
@@ -3394,6 +4138,18 @@
           "base": 3510,
           "img": "HeadIcon/3510.webp",
           "name": "嗜波螺_本来的样子",
+          "seen": false
+        },
+        {
+          "base": 3513,
+          "img": "HeadIcon/3513.webp",
+          "name": "嗜波螺_被污染的样子",
+          "seen": false
+        },
+        {
+          "base": 3518,
+          "img": "HeadIcon/3057.webp",
+          "name": "水泡壳_蜕皮时的样子",
           "seen": false
         },
         {
@@ -3427,6 +4183,12 @@
           "seen": false
         },
         {
+          "base": 3541,
+          "img": "HeadIcon/3541.webp",
+          "name": "乌拉塔_极夜的样子",
+          "seen": false
+        },
+        {
           "base": 3546,
           "img": "HeadIcon/3546.webp",
           "name": "圣剑-X",
@@ -3454,6 +4216,30 @@
           "base": 3554,
           "img": "HeadIcon/3554.webp",
           "name": "棋祈督_白子",
+          "seen": false
+        },
+        {
+          "base": 3556,
+          "img": "HeadIcon/3556.webp",
+          "name": "棋骑士_黑子",
+          "seen": false
+        },
+        {
+          "base": 3557,
+          "img": "HeadIcon/3557.webp",
+          "name": "棋绮后_黑子",
+          "seen": false
+        },
+        {
+          "base": 3558,
+          "img": "HeadIcon/3558.webp",
+          "name": "棋齐垒_黑子",
+          "seen": false
+        },
+        {
+          "base": 3559,
+          "img": "HeadIcon/3559.webp",
+          "name": "棋祈督_黑子",
           "seen": false
         },
         {
@@ -3490,6 +4276,12 @@
           "base": 3583,
           "img": "HeadIcon/3585.webp",
           "name": "月亮砣_上弦的样子",
+          "seen": false
+        },
+        {
+          "base": 3585,
+          "img": "HeadIcon/3583.webp",
+          "name": "月亮砣_下弦的样子",
           "seen": false
         },
         {
@@ -3589,6 +4381,18 @@
           "seen": false
         },
         {
+          "base": 3742,
+          "img": "HeadIcon/3742.webp",
+          "name": "鸭吉吉_起来鸭",
+          "seen": false
+        },
+        {
+          "base": 3743,
+          "img": "HeadIcon/3743.webp",
+          "name": "加油蟹_单只海葵的样子",
+          "seen": false
+        },
+        {
           "base": 3745,
           "img": "HeadIcon/3745.webp",
           "name": "雅丹鬃",
@@ -3614,7 +4418,7 @@
         }
       ],
       "seen": 0,
-      "total": 154
+      "total": 199
     }
   ],
   "source": "客户端官方配置:BinDataCompressed/GRASS_TRIAL_{CONF,CHAPTER,EVENT,EFFECT,PERIOD,LOG}_CONF(CUE4Parse 解包,普通池/首领/章节/周期/词条均来自官方);第 7 层 NPC 阵容为玩家实测(wiki)透传",

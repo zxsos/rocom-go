@@ -1,6 +1,8 @@
 package gamedata
 
 import (
+	"fmt"
+	"sort"
 	"strconv"
 	"testing"
 )
@@ -31,11 +33,25 @@ func TestEggModelConf(t *testing.T) {
 	//
 	// model 只保证落在**宠物形态 id 空间**(能查到物种名),不保证有对应的蛋配置行 ——
 	// 实测 6 条指向了只有物种名、没有 PET_EGG_CONF 行的形态(地鼠 3020002、钨丝贝贝 3733001)。
+	//
+	// ⚠️ 2026-10 起多第三种情形:**模型存在、但没有形态名**。
+	// PET_EGG_CONF.model_id 指的是**模型 id**(MODEL_CONF),与 PET_CONF 的形态 id 不是
+	// 同一空间 —— 新物种护主犬(3870002)、公平鸽(3872002)的蛋写 model_id=3870001/3872001,
+	// 这两个 id 只在 MODEL_CONF 有行,PET_CONF 里没有对应形态行(游戏侧尚未补出基础形态)。
+	// 这类**不是回归**,故只统计并 t.Logf 列出;断言仍然要抓的是「模型根本不存在」。
+	// 判据用 db.models(MODEL_CONF 全集,见 gen_gamedata.py 的 models)而不是硬编码 id ——
+	// 硬编码会随版本增长而失效,那才是真正的噪音来源。
 	var self, aliased uint32
+	var modelOnly []string
 	for conf := range db.eggConf {
 		model := db.EggModelConf(conf)
-		if db.species[strconv.FormatUint(uint64(model), 10)] == "" {
-			t.Errorf("conf %d 的外形 model %d 在物种名表里查不到", conf, model)
+		key := strconv.FormatUint(uint64(model), 10)
+		if db.species[key] == "" {
+			if !db.models[key] {
+				t.Errorf("conf %d 的外形 model %d 在 MODEL_CONF 与物种名表里都查不到", conf, model)
+			} else {
+				modelOnly = append(modelOnly, fmt.Sprintf("conf %d → model %d", conf, model))
+			}
 			continue
 		}
 		switch {
@@ -44,6 +60,11 @@ func TestEggModelConf(t *testing.T) {
 		case model != conf && aliased == 0:
 			aliased = conf
 		}
+	}
+	if len(modelOnly) > 0 {
+		sort.Strings(modelOnly)
+		t.Logf("已知例外:%d 条蛋的 model 在 MODEL_CONF 有行但形态查不到名字(游戏侧未补形态行):%v",
+			len(modelOnly), modelOnly)
 	}
 	if self == 0 {
 		t.Error("没有任何外形自指的条目:基础形态的 model_id 应等于自身 id")
