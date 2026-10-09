@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/rocom-go/internal/wire"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
 )
 
 // tsf4gMark 是应用层 protobuf body 之后的 tsf4g 尾标记;解码在其前停止(见 docs/protocol.md)。

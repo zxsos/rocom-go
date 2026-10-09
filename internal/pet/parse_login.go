@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/rocom-go/internal/wire"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
 )
 
 // ParseLoginAccount 从 ZoneLoginRsp(opcode 0x0102)取玩家 user_id 与昵称。

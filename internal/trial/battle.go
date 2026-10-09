@@ -1,7 +1,7 @@
 package trial
 
 import (
-	"github.com/zxsos/rocom-go/internal/wire"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 

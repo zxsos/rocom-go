@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/rocom-go/internal/pb"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/pb"
 )
 
 // PetBoxLoc 是宠物在仓库盒子里的位置(box_id 从 1 起,slot 盒内格位从 0 起)。

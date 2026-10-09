@@ -3,7 +3,7 @@ package scene
 import (
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/rocom-go/internal/wire"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/wire"
 )
 
 // 眠枭之星的收集状态判定(见 docs/data.md 3.4)。

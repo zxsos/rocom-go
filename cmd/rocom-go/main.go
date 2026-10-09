@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zxsos/rocom-go/internal/capture"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/capture"
 	"github.com/zxsos/rocom-go/internal/gamedata"
 	"github.com/zxsos/rocom-go/internal/hy2"
 	"github.com/zxsos/rocom-go/internal/pipeline"

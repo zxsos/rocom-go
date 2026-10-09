@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/rocom-go/internal/gcp"
-	"github.com/zxsos/rocom-go/internal/pb"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/pb"
 	"github.com/zxsos/rocom-go/internal/pet"
 )
 

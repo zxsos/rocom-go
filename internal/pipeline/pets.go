@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/zxsos/rocom-go/internal/capture"
-	"github.com/zxsos/rocom-go/internal/gcp"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/capture"
+	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
 	"github.com/zxsos/rocom-go/internal/pet"
 	"github.com/zxsos/rocom-go/internal/store"
 )
