@@ -32,8 +32,11 @@ jobs:
       - name: Build Linux amd64
         run: CGO_ENABLED=1 GOARCH=amd64 go build -ldflags="-s -w" -o rocom-go-linux-amd64 ./cmd/rocom-go
       
+      - name: Install ARM64 cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      
       - name: Build Linux arm64
-        run: CGO_ENABLED=1 GOARCH=arm64 go build -ldflags="-s -w" -o rocom-go-linux-arm64 ./cmd/rocom-go
+        run: CGO_ENABLED=1 GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -ldflags="-s -w" -o rocom-go-linux-arm64 ./cmd/rocom-go
       
       - name: Check version matches tag
         id: check
