@@ -30,7 +30,7 @@ jobs:
           cd web && npm install && npm run build
       
       - name: Build Linux binary
-        run: CGO_ENABLED=1 go build -o rocom-go-linux-amd64 ./cmd/rocom-go
+        run: CGO_ENABLED=1 go build -ldflags="-s -w" -o rocom-go-linux-amd64 ./cmd/rocom-go
       
       - name: Check version matches tag
         id: check
