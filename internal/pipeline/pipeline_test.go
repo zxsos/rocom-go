@@ -7,9 +7,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/capture"
+	"github.com/zxsos/rocom-go-parse/capture"
 	"github.com/zxsos/rocom-go/internal/gamedata"
-	"github.com/zxsos/github.com/zxsos/rocom-go-parse/gcp"
+	"github.com/zxsos/rocom-go-parse/gcp"
 	"github.com/zxsos/rocom-go/internal/pet"
 	"github.com/zxsos/rocom-go/internal/scene"
 	"github.com/zxsos/rocom-go/internal/server"
