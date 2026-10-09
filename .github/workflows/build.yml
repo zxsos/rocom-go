@@ -49,4 +49,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: rocom-go-linux-amd64
+          name: Releases ${{ github.ref_name }}
           generate_release_notes: true
