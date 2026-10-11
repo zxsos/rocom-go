@@ -42,6 +42,13 @@ rocom-key.pem
 .idea/
 .vscode/
 
+# 临时脚本(截图/调试用完即删,不提交)
+*.tmp.mjs
+*.tmp.js
+
+# verify 脚本运行时生成的探针构建目录(用完即弃,不提交)
+web/scripts/__probe-*/
+
 # IDE 本地项目数据(勿提交)
 .codebuddy/
 
