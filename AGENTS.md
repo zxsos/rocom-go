@@ -137,6 +137,9 @@
 - **新增测试后要做变异测试**：故意注入缺陷(改错一个常量、去掉一行赋值、反转一个比较符),
   确认测试真的会失败。**不验证过的测试等于没有** —— 一个永远绿灯的测试只给人虚假的安全感。
   覆盖率数字本身说明不了这一点。
+- **CI 只有一套**:`.github/workflows/build.yml`(GitHub Actions)是唯一的流水线。
+  CNB 相关配置(`.cnb.yml`、`.ide/`)已于 2026-10 删除,不要再加回来;文档里如再出现
+  `cnb.cool` 镜像引用,视为过期内容直接删掉或换成本地构建。
 - `internal/pb/*.pb.go`、`internal/gamedata/data/names.json`、`internal/pbdesc/data/*` 为生成物，
   改动应改生成脚本而非手改。
 - 相关工具与开源项目清单见 [docs/reference.md](docs/reference.md)。

@@ -342,8 +342,7 @@ sudo ./scripts/deploy.sh --uninstall            # 卸载（默认保留数据，
 二进制，运行镜像只留 alpine + 证书（**约 106 MB**）。
 
 ```bash
-docker pull docker.cnb.cool/bangbang222/roco:latest   # 预构建，amd64，免登录
-docker build -t rocom-go .                             # 其它架构（ARM 等）从源码构建
+docker build -t rocom-go .   # 从源码构建(amd64/ARM 均可,约 106 MB)
 ```
 
 先选一种方式：**A. 局域网网关**（家里软路由/旁路由，手机流量必经它）用 `-iface <网卡>`；
@@ -355,13 +354,13 @@ docker build -t rocom-go .                             # 其它架构（ARM 等�
 docker run -d --name rocom-go --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW --network host \
   -e TZ=Asia/Shanghai -v rocom-data:/data \
-  docker.cnb.cool/bangbang222/roco:latest -iface auto
+  rocom-go -iface auto
 
 # B 云端 hy2 代理（放行 UDP 11443；bridge 模式需 -p 11443:11443/udp,host 模式不必）
 docker run -d --name rocom-go --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW --network host \
   -e TZ=Asia/Shanghai -v rocom-data:/data \
-  docker.cnb.cool/bangbang222/roco:latest -iface auto -skip-self-ip=false -tls
+  rocom-go -iface auto -skip-self-ip=false -tls
 ```
 
 `-iface auto` 读默认路由选网卡，`--network host` 下容器与宿主机共享路由表所以算得出来。
@@ -471,7 +470,7 @@ systemd 版是 `/etc/rocom.env`），可用 `-e ROCOM_ENV_FILE=/某路径` 改�
   ```bash
   docker run -d --name rocom-go-replay -p 4939:4939 \
     -v /path/to/pcap:/pcap:ro -v rocom-data:/data \
-    docker.cnb.cool/bangbang222/roco:latest -pcap /pcap/xxx.pcap
+    rocom-go -pcap /pcap/xxx.pcap
   ```
 
 ### 实测状态（诚实版）
