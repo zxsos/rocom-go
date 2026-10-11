@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/zxsos/rocom-go/internal/envfile"
@@ -92,11 +94,19 @@ func (s *Server) handleAdminWebAddrConfirm(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "不支持的请求方法", http.StatusMethodNotAllowed)
 		return
 	}
-	// 入参可有可无(空体也合法),故解析错误一律忽略:按「无交接码」处理。
+	// 入参可有可无(空体也合法),故空体按「无交接码」处理。
+	// 但 body 非空却解析失败时返回 400:否则「交接码 JSON 写错了」会被误判成
+	// 「没传交接码」,请求会滑进另一条鉴权路径(要求已登录),报错文不对题。
 	var req struct {
 		Handoff string `json:"handoff"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	body, _ := io.ReadAll(r.Body)
+	if len(bytes.TrimSpace(body)) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "参数解析失败", http.StatusBadRequest)
+			return
+		}
+	}
 	// 两条并存的路径:
 	//   - 带交接码:来自**新地址**那一次访问,它是「新地址可达」的证据,无需令牌
 	//     (新源上还没有管理员会话,令牌按源隔离 —— 见 ApplyPendingWithHandoff)
