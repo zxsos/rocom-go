@@ -489,6 +489,25 @@ h2 { font-family: var(--font-display); font-size: var(--text-h2); }
 h3 { font-size: var(--text-h3); }
 
 * { box-sizing: border-box; }
+/* 全局滚动条:细、圆角、跟主题走。
+   起因:移动端/窄屏浏览器用 overlay 细滚动条,看着现代;桌面端 fallback 到系统
+   原生宽滚动条(Windows 下那条灰色粗条),和深色主题格格不入。这里统一收成细条:
+   轨道透明(不抢背景)、滑块用 --line(和分割线同一灰度,存在感弱)、hover 时加深
+   到 --fg-dim 给反馈。圆角 8px + 2px 透明边框是「细但好点」的折中:整条 10px 宽,
+   实际色块 6px,和 macOS overlay 条视觉一致。
+   Firefox 走 scrollbar-width/color 标准属性;Chromium/Safari/Edge 走 ::-webkit-*。
+   移动端浏览器基本忽略这两套(继续用 overlay),故这段只影响桌面端 —— 正是目标。 */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); background-clip: content-box; }
 /* 禁用移动端点按高亮:默认的 -webkit-tap-highlight-color 会在触摸按钮时闪一个
    灰色半透明方形框(点击一次闪一下,和 :active 反馈叠加很难看)。
    触控反馈改由各控件自己的 :active 变换(scale 回弹)承担,这里清掉原生残留。
